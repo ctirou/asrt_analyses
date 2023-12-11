@@ -1,11 +1,10 @@
 from pathlib import Path
 
-
 # Path definitions
 USER = 'coum'
 # USER = 'romain'
 
-if USER == 'Coum':
+if USER == 'coum':
     RAW_DATA_DIR = '/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt/raws'
     DATA_DIR = '/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt/preprocessed'
     RESULTS_DIR = '/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt/results'
