@@ -2,8 +2,8 @@ from pathlib import Path
 
 
 # Path definitions
-USER = 'Coum'
-# USER = 'Romain'
+USER = 'coum'
+# USER = 'romain'
 
 if USER == 'Coum':
     RAW_DATA_DIR = '/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt/raws'
