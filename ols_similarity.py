@@ -20,12 +20,12 @@ from tqdm.auto import tqdm
 from sklearn.covariance import LedoitWolf
 from mne.beamformer import make_lcmv, apply_lcmv_epochs
 import seaborn as sns
+from config import DATA_DIR, RESULTS_DIR, FREESURFER_DIR
 
 method = 'lcmv'
 lock = 'stim'
 trial_type = 'pattern'
 
-subjects_dir = op.join("./freesurfer/")
 
 def decod_stats(X):
     from mne.stats import permutation_cluster_1samp_test
@@ -45,8 +45,9 @@ def decod_stats(X):
 
     return np.squeeze(p_values_)
 
-data_path = '/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt/preprocessed'
-res_path = '/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt/results'
+data_path = DATA_DIR
+res_path = RESULTS_DIR
+subjects_dir = FREESURFER_DIR
 
 if not op.exists(op.join(res_path, 'figures', lock, 'similarity')):
     os.makedirs(op.join(res_path, 'figures', lock, 'similarity'))
@@ -56,15 +57,9 @@ figures = op.join(res_path, 'figures', lock, 'similarity')
 subjects = ['sub01', 'sub02', 'sub04', 'sub07', 'sub08', 'sub09',
             'sub10', 'sub12', 'sub13', 'sub14', 'sub15']
 
-subjects = ['sub01']
-
 epochs_list = ['2_PRACTICE', '3_EPOCH_1', '4_EPOCH_2', '5_EPOCH_3', '6_EPOCH_4']
 
-epochs_list = ['3_EPOCH_1']
-
-# for lab in range(34):
-# for lab in range(17, 34):
-for lab in range(1):
+for lab in range(34):
     
     all_in_seqs, all_out_seqs = [], []
     
@@ -96,7 +91,6 @@ for lab in range(1):
 
         # loop across sessions
         for epoch_num, epo in enumerate(epochs_list):
-        # for epoch_num, epo in zip([1], epochs_list):
         
             if epo == '2_PRACTICE':
                 epo_fname = 'prac'
@@ -272,5 +266,5 @@ for lab in range(1):
     plt.fill_between(times, 0, diff_inout[:, 1:5, :].mean((0, 1)), where=sig, color='C3', alpha=0.3)
     plt.legend()
     # plt.show()
-    # plt.savefig(op.join(figures, 'all_epochs_%s_%s.png' % (trial_type, label.name)))
+    plt.savefig(op.join(figures, 'all_epochs_%s_%s.png' % (trial_type, label.name)))
     # plt.close()

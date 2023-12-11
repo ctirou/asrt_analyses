@@ -21,13 +21,10 @@ from autoreject import AutoReject, Ransac
 import sys
 import pandas as pd
 import warnings
+from config import RAW_DATA_DIR, DATA_DIR
 
 subjects = ['sub01', 'sub02', 'sub04', 'sub07', 'sub08', 'sub09',
             'sub10', 'sub12', 'sub13', 'sub14', 'sub15']
-
-subjects = ['sub13', 'sub14', 'sub15']
-
-subjects = ['sub01']
 
 # To run on cluster
 # path = '/sps/crnl/Romain/ASRT_MEG/data/preprocessed'
@@ -41,10 +38,8 @@ def int_to_unicode(array):
 mode_ICA = False
 
 # Set path
-path = '/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt/preprocessed'
-path_data = '/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt/raws'
-path_results = '/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt/results'
-
+path = DATA_DIR
+path_data = RAW_DATA_DIR
 
 all_epochs_stim = list()
 all_epochs_button = list()
