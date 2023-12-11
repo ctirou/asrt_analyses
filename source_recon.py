@@ -5,6 +5,7 @@ import pandas as pd
 import mne
 from mne.beamformer import make_lcmv, apply_lcmv
 import autoreject
+from config import DATA_DIR, FREESURFER_DIR, RESULTS_DIR
 
 method = 'lcmv'
 lock = 'stim'
@@ -13,9 +14,10 @@ trial_type = 'pattern'
 movie = False
 overwrite = True
 
-data_path = './preprocessed'
-subjects_dir = op.join('./freesurfer')
-res_path = op.join('./results')
+data_path = DATA_DIR
+subjects_dir = FREESURFER_DIR
+res_path = RESULTS_DIR
+
 if not op.exists(res_path):
     os.mkdir(res_path)
 
