@@ -9,16 +9,9 @@ import os
 import os.path as op
 import numpy as np
 import mne
-import matplotlib as mpl
-import matplotlib.pyplot as plt
-from mne import Epochs, pick_types
-from mne.epochs import concatenate_epochs
-from mne.viz.utils import plt_show
 from mne.preprocessing import ICA
 from Levenshtein import editops
-from pathlib import Path
 from autoreject import AutoReject, Ransac
-import sys
 import pandas as pd
 import warnings
 from config import RAW_DATA_DIR, DATA_DIR

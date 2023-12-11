@@ -2,23 +2,11 @@ import os.path as op
 import os
 import numpy as np
 import mne
-import pandas as pd
-from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import make_pipeline
-from mne.decoding import SlidingEstimator, cross_val_multiscore
-from sklearn.model_selection import StratifiedKFold
 import matplotlib.pyplot as plt
 from scipy.spatial.distance import mahalanobis, euclidean, pdist, squareform
 from scipy.stats import ttest_1samp
-from itertools import cycle
 from mne.decoding import UnsupervisedSpatialFilter
 from sklearn.decomposition import PCA
-import scipy.stats
-import statsmodels.api as sm
-from tqdm.auto import tqdm
-from sklearn.covariance import LedoitWolf
-from mne.beamformer import make_lcmv, apply_lcmv_epochs
 from config import DATA_DIR, RESULTS_DIR, FREESURFER_DIR
 
 method = 'lcmv'
