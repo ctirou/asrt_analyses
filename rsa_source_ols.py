@@ -3,16 +3,24 @@ import os
 import numpy as np
 import mne
 import pandas as pd
+from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import make_pipeline
+from mne.decoding import SlidingEstimator, cross_val_multiscore
+from sklearn.model_selection import StratifiedKFold
 import matplotlib.pyplot as plt
 from scipy.spatial.distance import mahalanobis, euclidean, pdist, squareform
 from scipy.stats import ttest_1samp
+from itertools import cycle
+from mne.decoding import UnsupervisedSpatialFilter
+from sklearn.decomposition import PCA
 import scipy.stats
 import statsmodels.api as sm
 from tqdm.auto import tqdm
 from sklearn.covariance import LedoitWolf
 from mne.beamformer import make_lcmv, apply_lcmv_epochs
 import seaborn as sns
-from config import DATA_DIR, RESULTS_DIR, FREESURFER_DIR
+from config import RAW_DATA_DIR, DATA_DIR, RESULTS_DIR, FREESURFER_DIR
 
 method = 'lcmv'
 lock = 'stim'
@@ -57,7 +65,7 @@ for lab in range(34):
     
     for subject in subjects:
         # Read the behav file to get the sequence 
-        behav_dir = "./raws/%s/behav_data/" % (subject)
+        behav_dir = op.join(RAW_DATA_DIR, "%s/behav_data/" % (subject)) 
         behav_files = [f for f in os.listdir(behav_dir) if (not f.startswith('.') and ('_eASRT_Epoch_' in f))]
         behav = open(op.join(behav_dir, behav_files[0]), 'r')
         lines = behav.readlines()
