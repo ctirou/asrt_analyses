@@ -44,9 +44,8 @@ def decod_stats(X):
 
     return np.squeeze(p_values_)
 
-raw_behavs ='./raws/behav'
-data_path = './preprocessed'
-res_path = './results'
+data_path = '/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt/preprocessed'
+res_path = '/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt/results'
 
 if not op.exists(op.join(res_path, 'figures', lock, 'similarity')):
     os.makedirs(op.join(res_path, 'figures', lock, 'similarity'))
