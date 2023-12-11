@@ -232,5 +232,5 @@ plt.fill_between(times, 0, diff_inout[:, 1:5, :].mean((0, 1)), where=sig_unc, co
 plt.fill_between(times, 0, diff_inout[:, 1:5, :].mean((0, 1)), where=sig, color='C3', alpha=0.3)
 plt.legend()
 # plt.show()
-plt.savefig(op.join(figures, 'all_epochs_%s_%s.png' % (trial_type, label.name)))
+plt.savefig(op.join(figures, 'all_epochs_%s.png' % (trial_type)))
 # plt.close()
