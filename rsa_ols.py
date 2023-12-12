@@ -26,6 +26,7 @@ method = 'lcmv'
 lock = 'stim'
 trial_type = 'pattern'
 
+do_pca = True
 
 def decod_stats(X):
     from mne.stats import permutation_cluster_1samp_test
@@ -104,7 +105,14 @@ for subject in subjects:
             epoch_fname = op.join(data_path, "%s/%s_%s_s-epo.fif" % (lock, subject, epoch_num))
         epoch = mne.read_epochs(epoch_fname)
         times = epoch.times              
-                    
+        if do_pca:
+            n_component = 30    
+            pca = UnsupervisedSpatialFilter(PCA(n_component), average=False)
+            pca_data = pca.fit_transform(epoch.get_data())
+            sampling_freq = epoch.info['sfreq']
+            info = mne.create_info(n_component, ch_types='mag', sfreq=sampling_freq)
+            epoch = mne.EpochsArray(pca_data, info = info, events=epoch.events, event_id=epoch.event_id)
+
         # Prepare the design matrix                        
         ntrials = len(epoch)
         nconditions = 4
@@ -210,7 +218,6 @@ all_in_seqs = np.array(all_in_seqs)
 all_out_seqs = np.array(all_out_seqs)
 
 diff_inout = all_in_seqs.mean(axis=1) - all_out_seqs.mean(axis=1)
-times = epoch.times
 
 # with sns.plotting_context("talk"): 
 # plot the difference in vs. out sequence averaging all epochs
@@ -232,5 +239,5 @@ plt.fill_between(times, 0, diff_inout[:, 1:5, :].mean((0, 1)), where=sig_unc, co
 plt.fill_between(times, 0, diff_inout[:, 1:5, :].mean((0, 1)), where=sig, color='C3', alpha=0.3)
 plt.legend()
 # plt.show()
-plt.savefig(op.join(figures, 'all_epochs_%s.png' % (trial_type)))
-# plt.close()
+plt.savefig(op.join(figures, 'all_epochs_ols_%s.png' % (trial_type)))
+plt.close()

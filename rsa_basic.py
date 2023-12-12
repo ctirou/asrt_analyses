@@ -48,8 +48,8 @@ do_pca = True
 
 all_in_seqs = list()
 all_out_seqs = list()
-# for trial_type in ['all', 'pattern', 'random']:
-for trial_type in ['pattern']:
+for trial_type in ['all', 'pattern', 'random']:
+# for trial_type in ['pattern']:
     all_in_seqs = list()
     all_out_seqs = list()
     for subject in subjects:
@@ -78,6 +78,7 @@ for trial_type in ['pattern']:
             behav = pd.read_pickle(op.join(path_data, 'behav', f'{subject}_{epoch_num}.pkl'))
             epoch_fname = op.join(path_data, "%s/%s_%s_s-epo.fif" % (lock, subject, epoch_num))
             epochs = mne.read_epochs(epoch_fname)
+            times = epochs.times
             if do_pca:
                 n_component = 30    
                 pca = UnsupervisedSpatialFilter(PCA(n_component), average=False)
@@ -172,7 +173,6 @@ for trial_type in ['pattern']:
     all_out_seqs = np.array(all_out_seqs)
 
     diff_inout = all_in_seqs.mean(axis=1) - all_out_seqs.mean(axis=1)
-    times = epochs.times
 
     # plot the similarity evolution for inseq and outseq
     plt.plot(times, all_in_seqs[:, :, 0, :].mean(axis=(0, 1)), label='practice', color='C1', alpha=0.3)
