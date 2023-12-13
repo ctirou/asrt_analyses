@@ -20,7 +20,7 @@ from tqdm.auto import tqdm
 from sklearn.covariance import LedoitWolf
 from mne.beamformer import make_lcmv, apply_lcmv_epochs
 import seaborn as sns
-from config import RAW_DATA_DIR, DATA_DIR, RESULTS_DIR, FREESURFER_DIR
+from config import DATA_DIR, RESULTS_DIR, FREESURFER_DIR
 
 method = 'lcmv'
 lock = 'stim'
@@ -65,19 +65,19 @@ all_in_seqs, all_out_seqs = [], []
 
 for subject in subjects:
     # Read the behav file to get the sequence 
-    behav_dir = op.join(RAW_DATA_DIR, "%s/behav_data/" % (subject)) 
-    behav_files = [f for f in os.listdir(behav_dir) if (not f.startswith('.') and ('_eASRT_Epoch_' in f))]
-    behav = open(op.join(behav_dir, behav_files[0]), 'r')
-    lines = behav.readlines()
-    column_names = lines[0].split()
-    sequence = list()
-    for line in lines[1:]:
-            trialtype = int(line.split()[column_names.index('trialtype')])
-            if trialtype == 1:
-                sequence.append(int(line.split()[column_names.index('position')]))
-            if len(sequence) == 4:
-                break
-    
+    # behav_dir = op.join(RAW_DATA_DIR, "%s/behav_data/" % (subject)) 
+    # behav_files = [f for f in os.listdir(behav_dir) if (not f.startswith('.') and ('_eASRT_Epoch_' in f))]
+    # behav = open(op.join(behav_dir, behav_files[0]), 'r')
+    # lines = behav.readlines()
+    # column_names = lines[0].split()
+    # sequence = list()
+    # for line in lines[1:]:
+    #         trialtype = int(line.split()[column_names.index('trialtype')])
+    #         if trialtype == 1:
+    #             sequence.append(int(line.split()[column_names.index('position')]))
+    #         if len(sequence) == 4:
+    #             break
+        
     # create lists of possible combinations between stimuli
     one_two_similarities = list()
     one_three_similarities = list()
@@ -112,7 +112,13 @@ for subject in subjects:
             sampling_freq = epoch.info['sfreq']
             info = mne.create_info(n_component, ch_types='mag', sfreq=sampling_freq)
             epoch = mne.EpochsArray(pca_data, info = info, events=epoch.events, event_id=epoch.event_id)
-
+        
+        epoch_pat = epoch[np.where(behav["trialtypes"]==1)].get_data().mean(axis=0)
+        behav_pat = behav[behav["trialtypes"]==1]
+        assert len(epoch_pat) == len(behav_pat)
+        
+        epoch, behav = epoch_pat, behav_pat
+        
         # Prepare the design matrix                        
         ntrials = len(epoch)
         nconditions = 4
@@ -121,10 +127,12 @@ for subject in subjects:
         for icondi, condi in enumerate(behav["positions"]):            
             # assert isinstance(condi, np.int64) 
             design_matrix[icondi, condi-1] = 1
-
+        assert np.sum(design_matrix.sum(axis=1) == 1) == len(epoch)        
+       
         # Run OLS
         # z-score the data
-        meg_data_V = epoch.get_data()
+        # meg_data_V = epoch.get_data()
+        meg_data_V = epoch
         _, nchs, ntimes = meg_data_V.shape
         meg_data_V = scipy.stats.zscore(meg_data_V, axis=0)
 
@@ -192,7 +200,14 @@ for subject in subjects:
     one_four_similarities = np.array(one_four_similarities)   
     two_three_similarities = np.array(two_three_similarities)  
     two_four_similarities = np.array(two_four_similarities)   
-    three_four_similarities = np.array(three_four_similarities) 
+    three_four_similarities = np.array(three_four_similarities)
+    
+    sequence = list()
+    for _, row in behav.iterrows():
+        if row["trialtypes"] == 1:
+            sequence.append(int(row["positions"]))
+        if len(sequence) == 4:
+            break
 
     pairs_in_sequence = list()
     pairs_in_sequence.append(str(sequence[0]) + str(sequence[1]))
