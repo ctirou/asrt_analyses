@@ -3,23 +3,14 @@ import os
 import numpy as np
 import mne
 import pandas as pd
-from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import make_pipeline
-from mne.decoding import SlidingEstimator, cross_val_multiscore
-from sklearn.model_selection import StratifiedKFold
 import matplotlib.pyplot as plt
-from scipy.spatial.distance import mahalanobis, euclidean, pdist, squareform
+from scipy.spatial.distance import pdist, squareform
 from scipy.stats import ttest_1samp
-from itertools import cycle
-from mne.decoding import UnsupervisedSpatialFilter
-from sklearn.decomposition import PCA
 import scipy.stats
 import statsmodels.api as sm
 from tqdm.auto import tqdm
 from sklearn.covariance import LedoitWolf
 from mne.beamformer import make_lcmv, apply_lcmv_epochs
-import seaborn as sns
 from config import RAW_DATA_DIR, DATA_DIR, RESULTS_DIR, FREESURFER_DIR
 
 method = 'lcmv'
@@ -138,7 +129,13 @@ for lab in range(34):
             stcs_data = np.array(stcs_data)
             
             del fwd
-            
+
+            epoch_pat = epoch[np.where(behav["trialtypes"]==1)].get_data().mean(axis=0)
+            behav_pat = behav[behav["trialtypes"]==1]
+            assert len(epoch_pat) == len(behav_pat)
+        
+            epoch, behav = epoch_pat, behav_pat
+        
             # Prepare the design matrix                        
             ntrials = len(stcs_data)
             nconditions = 4
@@ -250,14 +247,8 @@ for lab in range(34):
     # plot the difference in vs. out sequence averaging all epochs
     plt.figure(figsize=(12.8, 7.2))
     plt.plot(times, diff_inout[:, 0, :].mean(0), label='practice', color='C7', alpha=0.6)
-    # plt.plot(times, diff_inout[:, 1, :].mean(0), label='block_1', color='C1', alpha=0.6)
-    # plt.plot(times, diff_inout[:, 2, :].mean(0), label='block_2', color='C2', alpha=0.6)
-    # plt.plot(times, diff_inout[:, 3, :].mean(0), label='block_3', color='C3', alpha=0.6)
-    # plt.plot(times, diff_inout[:, 4, :].mean(0), label='block_4', color='C4', alpha=0.6)
     plt.plot(times, diff_inout[:, 1:5, :].mean((0, 1)), label='learning', color='C1', alpha=0.6)
-    # plt.plot(times, diff_inout[:, 0:, :].mean((0, 1)), label='learning', color='C1', alpha=0.6)
     diff = diff_inout[:, 1:5, :].mean((1)) - diff_inout[:, 0, :]
-    # diff = diff_inout[:, 3, :] - diff_inout[:, 0, :]
     p_values_unc = ttest_1samp(diff, axis=0, popmean=0)[1]
     sig_unc = p_values_unc < 0.05
     p_values = decod_stats(diff)
@@ -267,4 +258,15 @@ for lab in range(34):
     plt.legend()
     # plt.show()
     plt.savefig(op.join(figures, 'all_epochs_%s_%s.png' % (trial_type, label.name)))
-    # plt.close()
+    plt.close()
+    
+    # plot the difference in vs. out sequence across epochs
+    plt.figure(figsize=(12.8, 7.2))
+    plt.plot(times, diff_inout[:, 0, :].mean(0), label='practice', color='C7', alpha=0.6)
+    plt.plot(times, diff_inout[:, 1, :].mean(0), label='block_1', color='C1', alpha=0.6)
+    plt.plot(times, diff_inout[:, 2, :].mean(0), label='block_2', color='C2', alpha=0.6)
+    plt.plot(times, diff_inout[:, 3, :].mean(0), label='block_3', color='C3', alpha=0.6)
+    plt.plot(times, diff_inout[:, 4, :].mean(0), label='block_4', color='C4', alpha=0.6)
+    plt.legend()
+    plt.savefig(op.join(figures, 'blocks_ols_%s.png' % (trial_type)))
+    plt.close()
