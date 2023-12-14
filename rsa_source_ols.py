@@ -127,15 +127,17 @@ for lab in range(34):
             for stc in stcs:
                 stcs_data.append(stc.in_label(label).data)
             stcs_data = np.array(stcs_data)
+            assert len(stcs_data) == len(behav)
             
             del fwd
 
-            epoch_pat = epoch[np.where(behav["trialtypes"]==1)].get_data().mean(axis=0)
+            behav = behav.reset_index()
             behav_pat = behav[behav["trialtypes"]==1]
-            assert len(epoch_pat) == len(behav_pat)
+            pat_data = stcs_data[np.where(behav["trialtypes"]==1)[0]]
+            assert len(pat_data) == len(behav_pat)
         
-            epoch, behav = epoch_pat, behav_pat
-        
+            stcs_data, behav = pat_data, behav_pat
+            
             # Prepare the design matrix                        
             ntrials = len(stcs_data)
             nconditions = 4
@@ -259,8 +261,8 @@ for lab in range(34):
     # plt.show()
     plt.savefig(op.join(figures, 'all_epochs_%s_%s.png' % (trial_type, label.name)))
     plt.close()
-    
-    # plot the difference in vs. out sequence across epochs
+
+    # plot per sessions
     plt.figure(figsize=(12.8, 7.2))
     plt.plot(times, diff_inout[:, 0, :].mean(0), label='practice', color='C7', alpha=0.6)
     plt.plot(times, diff_inout[:, 1, :].mean(0), label='block_1', color='C1', alpha=0.6)
@@ -268,5 +270,5 @@ for lab in range(34):
     plt.plot(times, diff_inout[:, 3, :].mean(0), label='block_3', color='C3', alpha=0.6)
     plt.plot(times, diff_inout[:, 4, :].mean(0), label='block_4', color='C4', alpha=0.6)
     plt.legend()
-    plt.savefig(op.join(figures, 'blocks_ols_%s.png' % (trial_type)))
+    plt.savefig(op.join(figures, 'per_block_%s_%s.png' % (trial_type, label.name)))
     plt.close()
