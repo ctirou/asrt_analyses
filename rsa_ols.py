@@ -3,30 +3,23 @@ import os
 import numpy as np
 import mne
 import pandas as pd
-from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import make_pipeline
-from mne.decoding import SlidingEstimator, cross_val_multiscore
-from sklearn.model_selection import StratifiedKFold
 import matplotlib.pyplot as plt
-from scipy.spatial.distance import mahalanobis, euclidean, pdist, squareform
+from scipy.spatial.distance import pdist, squareform
 from scipy.stats import ttest_1samp
-from itertools import cycle
 from mne.decoding import UnsupervisedSpatialFilter
 from sklearn.decomposition import PCA
 import scipy.stats
 import statsmodels.api as sm
 from tqdm.auto import tqdm
 from sklearn.covariance import LedoitWolf
-from mne.beamformer import make_lcmv, apply_lcmv_epochs
-import seaborn as sns
-from config import RAW_DATA_DIR, DATA_DIR, RESULTS_DIR, FREESURFER_DIR
+import random
+from config import RAW_DATA_DIR, DATA_DIR, RESULTS_DIR, FREESURFER_DIR, SUBJS
 
 method = 'lcmv'
 lock = 'stim'
 trial_type = 'pattern'
 
-do_pca = True
+do_pca = False
 
 def decod_stats(X):
     from mne.stats import permutation_cluster_1samp_test
@@ -55,14 +48,15 @@ if not op.exists(op.join(res_path, 'figures', lock, 'similarity')):
 
 figures = op.join(res_path, 'figures', lock, 'similarity')
 
-subjects = ['sub01', 'sub02', 'sub04', 'sub07', 'sub08', 'sub09',
-            'sub10', 'sub12', 'sub13', 'sub14', 'sub15']
+subjects = SUBJS
 
 epochs_list = ['2_PRACTICE', '3_EPOCH_1', '4_EPOCH_2', '5_EPOCH_3', '6_EPOCH_4']
 
 all_in_seqs, all_out_seqs = [], []
 
 for subject in subjects:
+    
+    # all_in_seqs, all_out_seqs = [], []
     
     # Read the behav file to get the sequence 
     behav_dir = op.join(RAW_DATA_DIR, "%s/behav_data/" % (subject)) 
@@ -77,6 +71,7 @@ for subject in subjects:
                 sequence.append(int(line.split()[column_names.index('position')]))
             if len(sequence) == 4:
                 break
+    # random.shuffle(sequence)
         
     # create lists of possible combinations between stimuli
     one_two_similarities = list()
@@ -88,6 +83,7 @@ for subject in subjects:
     
     # loop across sessions
     for epoch_num, epo in enumerate(epochs_list):
+    # for epoch_num, epo in zip([2], epochs_list):
                     
         if epo == '2_PRACTICE':
             epo_fname = 'prac'
@@ -163,6 +159,12 @@ for subject in subjects:
             rdm = squareform(pdist(response, metric="mahalanobis", VI=VI))
             assert ~np.isnan(rdm).all()
             rdm_times[:, :, itime] = rdm
+        
+        rdm_dir = op.join(RESULTS_DIR, "rdms", "sensors", subject)
+        if not op.exists(rdm_dir):
+            os.makedirs(rdm_dir)
+        rdm_fname = "rdm_%s.npy" % str(epoch_num)
+        np.save(op.join(rdm_dir, rdm_fname), rdm_times)
                 
         rdmx = rdm_times
         
@@ -208,28 +210,56 @@ for subject in subjects:
     pairs_in_sequence.append(str(sequence[2]) + str(sequence[3]))
     pairs_in_sequence.append(str(sequence[3]) + str(sequence[0]))
 
-    in_seq = list()
-    out_seq = list()
-    pairs = ['12', '13', '14', '23', '24', '34']
-    rev_pairs = ['21', '31', '41', '32', '42', '43']
+    in_seq, out_seq = [], []
     similarities = [one_two_similarities, one_three_similarities, one_four_similarities,
                     two_three_similarities, two_four_similarities, three_four_similarities]
+    
+    # plt.figure(figsize=(16, 7))
+    # plt.plot(times, one_two_similarities.mean(0), label="one_two")
+    # plt.plot(times, one_three_similarities.mean(0), label="one_three")
+    # plt.plot(times, one_four_similarities.mean(0), label="one_four")
+    # plt.plot(times, two_three_similarities.mean(0), label="two_three")
+    # plt.plot(times, two_four_similarities.mean(0), label="two_four")
+    # plt.plot(times, three_four_similarities.mean(0), label="three_four")
+    # plt.legend()
+    # plt.title("%s_%s" % (sequence, subject))
+    # plt.savefig(op.join(figures, 'sims_%s.png' % (subject)))
+    # plt.close()
+    
+    pairs = ['12', '13', '14', '23', '24', '34']
+    rev_pairs = ['21', '31', '41', '32', '42', '43']
+                        
     for pair, rev_pair, similarity in zip(pairs, rev_pairs, similarities):
         if ((pair in pairs_in_sequence) or (rev_pair in pairs_in_sequence)):
+            # print(pair)
+            # print(rev_pair)
             in_seq.append(similarity)
         else: 
             out_seq.append(similarity)
     all_in_seqs.append(np.array(in_seq))
     all_out_seqs.append(np.array(out_seq))
+    
+    all_in_seqs = np.array(all_in_seqs)
+    all_out_seqs = np.array(all_out_seqs)
 
+    diff_inout = all_in_seqs.mean(axis=1) - all_out_seqs.mean(axis=1)
+
+    plt.figure(figsize=(15, 7))
+    plt.plot(times, all_out_seqs.mean((0, 1, 2)), label="out_seq")
+    plt.plot(times, all_in_seqs.mean((0, 1, 2)), label="in_seq")
+    plt.plot(times, diff_inout[:, 0, :].mean(0), label='diff')
+    plt.legend()
+    plt.title("in/out_%s" % (subject))
+    plt.savefig(op.join(figures, "in_out_%s" % (subject)))
+    plt.close()
+    
 all_in_seqs = np.array(all_in_seqs)
 all_out_seqs = np.array(all_out_seqs)
 
 diff_inout = all_in_seqs.mean(axis=1) - all_out_seqs.mean(axis=1)
 
-# with sns.plotting_context("talk"): 
 # plot the difference in vs. out sequence averaging all epochs
-plt.figure(figsize=(12.8, 7.2))
+plt.figure(figsize=(15, 7))
 plt.plot(times, diff_inout[:, 0, :].mean(0), label='practice', color='C7', alpha=0.6)
 plt.plot(times, diff_inout[:, 1:5, :].mean((0, 1)), label='learning', color='C1', alpha=0.6)
 diff = diff_inout[:, 1:5, :].mean((1)) - diff_inout[:, 0, :]
@@ -240,16 +270,16 @@ sig = p_values < 0.05
 plt.fill_between(times, 0, diff_inout[:, 1:5, :].mean((0, 1)), where=sig_unc, color='C2', alpha=0.2)
 plt.fill_between(times, 0, diff_inout[:, 1:5, :].mean((0, 1)), where=sig, color='C3', alpha=0.3)
 plt.legend()
-plt.savefig(op.join(figures, 'all_epochs_ols_%s.png' % (trial_type)))
+plt.savefig(op.join(figures, 'all_ols_%s_no_seq_pca.png' % (trial_type)))
 plt.close()
 
 # plot the difference in vs. out sequence across epochs
-plt.figure(figsize=(12.8, 7.2))
-plt.plot(times, diff_inout[:, 0, :].mean(0), label='practice', color='C7', alpha=0.6)
-plt.plot(times, diff_inout[:, 1, :].mean(0), label='block_1', color='C1', alpha=0.6)
-plt.plot(times, diff_inout[:, 2, :].mean(0), label='block_2', color='C2', alpha=0.6)
-plt.plot(times, diff_inout[:, 3, :].mean(0), label='block_3', color='C3', alpha=0.6)
-plt.plot(times, diff_inout[:, 4, :].mean(0), label='block_4', color='C4', alpha=0.6)
-plt.legend()
-plt.savefig(op.join(figures, 'blocks_ols_%s.png' % (trial_type)))
-plt.close()
+# plt.figure(figsize=(12.8, 7.2))
+# plt.plot(times, diff_inout[:, 0, :].mean(0), label='practice', color='C7', alpha=0.6)
+# plt.plot(times, diff_inout[:, 1, :].mean(0), label='block_1', color='C1', alpha=0.6)
+# plt.plot(times, diff_inout[:, 2, :].mean(0), label='block_2', color='C2', alpha=0.6)
+# plt.plot(times, diff_inout[:, 3, :].mean(0), label='block_3', color='C3', alpha=0.6)
+# plt.plot(times, diff_inout[:, 4, :].mean(0), label='block_4', color='C4', alpha=0.6)
+# plt.legend()
+# plt.savefig(op.join(figures, 'blocks_ols_%s.png' % (trial_type)))
+# plt.close()
