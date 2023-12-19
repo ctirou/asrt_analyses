@@ -7,19 +7,14 @@ import matplotlib.pyplot as plt
 from scipy.spatial.distance import pdist, squareform
 from scipy.stats import ttest_1samp
 from mne.decoding import UnsupervisedSpatialFilter
-from sklearn.decomposition import PCA
 import scipy.stats
 import statsmodels.api as sm
 from tqdm.auto import tqdm
 from sklearn.covariance import LedoitWolf
-import random
 from config import RAW_DATA_DIR, DATA_DIR, RESULTS_DIR, FREESURFER_DIR, SUBJS
 
-method = 'lcmv'
 lock = 'stim'
 trial_type = 'pattern'
-
-do_pca = False
 
 def decod_stats(X):
     from mne.stats import permutation_cluster_1samp_test
@@ -101,13 +96,6 @@ for subject in subjects:
             epoch_fname = op.join(data_path, "%s/%s_%s_s-epo.fif" % (lock, subject, epoch_num))
         epoch = mne.read_epochs(epoch_fname)
         times = epoch.times              
-        if do_pca:
-            n_component = 30    
-            pca = UnsupervisedSpatialFilter(PCA(n_component), average=False)
-            pca_data = pca.fit_transform(epoch.get_data())
-            sampling_freq = epoch.info['sfreq']
-            info = mne.create_info(n_component, ch_types='mag', sfreq=sampling_freq)
-            epoch = mne.EpochsArray(pca_data, info = info, events=epoch.events, event_id=epoch.event_id)
         
         epoch_pat = epoch[np.where(behav["trialtypes"]==1)].get_data().mean(axis=0)
         behav_pat = behav[behav["trialtypes"]==1]
