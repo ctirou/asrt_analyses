@@ -97,8 +97,6 @@ for subject in subjects:
                         
     for pair, rev_pair, similarity in zip(pairs, rev_pairs, similarities):
         if ((pair in pairs_in_sequence) or (rev_pair in pairs_in_sequence)):
-            # print(pair)
-            # print(rev_pair)
             in_seq.append(similarity)
         else: 
             out_seq.append(similarity)

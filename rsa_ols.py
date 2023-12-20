@@ -129,14 +129,14 @@ for subject in subjects:
                 model = sm.OLS(endog=y, exog=design_matrix, missing="raise")
                 results = model.fit()
                 
-                coefs[:, ich, itime] = results.params
-                resids[:, ich, itime] = results.resid
+                coefs[:, ich, itime] = results.params # (4, 248, 163)
+                resids[:, ich, itime] = results.resid # (ntrials, 248, 163)
         
         # Calculate pairwise mahalanobis distance between regression coefficients        
         rdm_times = np.zeros((nconditions, nconditions, ntimes))
         for itime in tqdm(range(ntimes)):
-            response = coefs[:, :, itime]
-            residuals = resids[:, :, itime]
+            response = coefs[:, :, itime] # (4, 248)
+            residuals = resids[:, :, itime] # (51, 248)
             
             # Estimate covariance from residuals
             lw_shrinkage = LedoitWolf(assume_centered=True)
@@ -146,13 +146,29 @@ for subject in subjects:
             VI = np.linalg.inv(cov.covariance_) # covariance matrix needed for mahalonobis
             rdm = squareform(pdist(response, metric="mahalanobis", VI=VI))
             assert ~np.isnan(rdm).all()
-            rdm_times[:, :, itime] = rdm
+            rdm_times[:, :, itime] = rdm # rdm_times (4, 4, 163), rdm (4, 4)
         
         rdm_dir = op.join(RESULTS_DIR, "rdms", "sensors", subject)
         if not op.exists(rdm_dir):
             os.makedirs(rdm_dir)
         rdm_fname = "rdm_%s.npy" % str(epoch_num)
         np.save(op.join(rdm_dir, rdm_fname), rdm_times)
+        
+        coefs_dir = op.join(RESULTS_DIR, "coefs", "sensors", subject)
+        if not op.exists(coefs_dir):
+            os.makedirs(coefs_dir)
+        coefs_fname = "coefs_%s.npy" % str(epoch_num)
+        np.save(op.join(coefs_dir, coefs_fname), coefs)
+        response_fname = "response_%s.npy" % str(epoch_num)
+        np.save(op.join(coefs_dir, response_fname), response)
+        
+        resids_dir = op.join(RESULTS_DIR, "resids", "sensors", subject)
+        if not op.exists(resids_dir):
+            os.makedirs(resids_dir)
+        resids_fname = "resids_%s.npy" % str(epoch_num)
+        np.save(op.join(resids_dir, resids_fname), resids)
+        residuals_fname = "residuals_%s.npy" % str(epoch_num)
+        np.save(op.join(resids_dir, residuals_fname), residuals)
                 
         rdmx = rdm_times
         
@@ -219,8 +235,6 @@ for subject in subjects:
                         
     for pair, rev_pair, similarity in zip(pairs, rev_pairs, similarities):
         if ((pair in pairs_in_sequence) or (rev_pair in pairs_in_sequence)):
-            # print(pair)
-            # print(rev_pair)
             in_seq.append(similarity)
         else: 
             out_seq.append(similarity)
