@@ -15,8 +15,8 @@ figures_dir = op.join(RESULTS_DIR, 'figures', lock, 'similarity')
 figsize = (16, 7)
 
 # get times
-epoch_fname = op.join(DATA_DIR, lock, 'sub01_0_s-epoch.fif')
-epochs = mne.read_epoch(epoch_fname)
+epoch_fname = op.join(DATA_DIR, lock, 'sub01_0_s-epo.fif')
+epochs = mne.read_epochs(epoch_fname)
 times = epochs.times
 del epochs
 
@@ -45,9 +45,9 @@ for subject in subjects:
     two_three_similarities = list()
     two_four_similarities = list() 
     three_four_similarities = list()
-    for epoch_num, epoch, epo in zip(enumerate(epochs_list), [prac_0, epo_1, epo_2, epo_3, epo_4]):
+    for epoch_num, (epoch, epo) in enumerate(zip(epochs_list, [prac_0, epo_1, epo_2, epo_3, epo_4])):
         # load and read rdm file
-        rdm_fname = op.join(RESULTS_DIR, 'rdms', loca, 'rdm_%s.npy' % (epoch_num))
+        rdm_fname = op.join(RESULTS_DIR, 'rdms', loca, subject, 'rdm_%s.npy' % (epoch_num))
         rdm = np.load(rdm_fname)
         one_two_similarity = list()
         one_three_similarity = list()
@@ -109,6 +109,12 @@ for subject in subjects:
     two_four_similarities = np.array(two_four_similarities)   
     three_four_similarities = np.array(three_four_similarities)
     
+    pracs = np.array(prac_0)
+    epos_1 = np.array(epo_1)
+    epos_2 = np.array(epo_2)
+    epos_3 = np.array(epo_3)
+    epos_4 = np.array(epo_4)
+    
     pairs_in_sequence = list()
     pairs_in_sequence.append(str(sequence[0]) + str(sequence[1]))
     pairs_in_sequence.append(str(sequence[1]) + str(sequence[2]))
@@ -146,22 +152,22 @@ for subject in subjects:
     all_in_seqs.append(np.array(in_seq))
     all_out_seqs.append(np.array(out_seq))
     
-    all_in_seqs = np.array(all_in_seqs)
-    all_out_seqs = np.array(all_out_seqs)
+    # all_in_seqs = np.array(all_in_seqs)
+    # all_out_seqs = np.array(all_out_seqs)
 
-    diff_inout = all_in_seqs.mean(axis=1) - all_out_seqs.mean(axis=1)
+    # diff_inout = all_in_seqs.mean(axis=1) - all_out_seqs.mean(axis=1)
  
-    if not op.exists(op.join(figures_dir, "inOut_dist", epoch)):
-        os.makedirs(op.join(figures_dir, "inOut_dist", epoch))
-    plt.figure(figsize=figsize)
-    plt.ylim(-0.5, 3)
-    plt.plot(times, all_out_seqs.mean((0, 1, 2)), label="out_seq")
-    plt.plot(times, all_in_seqs.mean((0, 1, 2)), label="in_seq")
-    plt.plot(times, diff_inout[:, 0, :].mean(0), label='diff')
-    plt.legend()
-    plt.title("in/out_%s" % (subject))
-    plt.savefig(op.join(figures_dir, "inOut_dist", epoch, "%s.png" % (subject)))
-    plt.close()
+    # if not op.exists(op.join(figures_dir, "inOut_dist", epoch)):
+    #     os.makedirs(op.join(figures_dir, "inOut_dist", epoch))
+    # plt.figure(figsize=figsize)
+    # plt.ylim(-0.5, 3)
+    # plt.plot(times, all_out_seqs.mean((0, 1, 2)), label="out_seq")
+    # plt.plot(times, all_in_seqs.mean((0, 1, 2)), label="in_seq")
+    # plt.plot(times, diff_inout[:, 0, :].mean(0), label='diff')
+    # plt.legend()
+    # plt.title("in/out_%s" % (subject))
+    # plt.savefig(op.join(figures_dir, "inOut_dist", epoch, "%s.png" % (subject)))
+    # plt.close()
 
 # plot paired distances averaged across epochs and subs
 plt.figure(figsize=(figsize))
@@ -176,17 +182,17 @@ plt.title("paired_dist_ave")
 plt.savefig(op.join(figures_dir, "paired_dist_ave.png"))
 plt.close()
 
-all_in_seqs = np.array(all_in_seqs)
-all_out_seqs = np.array(all_out_seqs)
-diff_inout = all_in_seqs.mean(axis=1) - all_out_seqs.mean(axis=1)
+# all_in_seqs = np.array(all_in_seqs)
+# all_out_seqs = np.array(all_out_seqs)
+# diff_inout = all_in_seqs.mean(axis=1) - all_out_seqs.mean(axis=1)
 
-# plot the difference in vs. out sequence across epochs
-plt.figure(figsize=figsize)
-plt.plot(times, diff_inout[:, 0, :].mean(0), label='practice', color='C7', alpha=0.6)
-plt.plot(times, diff_inout[:, 1, :].mean(0), label='block_1', color='C1', alpha=0.6)
-plt.plot(times, diff_inout[:, 2, :].mean(0), label='block_2', color='C2', alpha=0.6)
-plt.plot(times, diff_inout[:, 3, :].mean(0), label='block_3', color='C3', alpha=0.6)
-plt.plot(times, diff_inout[:, 4, :].mean(0), label='block_4', color='C4', alpha=0.6)
-plt.legend()
-plt.savefig(op.join(figures_dir, 'ols_ave.png'))
-plt.close()
+# # plot the difference in vs. out sequence across epochs
+# plt.figure(figsize=figsize)
+# plt.plot(times, diff_inout[:, 0, :].mean(0), label='practice', color='C7', alpha=0.6)
+# plt.plot(times, diff_inout[:, 1, :].mean(0), label='block_1', color='C1', alpha=0.6)
+# plt.plot(times, diff_inout[:, 2, :].mean(0), label='block_2', color='C2', alpha=0.6)
+# plt.plot(times, diff_inout[:, 3, :].mean(0), label='block_3', color='C3', alpha=0.6)
+# plt.plot(times, diff_inout[:, 4, :].mean(0), label='block_4', color='C4', alpha=0.6)
+# plt.legend()
+# plt.savefig(op.join(figures_dir, 'ols_ave.png'))
+# plt.close()
