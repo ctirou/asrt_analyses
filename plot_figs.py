@@ -3,24 +3,26 @@ import os.path as op
 import numpy as np
 import mne
 import matplotlib.pyplot as plt
-from config import RESULTS_DIR, SUBJS, RAW_DATA_DIR, DATA_DIR
+from config import RESULTS_DIR, SUBJS, RAW_DATA_DIR, DATA_DIR, EPOCHS
 
 subjects = SUBJS
-epochs_list = ['2_PRACTICE', '3_EPOCH_1', '4_EPOCH_2', '5_EPOCH_3', '6_EPOCH_4']
+epochs_list = EPOCHS
 lock = 'stim'
 trial_type = 'pattern'
 loca = 'sensors'
 
 figures_dir = op.join(RESULTS_DIR, 'figures', lock, 'similarity')
-figsize = (15, 7)
+figsize = (16, 7)
 
 # get times
-epoch_fname = op.join(DATA_DIR, lock, 'sub01_0_s-epo.fif')
-epoch = mne.read_epoch(epoch_fname)
-times = epoch.times
-del epoch
+epoch_fname = op.join(DATA_DIR, lock, 'sub01_0_s-epoch.fif')
+epochs = mne.read_epoch(epoch_fname)
+times = epochs.times
+del epochs
 
 all_in_seqs, all_out_seqs = [], []
+# create lists for epochs
+prac_0, epo_1, epo_2, epo_3, epo_4 = [], [], [], [], []
 for subject in subjects:
     # all_in_seqs, all_out_seqs = [], [] # uncomment if you want fig per subject
     # Read the behav file to get the sequence 
@@ -43,7 +45,7 @@ for subject in subjects:
     two_three_similarities = list()
     two_four_similarities = list() 
     three_four_similarities = list()
-    for epoch_num, epo in enumerate(epochs_list):
+    for epoch_num, epoch, epo in zip(enumerate(epochs_list), [prac_0, epo_1, epo_2, epo_3, epo_4]):
         # load and read rdm file
         rdm_fname = op.join(RESULTS_DIR, 'rdms', loca, 'rdm_%s.npy' % (epoch_num))
         rdm = np.load(rdm_fname)
@@ -76,6 +78,30 @@ for subject in subjects:
         two_four_similarities.append(two_four_similarity) 
         three_four_similarities.append(three_four_similarity)
 
+        epo.append(one_two_similarity)
+        epo.append(one_three_similarity)
+        epo.append(one_four_similarity) 
+        epo.append(two_three_similarity)
+        epo.append(two_four_similarity) 
+        epo.append(three_four_similarity)
+        
+        # plot paired distances per epoch, per sub
+        if not op.exists(op.join(figures_dir, "paired_dist_epo", subject)):
+            os.makedirs(op.join(figures_dir, "paired_dist_epo", subject))
+        ylims = (1, 2.4)
+        plt.figure(figsize=(figsize))
+        plt.ylim(ylims)
+        plt.plot(times, np.array(one_two_similarities).mean(0), label="one_two")
+        plt.plot(times, np.array(one_three_similarities).mean(0), label="one_three")
+        plt.plot(times, np.array(one_four_similarities).mean(0), label="one_four")
+        plt.plot(times, np.array(two_three_similarities).mean(0), label="two_three")
+        plt.plot(times, np.array(two_four_similarities).mean(0), label="two_four")
+        plt.plot(times, np.array(three_four_similarities).mean(0), label="three_four")
+        plt.legend()
+        plt.title("%s" % (sequence))
+        plt.savefig(op.join(figures_dir, "paired_dist_epo", "%s.png" % (epoch)))
+        plt.close()
+
     one_two_similarities = np.array(one_two_similarities)
     one_three_similarities = np.array(one_three_similarities)  
     one_four_similarities = np.array(one_four_similarities)   
@@ -94,7 +120,24 @@ for subject in subjects:
                     two_three_similarities, two_four_similarities, three_four_similarities]
     pairs = ['12', '13', '14', '23', '24', '34']
     rev_pairs = ['21', '31', '41', '32', '42', '43']
-                        
+    
+    # plot paired distances averaged across epochs, per sub
+    if not op.exists(op.join(figures_dir, "paired_dist_ave")):
+        os.makedirs(op.join(figures_dir, "paired_dist_ave"))
+    ylims = (1, 2.4)
+    plt.figure(figsize=(figsize))
+    plt.ylim(ylims)
+    plt.plot(times, one_two_similarities.mean(0), label="one_two")
+    plt.plot(times, one_three_similarities.mean(0), label="one_three")
+    plt.plot(times, one_four_similarities.mean(0), label="one_four")
+    plt.plot(times, two_three_similarities.mean(0), label="two_three")
+    plt.plot(times, two_four_similarities.mean(0), label="two_four")
+    plt.plot(times, three_four_similarities.mean(0), label="three_four")
+    plt.legend()
+    plt.title("%s" % (sequence))
+    plt.savefig(op.join(figures_dir, "paired_dist_ave", "%s.png" % (subject)))
+    plt.close()
+            
     for pair, rev_pair, similarity in zip(pairs, rev_pairs, similarities):
         if ((pair in pairs_in_sequence) or (rev_pair in pairs_in_sequence)):
             in_seq.append(similarity)
@@ -103,17 +146,47 @@ for subject in subjects:
     all_in_seqs.append(np.array(in_seq))
     all_out_seqs.append(np.array(out_seq))
     
+    all_in_seqs = np.array(all_in_seqs)
+    all_out_seqs = np.array(all_out_seqs)
+
+    diff_inout = all_in_seqs.mean(axis=1) - all_out_seqs.mean(axis=1)
+ 
+    if not op.exists(op.join(figures_dir, "inOut_dist", epoch)):
+        os.makedirs(op.join(figures_dir, "inOut_dist", epoch))
+    plt.figure(figsize=figsize)
+    plt.ylim(-0.5, 3)
+    plt.plot(times, all_out_seqs.mean((0, 1, 2)), label="out_seq")
+    plt.plot(times, all_in_seqs.mean((0, 1, 2)), label="in_seq")
+    plt.plot(times, diff_inout[:, 0, :].mean(0), label='diff')
+    plt.legend()
+    plt.title("in/out_%s" % (subject))
+    plt.savefig(op.join(figures_dir, "inOut_dist", epoch, "%s.png" % (subject)))
+    plt.close()
+
+# plot paired distances averaged across epochs and subs
+plt.figure(figsize=(figsize))
+plt.plot(times, one_two_similarities.mean(0), label="one_two")
+plt.plot(times, one_three_similarities.mean(0), label="one_three")
+plt.plot(times, one_four_similarities.mean(0), label="one_four")
+plt.plot(times, two_three_similarities.mean(0), label="two_three")
+plt.plot(times, two_four_similarities.mean(0), label="two_four")
+plt.plot(times, three_four_similarities.mean(0), label="three_four")
+plt.legend()
+plt.title("paired_dist_ave")
+plt.savefig(op.join(figures_dir, "paired_dist_ave.png"))
+plt.close()
+
 all_in_seqs = np.array(all_in_seqs)
 all_out_seqs = np.array(all_out_seqs)
 diff_inout = all_in_seqs.mean(axis=1) - all_out_seqs.mean(axis=1)
 
 # plot the difference in vs. out sequence across epochs
-plt.figure(figsize=(12.8, 7.2))
+plt.figure(figsize=figsize)
 plt.plot(times, diff_inout[:, 0, :].mean(0), label='practice', color='C7', alpha=0.6)
 plt.plot(times, diff_inout[:, 1, :].mean(0), label='block_1', color='C1', alpha=0.6)
 plt.plot(times, diff_inout[:, 2, :].mean(0), label='block_2', color='C2', alpha=0.6)
 plt.plot(times, diff_inout[:, 3, :].mean(0), label='block_3', color='C3', alpha=0.6)
 plt.plot(times, diff_inout[:, 4, :].mean(0), label='block_4', color='C4', alpha=0.6)
 plt.legend()
-plt.savefig(op.join(figures_dir, 'blocks_ols_%s.png' % (trial_type)))
+plt.savefig(op.join(figures_dir, 'ols_ave.png'))
 plt.close()
