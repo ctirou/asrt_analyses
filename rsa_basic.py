@@ -3,18 +3,16 @@ import os
 import numpy as np
 import mne
 import pandas as pd
-from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import make_pipeline
-from mne.decoding import SlidingEstimator, cross_val_multiscore
-from sklearn.model_selection import StratifiedKFold
 import matplotlib.pyplot as plt
 from scipy.spatial.distance import mahalanobis
 from scipy.stats import ttest_1samp
-from itertools import cycle
 from mne.decoding import UnsupervisedSpatialFilter
 from sklearn.decomposition import PCA
 from config import RAW_DATA_DIR, DATA_DIR, RESULTS_DIR
+
+def ensure_dir(dirpath):
+    if not os.path.exists(dirpath):
+        os.makedirs(dirpath)
 
 def decod_stats(X):
     from mne.stats import permutation_cluster_1samp_test
@@ -136,6 +134,13 @@ for trial_type in ['all', 'pattern', 'random']:
             two_four_similarity = np.array(two_four_similarity) 
             three_four_similarity = np.array(three_four_similarity)
 
+            ensure_dir(op.join(RESULTS_DIR, 'sensor_sims', subject, epo))
+            for sim, mis in zip([one_two_similarity, one_three_similarity, one_four_similarity, 
+                          two_three_similarity, two_four_similarity, three_four_similarity], 
+                             ['one_two', 'one_three', 'one_four', 'two_three', 'two_four', 'three_four']):
+                fname = op.join(RESULTS_DIR, 'sensor_sims', subject, epo, "%s.npy" % (mis))
+                np.save(fname, sim)
+            
             one_two_similarities.append(one_two_similarity)
             one_three_similarities.append(one_three_similarity)
             one_four_similarities.append(one_four_similarity) 
