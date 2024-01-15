@@ -7,15 +7,18 @@ from config import RESULTS_DIR, SUBJS, RAW_DATA_DIR, DATA_DIR, EPOCHS
 
 subjects = SUBJS
 epochs_list = EPOCHS
+
+# subjects, epochs_list = ['sub01'], ['2_PRACTICE']
+
 lock = 'stim'
 trial_type = 'pattern'
-loca = 'sensors'
-ols = False
+
+ols = True
+source = True
 
 def ensure_dir(dirpath):
     if not os.path.exists(dirpath):
         os.makedirs(dirpath)
-
 
 figures_dir = op.join(RESULTS_DIR, 'figures', lock, 'similarity')
 figsize = (16, 7)
@@ -64,9 +67,32 @@ for subject in subjects:
         three_four_similarity = list()
         if ols:
             # load and read rdm file
-            rdm_fname = op.join(RESULTS_DIR, 'rdms', loca, subject, 'rdm_%s.npy' % (epoch_num))
-            rdm = np.load(rdm_fname)
-                        
+            if source:
+                loca = 'source'
+            else:
+                loca = 'sensors'
+            rdm_fname = op.join(RESULTS_DIR, 'rdms', loca, subject, 'rdm_%s.npy' % (epoch_num)) # (4, 4, 263)
+            # coefs_fname = op.join(RESULTS_DIR, 'coefs', loca, subject, 'coefs_%s.npy' % (epoch_num)) # (4, 248, 163)
+            # resp_fname = op.join(RESULTS_DIR, 'coefs', loca, subject, 'response_%s.npy' % (epoch_num)) # (4, 248)
+            # resids_fname = op.join(RESULTS_DIR, 'resids', loca, subject, 'resids_%s.npy' % (epoch_num)) # (ntrials, 248, 163)
+            # residuals_fname = op.join(RESULTS_DIR, 'resids', loca, subject, 'residuals_%s.npy' % (epoch_num)) # (ntrials, 248)
+            
+            # coefs = np.load(coefs_fname)
+            # ensure_dir(op.join(figures_dir, "coefs", loca, subject))
+            # plt.figure(figsize=(16, 7))
+            # plt.plot(times, coefs.mean(1).T, label=[i for i in range(1, 5)])
+            # plt.legend()
+            # plt.savefig(op.join(figures_dir, "coefs", loca, subject, "coefs_%s" % str(epoch)))
+            # plt.close()
+            
+            # resids = np.load(resids_fname)
+            # ensure_dir(op.join(figures_dir, "resids", loca, subject))
+            # plt.figure(figsize=(16, 7))
+            # plt.plot(times, resids.mean((0, 1)))
+            # plt.savefig(op.join(figures_dir, "resids", loca, subject, "resids_%s" % str(epoch)))
+            # plt.close()
+            
+            rdm = np.load(rdm_fname)            
             for itime in range(rdm.shape[2]):
                 one_two_similarity.append(rdm[0, 1, itime])
                 one_three_similarity.append(rdm[0, 2, itime])

@@ -11,12 +11,15 @@ import statsmodels.api as sm
 from tqdm.auto import tqdm
 from sklearn.covariance import LedoitWolf
 from mne.beamformer import make_lcmv, apply_lcmv_epochs
-from config import RAW_DATA_DIR, DATA_DIR, RESULTS_DIR, FREESURFER_DIR
+from config import RAW_DATA_DIR, DATA_DIR, RESULTS_DIR, FREESURFER_DIR, SUBJS, EPOCHS
 
 method = 'lcmv'
 lock = 'stim'
 trial_type = 'pattern'
 
+def ensure_dir(dirpath):
+    if not os.path.exists(dirpath):
+        os.makedirs(dirpath)
 
 def decod_stats(X):
     from mne.stats import permutation_cluster_1samp_test
@@ -39,16 +42,10 @@ def decod_stats(X):
 data_path = DATA_DIR
 res_path = RESULTS_DIR
 subjects_dir = FREESURFER_DIR
-
-if not op.exists(op.join(res_path, 'figures', lock, 'similarity')):
-    os.makedirs(op.join(res_path, 'figures', lock, 'similarity'))
+subjects, epochs_list = SUBJS, EPOCHS
 
 figures = op.join(res_path, 'figures', lock, 'similarity')
-
-subjects = ['sub01', 'sub02', 'sub04', 'sub07', 'sub08', 'sub09',
-            'sub10', 'sub12', 'sub13', 'sub14', 'sub15']
-
-epochs_list = ['2_PRACTICE', '3_EPOCH_1', '4_EPOCH_2', '5_EPOCH_3', '6_EPOCH_4']
+ensure_dir(figures)
 
 for lab in range(34):
     
@@ -180,7 +177,26 @@ for lab in range(34):
                 rdm = squareform(pdist(response, metric="mahalanobis", VI=VI))
                 assert ~np.isnan(rdm).all()
                 rdm_times[:, :, itime] = rdm
-                    
+            
+            rdm_dir = op.join(RESULTS_DIR, "rdms", "source", subject, label.name)
+            ensure_dir(rdm_dir)
+            rdm_fname = "rdm_%s.npy" % str(epoch_num)
+            np.save(op.join(rdm_dir, rdm_fname), rdm_times)
+            
+            coefs_dir = op.join(RESULTS_DIR, "coefs", "source", subject, label.name)
+            ensure_dir(coefs_dir)
+            coefs_fname = "coefs_%s.npy" % str(epoch_num)
+            np.save(op.join(coefs_dir, coefs_fname), coefs)
+            response_fname = "response_%s.npy" % str(epoch_num)
+            np.save(op.join(coefs_dir, response_fname), response)
+            
+            resids_dir = op.join(RESULTS_DIR, "resids", "source", subject, label.name)
+            ensure_dir(resids_dir)
+            resids_fname = "resids_%s.npy" % str(epoch_num)
+            np.save(op.join(resids_dir, resids_fname), resids)
+            residuals_fname = "residuals_%s.npy" % str(epoch_num)
+            np.save(op.join(resids_dir, residuals_fname), residuals)
+            
             rdmx = rdm_times
             
             one_two_similarity = list()
