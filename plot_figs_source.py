@@ -3,24 +3,39 @@ import os.path as op
 import numpy as np
 import mne
 import matplotlib.pyplot as plt
+from scipy.stats import ttest_1samp
 from config import RESULTS_DIR, SUBJS, RAW_DATA_DIR, DATA_DIR, EPOCHS, FREESURFER_DIR
 
 subjects = SUBJS
 epochs_list = EPOCHS
 subjects_dir = FREESURFER_DIR
 
-
-# subjects, epochs_list = ['sub01'], ['2_PRACTICE']
-
 lock = 'stim'
 trial_type = 'pattern'
 
-ols = True
-source = True
+ols = False
 
 def ensure_dir(dirpath):
     if not os.path.exists(dirpath):
         os.makedirs(dirpath)
+        
+def decod_stats(X):
+    from mne.stats import permutation_cluster_1samp_test
+    """Statistical test applied across subjects"""
+    # check input
+    X = np.array(X)
+
+    # stats function report p_value for each cluster
+    T_obs_, clusters, p_values, _ = permutation_cluster_1samp_test(
+        X, out_type='indices', n_permutations=2**12, n_jobs=-1,
+        verbose=False)
+
+    # format p_values to get same dimensionality as X
+    p_values_ = np.ones_like(X[0]).T
+    for cluster, pval in zip(clusters, p_values):
+        p_values_[cluster] = pval
+
+    return np.squeeze(p_values_)
 
 figures_dir = op.join(RESULTS_DIR, 'figures', lock, 'similarity')
 figsize = (16, 7)
@@ -74,13 +89,7 @@ for lab in range(34):
             label = labels[lab]
             if ols:
                 # load and read rdm file
-                if source:
-                    loca = 'source'
-                    rdm_fname = op.join(RESULTS_DIR, 'rdms', loca, subject, label.name, 'rdm_%s.npy' % (epoch_num)) # (4, 4, 263)
-                else:
-                    loca = 'sensors'
-                    rdm_fname = op.join(RESULTS_DIR, 'rdms', loca, subject, 'rdm_%s.npy' % (epoch_num)) # (4, 4, 263)
-
+                rdm_fname = op.join(RESULTS_DIR, 'rdms', 'source', subject, label.name, 'rdm_%s.npy' % (epoch_num)) # (4, 4, 263)
                 # coefs_fname = op.join(RESULTS_DIR, 'coefs', loca, subject, 'coefs_%s.npy' % (epoch_num)) # (4, 248, 163)
                 # resp_fname = op.join(RESULTS_DIR, 'coefs', loca, subject, 'response_%s.npy' % (epoch_num)) # (4, 248)
                 # resids_fname = op.join(RESULTS_DIR, 'resids', loca, subject, 'resids_%s.npy' % (epoch_num)) # (ntrials, 248, 163)
@@ -100,7 +109,6 @@ for lab in range(34):
                 # plt.plot(times, resids.mean((0, 1)))
                 # plt.savefig(op.join(figures_dir, "resids", loca, subject, "resids_%s" % str(epoch)))
                 # plt.close()
-                
                 rdm = np.load(rdm_fname)            
                 for itime in range(rdm.shape[2]):
                     one_two_similarity.append(rdm[0, 1, itime])
@@ -133,6 +141,7 @@ for lab in range(34):
             else:
                 sim_list = [one_two_similarities, one_three_similarities, one_four_similarities, 
                             two_three_similarities, two_four_similarities, three_four_similarities]
+                # all false need this for sensors
                 for sim, mis, sss in zip(sim_list, ['one_two', 'one_three', 'one_four', 'two_three', 'two_four', 'three_four'], similarities_list):
                     sim_fname = op.join(RESULTS_DIR, 'sensor_sims', subject, epoch, "%s.npy" % mis)
                     sim.append(np.load(sim_fname))
@@ -249,42 +258,63 @@ for lab in range(34):
         # plt.close()
         
     # plot paired distances averaged across epochs and subs ---- done
-    plt.figure(figsize=(16, 7))
-    plt.plot(times, one_two_similarities.mean(0), label="one_two")
-    plt.plot(times, one_three_similarities.mean(0), label="one_three")
-    plt.plot(times, one_four_similarities.mean(0), label="one_four")
-    plt.plot(times, two_three_similarities.mean(0), label="two_three")
-    plt.plot(times, two_four_similarities.mean(0), label="two_four")
-    plt.plot(times, three_four_similarities.mean(0), label="three_four")
-    plt.legend()
-    plt.title("paired_dist_ave")
-    plt.savefig(op.join(figures_dir, "paired_dist_ave.png"))
-    plt.close()
+    # plt.figure(figsize=(16, 7))
+    # plt.plot(times, one_two_similarities.mean(0), label="one_two")
+    # plt.plot(times, one_three_similarities.mean(0), label="one_three")
+    # plt.plot(times, one_four_similarities.mean(0), label="one_four")
+    # plt.plot(times, two_three_similarities.mean(0), label="two_three")
+    # plt.plot(times, two_four_similarities.mean(0), label="two_four")
+    # plt.plot(times, three_four_similarities.mean(0), label="three_four")
+    # plt.legend()
+    # plt.title("paired_dist_ave")
+    # plt.savefig(op.join(figures_dir, "paired_dist_ave.png"))
+    # plt.close()
 
     all_in_seqs = np.array(all_in_seqs)
     all_out_seqs = np.array(all_out_seqs)
     diff_inout = all_in_seqs.mean(axis=1) - all_out_seqs.mean(axis=1)
 
     # plot the difference in vs. out sequence across epochs
-    ensure_dir(op.join(figures_dir, "ave"))
-    plt.figure(figsize=(16, 7))
-    plt.plot(times, diff_inout[:, 0, :].mean(0), label='practice', color='C7', alpha=0.6)
-    plt.plot(times, diff_inout[:, 1, :].mean(0), label='block_1', color='C1', alpha=0.6)
-    plt.plot(times, diff_inout[:, 2, :].mean(0), label='block_2', color='C2', alpha=0.6)
-    plt.plot(times, diff_inout[:, 3, :].mean(0), label='block_3', color='C3', alpha=0.6)
-    plt.plot(times, diff_inout[:, 4, :].mean(0), label='block_4', color='C4', alpha=0.6)
-    plt.legend()
-    plt.savefig(op.join(figures_dir, 'ave', '%s.png' % (label.name)))
-    plt.close()
+    # ensure_dir(op.join(figures_dir, "ave"))
+    # plt.figure(figsize=(16, 7))
+    # plt.plot(times, diff_inout[:, 0, :].mean(0), label='practice', color='C7', alpha=0.6)
+    # plt.plot(times, diff_inout[:, 1, :].mean(0), label='block_1', color='C1', alpha=0.6)
+    # plt.plot(times, diff_inout[:, 2, :].mean(0), label='block_2', color='C2', alpha=0.6)
+    # plt.plot(times, diff_inout[:, 3, :].mean(0), label='block_3', color='C3', alpha=0.6)
+    # plt.plot(times, diff_inout[:, 4, :].mean(0), label='block_4', color='C4', alpha=0.6)
+    # plt.legend()
+    # plt.savefig(op.join(figures_dir, 'ave', '%s.png' % (label.name)))
+    # plt.close()
 
     # plot paired distances per epoch averaged across subs ---- done
-    ensure_dir(op.join(figures_dir, "paired_dist_ave", label.name))
-    for epoch, sim in zip(epochs_list, similarities_list):
-        plt.figure(figsize=(16, 7))
-        # plt.ylim(0, 9)
-        for i, lab in zip(d[epoch][sim], similarities_list):
-            plt.plot(times, i, label=lab)
-        plt.legend()
-        plt.title("%s" % (epoch))
-        plt.savefig(op.join(figures_dir, "paired_dist_ave", label.name, "%s.png" % (epoch)))
-        plt.close()
+    # ensure_dir(op.join(figures_dir, "paired_dist_ave", label.name))
+    # for epoch, sim in zip(epochs_list, similarities_list):
+    #     plt.figure(figsize=(16, 7))
+    #     # plt.ylim(0, 9)
+    #     for i, lab in zip(d[epoch][sim], similarities_list):
+    #         plt.plot(times, i, label=lab)
+    #     plt.legend()
+    #     plt.title("%s" % (epoch))
+    #     plt.savefig(op.join(figures_dir, "paired_dist_ave", label.name, "%s.png" % (epoch)))
+    #     plt.close()
+    
+    # plot the difference in vs. out sequence averaging all epochs
+    ensure_dir(op.join(figures_dir, 'source', 'ave', '%s' % ('ols' if ols else 'basic')))
+    fname = label.name + '.png'
+    if ols:
+        loca = 'ols'
+    else:
+        loca = 'basic'
+    plt.figure(figsize=(15, 7))
+    plt.plot(times, diff_inout[:, 0, :].mean(0), label='practice', color='C7', alpha=0.6)
+    plt.plot(times, diff_inout[:, 1:5, :].mean((0, 1)), label='learning', color='C1', alpha=0.6)
+    diff = diff_inout[:, 1:5, :].mean((1)) - diff_inout[:, 0, :]
+    p_values_unc = ttest_1samp(diff, axis=0, popmean=0)[1]
+    sig_unc = p_values_unc < 0.05
+    p_values = decod_stats(diff)
+    sig = p_values < 0.05
+    plt.fill_between(times, 0, diff_inout[:, 1:5, :].mean((0, 1)), where=sig_unc, color='C2', alpha=0.2)
+    plt.fill_between(times, 0, diff_inout[:, 1:5, :].mean((0, 1)), where=sig, color='C3', alpha=0.3)
+    plt.legend()
+    plt.savefig(op.join(figures_dir, 'source', 'ave', loca, fname))
+    plt.close()
