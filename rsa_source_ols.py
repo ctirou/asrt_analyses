@@ -47,7 +47,7 @@ subjects, epochs_list = SUBJS, EPOCHS
 figures = op.join(res_path, 'figures', lock, 'similarity')
 ensure_dir(figures)
 
-for lab in range(34):
+for lab in tqdm(range(34)):
     
     all_in_seqs, all_out_seqs = [], []
     

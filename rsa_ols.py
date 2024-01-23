@@ -5,7 +5,6 @@ import mne
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.spatial.distance import pdist, squareform
-from scipy.stats import ttest_1samp
 from mne.decoding import UnsupervisedSpatialFilter
 import scipy.stats
 import statsmodels.api as sm
@@ -147,24 +146,24 @@ for subject in subjects:
             assert ~np.isnan(rdm).all()
             rdm_times[:, :, itime] = rdm # rdm_times (4, 4, 163), rdm (4, 4)
         
-        rdm_dir = op.join(RESULTS_DIR, "rdms", "sensors", subject)
-        ensure_dir(rdm_dir)
-        rdm_fname = "rdm_%s.npy" % str(epoch_num)
-        np.save(op.join(rdm_dir, rdm_fname), rdm_times)
+        rdm_dir = op.join(RESULTS_DIR, "rdms", "sensors", "shuffled", subject)
+        # ensure_dir(rdm_dir)
+        # rdm_fname = "rdm_%s.npy" % str(epoch_num)
+        # np.save(op.join(rdm_dir, rdm_fname), np.random.shuffle(rdm_times))
         
-        coefs_dir = op.join(RESULTS_DIR, "coefs", "sensors", subject)
-        ensure_dir(coefs_dir)
-        coefs_fname = "coefs_%s.npy" % str(epoch_num)
-        np.save(op.join(coefs_dir, coefs_fname), coefs)
-        response_fname = "response_%s.npy" % str(epoch_num)
-        np.save(op.join(coefs_dir, response_fname), response)
+        # coefs_dir = op.join(RESULTS_DIR, "coefs", "sensors", subject)
+        # ensure_dir(coefs_dir)
+        # coefs_fname = "coefs_%s.npy" % str(epoch_num)
+        # np.save(op.join(coefs_dir, coefs_fname), coefs)
+        # response_fname = "response_%s.npy" % str(epoch_num)
+        # np.save(op.join(coefs_dir, response_fname), response)
         
-        resids_dir = op.join(RESULTS_DIR, "resids", "sensors", subject)
-        ensure_dir(resids_dir)
-        resids_fname = "resids_%s.npy" % str(epoch_num)
-        np.save(op.join(resids_dir, resids_fname), resids)
-        residuals_fname = "residuals_%s.npy" % str(epoch_num)
-        np.save(op.join(resids_dir, residuals_fname), residuals)
+        # resids_dir = op.join(RESULTS_DIR, "resids", "sensors", subject)
+        # ensure_dir(resids_dir)
+        # resids_fname = "resids_%s.npy" % str(epoch_num)
+        # np.save(op.join(resids_dir, resids_fname), resids)
+        # residuals_fname = "residuals_%s.npy" % str(epoch_num)
+        # np.save(op.join(resids_dir, residuals_fname), residuals)
                 
         rdmx = rdm_times
         
@@ -213,19 +212,7 @@ for subject in subjects:
     in_seq, out_seq = [], []
     similarities = [one_two_similarities, one_three_similarities, one_four_similarities,
                     two_three_similarities, two_four_similarities, three_four_similarities]
-    
-    # plt.figure(figsize=(16, 7))
-    # plt.plot(times, one_two_similarities.mean(0), label="one_two")
-    # plt.plot(times, one_three_similarities.mean(0), label="one_three")
-    # plt.plot(times, one_four_similarities.mean(0), label="one_four")
-    # plt.plot(times, two_three_similarities.mean(0), label="two_three")
-    # plt.plot(times, two_four_similarities.mean(0), label="two_four")
-    # plt.plot(times, three_four_similarities.mean(0), label="three_four")
-    # plt.legend()
-    # plt.title("%s_%s" % (sequence, subject))
-    # plt.savefig(op.join(figures, 'sims_%s.png' % (subject)))
-    # plt.close()
-    
+        
     pairs = ['12', '13', '14', '23', '24', '34']
     rev_pairs = ['21', '31', '41', '32', '42', '43']
                         
@@ -237,47 +224,7 @@ for subject in subjects:
     all_in_seqs.append(np.array(in_seq))
     all_out_seqs.append(np.array(out_seq))
     
-    all_in_seqs = np.array(all_in_seqs)
-    all_out_seqs = np.array(all_out_seqs)
-
-    diff_inout = all_in_seqs.mean(axis=1) - all_out_seqs.mean(axis=1)
-
-    plt.figure(figsize=(15, 7))
-    plt.plot(times, all_out_seqs.mean((0, 1, 2)), label="out_seq")
-    plt.plot(times, all_in_seqs.mean((0, 1, 2)), label="in_seq")
-    plt.plot(times, diff_inout[:, 0, :].mean(0), label='diff')
-    plt.legend()
-    plt.title("in/out_%s" % (subject))
-    plt.savefig(op.join(figures, "in_out_%s" % (subject)))
-    plt.close()
-    
 all_in_seqs = np.array(all_in_seqs)
 all_out_seqs = np.array(all_out_seqs)
 
 diff_inout = all_in_seqs.mean(axis=1) - all_out_seqs.mean(axis=1)
-
-# plot the difference in vs. out sequence averaging all epochs
-plt.figure(figsize=(15, 7))
-plt.plot(times, diff_inout[:, 0, :].mean(0), label='practice', color='C7', alpha=0.6)
-plt.plot(times, diff_inout[:, 1:5, :].mean((0, 1)), label='learning', color='C1', alpha=0.6)
-diff = diff_inout[:, 1:5, :].mean((1)) - diff_inout[:, 0, :]
-p_values_unc = ttest_1samp(diff, axis=0, popmean=0)[1]
-sig_unc = p_values_unc < 0.05
-p_values = decod_stats(diff)
-sig = p_values < 0.05
-plt.fill_between(times, 0, diff_inout[:, 1:5, :].mean((0, 1)), where=sig_unc, color='C2', alpha=0.2)
-plt.fill_between(times, 0, diff_inout[:, 1:5, :].mean((0, 1)), where=sig, color='C3', alpha=0.3)
-plt.legend()
-plt.savefig(op.join(figures, 'all_ols_%s_no_seq_pca.png' % (trial_type)))
-plt.close()
-
-# plot the difference in vs. out sequence across epochs
-# plt.figure(figsize=(12.8, 7.2))
-# plt.plot(times, diff_inout[:, 0, :].mean(0), label='practice', color='C7', alpha=0.6)
-# plt.plot(times, diff_inout[:, 1, :].mean(0), label='block_1', color='C1', alpha=0.6)
-# plt.plot(times, diff_inout[:, 2, :].mean(0), label='block_2', color='C2', alpha=0.6)
-# plt.plot(times, diff_inout[:, 3, :].mean(0), label='block_3', color='C3', alpha=0.6)
-# plt.plot(times, diff_inout[:, 4, :].mean(0), label='block_4', color='C4', alpha=0.6)
-# plt.legend()
-# plt.savefig(op.join(figures, 'blocks_ols_%s.png' % (trial_type)))
-# plt.close()

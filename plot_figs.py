@@ -3,7 +3,8 @@ import os.path as op
 import numpy as np
 import mne
 import matplotlib.pyplot as plt
-from scipy.stats import ttest_1samp
+from scipy.stats import ttest_1samp, spearmanr
+from tqdm.auto import tqdm
 from config import RESULTS_DIR, SUBJS, RAW_DATA_DIR, DATA_DIR, EPOCHS
 
 subjects = SUBJS
@@ -319,3 +320,18 @@ plt.fill_between(times, 0, diff_inout[:, 1:5, :].mean((0, 1)), where=sig, color=
 plt.legend()
 plt.savefig(op.join(figures_dir, 'megave_sensors_%s.png' % ('ols' if ols else 'basic')))
 plt.close()
+
+all_rhos = []
+for sub in range(len(subjects)):
+    rhos = []
+    for t in tqdm(range(len(times))):
+        rhos.append(spearmanr([0, 1, 2, 3, 4], diff_inout[sub, :, t]))
+    all_rhos.append(rhos)
+all_rhos = np.array(all_rhos)
+
+plt.figure(figsize=(16, 7))
+plt.plot(times, all_rhos.mean(0)[:, 0], label='rho')
+diff = all_rhos.mean(0)[:, 0] - 0
+p_values = decod_stats(diff)
+plt.fill_between(times, 0, all_rhos.mean(0)[:, 0], where=sig, color='C3', alpha=0.3)
+plt.legend()
