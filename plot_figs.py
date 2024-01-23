@@ -11,8 +11,9 @@ epochs_list = EPOCHS
 
 lock = 'stim'
 trial_type = 'pattern'
+params = 'bslned_transitions'
 
-ols = False
+ols = True
 
 def ensure_dir(dirpath):
     if not os.path.exists(dirpath):
@@ -36,9 +37,9 @@ def decod_stats(X):
 
     return np.squeeze(p_values_)
 
-figures_dir = op.join(RESULTS_DIR, 'figures', lock, 'similarity')
+figures_dir = op.join(RESULTS_DIR, 'figures', lock, 'similarity', params)
+ensure_dir(figures_dir)
 figsize = (16, 7)
-
 # get times
 epoch_fname = op.join(DATA_DIR, lock, 'sub01_0_s-epo.fif')
 epochs = mne.read_epochs(epoch_fname)
@@ -46,7 +47,7 @@ times = epochs.times
 del epochs
 
 similarities_list = ['one_two_similarities', 'one_three_similarities', 'one_four_similarities',
-                'two_three_similarities', 'two_four_similarities', 'three_four_similarities']
+                     'two_three_similarities', 'two_four_similarities', 'three_four_similarities']
 
 d = {i:{j: list() for j in similarities_list} for i in epochs_list}
 
@@ -126,6 +127,21 @@ for subject in subjects:
             two_four_similarity = np.array(two_four_similarity) 
             three_four_similarity = np.array(three_four_similarity)
             
+            sim_list_arr = [one_two_similarity, one_three_similarity, one_four_similarity, 
+                            two_three_similarity, two_four_similarity, three_four_similarity]
+            
+            # calculate mean baseline value
+            all_means = []
+            for sims in sim_list_arr:
+                mimi = []
+                for itime, sim in zip(times, sims):
+                    if itime < 0:
+                        mimi.append(sim)
+                all_means.append(np.mean(mimi))
+            # baseline correction for each transitions
+            for mean_val, sim in zip(all_means, sim_list_arr):
+                sim -= mean_val
+                        
             one_two_similarities.append(one_two_similarity)
             one_three_similarities.append(one_three_similarity)
             one_four_similarities.append(one_four_similarity) 
@@ -140,9 +156,9 @@ for subject in subjects:
                 sim.append(np.load(sim_fname))
                 d[epoch][sss].append(np.load(sim_fname))
             
-        # plot paired distances per epoch, per sub ---- done
+        # # plot paired distances per epoch, per sub ---- done
         # ensure_dir(op.join(figures_dir, "paired_dist_epo", subject))
-        # ylims = (0, 12)
+        # ylims = (-1.5, 3)
         # plt.figure(figsize=(16, 7))
         # plt.ylim(ylims)
         # plt.plot(times, np.array(one_two_similarities).mean(0), label="one_two")
@@ -181,7 +197,7 @@ for subject in subjects:
         
         # ensure_dir(op.join(figures_dir, "inOut_dist", epoch))
         # plt.figure(figsize=figsize)
-        # plt.ylim(-1, 7)
+        # plt.ylim(-1.5, 2)
         # plt.plot(times, all_out_seqs.mean((0, 1, 2)), label="out_seq")
         # plt.plot(times, all_in_seqs.mean((0, 1, 2)), label="in_seq")
         # plt.plot(times, diff_inout[:, 0, :].mean(0), label='diff')
@@ -209,9 +225,9 @@ for subject in subjects:
     pairs = ['12', '13', '14', '23', '24', '34']
     rev_pairs = ['21', '31', '41', '32', '42', '43']
     
-    # plot paired distances averaged across epochs, per sub ---- done
+    # # plot paired distances averaged across epochs, per sub ---- done
     # ensure_dir(op.join(figures_dir, "paired_dist_ave"))
-    # ylims = (1, 8)
+    # ylims = (-0.5, 2.5)
     # plt.figure(figsize=(16, 7))
     # plt.ylim(ylims)
     # plt.plot(times, one_two_similarities.mean(0), label="one_two")
@@ -232,13 +248,11 @@ for subject in subjects:
             out_seq.append(similarity)
     all_in_seqs.append(np.array(in_seq))
     all_out_seqs.append(np.array(out_seq))
-    
+
+    # # plot in/out and diff averaged across epochs and subs ---- done
     # all_in_seqs = np.array(all_in_seqs)
     # all_out_seqs = np.array(all_out_seqs)
-
     # diff_inout = all_in_seqs.mean(axis=1) - all_out_seqs.mean(axis=1)
- 
-    # plot in/out and diff averaged across epochs and subs ---- done
     # ensure_dir(op.join(figures_dir, "inOut_dist"))
     # plt.figure(figsize=figsize)
     # plt.ylim(-1, 7)
@@ -251,46 +265,48 @@ for subject in subjects:
     # plt.close()
 
 # plot paired distances averaged across epochs and subs ---- done
-# plt.figure(figsize=(16, 7))
-# plt.plot(times, one_two_similarities.mean(0), label="one_two")
-# plt.plot(times, one_three_similarities.mean(0), label="one_three")
-# plt.plot(times, one_four_similarities.mean(0), label="one_four")
-# plt.plot(times, two_three_similarities.mean(0), label="two_three")
-# plt.plot(times, two_four_similarities.mean(0), label="two_four")
-# plt.plot(times, three_four_similarities.mean(0), label="three_four")
-# plt.legend()
-# plt.title("paired_dist_ave")
-# plt.savefig(op.join(figures_dir, "paired_dist_ave.png"))
-# plt.close()
+ensure_dir(op.join(figures_dir, "paired_dist_ave"))
+plt.figure(figsize=(16, 7))
+plt.plot(times, one_two_similarities.mean(0), label="one_two")
+plt.plot(times, one_three_similarities.mean(0), label="one_three")
+plt.plot(times, one_four_similarities.mean(0), label="one_four")
+plt.plot(times, two_three_similarities.mean(0), label="two_three")
+plt.plot(times, two_four_similarities.mean(0), label="two_four")
+plt.plot(times, three_four_similarities.mean(0), label="three_four")
+plt.legend()
+plt.title("paired_dist_ave")
+plt.savefig(op.join(figures_dir, "paired_dist_ave.png"))
+plt.close()
 
 all_in_seqs = np.array(all_in_seqs)
 all_out_seqs = np.array(all_out_seqs)
 diff_inout = all_in_seqs.mean(axis=1) - all_out_seqs.mean(axis=1)
 
-# # plot the difference in vs. out sequence across epochs
-# plt.figure(figsize=(16, 7))
-# plt.plot(times, diff_inout[:, 0, :].mean(0), label='practice', color='C7', alpha=0.6)
-# plt.plot(times, diff_inout[:, 1, :].mean(0), label='block_1', color='C1', alpha=0.6)
-# plt.plot(times, diff_inout[:, 2, :].mean(0), label='block_2', color='C2', alpha=0.6)
-# plt.plot(times, diff_inout[:, 3, :].mean(0), label='block_3', color='C3', alpha=0.6)
-# plt.plot(times, diff_inout[:, 4, :].mean(0), label='block_4', color='C4', alpha=0.6)
-# plt.legend()
-# plt.savefig(op.join(figures_dir, 'ols_ave.png'))
-# plt.close()
+# plot the difference in vs. out sequence across epochs
+plt.figure(figsize=(16, 7))
+plt.plot(times, diff_inout[:, 0, :].mean(0), label='practice', color='C7', alpha=0.6)
+plt.plot(times, diff_inout[:, 1, :].mean(0), label='block_1', color='C1', alpha=0.6)
+plt.plot(times, diff_inout[:, 2, :].mean(0), label='block_2', color='C2', alpha=0.6)
+plt.plot(times, diff_inout[:, 3, :].mean(0), label='block_3', color='C3', alpha=0.6)
+plt.plot(times, diff_inout[:, 4, :].mean(0), label='block_4', color='C4', alpha=0.6)
+plt.legend()
+plt.savefig(op.join(figures_dir, 'ols_ave.png'))
+plt.close()
 
 # plot paired distances per epoch averaged across subs ---- done
-# for epoch, sim in zip(epochs_list, similarities_list):
-#     plt.figure(figsize=(16, 7))
-#     plt.ylim(0, 9)
-#     for i, label in zip(d[epoch][sim], similarities_list):
-#         plt.plot(times, i, label=label)
-#     plt.legend()
-#     plt.title("%s" % (epoch))
-#     plt.savefig(op.join(figures_dir, "paired_dist_ave", "%s.png" % (epoch)))
-#     plt.close()
+ensure_dir(op.join(figures_dir, "paired_dist_ave"))
+for epoch, sim in zip(epochs_list, similarities_list):
+    plt.figure(figsize=(16, 7))
+    plt.ylim(0, 9)
+    for i, label in zip(d[epoch][sim], similarities_list):
+        plt.plot(times, i, label=label)
+    plt.legend()
+    plt.title("%s" % (epoch))
+    plt.savefig(op.join(figures_dir, "paired_dist_ave", "%s.png" % (epoch)))
+    plt.close()
     
 # plot the difference in vs. out sequence averaging all epochs
-plt.figure(figsize=(15, 7))
+plt.figure(figsize=(16, 7))
 plt.plot(times, diff_inout[:, 0, :].mean(0), label='practice', color='C7', alpha=0.6)
 plt.plot(times, diff_inout[:, 1:5, :].mean((0, 1)), label='learning', color='C1', alpha=0.6)
 diff = diff_inout[:, 1:5, :].mean((1)) - diff_inout[:, 0, :]
