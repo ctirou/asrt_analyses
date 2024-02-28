@@ -1,14 +1,14 @@
 import mne
 import os.path as op
+import os
 import numpy as np
-from mne.decoding import SlidingEstimator, cross_val_multiscore, CSP
+from mne.decoding import SlidingEstimator, cross_val_multiscore, CSP, GeneralizingEstimator
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression, Ridge
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.naive_bayes import GaussianNB
 from sklearn.pipeline import make_pipeline
 from sklearn.model_selection import KFold, StratifiedKFold, RepeatedKFold, RepeatedStratifiedKFold, train_test_split
-from sklearn.svm import LinearSVC
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -17,6 +17,7 @@ from mne.decoding import UnsupervisedSpatialFilter
 from base import ensure_dir
 from config import *
 from lazypredict.Supervised import LazyClassifier
+
 
 do_pca = False
 
@@ -74,41 +75,16 @@ for subject in subjects[:1]:
     # clf = LazyClassifier(verbose=0,ignore_warnings=True, custom_metric=None)
     # models, predictions = clf.fit(X_train, X_test, y_train, y_test)
     
-    # 1 ---------- Test classic sliding estimators
+    # 1 ---------- Test clasic sliding estimators
     # Define the type of decoder
-    clf = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000)) # LR > LDA, LinearSVM
-    clf = make_pipeline(StandardScaler(), LinearSVC(penalty='l1', dual='auto', max_iter=1000)) # LR > LDA
+    clf = make_pipeline(LinearDiscriminantAnalysis()) # essayer avec non lineaire
     # Decod the stim (left, right, top, bottom) with SlidingEstimator
-    slide = SlidingEstimator(clf, scoring='accuracy', n_jobs=-1)
-    scores = cross_val_multiscore(slide, X, y, cv=KFold(10))
-    mean_score = scores.mean(0)
-    print(max(mean_score))
-    plt.plot(times, mean_score)
+    # slide = SlidingEstimator(clf, scoring='accuracy', n_jobs=4)
+    clf = GeneralizingEstimator(clf, n_jobs=-1, scoring='accuracy', verbose=True)
+    clf.fit(X, y)
+    scores = clf.score(X, y)    
     
-    # 2 ---------- Test decoding during sliding windows with PCA + flattened
-    window_length = 0.1  # time window in s
-    spacing = 0.05  # sliding period in s
-    X = epochs.pick_types(meg=True, stim=False, ref_meg=False)._data
-    pca = UnsupervisedSpatialFilter(PCA(100), average=False)
-    X_pca = pca.fit_transform(X)
-    times = list()
-    scores = list()
-    for time in np.arange(epochs.tmin, epochs.tmax - window_length, spacing):
-        tt = np.where((epochs.times >= time) & (epochs.times < time + window_length))[0]
-        xx = X_pca[:, :, tt]
-        xx = xx.reshape(xx.shape[0], xx.shape[1]*xx.shape[2])
-        score = cross_val_multiscore(clf, xx, y, cv=KFold(3)).mean()
-        times.append(time + window_length/2.)
-        scores.append(score)
-    plt.plot(times, scores)
-
-    clf = make_pipeline(CSP(n_components=20, reg=None, log=True, norm_trace=False),
-                        LogisticRegression())
-    for time in np.arange(epochs.tmin, epochs.tmax - window_length, spacing):
-        tt = np.where((epochs.times >= time) & (epochs.times < time + window_length))[0]
-        xx = X[:, :, tt]
-        score = cross_val_multiscore(clf, xx, y, cv=KFold(3)).mean()
-        times.append(time + window_length/2.)
-        scores.append(score)
-    scores3 = np.mean(scores, axis=0)
-
+    # scores = cross_val_multiscore(slide, X, y, cv=KFold(10))
+    # mean_score = scores.mean(0)
+    # plt.plot(times, mean_score)
+    
