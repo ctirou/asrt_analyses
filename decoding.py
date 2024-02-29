@@ -8,7 +8,7 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.naive_bayes import GaussianNB
 from sklearn.pipeline import make_pipeline
 from sklearn.model_selection import KFold, StratifiedKFold, RepeatedKFold, RepeatedStratifiedKFold, train_test_split
-from sklearn.svm import LinearSVC
+from sklearn.svm import LinearSVC, SVC
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -26,7 +26,9 @@ lock = 'stim'
 figures = op.join(RESULTS_DIR, 'figures', lock, 'decoding')
 ensure_dir(figures)
 
-for subject in subjects[:1]:
+for subject in subjects:
+    
+    print(subject)
     
     all_epochs = list()
     all_behavs = list()
@@ -75,15 +77,20 @@ for subject in subjects[:1]:
     # models, predictions = clf.fit(X_train, X_test, y_train, y_test)
     
     # 1 ---------- Test classic sliding estimators
+    res_path = op.join(figures, 'classic_stim', 'SVC')
+    ensure_dir(res_path)
     # Define the type of decoder
-    clf = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000)) # LR > LDA, LinearSVM
-    clf = make_pipeline(StandardScaler(), LinearSVC(penalty='l1', dual='auto', max_iter=1000)) # LR > LDA
+    clf = make_pipeline(StandardScaler(), SVC(gamma='auto')) # LR > LDA, LinearSVM
+    # clf = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000)) # LR > LDA, lSVC, rbf-SVC 
     # Decod the stim (left, right, top, bottom) with SlidingEstimator
     slide = SlidingEstimator(clf, scoring='accuracy', n_jobs=-1)
     scores = cross_val_multiscore(slide, X, y, cv=KFold(10))
     mean_score = scores.mean(0)
     print(max(mean_score))
     plt.plot(times, mean_score)
+    plt.title("%s" % max(mean_score))
+    plt.savefig(op.join(res_path, "%s" % subject))
+    plt.close()
     
     # 2 ---------- Test decoding during sliding windows with PCA + flattened
     window_length = 0.1  # time window in s
