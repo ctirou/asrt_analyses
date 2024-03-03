@@ -3,12 +3,10 @@ import os.path as op
 import numpy as np
 from mne.decoding import SlidingEstimator, cross_val_multiscore, CSP
 from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import LogisticRegression, Ridge
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
-from sklearn.naive_bayes import GaussianNB
+from sklearn.linear_model import LogisticRegression
+from sklearn.neighbors import KNeighborsClassifier, NearestNeighbors
 from sklearn.pipeline import make_pipeline
-from sklearn.model_selection import KFold, StratifiedKFold, RepeatedKFold, RepeatedStratifiedKFold, train_test_split
-from sklearn.svm import LinearSVC, SVC
+from sklearn.model_selection import KFold, StratifiedKFold, RepeatedKFold, RepeatedStratifiedKFold, train_test_split, GridSearchCV
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -28,7 +26,7 @@ ensure_dir(figures)
 
 for subject in subjects:
     
-    print(subject)
+    # print(subject)
     
     all_epochs = list()
     all_behavs = list()
@@ -77,14 +75,25 @@ for subject in subjects:
     # models, predictions = clf.fit(X_train, X_test, y_train, y_test)
     
     # 1 ---------- Test classic sliding estimators
-    res_path = op.join(figures, 'classic_stim', 'SVC')
+    res_path = op.join(figures, 'classic_stim', 'NN')
     ensure_dir(res_path)
     # Define the type of decoder
-    clf = make_pipeline(StandardScaler(), SVC(gamma='auto')) # LR > LDA, LinearSVM
-    # clf = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000)) # LR > LDA, lSVC, rbf-SVC 
+    param_grid = {'logisticregression__C': [0.01, 0.1, 1, 10, 100],
+                  'logisticregression__penalty': ['l1', 'l2', 'elasticnet', 'None'],
+                  'logisticregression__solver': ['lbfgs', 'liblinear', 'newton-cg', 'newton-cholesky', 'sag', 'saga']}
+
+    clf = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000)) # LR > LDA, lSVC, rbf-SVC, Perceptron, RF, GaussianNB, KNN
+    grid_search = GridSearchCV(clf, param_grid=param_grid, cv=5, scoring='accuracy', verbose=1, n_jobs=-1)
+    grid_search.fit(X, y)
+    
+    print("Best parameters:", grid_search.best_params_)
+    print("Best cross-validation score:", grid_search.best_score_)
+    # Use the best estimator for further predictions or analysis
+    best_model = grid_search.best_estimator_
+
     # Decod the stim (left, right, top, bottom) with SlidingEstimator
     slide = SlidingEstimator(clf, scoring='accuracy', n_jobs=-1)
-    scores = cross_val_multiscore(slide, X, y, cv=KFold(10))
+    scores = cross_val_multiscore(slide, X, y, cv=KFold(3))
     mean_score = scores.mean(0)
     print(max(mean_score))
     plt.plot(times, mean_score)
@@ -93,6 +102,8 @@ for subject in subjects:
     plt.close()
     
     # 2 ---------- Test decoding during sliding windows with PCA + flattened
+    res_path = op.join(figures, 'slide_stim', 'LR')
+    ensure_dir(res_path)
     window_length = 0.1  # time window in s
     spacing = 0.05  # sliding period in s
     X = epochs.pick_types(meg=True, stim=False, ref_meg=False)._data
@@ -100,6 +111,8 @@ for subject in subjects:
     X_pca = pca.fit_transform(X)
     times = list()
     scores = list()
+    best_scores = list()
+    best_params = list()
     for time in np.arange(epochs.tmin, epochs.tmax - window_length, spacing):
         tt = np.where((epochs.times >= time) & (epochs.times < time + window_length))[0]
         xx = X_pca[:, :, tt]
@@ -108,6 +121,10 @@ for subject in subjects:
         times.append(time + window_length/2.)
         scores.append(score)
     plt.plot(times, scores)
+    plt.title(max(scores))
+    plt.savefig(op.join(res_path, "%s" % subject))
+    plt.close()
+
 
     clf = make_pipeline(CSP(n_components=20, reg=None, log=True, norm_trace=False),
                         LogisticRegression())

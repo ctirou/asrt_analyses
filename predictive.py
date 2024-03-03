@@ -18,14 +18,19 @@ from base import ensure_dir
 from config import *
 from lazypredict.Supervised import LazyClassifier
 
+# stim disp= 500 ms
+# RSI = 750 ms in task
 
-do_pca = False
+do_pca = True
 
-data_path = DATA_DIR
+data_path = '/Volumes/Ultra_Touch/pred_asrt'
+# data_path = DATA_DIR
 subjects, epochs_list = SUBJS, EPOCHS
 lock = 'stim'
 figures = op.join(RESULTS_DIR, 'figures', lock, 'decoding')
 ensure_dir(figures)
+
+mean_score = list()
 
 for subject in subjects[:1]:
     
@@ -49,17 +54,6 @@ for subject in subjects[:1]:
         
         all_epochs.append(epoch)
         all_behavs.append(behav)
-
-        # positions = behav['positions']
-        # cv = StratifiedKFold(5, shuffle=True)
-        # clf = make_pipeline(StandardScaler(), LogisticRegression(max_iter=10000))
-        # clf = SlidingEstimator(clf, scoring='accuracy', n_jobs=2)
-        # X = epoch.get_data()
-        # y = positions
-        # scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=False)
-        # plt.plot(epoch.times, scores.mean(0))
-        # plt.show()
-        # plt.close()
     
     for epoch in all_epochs: # see mne.preprocessing.maxwell_filter to realign the runs to a common head position. On raw data.
         epoch.info['dev_head_t'] = all_epochs[0].info['dev_head_t']
@@ -69,22 +63,53 @@ for subject in subjects[:1]:
             
     y = np.array(behav_df['positions'])
     X = epochs.get_data()
-    
-    # 0 ---------- Lazy Classifier
-    # X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=.2, random_state=None)
-    # clf = LazyClassifier(verbose=0,ignore_warnings=True, custom_metric=None)
-    # models, predictions = clf.fit(X_train, X_test, y_train, y_test)
-    
+        
     # 1 ---------- Test clasic sliding estimators
-    # Define the type of decoder
-    clf = make_pipeline(LinearDiscriminantAnalysis()) # essayer avec non lineaire
-    # Decod the stim (left, right, top, bottom) with SlidingEstimator
-    # slide = SlidingEstimator(clf, scoring='accuracy', n_jobs=4)
+    clf = make_pipeline(StandardScaler(), LogisticRegression())
     clf = GeneralizingEstimator(clf, n_jobs=-1, scoring='accuracy', verbose=True)
+    # scores = cross_val_multiscore(clf, X, y, cv=KFold(10))
     clf.fit(X, y)
-    scores = clf.score(X, y)    
+    score = clf.score(X, y)    
     
-    # scores = cross_val_multiscore(slide, X, y, cv=KFold(10))
-    # mean_score = scores.mean(0)
-    # plt.plot(times, mean_score)
+    # mean_score.append(score)
+    # mean_score.append(scores.mean(axis=0))
+
     
+    # mean_score.append(scores.mean(0))
+    
+    # fig, ax = plt.subplots(1, 1)
+    # im = ax.imshow(
+    #     mean_score,
+    #     interpolation="lanczos",
+    #     origin="lower",
+    #     cmap="RdBu_r",
+    #     extent=epochs.times[[0, -1, 0, -1]],
+    #     vmin=0.0,
+    #     vmax=1.0,
+    # )
+    # ax.set_xlabel("Testing Time (s)")
+    # ax.set_ylabel("Training Time (s)")
+    # ax.set_title("Temporal generalization")
+    # ax.axvline(0, color="k")
+    # ax.axhline(0, color="k")
+    # cbar = plt.colorbar(im, ax=ax)
+    # cbar.set_label("accuracy")
+    
+mean_score = np.array(mean_score)
+score = mean_score.copy().mean(axis=0)
+
+fig, ax = plt.subplots(1, 1)
+im = ax.imshow(
+    score,
+    interpolation="gaussian",
+    origin="lower",
+    cmap="RdBu_r",
+    extent=times[[0, -1, 0, -1]])
+
+ax.set_xlabel("Testing Time (s)")
+ax.set_ylabel("Training Time (s)")
+ax.set_title("Temporal generalization")
+ax.axvline(0, color="k")
+ax.axhline(0, color="k")
+cbar = plt.colorbar(im, ax=ax)
+cbar.set_label("accuracy")
