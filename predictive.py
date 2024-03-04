@@ -16,7 +16,6 @@ from sklearn.decomposition import PCA, FastICA
 from mne.decoding import UnsupervisedSpatialFilter
 from base import ensure_dir
 from config import *
-from lazypredict.Supervised import LazyClassifier
 
 # stim disp= 500 ms
 # RSI = 750 ms in task
@@ -27,12 +26,12 @@ data_path = '/Volumes/Ultra_Touch/pred_asrt'
 # data_path = DATA_DIR
 subjects, epochs_list = SUBJS, EPOCHS
 lock = 'stim'
-figures = op.join(RESULTS_DIR, 'figures', lock, 'decoding')
+figures = op.join(RESULTS_DIR, 'figures', lock, 'generalizing')
 ensure_dir(figures)
 
 mean_score = list()
 
-for subject in subjects[:1]:
+for subject in subjects:
     
     all_epochs = list()
     all_behavs = list()
@@ -41,7 +40,7 @@ for subject in subjects[:1]:
 
         behav = pd.read_pickle(op.join(data_path, 'behav', f'{subject}_{epoch_num}.pkl'))
         epoch_fname = op.join(data_path, "%s/%s_%s_s-epo.fif" % (lock, subject, epoch_num))
-        epoch = mne.read_epochs(epoch_fname)
+        epoch = mne.read_epochs(epoch_fname, verbose="error")
         times = epoch.times
         
         if do_pca:
@@ -65,42 +64,44 @@ for subject in subjects[:1]:
     X = epochs.get_data()
         
     # 1 ---------- Test clasic sliding estimators
-    clf = make_pipeline(StandardScaler(), LogisticRegression())
+    clf = make_pipeline(StandardScaler(), LogisticRegression(solver='liblinear'))
     clf = GeneralizingEstimator(clf, n_jobs=-1, scoring='accuracy', verbose=True)
-    # scores = cross_val_multiscore(clf, X, y, cv=KFold(10))
-    clf.fit(X, y)
-    score = clf.score(X, y)    
-    
-    # mean_score.append(score)
+    # scores = cross_val_multiscore(clf, X, y, cv=KFold(5))
     # mean_score.append(scores.mean(axis=0))
 
-    
+    clf.fit(X, y)
+    score = clf.score(X, y)    
+    mean_score.append(score)
+
     # mean_score.append(scores.mean(0))
+    res_path_1 = op.join(figures, "norm_gen", "K5")
+    ensure_dir(res_path_1)
+    ymin, ymax = -1, 4
+    fig, ax = plt.subplots(1, 1, figsize=(12, 4))
+    im = ax.imshow(
+        score,
+        interpolation="lanczos",
+        origin="lower",
+        cmap="RdBu_r",
+        extent=times[[0, -1, 0, -1]],
+        aspect=.7)
     
-    # fig, ax = plt.subplots(1, 1)
-    # im = ax.imshow(
-    #     mean_score,
-    #     interpolation="lanczos",
-    #     origin="lower",
-    #     cmap="RdBu_r",
-    #     extent=epochs.times[[0, -1, 0, -1]],
-    #     vmin=0.0,
-    #     vmax=1.0,
-    # )
-    # ax.set_xlabel("Testing Time (s)")
-    # ax.set_ylabel("Training Time (s)")
-    # ax.set_title("Temporal generalization")
-    # ax.axvline(0, color="k")
-    # ax.axhline(0, color="k")
-    # cbar = plt.colorbar(im, ax=ax)
-    # cbar.set_label("accuracy")
+    ax.set_xlabel("Testing Time (s)")
+    ax.set_ylabel("Training Time (s)")
+    ax.set_title("Temporal generalization")
+    ax.axvline(0, color="k")
+    ax.axhline(0, color="k")
+    ax.set_ylim(ymin, ymax)
+    cbar = plt.colorbar(im, ax=ax)
+    cbar.set_label("accuracy")
+    fig.savefig(op.join(res_path_1, "%s.png" % (subject)))
     
 mean_score = np.array(mean_score)
-score = mean_score.copy().mean(axis=0)
+score_f = mean_score.copy().mean(axis=0)
 
 fig, ax = plt.subplots(1, 1)
 im = ax.imshow(
-    score,
+    score_f,
     interpolation="gaussian",
     origin="lower",
     cmap="RdBu_r",
@@ -113,3 +114,4 @@ ax.axvline(0, color="k")
 ax.axhline(0, color="k")
 cbar = plt.colorbar(im, ax=ax)
 cbar.set_label("accuracy")
+fig.savefig(op.join(res_path_1, "mean.png"))
