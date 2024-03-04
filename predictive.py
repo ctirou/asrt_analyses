@@ -74,7 +74,7 @@ for subject in subjects:
     mean_score.append(score)
 
     # mean_score.append(scores.mean(0))
-    res_path_1 = op.join(figures, "norm_gen", "K5")
+    res_path_1 = op.join(figures, "big_gen", "noK")
     ensure_dir(res_path_1)
     ymin, ymax = -1, 4
     fig, ax = plt.subplots(1, 1, figsize=(12, 4))
@@ -84,7 +84,7 @@ for subject in subjects:
         origin="lower",
         cmap="RdBu_r",
         extent=times[[0, -1, 0, -1]],
-        aspect=.7)
+        aspect=0.7)
     
     ax.set_xlabel("Testing Time (s)")
     ax.set_ylabel("Training Time (s)")
@@ -99,19 +99,21 @@ for subject in subjects:
 mean_score = np.array(mean_score)
 score_f = mean_score.copy().mean(axis=0)
 
-fig, ax = plt.subplots(1, 1)
+fig, ax = plt.subplots(1, 1, figsize=(12, 4))
 im = ax.imshow(
     score_f,
-    interpolation="gaussian",
+    interpolation="lanczos",
     origin="lower",
     cmap="RdBu_r",
-    extent=times[[0, -1, 0, -1]])
+    extent=times[[0, -1, 0, -1]],
+    aspect=0.7)
 
 ax.set_xlabel("Testing Time (s)")
 ax.set_ylabel("Training Time (s)")
 ax.set_title("Temporal generalization")
 ax.axvline(0, color="k")
 ax.axhline(0, color="k")
+ax.set_ylim(ymin, ymax)
 cbar = plt.colorbar(im, ax=ax)
 cbar.set_label("accuracy")
 fig.savefig(op.join(res_path_1, "mean.png"))
