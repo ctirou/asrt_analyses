@@ -17,7 +17,7 @@ from mne.decoding import UnsupervisedSpatialFilter
 from base import ensure_dir
 from config import *
 
-# stim disp= 500 ms
+# stim disp = 500 ms
 # RSI = 750 ms in task
 
 do_pca = False
@@ -25,7 +25,7 @@ do_pca = False
 trial_types = ['all', 'pattern', 'random']
 
 data_path = '/Volumes/Ultra_Touch/pred_asrt'
-# data_path = DATA_DIR
+# data_path = '/Users/coum/Desktop/pred_asrt'
 subjects, epochs_list = SUBJS, EPOCHS
 lock = 'stim'
 figures = op.join(RESULTS_DIR, 'figures', lock, 'generalizing')
@@ -33,7 +33,7 @@ ensure_dir(figures)
 
 mean_score = list()
 
-for trial_type in trial_types:
+for trial_type in trial_types[:1]:
      
     for subject in subjects[:1]:
         
@@ -44,18 +44,20 @@ for trial_type in trial_types:
 
             behav = pd.read_pickle(op.join(data_path, 'behav', f'{subject}_{epoch_num}.pkl'))
             epoch_fname = op.join(data_path, "%s/%s_%s_s-epo.fif" % (lock, subject, epoch_num))
-            epoch = mne.read_epochs(epoch_fname, verbose="error", preload=False)
-            times = epoch.times
+            epoch_gen = mne.read_epochs(epoch_fname, verbose="error", preload=False)
+            times = epoch_gen.times
+            
+            # for trial_type in trial_types[:1]:
             
             # keep only pattern or random trials
             if trial_type == 'pattern':
                 behav = behav[behav['trialtypes'] == 1]
-                epoch = epoch[np.where(behav['trialtypes']==1)[0]]
+                epoch = epoch_gen[np.where(behav['trialtypes']==1)[0]]
             elif trial_type == 'random':
-                behav = behav[behav['trialtypes'] == 1]
-                epoch = epoch[np.where(behav['trialtypes']==1)[0]]
+                behav = behav[behav['trialtypes'] == 2]
+                epoch = epoch_gen[np.where(behav['trialtypes']==2)[0]]
             else:
-                pass
+                epoch = epoch_gen.copy()
             assert len(epoch) == len(behav)
             
             if do_pca:
@@ -80,8 +82,8 @@ for trial_type in trial_types:
             
         # 1 ---------- Test clasic sliding estimators
         clf = make_pipeline(StandardScaler(), LogisticRegression(solver='liblinear'))
-        clf = GeneralizingEstimator(clf, n_jobs=-1, scoring='accuracy', verbose=True)
-        # scores = cross_val_multiscore(clf, X, y, cv=KFold(5))
+        clf = SlidingEstimator(clf, scoring='accuracy', n_jobs=-1, verbose=True)
+        scores = cross_val_multiscore(clf, X, y, cv=KFold(5))
         # mean_score.append(scores.mean(axis=0))
 
         clf.fit(X, y)
@@ -89,46 +91,44 @@ for trial_type in trial_types:
         mean_score.append(score)
 
         # mean_score.append(scores.mean(0))
-        res_path_1 = op.join(figures, "big_gen", "noK")
-        ensure_dir(res_path_1)
-        ymin, ymax = -1, 4
-        fig, ax = plt.subplots(1, 1, figsize=(12, 4))
+        res_path = op.join(figures, "big_gen", trial_type, "K10")
+        ensure_dir(res_path)
+        fig, ax = plt.subplots(1, 1)
         im = ax.imshow(
+            # scores.mean(axis=0)
             score,
             interpolation="lanczos",
             origin="lower",
             cmap="RdBu_r",
             extent=times[[0, -1, 0, -1]],
-            aspect=0.7)
+            aspect=0.5)
         
         ax.set_xlabel("Testing Time (s)")
         ax.set_ylabel("Training Time (s)")
         ax.set_title("Temporal generalization")
         ax.axvline(0, color="k")
         ax.axhline(0, color="k")
-        ax.set_ylim(ymin, ymax)
         cbar = plt.colorbar(im, ax=ax)
         cbar.set_label("accuracy")
-        fig.savefig(op.join(res_path_1, "%s.png" % (subject)))
+        fig.savefig(op.join(res_path, "%s.png" % (subject)))
         
     mean_score = np.array(mean_score)
     score_f = mean_score.copy().mean(axis=0)
 
-    fig, ax = plt.subplots(1, 1, figsize=(12, 4))
+    fig, ax = plt.subplots(1, 1)
     im = ax.imshow(
         score_f,
         interpolation="lanczos",
         origin="lower",
         cmap="RdBu_r",
         extent=times[[0, -1, 0, -1]],
-        aspect=0.7)
+        aspect=0.5)
 
     ax.set_xlabel("Testing Time (s)")
     ax.set_ylabel("Training Time (s)")
     ax.set_title("Temporal generalization")
     ax.axvline(0, color="k")
     ax.axhline(0, color="k")
-    ax.set_ylim(ymin, ymax)
     cbar = plt.colorbar(im, ax=ax)
     cbar.set_label("accuracy")
-    fig.savefig(op.join(res_path_1, "mean.png"))
+    fig.savefig(op.join(res_path, "mean.png"))
