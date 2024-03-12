@@ -27,7 +27,7 @@ for trial_type in trial_types:
         
         np_f = op.join(RESULTS_DIR, 'figures', lock, 'generalizing', 'big_gen', trial_type, fold, 'npy', '%s.npy' % subject)
         np_score = np.load(np_f)
-        scores.append(np_score)
+        scores.append(np.load(np_f))
         
         fig, ax = plt.subplots(1, 1, figsize=(16, 7))
         im = ax.imshow(
@@ -36,7 +36,9 @@ for trial_type in trial_types:
             origin="lower",
             cmap="RdBu_r",
             extent=times[[0, -1, 0, -1]],
-            aspect=0.5)
+            aspect=0.5,
+            vmin=.20,
+            vmax=.30)
         
         ax.set_xlabel("Testing Time (s)")
         ax.set_ylabel("Training Time (s)")
@@ -56,7 +58,9 @@ for trial_type in trial_types:
         origin="lower",
         cmap="RdBu_r",
         extent=times[[0, -1, 0, -1]],
-        aspect=0.5)
+        aspect=0.5,
+        vmin=.20,
+        vmax=.30)
 
     ax.set_xlabel("Testing Time (s)")
     ax.set_ylabel("Training Time (s)")
