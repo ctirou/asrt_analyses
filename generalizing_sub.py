@@ -22,7 +22,7 @@ from config import *
 
 do_pca = False
 
-trial_types = ['all', 'pattern', 'random']
+trial_types = ['all', 'random', 'pattern']
 
 data_path = '/Volumes/Ultra_Touch/pred_asrt'
 # data_path = '/Users/coum/Desktop/pred_asrt'
@@ -33,7 +33,7 @@ ensure_dir(figures)
 
 mean_score = list()
 
-for trial_type in trial_types[:1]:
+for trial_type in trial_types[-1:]:
      
     for subject in subjects[:1]:
         
@@ -46,9 +46,7 @@ for trial_type in trial_types[:1]:
             epoch_fname = op.join(data_path, "%s/%s_%s_s-epo.fif" % (lock, subject, epoch_num))
             epoch_gen = mne.read_epochs(epoch_fname, verbose="error", preload=False)
             times = epoch_gen.times
-            
-            # for trial_type in trial_types[:1]:
-            
+                        
             # keep only pattern or random trials
             if trial_type == 'pattern':
                 behav = behav[behav['trialtypes'] == 1]
@@ -59,15 +57,7 @@ for trial_type in trial_types[:1]:
             else:
                 epoch = epoch_gen.copy()
             assert len(epoch) == len(behav)
-            
-            if do_pca:
-                n_component = 30    
-                pca = UnsupervisedSpatialFilter(PCA(n_component), average=False)
-                pca_data = pca.fit_transform(epoch.get_data())
-                sampling_freq = epoch.info['sfreq']
-                info = mne.create_info(n_component, ch_types='mag', sfreq=sampling_freq)
-                epoch = mne.EpochsArray(pca_data, info=info, events=epoch.events, event_id=epoch.event_id)
-            
+                        
             all_epochs.append(epoch)
             all_behavs.append(behav)
         
@@ -86,17 +76,17 @@ for trial_type in trial_types[:1]:
         scores = cross_val_multiscore(clf, X, y, cv=KFold(5))
         # mean_score.append(scores.mean(axis=0))
 
-        clf.fit(X, y)
-        score = clf.score(X, y)    
-        mean_score.append(score)
+        # clf.fit(X, y)
+        # score = clf.score(X, y)    
+        # mean_score.append(score)
 
         # mean_score.append(scores.mean(0))
         res_path = op.join(figures, "big_gen", trial_type, "K10")
         ensure_dir(res_path)
         fig, ax = plt.subplots(1, 1)
         im = ax.imshow(
-            # scores.mean(axis=0)
-            score,
+            scores.mean(axis=0),
+            # score,
             interpolation="lanczos",
             origin="lower",
             cmap="RdBu_r",
