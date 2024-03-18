@@ -33,3 +33,19 @@ def do_pca(epochs):
     info = mne.create_info(n_component, ch_types='mag', sfreq=sampling_freq)
     all_epochs = mne.EpochsArray(pca_data, info = info, events=epochs.events, event_id=epochs.event_id)
     return all_epochs
+
+def get_sequence(behav_dir):
+    import os
+    import os.path as op
+    behav_files = [f for f in os.listdir(behav_dir) if (not f.startswith('.') and ('_eASRT_Epoch_' in f))]
+    behav = open(op.join(behav_dir, behav_files[0]), 'r')
+    lines = behav.readlines()
+    column_names = lines[0].split()
+    sequence = list()
+    for line in lines[1:]:
+            trialtype = int(line.split()[column_names.index('trialtype')])
+            if trialtype == 1:
+                sequence.append(int(line.split()[column_names.index('position')]))
+            if len(sequence) == 4:
+                break
+    return sequence
