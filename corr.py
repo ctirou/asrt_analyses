@@ -16,13 +16,14 @@ from scipy.stats import pearsonr
 
 lock = 'stim'
 trial_type = 'pattern'
+params = 'correlations'
 
 data_path = DATA_DIR
 res_path = RESULTS_DIR
 subjects_dir = FREESURFER_DIR
 subjects, epochs_list = SUBJS, EPOCHS
 
-figures = op.join(res_path, 'figures', lock, 'similarity')
+figures = res_path / 'figures' / lock / 'similarity' / params
 ensure_dir(figures)
 
 all_in_seqs, all_out_seqs = [], []
@@ -56,79 +57,9 @@ for subject in subjects:
     
     # loop across sessions
     for epoch_num, epo in enumerate(epochs_list):
-    # for epoch_num, epo in zip([2], epochs_list):
-                    
-        if epo == '2_PRACTICE':
-            epo_fname = 'prac'
-        else:
-            epo_fname = 'sess-%s' % (str(epoch_num).zfill(2))
-    
-        behav_fname = op.join(data_path, "behav/%s_%s.pkl" % (subject, epoch_num))
-        behav = pd.read_pickle(behav_fname)
-        # read epochs
-        if lock == 'button': 
-            epoch_bsl_fname = op.join(data_path, "bsl/%s_%s_bl-epo.fif" % (subject, epoch_num))
-            epoch_bsl = mne.read_epochs(epoch_bsl_fname)
-            epoch_fname = op.join(data_path, "%s/%s_%s_b-epo.fif" % (lock, subject, epoch_num))
-        else:
-            epoch_fname = op.join(data_path, "%s/%s_%s_s-epo.fif" % (lock, subject, epoch_num))
-        epoch = mne.read_epochs(epoch_fname)
-        times = epoch.times              
         
-        epoch_pat = epoch[np.where(behav["trialtypes"]==1)].get_data().mean(axis=0)
-        behav_pat = behav[behav["trialtypes"]==1]
-        assert len(epoch_pat) == len(behav_pat)
-        
-        epoch, behav = epoch_pat, behav_pat
-        
-        # Prepare the design matrix                        
-        ntrials = len(epoch)
-        nconditions = 4
-        design_matrix = np.zeros((ntrials, nconditions))
-        
-        for icondi, condi in enumerate(behav["positions"]):            
-            # assert isinstance(condi, np.int64) 
-            design_matrix[icondi, condi-1] = 1
-        assert np.sum(design_matrix.sum(axis=1) == 1) == len(epoch)        
-       
-        # Run OLS
-        # z-score the data
-        # meg_data_V = epoch.get_data()
-        meg_data_V = epoch
-        _, nchs, ntimes = meg_data_V.shape
-        meg_data_V = scipy.stats.zscore(meg_data_V, axis=0)
-
-        coefs = np.zeros((nconditions, nchs, ntimes))
-        resids = np.zeros_like(meg_data_V)
-        for ich in tqdm(range(nchs)):
-            for itime in range(ntimes):
-                y = meg_data_V[:, ich, itime]
-                
-                model = sm.OLS(endog=y, exog=design_matrix, missing="raise")
-                results = model.fit()
-                
-                coefs[:, ich, itime] = results.params # (4, 248, 163)
-                resids[:, ich, itime] = results.resid # (ntrials, 248, 163)
-        
-        # Calculate pairwise mahalanobis distance between regression coefficients        
-        rdm_times = np.zeros((nconditions, nconditions, ntimes))
-        for itime in tqdm(range(ntimes)):
-            response = coefs[:, :, itime] # (4, 248)
-            residuals = resids[:, :, itime] # (51, 248)
-            
-            # Estimate covariance from residuals
-            lw_shrinkage = LedoitWolf(assume_centered=True)
-            cov = lw_shrinkage.fit(residuals)
-            
-            # Compute pairwise mahalanobis distances
-            VI = np.linalg.inv(cov.covariance_) # covariance matrix needed for mahalonobis
-            rdm = squareform(pdist(response, metric="mahalanobis", VI=VI))
-            assert ~np.isnan(rdm).all()
-            rdm_times[:, :, itime] = rdm # rdm_times (4, 4, 163), rdm (4, 4)
-        
-        rdm_dir = op.join(RESULTS_DIR, "rdms", "sensors", "shuffled", subject)
-                
-        rdmx = rdm_times
+        rdm_fname = res_path / 'rdms' / 'sensors' / subject / f'rdm_{epoch_num}.npy' # (4, 4, 263)                
+        rdmx = np.load(rdm_fname)            
         
         one_two_similarity = list()
         one_three_similarity = list()
@@ -186,22 +117,24 @@ for subject in subjects:
             out_seq.append(similarity)
     all_in_seqs.append(np.array(in_seq))
     all_out_seqs.append(np.array(out_seq))
+
+    # plot per subject
     
 all_in_seqs = np.array(all_in_seqs)
 all_out_seqs = np.array(all_out_seqs)
 
 diff_inout = all_in_seqs.mean(axis=1) - all_out_seqs.mean(axis=1)
 
-diff_inout = np.reshape(diff_inout, (diff_inout.shape[1], diff_inout.shape[-1]))
-data = diff_inout.copy()
+# diff_inout = np.reshape(diff_inout, (diff_inout.shape[1], diff_inout.shape[-1]))
+data = diff_inout.copy().mean(0)
 
-correlations = {}
-for i in range(data.shape[0]):
-    for j in range(i+1, data.shape[0]):
-        corr, _ = pearsonr(data[i], data[j])
-        correlations[(i, j)] = corr
+# correlations = {}
+# for i in range(data.shape[0]):
+#     for j in range(i+1, data.shape[0]):
+#         corr, _ = pearsonr(data[i], data[j])
+#         correlations[(i, j)] = corr
         
-corr_matrix = np.corrcoef(data)
+corr_matrix = np.corrcoef(data) # uses pearson's r
 
 # Plot the correlation matrix
 fig, ax = plt.subplots()
@@ -224,5 +157,6 @@ for i in range(len(corr_matrix)):
     for j in range(len(corr_matrix)):
         ax.text(j, i, f'{corr_matrix[i, j]:.2f}', 
                 ha='center', va='center', color='w')
-
-plt.show()
+plt.title('mean')
+plt.savefig(figures / 'mean.png')
+# plt.show()
