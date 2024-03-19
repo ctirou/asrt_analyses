@@ -64,7 +64,7 @@ for cond, num in zip(conditions, [one, two, three, four]):
     new_beh.drop(selected_idx, inplace=True)
     assert len(new_epochs) == len(new_beh)
     
-    # Resampling (here rate = 1)
+    # Resampling (here = 1)
     evoked = selected_epo.average()
 
 clf = make_pipeline(StandardScaler(), LogisticRegression(solver='liblinear', max_iter=1000))
