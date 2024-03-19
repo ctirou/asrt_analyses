@@ -24,7 +24,7 @@ lock = 'stim'
 figures = op.join(RESULTS_DIR, 'figures', lock, 'decoding')
 ensure_dir(figures)
 
-for subject in subjects:
+for subject in subjects[:1]:
     
     # print(subject)
     

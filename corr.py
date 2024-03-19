@@ -136,6 +136,8 @@ for subject in subjects:
     in_seq, out_seq = [], []
     similarities = [one_two_similarities, one_three_similarities, one_four_similarities,
                     two_three_similarities, two_four_similarities, three_four_similarities]
+    
+    
     pairs = ['12', '13', '14', '23', '24', '34']
     rev_pairs = ['21', '31', '41', '32', '42', '43']
                 
