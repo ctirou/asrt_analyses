@@ -8,63 +8,31 @@ from scipy.spatial.distance import mahalanobis
 from scipy.stats import ttest_1samp
 from mne.decoding import UnsupervisedSpatialFilter
 from sklearn.decomposition import PCA
-from config import RAW_DATA_DIR, DATA_DIR, RESULTS_DIR
-
-def ensure_dir(dirpath):
-    if not os.path.exists(dirpath):
-        os.makedirs(dirpath)
-
-def decod_stats(X):
-    from mne.stats import permutation_cluster_1samp_test
-    """Statistical test applied across subjects"""
-    # check input
-    X = np.array(X)
-
-    # stats function report p_value for each cluster
-    T_obs_, clusters, p_values, _ = permutation_cluster_1samp_test(
-        X, out_type='indices', n_permutations=2**12, n_jobs=-1,
-        verbose=False)
-
-    # format p_values to get same dimensionality as X
-    p_values_ = np.ones_like(X[0]).T
-    for cluster, pval in zip(clusters, p_values):
-        p_values_[cluster] = pval
-
-    return np.squeeze(p_values_)
+from base import *
+from config import *
+from tqdm.auto import tqdm
 
 lock = 'stim'
 path_data = DATA_DIR
 figures = op.join(RESULTS_DIR, 'figures', lock, 'similarity')
 
-subjects = ['sub01', 'sub02', 'sub04', 'sub07', 'sub08', 'sub09',
-            'sub10', 'sub12', 'sub13', 'sub14', 'sub15']
+subjects = SUBJS
 
-
-epochs_list = ['2_PRACTICE', '3_EPOCH_1', '4_EPOCH_2', '5_EPOCH_3', '6_EPOCH_4']
+epochs_list = EPOCHS
 
 do_pca = True
 
 all_in_seqs = list()
 all_out_seqs = list()
-for trial_type in ['all', 'pattern', 'random']:
-# for trial_type in ['pattern']:
+# for trial_type in ['all', 'pattern', 'random']:
+for trial_type in ['pattern']:
     all_in_seqs = list()
     all_out_seqs = list()
     for subject in subjects:
         # Read the behav file to get the sequence 
-        behav_dir = op.join(RAW_DATA_DIR, "%s/behav_data/" % (subject)) 
-        behav_files = [f for f in os.listdir(behav_dir) if (not f.startswith('.') and ('_eASRT_Epoch_' in f))]
-        behav = open(op.join(behav_dir, behav_files[0]), 'r')
-        lines = behav.readlines()
-        column_names = lines[0].split()
-        sequence = list()
-        for line in lines[1:]:
-                trialtype = int(line.split()[column_names.index('trialtype')])
-                if trialtype == 1:
-                    sequence.append(int(line.split()[column_names.index('position')]))
-                if len(sequence) == 4:
-                    break
-
+        behav_dir = RAW_DATA_DIR / subject / "behav_data"
+        sequence = get_sequence(behav_dir)
+        
         one_two_similarities = list()
         one_three_similarities = list()
         one_four_similarities = list() 
@@ -110,7 +78,8 @@ for trial_type in ['all', 'pattern', 'random']:
                 two_pattern = epochs[np.where(behav['positions']==2)[0]].get_data().mean(axis=0)
                 three_pattern = epochs[np.where(behav['positions']==3)[0]].get_data().mean(axis=0)
                 four_pattern = epochs[np.where(behav['positions']==4)[0]].get_data().mean(axis=0)
-
+            assert one_pattern.shape == two_pattern.shape == three_pattern.shape == four_pattern.shape
+            
             cov = mne.compute_covariance(epochs, tmin=-0.2, tmax=0)
             inv = np.linalg.inv(cov.data)
 
@@ -135,11 +104,11 @@ for trial_type in ['all', 'pattern', 'random']:
             three_four_similarity = np.array(three_four_similarity)
 
             ensure_dir(op.join(RESULTS_DIR, 'sensor_sims', subject, epo))
-            for sim, mis in zip([one_two_similarity, one_three_similarity, one_four_similarity, 
-                          two_three_similarity, two_four_similarity, three_four_similarity], 
-                             ['one_two', 'one_three', 'one_four', 'two_three', 'two_four', 'three_four']):
-                fname = op.join(RESULTS_DIR, 'sensor_sims', subject, epo, "%s.npy" % (mis))
-                np.save(fname, sim)
+            # for sim, mis in zip([one_two_similarity, one_three_similarity, one_four_similarity, 
+            #               two_three_similarity, two_four_similarity, three_four_similarity], 
+            #                  ['one_two', 'one_three', 'one_four', 'two_three', 'two_four', 'three_four']):
+                # fname = op.join(RESULTS_DIR, 'sensor_sims', subject, epo, "%s.npy" % (mis))
+                # np.save(fname, sim)
             
             one_two_similarities.append(one_two_similarity)
             one_three_similarities.append(one_three_similarity)

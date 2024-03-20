@@ -49,3 +49,19 @@ def get_sequence(behav_dir):
             if len(sequence) == 4:
                 break
     return sequence
+
+def get_inout_seq(sequence, similarities):
+    pairs_in_sequence = list()
+    pairs_in_sequence.append(str(sequence[0]) + str(sequence[1]))
+    pairs_in_sequence.append(str(sequence[1]) + str(sequence[2]))
+    pairs_in_sequence.append(str(sequence[2]) + str(sequence[3]))
+    pairs_in_sequence.append(str(sequence[3]) + str(sequence[0]))
+    in_seq, out_seq = [], []
+    pairs = ['12', '13', '14', '23', '24', '34']
+    rev_pairs = ['21', '31', '41', '32', '42', '43']
+    for pair, rev_pair, similarity in zip(pairs, rev_pairs, similarities):
+        if ((pair in pairs_in_sequence) or (rev_pair in pairs_in_sequence)):
+            in_seq.append(similarity)
+        else: 
+            out_seq.append(similarity)
+    return in_seq, out_seq
