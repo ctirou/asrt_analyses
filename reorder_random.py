@@ -24,7 +24,7 @@ figures = RESULTS_DIR / 'figures' / lock / 'similarity'
 subjects = SUBJS
 epochs_list = EPOCHS
 
-fold = 5
+fold = 10
 
 for subject in subjects[:1]:
     # Read the behav file and get the sequence 

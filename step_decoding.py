@@ -1,5 +1,5 @@
 import os
-import neo
+import os.path as op
 import numpy as np
 import mne
 from mne.decoding import CSP
@@ -14,11 +14,9 @@ from sklearn.linear_model import (
     LogisticRegressionCV,
     LogisticRegression,
 )
-from xgboost import XGBClassifier
 import matplotlib.pyplot as plt
 from jr.gat import scorer_spearman
 from sklearn.metrics import make_scorer
-from pathlib import Path
 from base import *
 from config import *
 import pandas as pd
@@ -29,7 +27,9 @@ lock = "stim"
 subject = "sub01"
 subjects = SUBJS
 
-params = ""
+params = "train_on_random"
+figures = RESULTS_DIR / 'figures' / lock / 'decoding' / params
+ensure_dir(figures)
 
 all_scores = list()
 
@@ -66,13 +66,13 @@ for subject in subjects:
 
     # set-up the classifier and cv structure
     clf = make_pipeline(
-        StandardScaler(), LogisticRegression(solver="liblinear", max_iter=10000)
+        StandardScaler(), LogisticRegressionCV(max_iter=10000)
     )
     clf = SlidingEstimator(clf, n_jobs=-1, scoring="accuracy", verbose=True)
     cv = StratifiedKFold(10, shuffle=True)
 
     # train on practice data
-    X = mne.read_epochs(epo_fnames[0], preload=False, verbose="error").get_data()
+    X = mne.read_epochs(epo_fnames[0], preload=True, verbose="error").get_data()
     y = all_beh[0].positions
     assert X.shape[0] == y.shape[0]
 
@@ -84,10 +84,21 @@ for subject in subjects:
     # plt.plot(times, scores_p.mean(0))
 
     scores = cross_val_multiscore(clf, X, y, cv=cv)
-
-    all_scores.append(scores)
-    all_scores = np.array(all_scores)
-
-    plt.plot(times, all_scores.mean((0, 1)))
+    plt.subplots(1, 1, figsize=(16, 7))
+    plt.plot(times, scores.mean(0))
     plt.axhline(y=0.25, ls="dashed", color="k")
     plt.axvline(x=0, ls="dashed", color="k")
+    plt.title(f'{subject}')
+    plt.savefig(op.join(figures, '%s.png' % subject))
+    plt.close()
+    
+    all_scores.append(scores)
+
+all_scores = np.array(all_scores)
+plt.subplots(1, 1, figsize=(16, 7))
+plt.plot(times, all_scores.mean((0, 1)))
+plt.axhline(y=0.25, ls="dashed", color="k")
+plt.axvline(x=0, ls="dashed", color="k")
+plt.title('mean')
+plt.savefig(op.join(figures, 'mean.png'))
+plt.close()
