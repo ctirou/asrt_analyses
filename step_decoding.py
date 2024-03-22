@@ -36,38 +36,22 @@ all_scores = list()
 for subject in subjects:
 
     epo_dir = data_path / lock
-    epo_fnames = [
-        epo_dir / f"{f}"
-        for f in sorted(os.listdir(epo_dir))
-        if ".fif" in f and subject in f
-    ]
-    all_epo = [
-        mne.read_epochs(fname, preload=False, verbose="error") for fname in epo_fnames
-    ]
+    epo_fnames = [epo_dir / f"{f}" for f in sorted(os.listdir(epo_dir)) if ".fif" in f and subject in f]
+    all_epo = [mne.read_epochs(fname, preload=False, verbose="error") for fname in epo_fnames]
     times = all_epo[0].times
 
     beh_dir = data_path / "behav"
-    beh_fnames = [
-        beh_dir / f"{f}"
-        for f in sorted(os.listdir(beh_dir))
-        if ".pkl" in f and subject in f
-    ]
+    beh_fnames = [beh_dir / f"{f}" for f in sorted(os.listdir(beh_dir)) if ".pkl" in f and subject in f]
     all_beh = [pd.read_pickle(fname) for fname in beh_fnames]
 
-    for (
-        epoch
-    ) in (
-        all_epo
-    ):  # see mne.preprocessing.maxwell_filter to realign the runs to a common head position. On raw data.
+    for epoch in all_epo:  # see mne.preprocessing.maxwell_filter to realign the runs to a common head position. On raw data.
         epoch.info["dev_head_t"] = all_epo[0].info["dev_head_t"]
 
     epochs = mne.concatenate_epochs(all_epo)
     behav_df = pd.concat(all_beh)
 
     # set-up the classifier and cv structure
-    clf = make_pipeline(
-        StandardScaler(), LogisticRegressionCV(max_iter=10000)
-    )
+    clf = make_pipeline(StandardScaler(), LogisticRegressionCV(max_iter=10000))
     clf = SlidingEstimator(clf, n_jobs=-1, scoring="accuracy", verbose=True)
     cv = StratifiedKFold(10, shuffle=True)
 
