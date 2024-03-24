@@ -13,7 +13,7 @@ def decod_stats(X):
     # stats function report p_value for each cluster
     T_obs_, clusters, p_values, _ = permutation_cluster_1samp_test(
         X, out_type='indices', n_permutations=2**12, n_jobs=-1,
-        verbose=False)
+        verbose=True)
 
     # format p_values to get same dimensionality as X
     p_values_ = np.ones_like(X[0]).T

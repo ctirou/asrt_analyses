@@ -26,6 +26,8 @@ data_path = DATA_DIR
 lock = "stim"
 subject = "sub01"
 subjects = SUBJS
+folds = 3
+chance = 0.25
 
 params = "train_on_random"
 figures = RESULTS_DIR / 'figures' / lock / 'decoding' / params
@@ -53,36 +55,35 @@ for subject in subjects:
     # set-up the classifier and cv structure
     clf = make_pipeline(StandardScaler(), LogisticRegressionCV(max_iter=10000))
     clf = SlidingEstimator(clf, n_jobs=-1, scoring="accuracy", verbose=True)
-    cv = StratifiedKFold(10, shuffle=True)
+    cv = StratifiedKFold(folds, shuffle=True)
 
     # train on practice data
     X = mne.read_epochs(epo_fnames[0], preload=True, verbose="error").get_data()
     y = all_beh[0].positions
     assert X.shape[0] == y.shape[0]
-
-    # scores_p, scores_p1, scores_p2, scores_p3, scores_p4 = list(), list(), list(), list(), list()
-    # for train, test in cv.split(X, y):
-    #     clf.fit(X[train], y[train])
-    #     scores_p.append(clf.score(X[test], y[test]))
-    # scores_p = np.array(scores_p)
-    # plt.plot(times, scores_p.mean(0))
-
     scores = cross_val_multiscore(clf, X, y, cv=cv)
-    plt.subplots(1, 1, figsize=(16, 7))
-    plt.plot(times, scores.mean(0))
-    plt.axhline(y=0.25, ls="dashed", color="k")
-    plt.axvline(x=0, ls="dashed", color="k")
-    plt.title(f'{subject}')
-    plt.savefig(op.join(figures, '%s.png' % subject))
-    plt.close()
+    # plt.subplots(1, 1, figsize=(16, 7))
+    # plt.plot(times, scores.mean(0))
+    # plt.axhline(y=0.25, ls="dashed", color="k")
+    # plt.axvline(x=0, ls="dashed", color="k")
+    # pval = decod_stats(scores - chance)
+    # sig = pval < .05
+    # plt.fill_between(times, chance, scores.mean(0), where=sig, alpha=1)
+    # plt.title(f'{subject}')
+    # plt.savefig(op.join(figures, '%s.png' % subject))
+    # plt.close()
     
     all_scores.append(scores)
 
 all_scores = np.array(all_scores)
+pval = decod_stats(all_scores - chance)
+sig = pval < .05
+
 plt.subplots(1, 1, figsize=(16, 7))
 plt.plot(times, all_scores.mean((0, 1)))
 plt.axhline(y=0.25, ls="dashed", color="k")
 plt.axvline(x=0, ls="dashed", color="k")
+plt.fill_between(times, chance, scores.mean(0), where=sig, alpha=1)
 plt.title('mean')
 plt.savefig(op.join(figures, 'mean.png'))
 plt.close()
