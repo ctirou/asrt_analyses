@@ -161,11 +161,32 @@ for sub in tqdm(range(len(subjects))):
     all_rhos.append(rhos)
 all_rhos = np.array(all_rhos)
 
-plt.figure(figsize=(16, 7))
+# plot rhos per subject
+for isub, sub in enumerate(subjects):
+    plt.subplots(1, 1, figsize=(16, 7))
+    plt.plot(times, all_rhos[isub, :, 0], label="rho")
+    sig = all_rhos[isub, :, 1] < 0.05 # not good for small sample size
+    plt.fill_between(times, 0, all_rhos[isub, :, 0], where=sig, alpha=0.3)
+    plt.legend()
+    plt.ylim(-1.5, 1.5)
+    plt.axhline(y = -1, color='k', ls="dashed")
+    plt.axhline(y = 1, color='k', ls="dashed")
+    plt.axhline(y = 0, color='k')
+    plt.title(sub)
+    plt.savefig(op.join(figures_dir, f'{sub}.png'))
+
+# plot average rho across subjects
+plt.subplots(1, 1, figsize=(16, 7))
 plt.plot(times, all_rhos.mean(0)[:, 0], label='rho')
 diff = all_rhos[:, :, 0]
 p_values = decod_stats(diff)
+p_values_unc = ttest_1samp(diff, axis=0, popmean=0)[1]
 sig = p_values < 0.05
-sig = all_rhos[:, :, 1] < 0.05
-plt.fill_between(times, 0, all_rhos.mean(0)[:, 0], where=sig, color='C3', alpha=0.3)
+sig_unc = p_values_unc < 0.05
+plt.fill_between(times, 0, all_rhos.mean(0)[:, 0], where=sig_unc, color='C2', alpha=1)
+plt.fill_between(times, 0, all_rhos.mean(0)[:, 0], where=sig, alpha=0.3)
+plt.ylim(-1, 1)
+plt.axhline(y = 0, color='k')
 plt.legend()
+plt.title('mean')
+plt.savefig(op.join(figures_dir, 'mean.png'))

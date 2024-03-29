@@ -11,7 +11,7 @@ import pingouin as pg
 from config import DATA_DIR, RESULTS_DIR, SUBJS
 
 path_data = DATA_DIR
-path_plots = op.join(RESULTS_DIR, 'figures')
+path_plots = op.join(RESULTS_DIR, 'figures', 'behav')
 
 subjects = SUBJS
 
@@ -46,7 +46,7 @@ for subject in subjects:
         for j, k in enumerate(behav_df['RTs']):
             all_RT.append(k)
             if behav_df['triplets'][j] == 30:
-                pattern_RT[f'Epoch_{i}'].append(behav_df['RTs'][j]) #faire liste et moyennes puis append contenu liste dans dico
+                pattern_RT[f'Epoch_{i}'].append(behav_df['RTs'][j]) # faire liste et moyennes puis append contenu liste dans dico
             elif behav_df['triplets'][j] == 32 or  behav_df['triplets'][j] == 34:
                 random_RT[f'Epoch_{i}'].append(behav_df['RTs'][j])
 
@@ -99,6 +99,7 @@ for subject in subjects:
         ax.errorbar(x, np.mean(pdf), yerr=perr, fmt='-o', color='mediumseagreen', alpha=.7)
         ax.errorbar(x, np.mean(rdf), yerr=rerr, fmt='-o', color='C7', alpha=.7)
         ax.legend()
+        ax.set_ylim(250, 550)
         ax.set_xlabel("Session")
         ax.set_ylabel("Reaction Time (ms)")
         # ax.grid(alpha=.2, which='both')
@@ -110,6 +111,6 @@ for subject in subjects:
         # # rajouter lignes a 0 learn index
         # plt.show()
         plt.close()
-        fig.savefig(op.join(path_plots, 'behav_%s.png') % subject)
+        fig.savefig(op.join(path_plots, f'{subject}.png'))
 
 # print(ttest_rel(np.mean(pdf['1']), np.mean(rdf['1']), nan_policy='propagate', alternative='two-sided')[1])
