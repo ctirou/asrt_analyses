@@ -20,11 +20,11 @@ data_path = DATA_DIR
 lock = "stim"
 subject = "sub01"
 subjects = SUBJS
-folds = 5
+folds = 3
 chance = 0.25
 scoring = 'accuracy'
 
-params = "train_on_practice"
+params = "train_on_practice_filt"
 figures = RESULTS_DIR / 'figures' / lock / 'decoding' / params
 ensure_dir(figures)
 
@@ -61,6 +61,16 @@ for trial_type in trial_types:
         # train on practice data
         X_0 = mne.read_epochs(epo_fnames[0], preload=True, verbose="error").get_data()
         y_0 = all_beh[0].positions
+        if trial_type == 'pattern':
+            pattern = all_beh[0].trialtypes == 1
+            X_0 = X[0][pattern]
+            y_0 = y_0[pattern]
+        elif trial_type == 'random':
+            random = all_beh[0].trialtypes == 2
+            X_0 = X[0][random]
+            y_0 = y_0[random]
+        else:
+            pass
         assert X_0.shape[0] == y_0.shape[0]
         # scores = cross_val_multiscore(clf, X, y, cv=cv)
         # plt.subplots(1, 1, figsize=(16, 7))
@@ -75,17 +85,17 @@ for trial_type in trial_types:
         # plt.close()
         # scores_0.append(scores)
         # clf.fit(X, y)
-        pred = list()
+        # pred = list()
         # there is only randoms in practice sessions
         for train_0, test_0 in cv.split(X_0, y_0):
             clf.fit(X_0[train_0], y_0[train_0])
-            # scores_0.append(np.array(clf.score(X_0[test_0], y_0[test_0])))
-            pred.append(np.array(clf.predict_proba(X_0[test_0])))
-        pred = np.array(pred)
-        pred = pred.mean(axis=(0, 1))
-        plt.plot(times, pred, label=np.arange(1, 5))
-        plt.legend()
-        plt.show()
+            scores_0.append(np.array(clf.score(X_0[test_0], y_0[test_0])))
+            # pred.append(np.array(clf.predict_proba(X_0[test_0])))
+        # pred = np.array(pred)
+        # pred = pred.mean(axis=(0, 1))
+        # plt.plot(times, pred, label=np.arange(1, 5))
+        # plt.legend()
+        # plt.show()
         
         for i, score_list in zip(range(1, len(all_epo)), [scores_1, scores_2, scores_3, scores_4]):
             X = all_epo[i].get_data()
@@ -130,6 +140,7 @@ for trial_type in trial_types:
         plt.close()
         
     plt.subplots(1, 1, figsize=(16, 7))
+    plt.plot(times, scores_0.mean(0)).T, label='practice'
     plt.plot(times, scores_1.mean(0).T, label='block_1')
     plt.plot(times, scores_2.mean(0).T, label='block_2')
     plt.plot(times, scores_3.mean(0).T, label='block_3')

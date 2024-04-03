@@ -1,16 +1,12 @@
 import os
-import os.path as op
 import numpy as np
 import mne
-from mne.decoding import CSP
-from mne.decoding import cross_val_multiscore, SlidingEstimator, GeneralizingEstimator
+from mne.decoding import cross_val_multiscore, SlidingEstimator
 from sklearn.pipeline import make_pipeline
 from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import RidgeCV, Ridge, LogisticRegressionCV, LogisticRegression
+from sklearn.linear_model import LogisticRegressionCV
 import matplotlib.pyplot as plt
-from jr.gat import scorer_spearman
-from sklearn.metrics import make_scorer
 from base import *
 from config import *
 import pandas as pd
@@ -18,8 +14,9 @@ import pandas as pd
 data_path = DATA_DIR
 lock = "stim"
 subjects = SUBJS
-folds = 3
+folds = 5
 chance = 0.5
+threshold = 0.05
 scoring = 'accuracy'
 
 params = "trialtype"
@@ -33,13 +30,8 @@ cv = StratifiedKFold(folds, shuffle=True)
 
 all_scores = list()
 
-for subject in subjects[:2]:
+for subject in subjects:
     
-    res_dir = figures / subject
-    ensure_dir(res_dir)
-
-    scores_sub = list()
-
     epo_dir = data_path / lock
     epo_fnames = [epo_dir / f"{f}" for f in sorted(os.listdir(epo_dir)) if ".fif" in f and subject in f]
     all_epo = [mne.read_epochs(fname, preload=False, verbose="error") for fname in epo_fnames]
@@ -51,44 +43,29 @@ for subject in subjects[:2]:
 
     for epoch in all_epo:  # see mne.preprocessing.maxwell_filter to realign the runs to a common head position. On raw data.
         epoch.info["dev_head_t"] = all_epo[0].info["dev_head_t"]
-
-    for fname, beh, epo in zip(['practice', 'b1', 'b2', 'b3', 'b4'], all_beh, all_epo):
         
-        # per session
-        X = epo.get_data()
-        y = beh.trialtypes
-        assert X.shape[0] == y.shape[0]
-
-        scores = cross_val_multiscore(clf, X, y, cv=cv)
-        pval = decod_stats(scores - chance)
-        sig = pval < .05
-        plt.subplots(1, 1, figsize=(16, 7))
-        plt.plot(times, scores.mean(0).T)
-        plt.fill_between(times, chance, scores.mean(0).T, alpha=0.2)
-        plt.title(f"{fname}.png")
-        plt.savefig(res_dir / f"{fname}.png")
-        plt.close()
-        
-        scores_sub.append(scores)
-        
-    scores_sub = np.array(scores_sub)
-    pval = decod_stats(scores_sub.mean(1) - chance)
-    sig = pval < .05
-    plt.subplots(1, 1, figsize=(16, 7))
-    plt.plot(times, scores_sub.mean(axis=(0, 1)).T)
-    plt.fill_between(times, chance, scores_sub.mean(axis=(0, 1)).T, alpha=0.2)
-    plt.title(f"{subject}.png")
-    plt.savefig(figures / f"{subject}.png")
-    plt.close()
+    beh = pd.concat(all_beh)
+    epochs = mne.concatenate_epochs(all_epo)
     
-    all_scores.append(scores_sub)
+    X = epochs.get_data()
+    y = beh.trialtypes
+        
+    scores = cross_val_multiscore(clf, X, y, cv=cv)
+    all_scores.append(scores)
+    
+    plt.subplots(1, 1, figsize=(16, 7))
+    plt.plot(times, scores.mean(0).T)
+    plt.title(f"{subject}")
+    plt.savefig(figures / f"{subject}.png")
 
-all_scores = np.array(all_scores)
-pval = decod_stats(scores_sub - chance)
-sig = pval < .05
+scores = all_scores.copy()
+scores = np.array(scores).mean(axis=(0,1)).T
+pval = decod_stats(scores - chance)
+sig = pval < threshold
+
 plt.subplots(1, 1, figsize=(16, 7))
-plt.plot(times, scores_sub.mean(0).T)
-plt.fill_between(times, chance, all_scores.mean(0).T, alpha=0.2)
-plt.title("mean.png")
-plt.savefig(figures / "mean.png")
+plt.plot(times, scores)
+plt.fill_between(times, chance, scores, where=sig)
+plt.title('mean')
+plt.savefig(figures, 'mean.png')
 plt.close()
