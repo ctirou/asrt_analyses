@@ -20,9 +20,10 @@ data_path = DATA_DIR
 lock = "stim"
 subject = "sub01"
 subjects = SUBJS
-folds = 3
+folds = 10
 chance = 0.25
 scoring = 'accuracy'
+threshold = 0.05
 
 params = "train_on_practice_filt"
 figures = RESULTS_DIR / 'figures' / lock / 'decoding' / params
@@ -33,7 +34,7 @@ clf = make_pipeline(StandardScaler(), LogisticRegressionCV(max_iter=10000))
 clf = SlidingEstimator(clf, n_jobs=-1, scoring=scoring, verbose=True)
 cv = StratifiedKFold(folds, shuffle=True)
 
-for trial_type in trial_types:
+for trial_type in trial_types[1:]:
     
     ensure_dir(figures / trial_type)
     # practice
@@ -44,7 +45,7 @@ for trial_type in trial_types:
     scores_3 = []
     scores_4 = []
 
-    for subject in subjects[:1]:
+    for subject in subjects:
 
         epo_dir = data_path / lock
         epo_fnames = [epo_dir / f"{f}" for f in sorted(os.listdir(epo_dir)) if ".fif" in f and subject in f]
@@ -59,18 +60,17 @@ for trial_type in trial_types:
             epoch.info["dev_head_t"] = all_epo[0].info["dev_head_t"]
 
         # train on practice data
-        X_0 = mne.read_epochs(epo_fnames[0], preload=True, verbose="error").get_data()
-        y_0 = all_beh[0].positions
         if trial_type == 'pattern':
             pattern = all_beh[0].trialtypes == 1
-            X_0 = X[0][pattern]
-            y_0 = y_0[pattern]
+            X_0 = all_epo[0].get_data()[pattern]
+            y_0 = np.array(all_beh[0].positions[pattern])
         elif trial_type == 'random':
             random = all_beh[0].trialtypes == 2
-            X_0 = X[0][random]
-            y_0 = y_0[random]
+            X_0 = all_epo[0].get_data()[random]
+            y_0 = np.array(all_beh[0].positions[random])
         else:
-            pass
+            X_0 = all_epo[0].get_data()
+            y_0 = all_beh[0].positions
         assert X_0.shape[0] == y_0.shape[0]
         # scores = cross_val_multiscore(clf, X, y, cv=cv)
         # plt.subplots(1, 1, figsize=(16, 7))
@@ -130,7 +130,7 @@ for trial_type in trial_types:
         plt.subplots(1, 1, figsize=(16, 7))
         plt.plot(times, score.mean(0).T, label=label)
         pval = decod_stats(score - chance)
-        sig = pval < .05
+        sig = pval < threshold
         plt.fill_between(times, chance, score.mean(0).T, where=sig, alpha=.3)
         plt.legend()
         plt.title("train on practice")
@@ -140,14 +140,14 @@ for trial_type in trial_types:
         plt.close()
         
     plt.subplots(1, 1, figsize=(16, 7))
-    plt.plot(times, scores_0.mean(0)).T, label='practice'
+    plt.plot(times, scores_0.mean(0).T, label='practice')
     plt.plot(times, scores_1.mean(0).T, label='block_1')
     plt.plot(times, scores_2.mean(0).T, label='block_2')
     plt.plot(times, scores_3.mean(0).T, label='block_3')
     plt.plot(times, scores_4.mean(0).T, label='block_4')
     for score in [scores_0, scores_1, scores_2, scores_3, scores_4]:
         pval = decod_stats(score - chance)
-        sig = pval < .05
+        sig = pval < threshold
         plt.fill_between(times, chance, score.mean(0).T, where=sig, alpha=.3)
     plt.legend()
     plt.title("train on practice_combined")
