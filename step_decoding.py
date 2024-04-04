@@ -22,7 +22,7 @@ data_path = DATA_DIR
 lock = "stim"
 subject = "sub01"
 subjects = SUBJS
-folds = 3
+folds = 10
 chance = 0.25
 threshold = 0.05
 scoring = "accuracy"
@@ -39,7 +39,7 @@ cv = StratifiedKFold(folds, shuffle=True)
 true_pred_means, false_pred_means = [], []
 all_in_seqs, all_out_seqs = [], []
 
-for subject in subjects[:2]:
+for subject in subjects:
 
     epo_dir = data_path / lock
     epo_fnames = [epo_dir / f"{f}" for f in sorted(os.listdir(epo_dir)) if ".fif" in f and subject in f]
@@ -160,8 +160,15 @@ plt.title('mean_true_vs_false_pred')
 plt.savefig(figures / 'mean_true_vs_false_pred.png')
 
 # in vs out sequence decoding performance
-all_in_seq = np.array(all_in_seqs).mean(axis=(0, 1)).T
-all_out_seq = np.array(all_out_seqs).mean(axis=(0, 1)).T
+# all_in_seq = np.array(all_in_seqs).mean(axis=(0, 1)).T
+# all_out_seq = np.array(all_out_seqs).mean(axis=(0, 1)).T
+
+all_in_seq = np.array(all_in_seqs)
+all_out_seq = np.array(all_out_seqs)
+
+np.save(figures / 'all_in.npy', all_in_seq)
+np.save(figures / 'all_out.npy', all_out_seq)
+
 diff_inout = all_in_seq - all_out_seq
 diff = diff_inout[:, 1:5, :].mean((1)) - diff_inout[:, 0, :]
 
