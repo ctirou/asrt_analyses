@@ -5,41 +5,32 @@ import pandas as pd
 import mne
 from mne.beamformer import make_lcmv, apply_lcmv
 import autoreject
-from config import DATA_DIR, FREESURFER_DIR, RESULTS_DIR
+from base import *
+from config import *
 
 method = 'lcmv'
 lock = 'stim'
-# lock = 'button'
 trial_type = 'pattern'
 movie = False
 overwrite = True
 
+subjects = SUBJS
+epochs_list = EPOCHS
 data_path = DATA_DIR
 subjects_dir = FREESURFER_DIR
 res_path = RESULTS_DIR
-
-if not op.exists(res_path):
-    os.mkdir(res_path)
-
-subjects = ['sub01', 'sub02', 'sub04', 'sub07', 'sub08', 'sub09',
-            'sub10', 'sub12', 'sub13', 'sub14', 'sub15']
 
 # create results directory
 folders = ["stcs", "bem", "src", "trans", "fwd"]
 for f in folders:
     if f == "stcs":
         path = os.path.join(res_path, "stcs", method, lock)
-        if not op.exists(path):
-            os.makedirs(path)
+        ensure_dir(path)
     elif f in folders[-2:]:
         path = op.join(res_path, f, lock)
-        if not op.exists(path):
-            os.makedirs(path)
+        ensure_dir(path)
     else:
-        if not op.exists(op.join(res_path, f)):
-            os.mkdir(op.join(res_path, f))
-
-epochs_list = ['2_PRACTICE', '3_EPOCH_1', '4_EPOCH_2', '5_EPOCH_3', '6_EPOCH_4']
+        ensure_dir(os.path.join(res_path, f))
 
 for subject in subjects: 
     # source space
@@ -60,8 +51,7 @@ for subject in subjects:
         bem = mne.make_bem_solution(model)
         mne.bem.write_bem_solution(bem_fname, bem, overwrite=overwrite)
     # loop across all epochs
-    for epoch_num, epo in enumerate(epochs_list): # if practice included
-    # for epoch_num, epo in zip([1, 2, 3, 4], epochs_list): # if practice not included
+    for epoch_num, epo in enumerate(epochs_list):
         # read behav and epoch files
         behav_fname = op.join(data_path, "behav/%s_%s.pkl" % (subject, epoch_num))
         behav = pd.read_pickle(behav_fname)
@@ -75,20 +65,18 @@ for subject in subjects:
             epoch_bsl_fname = op.join(data_path, "bsl/%s_%s_bl-epo.fif" % (subject, epoch_num))
             epoch_bsl = mne.read_epochs(epoch_bsl_fname)                                                        
         # get average of each stimuli if they are pattern
-        if epoch_num == 0:
-            one_pattern = epoch[np.where((behav['positions']==1))[0]]
-            two_pattern = epoch[np.where((behav['positions']==2))[0]]
-            three_pattern = epoch[np.where((behav['positions']==3))[0]]
-            four_pattern = epoch[np.where((behav['positions']==4))[0]]
-        else:
-            one_pattern = epoch[np.where((behav['positions']==1) & (behav['trialtypes']==1))[0]]
-            two_pattern = epoch[np.where((behav['positions']==2) & (behav['trialtypes']==1))[0]]
-            three_pattern = epoch[np.where((behav['positions']==3) & (behav['trialtypes']==1))[0]]
-            four_pattern = epoch[np.where((behav['positions']==4) & (behav['trialtypes']==1))[0]]
-        check = 0
-        for pat in [one_pattern, two_pattern, three_pattern, four_pattern]:
-            check += pat.shape[0]
-        assert check == epoch.shape[0]
+        if trial_type == 'pattern':
+            filt = 1
+        elif trial_type == 'random':
+            filt = 2
+        one_pattern = epoch[np.where((behav['positions']==1) & (behav['trialtypes']==filt))[0]]
+        two_pattern = epoch[np.where((behav['positions']==2) & (behav['trialtypes']==filt))[0]]
+        three_pattern = epoch[np.where((behav['positions']==3) & (behav['trialtypes']==filt))[0]]
+        four_pattern = epoch[np.where((behav['positions']==4) & (behav['trialtypes']==filt))[0]]
+        # check = 0
+        # for pat in [one_pattern, two_pattern, three_pattern, four_pattern]:
+        #     check += len(pat)
+        # assert check == len(epoch)
         # create trans file
         trans_fname = os.path.join(res_path, "trans", lock,  "%s-trans-%s.fif" % (subject, epoch_num))
         if not op.exists(trans_fname) or overwrite:
@@ -98,7 +86,8 @@ for subject in subjects:
             coreg.omit_head_shape_points(distance=5.0 / 1000)
             coreg.fit_icp(n_iterations=100, verbose=True)
             mne.write_trans(trans_fname, coreg.trans, overwrite=overwrite)
-        # compute source estimate with beamformer algorithm, on evoked data
+            
+        # compute source estimate with beamformer algorithm, on evoked data, for each stimulus
         for pat, num in zip([one_pattern, two_pattern, three_pattern, four_pattern], [1, 2, 3, 4]):
             if epo == '2_PRACTICE':
                 epo_fname = 'prac'

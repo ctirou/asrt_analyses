@@ -171,27 +171,44 @@ all_out_seq = np.array(all_out_seqs)
 np.save(figures / 'all_in.npy', all_in_seq)
 np.save(figures / 'all_out.npy', all_out_seq)
 
+all_in_seq = np.load(figures / 'all_in.npy').mean(axis=(1))
+all_out_seq = np.load(figures / 'all_out.npy').mean(axis=(1))
+
 diff_inout = all_in_seq - all_out_seq
-diff = diff_inout[:, 1:5, :].mean((1)) - diff_inout[:, 0, :]
+
+for i in range(1, 5):
+    plt.subplots(1, 1, figsize=(16, 7))
+    d = diff_inout[:, i, :] - diff_inout[:, 0, :]
+    pval = decod_stats(d)
+    sig = pval < threshold
+    plt.plot(times, diff_inout[:, 0, :].mean(0), label='practice', color='C7', alpha=0.6)
+    plt.plot(times, d.mean(0).T, label=f"block_{i}")
+    plt.fill_between(times, chance, d.mean(0).T, where=sig, color='C3', alpha=0.3)
+    plt.axvspan(.0, .2, color='gray', label='stimulus', alpha=.1)
+    plt.axvline(0, color='grey')
+    plt.axhline(0, color='black', ls='dashed')
+    plt.legend()
+    plt.title(f"block_{i}")
+    plt.ylim(-0.10, 0.10)
+    plt.savefig(figures / f"block_{i}.png")
 
 plt.subplots(1, 1, figsize=(16, 7))
-plt.plot(times, all_in_seq, label="in_seq")
-plt.plot(times, all_out_seq, label="out_seq")
-plt.plot(times, diff, label="diff")
-
+for i in range(1, 5):
+    d = diff_inout[:, i, :] - diff_inout[:, 0, :]
+    pval = decod_stats(d)
+    sig = pval < threshold
+    plt.plot(times, d.mean(0).T, label=f"block_{i}")
+    plt.fill_between(times, chance, d.mean(0).T, where=sig, color='C3', alpha=0.3)
+plt.plot(times, diff_inout[:, 0, :].mean(0), label='practice', color='C7', alpha=0.6)
 plt.axvspan(.0, .2, color='gray', label='stimulus', alpha=.1)
 plt.axvline(0, color='grey')
 plt.axhline(0, color='black', ls='dashed')
 plt.legend()
-plt.title('mean_in_vs_out_decoding')
-plt.savefig(figures / 'mean_in_vs_out_decod.png')
-plt.close()
+plt.title("all_blocks")
+plt.savefig(figures / "all_blocks.png")
 
-all_in_seq = np.load(figures / 'all_in.npy').mean(axis=(1))
-all_out_seq = np.load(figures / 'all_out.npy').mean(axis=(1))
-diff_inout = all_in_seq - all_out_seq
+# plot diff: in - out
 diff = diff_inout[:, 1:5, :].mean((1)) - diff_inout[:, 0, :]
-
 plt.subplots(1, 1, figsize=(16, 7))
 plt.plot(times, diff_inout[:, 0, :].mean(0), label='practice', color='C7', alpha=0.6)
 plt.plot(times, diff_inout[:, 1:5, :].mean((0, 1)), label='learning', color='C1', alpha=0.6)
@@ -206,3 +223,6 @@ plt.axvline(0, color='grey')
 plt.axhline(0, color='black', ls='dashed')
 plt.legend()
 plt.show()
+plt.title('mean_in_vs_out_decoding')
+plt.savefig(figures / 'mean_in_vs_out_decod.png')
+plt.close()
