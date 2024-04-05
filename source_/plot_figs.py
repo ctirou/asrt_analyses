@@ -3,41 +3,19 @@ import os.path as op
 import numpy as np
 import mne
 import matplotlib.pyplot as plt
-from scipy.stats import ttest_1samp
-from config import RESULTS_DIR, SUBJS, RAW_DATA_DIR, DATA_DIR, EPOCHS, FREESURFER_DIR
+from scipy.stats import ttest_1samp, spearmanr
+from base import *
+from config import *
 
 subjects = SUBJS
 epochs_list = EPOCHS
 subjects_dir = FREESURFER_DIR
-
 lock = 'stim'
 trial_type = 'pattern'
 
-ols = False
+ols = True
 
-def ensure_dir(dirpath):
-    if not os.path.exists(dirpath):
-        os.makedirs(dirpath)
-        
-def decod_stats(X):
-    from mne.stats import permutation_cluster_1samp_test
-    """Statistical test applied across subjects"""
-    # check input
-    X = np.array(X)
-
-    # stats function report p_value for each cluster
-    T_obs_, clusters, p_values, _ = permutation_cluster_1samp_test(
-        X, out_type='indices', n_permutations=2**12, n_jobs=-1,
-        verbose=False)
-
-    # format p_values to get same dimensionality as X
-    p_values_ = np.ones_like(X[0]).T
-    for cluster, pval in zip(clusters, p_values):
-        p_values_[cluster] = pval
-
-    return np.squeeze(p_values_)
-
-figures_dir = op.join(RESULTS_DIR, 'figures', lock, 'similarity')
+figures_dir = RESULTS_DIR /'figures' / lock / 'similarity' / 'source'
 figsize = (16, 7)
 
 # get times
@@ -47,30 +25,18 @@ times = epochs.times
 del epochs
 
 similarities_list = ['one_two_similarities', 'one_three_similarities', 'one_four_similarities',
-                'two_three_similarities', 'two_four_similarities', 'three_four_similarities']
-
+                     'two_three_similarities', 'two_four_similarities', 'three_four_similarities']
 d = {i:{j: list() for j in similarities_list} for i in epochs_list}
 
-all_in_seqs, all_out_seqs = [], []
-# create lists for epochs
 for lab in range(34):
+    
     all_in_seqs, all_out_seqs = [], []
 
     for subject in subjects:
         # all_in_seqs, all_out_seqs = [], [] # uncomment if you want fig per subject
         # Read the behav file to get the sequence 
         behav_dir = op.join(RAW_DATA_DIR, "%s/behav_data/" % (subject)) 
-        behav_files = [f for f in os.listdir(behav_dir) if (not f.startswith('.') and ('_eASRT_Epoch_' in f))]
-        behav = open(op.join(behav_dir, behav_files[0]), 'r')
-        lines = behav.readlines()
-        column_names = lines[0].split()
-        sequence = list()
-        for line in lines[1:]:
-                trialtype = int(line.split()[column_names.index('trialtype')])
-                if trialtype == 1:
-                    sequence.append(int(line.split()[column_names.index('position')]))
-                if len(sequence) == 4:
-                    break
+        sequence = get_sequence(behav_dir)
         # create lists of possible combinations between stimuli
         one_two_similarities = list()
         one_three_similarities = list()
@@ -204,17 +170,11 @@ for lab in range(34):
         two_four_similarities = np.array(two_four_similarities)   
         three_four_similarities = np.array(three_four_similarities)
         
-        pairs_in_sequence = list()
-        pairs_in_sequence.append(str(sequence[0]) + str(sequence[1]))
-        pairs_in_sequence.append(str(sequence[1]) + str(sequence[2]))
-        pairs_in_sequence.append(str(sequence[2]) + str(sequence[3]))
-        pairs_in_sequence.append(str(sequence[3]) + str(sequence[0]))
-
-        in_seq, out_seq = [], []
         similarities = [one_two_similarities, one_three_similarities, one_four_similarities,
                         two_three_similarities, two_four_similarities, three_four_similarities]
-        pairs = ['12', '13', '14', '23', '24', '34']
-        rev_pairs = ['21', '31', '41', '32', '42', '43']
+        
+        in_seq, out_seq = get_inout_seq(sequence, similarities)
+        
         
         # plot paired distances averaged across epochs, per sub ---- done
         # ensure_dir(op.join(figures_dir, "paired_dist_ave", label.name))
@@ -232,13 +192,8 @@ for lab in range(34):
         # plt.savefig(op.join(figures_dir, "paired_dist_ave", label.name, "%s.png" % (subject)))
         # plt.close()
                 
-        for pair, rev_pair, similarity in zip(pairs, rev_pairs, similarities):
-            if ((pair in pairs_in_sequence) or (rev_pair in pairs_in_sequence)):
-                in_seq.append(similarity)
-            else: 
-                out_seq.append(similarity)
-        all_in_seqs.append(np.array(in_seq))
-        all_out_seqs.append(np.array(out_seq))
+        all_in_seqs.append(in_seq)
+        all_out_seqs.append(out_seq)
         
         # all_in_seqs = np.array(all_in_seqs)
         # all_out_seqs = np.array(all_out_seqs)
@@ -299,22 +254,68 @@ for lab in range(34):
     #     plt.close()
     
     # plot the difference in vs. out sequence averaging all epochs
-    ensure_dir(op.join(figures_dir, 'source', 'ave', '%s' % ('ols' if ols else 'basic')))
-    fname = label.name + '.png'
-    if ols:
-        loca = 'ols'
-    else:
-        loca = 'basic'
-    plt.figure(figsize=(15, 7))
-    plt.plot(times, diff_inout[:, 0, :].mean(0), label='practice', color='C7', alpha=0.6)
-    plt.plot(times, diff_inout[:, 1:5, :].mean((0, 1)), label='learning', color='C1', alpha=0.6)
-    diff = diff_inout[:, 1:5, :].mean((1)) - diff_inout[:, 0, :]
-    p_values_unc = ttest_1samp(diff, axis=0, popmean=0)[1]
-    sig_unc = p_values_unc < 0.05
+    # ensure_dir(op.join(figures_dir, 'source', 'ave', '%s' % ('ols' if ols else 'basic')))
+    # fname = label.name + '.png'
+    # if ols:
+    #     loca = 'ols'
+    # else:
+    #     loca = 'basic'
+    # plt.figure(figsize=(15, 7))
+    # plt.plot(times, diff_inout[:, 0, :].mean(0), label='practice', color='C7', alpha=0.6)
+    # plt.plot(times, diff_inout[:, 1:5, :].mean((0, 1)), label='learning', color='C1', alpha=0.6)
+    # diff = diff_inout[:, 1:5, :].mean((1)) - diff_inout[:, 0, :]
+    # p_values_unc = ttest_1samp(diff, axis=0, popmean=0)[1]
+    # sig_unc = p_values_unc < 0.05
+    # p_values = decod_stats(diff)
+    # sig = p_values < 0.05
+    # plt.fill_between(times, 0, diff_inout[:, 1:5, :].mean((0, 1)), where=sig_unc, color='C2', alpha=0.2)
+    # plt.fill_between(times, 0, diff_inout[:, 1:5, :].mean((0, 1)), where=sig, color='C3', alpha=0.3)
+    # plt.legend()
+    # plt.savefig(op.join(figures_dir, 'source', 'ave', loca, fname))
+    # plt.close()
+    
+    all_rhos = []
+    for sub in range(len(subjects)):
+        rhos = []
+        for t in range(len(times)):
+            rhos.append(spearmanr([0, 1, 2, 3, 4], diff_inout[sub, :, t]))
+        all_rhos.append(rhos)
+    all_rhos = np.array(all_rhos)
+
+    # corr_dir = figures_dir / 'correlations' / label.name
+    # ensure_dir(corr_dir)
+    # # plot rhos per subject
+    # for isub, sub in enumerate(subjects):
+    #     plt.subplots(1, 1, figsize=(16, 7))
+    #     plt.plot(times, all_rhos[isub, :, 0], label="rho")
+    #     sig = all_rhos[isub, :, 1] < 0.05 # not good for small sample size
+    #     plt.fill_between(times, 0, all_rhos[isub, :, 0], where=sig, alpha=0.3)
+    #     plt.axvspan(.0, .2, color='gray', label='stimulus', alpha=.1)
+    #     plt.axvline(0, color='grey')
+    #     plt.legend()
+    #     plt.ylim(-1.5, 1.5)
+    #     plt.axhline(y = -1, color='k', ls="dashed")
+    #     plt.axhline(y = 1, color='k', ls="dashed")
+    #     plt.axhline(y = 0, color='k')
+    #     plt.title(sub)
+    #     plt.savefig(corr_dir / f'{sub}.png')
+    #     plt.close()
+        
+    # plot average rho across subjects
+    plt.subplots(1, 1, figsize=(16, 7))
+    plt.plot(times, all_rhos.mean(0)[:, 0], label='rho')
+    diff = all_rhos[:, :, 0]
     p_values = decod_stats(diff)
+    p_values_unc = ttest_1samp(diff, axis=0, popmean=0)[1]
     sig = p_values < 0.05
-    plt.fill_between(times, 0, diff_inout[:, 1:5, :].mean((0, 1)), where=sig_unc, color='C2', alpha=0.2)
-    plt.fill_between(times, 0, diff_inout[:, 1:5, :].mean((0, 1)), where=sig, color='C3', alpha=0.3)
+    sig_unc = p_values_unc < 0.05
+    plt.fill_between(times, 0, all_rhos.mean(0)[:, 0], where=sig_unc, color='C2', alpha=1)
+    plt.fill_between(times, 0, all_rhos.mean(0)[:, 0], where=sig, alpha=0.3)
+    plt.ylim(-1, 1)
+    plt.axhline(y = 0, color='k')
+    plt.axvspan(.0, .2, color='gray', label='stimulus', alpha=.1)
+    plt.axvline(0, color='grey')
     plt.legend()
-    plt.savefig(op.join(figures_dir, 'source', 'ave', loca, fname))
+    plt.title('mean')
+    plt.savefig(figures_dir / 'correlations' / f"{label.name}.png")
     plt.close()

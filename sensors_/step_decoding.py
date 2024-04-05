@@ -16,6 +16,7 @@ from base import *
 from config import *
 import pandas as pd
 from sklearn.metrics import accuracy_score
+from scipy.stats import ttest_1samp
 
 trial_types = ["all", "pattern", "random"]
 data_path = DATA_DIR
@@ -158,6 +159,7 @@ plt.axhline(0.25, color='black', ls='dashed')
 plt.legend()
 plt.title('mean_true_vs_false_pred')
 plt.savefig(figures / 'mean_true_vs_false_pred.png')
+plt.close()
 
 # in vs out sequence decoding performance
 # all_in_seq = np.array(all_in_seqs).mean(axis=(0, 1)).T
@@ -183,3 +185,24 @@ plt.axhline(0, color='black', ls='dashed')
 plt.legend()
 plt.title('mean_in_vs_out_decoding')
 plt.savefig(figures / 'mean_in_vs_out_decod.png')
+plt.close()
+
+all_in_seq = np.load(figures / 'all_in.npy').mean(axis=(1))
+all_out_seq = np.load(figures / 'all_out.npy').mean(axis=(1))
+diff_inout = all_in_seq - all_out_seq
+diff = diff_inout[:, 1:5, :].mean((1)) - diff_inout[:, 0, :]
+
+plt.subplots(1, 1, figsize=(16, 7))
+plt.plot(times, diff_inout[:, 0, :].mean(0), label='practice', color='C7', alpha=0.6)
+plt.plot(times, diff_inout[:, 1:5, :].mean((0, 1)), label='learning', color='C1', alpha=0.6)
+p_values_unc = ttest_1samp(diff, axis=0, popmean=0)[1]
+sig_unc = p_values_unc < 0.05
+p_values = decod_stats(diff)
+sig = p_values < 0.05
+plt.fill_between(times, 0, diff_inout[:, 1:5, :].mean((0, 1)), where=sig_unc, color='C2', alpha=0.2)
+plt.fill_between(times, 0, diff_inout[:, 1:5, :].mean((0, 1)), where=sig, color='C3', alpha=0.3)
+plt.axvspan(.0, .2, color='gray', label='stimulus', alpha=.1)
+plt.axvline(0, color='grey')
+plt.axhline(0, color='black', ls='dashed')
+plt.legend()
+plt.show()

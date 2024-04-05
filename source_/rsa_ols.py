@@ -11,40 +11,19 @@ import statsmodels.api as sm
 from tqdm.auto import tqdm
 from sklearn.covariance import LedoitWolf
 from mne.beamformer import make_lcmv, apply_lcmv_epochs
-from config import RAW_DATA_DIR, DATA_DIR, RESULTS_DIR, FREESURFER_DIR, SUBJS, EPOCHS
+from base import *
+from config import *
 
 method = 'lcmv'
 lock = 'stim'
 trial_type = 'pattern'
-
-def ensure_dir(dirpath):
-    if not os.path.exists(dirpath):
-        os.makedirs(dirpath)
-
-def decod_stats(X):
-    from mne.stats import permutation_cluster_1samp_test
-    """Statistical test applied across subjects"""
-    # check input
-    X = np.array(X)
-
-    # stats function report p_value for each cluster
-    T_obs_, clusters, p_values, _ = permutation_cluster_1samp_test(
-        X, out_type='indices', n_permutations=2**12, n_jobs=-1,
-        verbose=False)
-
-    # format p_values to get same dimensionality as X
-    p_values_ = np.ones_like(X[0]).T
-    for cluster, pval in zip(clusters, p_values):
-        p_values_[cluster] = pval
-
-    return np.squeeze(p_values_)
 
 data_path = DATA_DIR
 res_path = RESULTS_DIR
 subjects_dir = FREESURFER_DIR
 subjects, epochs_list = SUBJS, EPOCHS
 
-figures = op.join(res_path, 'figures', lock, 'similarity')
+figures = res_path / 'figures' / lock / 'similarity'
 ensure_dir(figures)
 
 for lab in tqdm(range(34)):
@@ -53,18 +32,8 @@ for lab in tqdm(range(34)):
     
     for subject in subjects:
         # Read the behav file to get the sequence 
-        behav_dir = op.join(RAW_DATA_DIR, "%s/behav_data/" % (subject)) 
-        behav_files = [f for f in os.listdir(behav_dir) if (not f.startswith('.') and ('_eASRT_Epoch_' in f))]
-        behav = open(op.join(behav_dir, behav_files[0]), 'r')
-        lines = behav.readlines()
-        column_names = lines[0].split()
-        sequence = list()
-        for line in lines[1:]:
-                trialtype = int(line.split()[column_names.index('trialtype')])
-                if trialtype == 1:
-                    sequence.append(int(line.split()[column_names.index('position')]))
-                if len(sequence) == 4:
-                    break
+        behav_dir = op.join(RAW_DATA_DIR, "%s/behav_data/" % (subject))
+        sequence = get_sequence(behav_dir) 
         # create lists of possible combinations between stimuli
         one_two_similarities = list()
         one_three_similarities = list()
@@ -95,7 +64,6 @@ for lab in tqdm(range(34)):
             else:
                 epoch_fname = op.join(data_path, "%s/%s_%s_s-epo.fif" % (lock, subject, epoch_num))
             epoch = mne.read_epochs(epoch_fname)
-            times = epoch.times              
 
             trans_fname = os.path.join(res_path, "trans", lock,  "%s-trans-%s.fif" % (subject, epoch_num))
             fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,
