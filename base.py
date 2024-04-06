@@ -8,7 +8,8 @@ def decod_stats(X):
     from mne.stats import permutation_cluster_1samp_test
     """Statistical test applied across subjects"""
     # check input
-    X = np.array(X)
+    if not isinstance(X, np.ndarray):
+        X = np.array(X)
 
     # stats function report p_value for each cluster
     T_obs_, clusters, p_values, _ = permutation_cluster_1samp_test(
