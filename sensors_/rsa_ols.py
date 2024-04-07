@@ -32,17 +32,7 @@ for subject in subjects:
     
     # Read the behav file to get the sequence 
     behav_dir = op.join(RAW_DATA_DIR, "%s/behav_data/" % (subject)) 
-    behav_files = [f for f in os.listdir(behav_dir) if (not f.startswith('.') and ('_eASRT_Epoch_' in f))]
-    behav = open(op.join(behav_dir, behav_files[0]), 'r')
-    lines = behav.readlines()
-    column_names = lines[0].split()
-    sequence = list()
-    for line in lines[1:]:
-            trialtype = int(line.split()[column_names.index('trialtype')])
-            if trialtype == 1:
-                sequence.append(int(line.split()[column_names.index('position')]))
-            if len(sequence) == 4:
-                break
+    sequence = get_sequence(behav_dir)
     # random.shuffle(sequence)
         
     # create lists of possible combinations between stimuli
