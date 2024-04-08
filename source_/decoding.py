@@ -38,7 +38,7 @@ threshold = 0.05
 scoring = "accuracy"
 hemi = 'lh'
 params = "step_decoding"
-verbose = "error"
+verbose = True
 # figures dir
 figures = RESULTS_DIR / 'figures' / lock / 'decoding' / params / 'source'
 ensure_dir(figures)
@@ -56,9 +56,9 @@ labels = mne.read_labels_from_annot(subject='sub01', parc='aparc', hemi=hemi, su
 label_names = [label.name for label in labels]
 del labels
 # to store cross-val multiscore
-scores_dict = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(list)))) 
+scores_dict = defaultdict(lambda: defaultdict(lambda: defaultdict(list))) 
 # to store dissimilarity distances
-rsa_dict = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(list)))))
+rsa_dict = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(list))))
 combinations = ['one_two', 'one_three', 'one_four', 'two_three', 'two_four', 'three_four']
 
 for subject in subjects[:1]:
@@ -144,7 +144,7 @@ for subject in subjects[:1]:
                 
                 # cross-val multiscore decoding
                 scores = cross_val_multiscore(clf, X, y, cv=cv)
-                scores_dict[label.name][subject][trial_type][session_id].append(scores.mean(0).flatten())
+                scores_dict[label.name][trial_type][session_id].append(scores.mean(0).flatten())
                 
                 # prepare design matrix
                 ntrials = len(X)
@@ -203,35 +203,34 @@ for subject in subjects[:1]:
                 similarities = [one_two_similarity, one_three_similarity, one_four_similarity, 
                                 two_three_similarity, two_four_similarity, three_four_similarity]
                 
-                for combi, similarity in zip(range(len(combinations)), similarities):
-                    rsa_dict[label.name][subject][trial_type][session_id][combi].append(similarity)
+                for combi, similarity in zip(combinations, similarities):
+                    rsa_dict[label.name][trial_type][session_id][combi].append(similarity)
 
-##### Decoding dataframe #####
-time_points = range(len(times))
-index = pd.MultiIndex.from_product([label_names, subjects, trial_types, range(5)], names=['label', 'subject', 'trial_type', 'session'])
-scores_df = pd.DataFrame(index=index, columns=time_points)
-for label in labels:
-    for subject in subjects:
-        for trial_type in trial_types:
-            for session_id in range(len(sessions)):
-                scores_list = scores_dict[label.name][subject][trial_type][session_id]
-                if scores_list:
-                    average_scores = np.mean(scores_list, axis=0)
-                    scores_df.loc[(label.name, subject, trial_type, session_id), :] = average_scores.flatten()
-scores_df.to_csv(figures / f"{subject}_scores.csv", sep="\t")
+    ##### Decoding dataframe #####
+    time_points = range(len(times))
+    index = pd.MultiIndex.from_product([label_names, trial_types, range(5)], names=['label', 'trial_type', 'session'])
+    scores_df = pd.DataFrame(index=index, columns=time_points)
+    for label in labels:
+            for trial_type in trial_types:
+                for session_id in range(len(sessions)):
+                    scores_list = scores_dict[label.name][trial_type][session_id]
+                    if scores_list:
+                        average_scores = np.mean(scores_list, axis=0)
+                        scores_df.loc[(label.name, trial_type, session_id), :] = average_scores.flatten()
+    scores_df.to_csv(figures / f"{subject}_scores.csv", sep="\t")
 
-##### RSA dataframe #####
-index = pd.MultiIndex.from_product([label_names, subjects, trial_types, range(5), combinations], names=['label', 'subject', 'trial_type', 'session', 'similarities'])
-rsa_df = pd.DataFrame(index=index, columns=time_points)
-for label in labels:
-    for subject in subjects:
-        for trial_type in trial_types:
-            for session_id in range(len(sessions)):
-                for isim, similarity in enumerate(combinations):
-                    rsa_list = rsa_dict[label.name][subject][trial_type][session_id][isim]
-                    if rsa_list:
-                        rsa_scores = np.mean(rsa_list, axis=0)
-                        rsa_df.loc[(label.name, subject, trial_type, session_id, isim), :] = rsa_scores.flatten()
+    ##### RSA dataframe #####
+    index = pd.MultiIndex.from_product([label_names, trial_types, range(5), combinations], names=['label', 'trial_type', 'session', 'similarities'])
+    rsa_df = pd.DataFrame(index=index, columns=time_points)
+    for label in labels:
+            for trial_type in trial_types:
+                for session_id in range(len(sessions)):
+                    for isim, similarity in enumerate(combinations):
+                        rsa_list = rsa_dict[label.name][trial_type][session_id][similarity]
+                        if rsa_list:
+                            rsa_scores = np.mean(rsa_list, axis=0)
+                            rsa_df.loc[(label.name, trial_type, session_id, similarity), :] = rsa_scores.flatten()
+    rsa_df.to_csv(figures / f"{subject}_rsa.csv", sep="\t")
 
 ###### plot decoding scores #######
 max_value = scores_df.max().max()
