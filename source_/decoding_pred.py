@@ -39,7 +39,7 @@ scoring = "accuracy"
 hemi = 'lh'
 params = "step_decoding"
 verbose = "error"
-jobs = -1
+jobs = 10
 # figures dir
 figures = RESULTS_DIR / 'figures' / lock / 'decoding' / params / 'source'
 ensure_dir(figures)
