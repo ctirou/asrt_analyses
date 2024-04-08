@@ -37,7 +37,7 @@ chance = 0.25
 threshold = 0.05
 scoring = "accuracy"
 hemi = 'lh'
-params = "new_decoding"
+params = "step_decoding"
 verbose = "error"
 jobs = -1
 # figures dir
@@ -56,10 +56,8 @@ del epochs
 labels = mne.read_labels_from_annot(subject='sub01', parc='aparc', hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
 label_names = [label.name for label in labels]
 del labels
-# to store cross-val multiscore
-scores_dict = defaultdict(lambda: defaultdict(lambda: defaultdict(list))) 
 # to store dissimilarity distances
-rsa_dict = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(list))))
+pred_decod_dict = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(list))))
 combinations = ['one_two', 'one_three', 'one_four', 'two_three', 'two_four', 'three_four']
 
 for subject in subjects:
@@ -87,12 +85,12 @@ for subject in subjects:
         all_in_seqs, all_out_seqs = [], []
         true_pred_means, false_pred_means = [], []
 
-        for session_id, epo_fname in enumerate(sessions):
+        for session_id, session in enumerate(sessions):
             # get session behav and epoch
             if session_id == 0:
-                epo_fname = 'prac'
+                session = 'prac'
             else:
-                epo_fname = 'sess-%s' % (str(session_id).zfill(2))
+                session = 'sess-%s' % (str(session_id).zfill(2))
             behav = all_beh[session_id]
             epoch = all_epo[session_id]
             if lock == 'button': 
@@ -122,7 +120,7 @@ for subject in subjects:
             stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
             
             for ilabel, label in enumerate(labels):
-                print(subject, trial_type, epo_fname, label.name)            
+                print(subject, trial_type, session, label.name)            
                 # get stcs in label
                 stcs_data = list()
                 for stc in stcs:
@@ -143,95 +141,50 @@ for subject in subjects:
                     y = behav.positions            
                 assert X.shape[0] == y.shape[0]
                 
-                # cross-val multiscore decoding
-                scores = cross_val_multiscore(clf, X, y, cv=cv)
-                scores_dict[label.name][trial_type][session_id].append(scores.mean(0).flatten())
+                pred = np.zeros((len(y), X.shape[-1]))
+                # there is only randoms in practice sessions
+                for train, test in cv.split(X, y):
+                    clf.fit(X[train], y[train])
+                    pred[test] = np.array(clf.predict(X[test]))
+                cms = list()
+                for t in range(X.shape[-1]):
+                    cms.append(confusion_matrix(y, pred[:, t], normalize='true', labels=clf.classes_))
                 
-                # prepare design matrix
-                ntrials = len(X)
-                nconditions = len(set(y))
-                design_matrix = np.zeros((ntrials, nconditions))
+                one_two_similarity = list()
+                one_three_similarity = list()
+                one_four_similarity = list() 
+                two_three_similarity = list()
+                two_four_similarity = list()
+                three_four_similarity = list()
                 
-                for icondi, condi in enumerate(y):
-                    design_matrix[icondi, condi-1] = 1
-                assert np.sum(design_matrix.sum(axis=1) == 1) == len(X)
-                
-                data = X.copy()
-                _, verticies, ntimes = data.shape       
-                data = zscore(data, axis=0)
-                
-                coefs = np.zeros((nconditions, verticies, ntimes))
-                resids = np.zeros_like(data)
-                for vertex in tqdm(range(verticies)):
-                    for itime in range(ntimes):
-                        Y = data[:, vertex, itime]                    
-                        model = sm.OLS(endog=Y, exog=design_matrix, missing="raise")
-                        results = model.fit()
-                        coefs[:, vertex, itime] = results.params
-                        resids[:, vertex, itime] = results.resid
-
-                rdm_times = np.zeros((nconditions, nconditions, ntimes))
-                for itime in tqdm(range(ntimes)):
-                    response = coefs[:, :, itime]
-                    residuals = resids[:, :, itime]
-                    
-                    # Estimate covariance from residuals
-                    lw_shrinkage = LedoitWolf(assume_centered=True)
-                    cov = lw_shrinkage.fit(residuals)
-                    
-                    # Compute pairwise mahalanobis distances
-                    VI = np.linalg.inv(cov.covariance_) # covariance matrix needed for mahalonobis
-                    rdm = squareform(pdist(response, metric="mahalanobis", VI=VI))
-                    assert ~np.isnan(rdm).all()
-                    rdm_times[:, :, itime] = rdm
-
-                    rdmx = rdm_times.copy()
-                    one_two_similarity = list()
-                    one_three_similarity = list()
-                    one_four_similarity = list() 
-                    two_three_similarity = list()
-                    two_four_similarity = list()
-                    three_four_similarity = list()
-
-                    for itime in range(rdmx.shape[2]):
-                        one_two_similarity.append(rdmx[0, 1, itime])
-                        one_three_similarity.append(rdmx[0, 2, itime])
-                        one_four_similarity.append(rdmx[0, 3, itime])
-                        two_three_similarity.append(rdmx[1, 2, itime])
-                        two_four_similarity.append(rdmx[1, 3, itime])
-                        three_four_similarity.append(rdmx[2, 3, itime])
+                c = np.array(cms)
+                for itime in range(len(times)):
+                    one_two_similarity.append(c[itime, 0, 1])
+                    one_three_similarity.append(c[itime, 0, 2])
+                    one_four_similarity.append(c[itime, 0, 3])
+                    two_three_similarity.append(c[itime, 1, 2])
+                    two_four_similarity.append(c[itime, 1, 3])
+                    three_four_similarity.append(c[itime, 2, 3])
                                     
                 similarities = [one_two_similarity, one_three_similarity, one_four_similarity, 
                                 two_three_similarity, two_four_similarity, three_four_similarity]
                 
                 for combi, similarity in zip(combinations, similarities):
-                    rsa_dict[label.name][trial_type][session_id][combi].append(similarity)
+                    pred_decod_dict[label.name][trial_type][session_id][combi].append(similarity)
 
-    ##### Decoding dataframe #####
+    ##### Step_decoding dataframe #####
     time_points = range(len(times))
-    index = pd.MultiIndex.from_product([label_names, trial_types, range(5)], names=['label', 'trial_type', 'session'])
-    scores_df = pd.DataFrame(index=index, columns=time_points)
-    for label in labels:
-            for trial_type in trial_types:
-                for session_id in range(len(sessions)):
-                    scores_list = scores_dict[label.name][trial_type][session_id]
-                    if scores_list:
-                        average_scores = np.mean(scores_list, axis=0)
-                        scores_df.loc[(label.name, trial_type, session_id), :] = average_scores.flatten()
-    scores_df.to_csv(figures / f"{subject}_scores.csv", sep="\t")
-
-    ##### RSA dataframe #####
     index = pd.MultiIndex.from_product([label_names, trial_types, range(5), combinations], names=['label', 'trial_type', 'session', 'similarities'])
-    rsa_df = pd.DataFrame(index=index, columns=time_points)
+    pred_df = pd.DataFrame(index=index, columns=time_points)
     for label in labels:
             for trial_type in trial_types:
                 for session_id in range(len(sessions)):
                     for isim, similarity in enumerate(combinations):
-                        rsa_list = rsa_dict[label.name][trial_type][session_id][similarity]
-                        if rsa_list:
-                            rsa_scores = np.mean(rsa_list, axis=0)
-                            rsa_df.loc[(label.name, trial_type, session_id, similarity), :] = rsa_scores.flatten()
-    rsa_df.to_csv(figures / f"{subject}_rsa.csv", sep="\t")
+                        scores_list = pred_decod_dict[label.name][trial_type][session_id][similarity]
+                        if scores_list:
+                            scores = np.mean(scores_list, axis=0)
+                            pred_df.loc[(label.name, trial_type, session_id, similarity), :] = scores.flatten()
+    pred_df.to_csv(figures / f"{subject}_pred.csv", sep="\t")
         
     
 # ###### plot decoding scores #######

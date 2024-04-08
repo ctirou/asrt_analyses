@@ -62,8 +62,10 @@ for subject in subjects:
     two_four_similarities = list() 
     three_four_similarities = list()
 
-    beh = pd.concat(all_beh)
-    epochs = mne.concatenate_epochs(all_epo)
+    # get sequence
+    raw_beh_dir = RAW_DATA_DIR / subject / 'behav_data'
+    sequence = get_sequence(raw_beh_dir)
+
     
     for i, epo_fname in zip(range(5), ['practice', 'b1', 'b2', 'b3', 'b4']): 
     
@@ -96,10 +98,6 @@ for subject in subjects:
 
         true_pred_means.append(np.array([np.mean(true_pred[t][true_pred[t] != 0]) for t in range(len(times))]))
         false_pred_means.append(np.array([np.mean(false_pred[t][false_pred[t] != 0]) for t in range(len(times))]))
-        
-        # get sequence
-        raw_beh_dir = RAW_DATA_DIR / subject / 'behav_data'
-        sequence = get_sequence(raw_beh_dir)
         
         one_two_similarity = list()
         one_three_similarity = list()
