@@ -3,13 +3,12 @@ import os.path as op
 import numpy as np
 import pandas as pd
 import mne
-from mne.decoding import cross_val_multiscore, SlidingEstimator
+from mne.decoding import SlidingEstimator
 from sklearn.pipeline import make_pipeline
 from sklearn.model_selection import StratifiedKFold, train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegressionCV
-from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, multilabel_confusion_matrix, accuracy_score
-import matplotlib.pyplot as plt
+from sklearn.metrics import confusion_matrix
 from jr.gat import scorer_spearman
 from sklearn.metrics import make_scorer
 from base import *
@@ -36,17 +35,13 @@ folds = 10
 chance = 0.25
 threshold = 0.05
 scoring = "accuracy"
-hemi = 'lh'
+hemi = 'both'
 params = "step_decoding"
 verbose = "error"
 jobs = 10
 # figures dir
 figures = RESULTS_DIR / 'figures' / lock / 'decoding' / params / 'source'
 ensure_dir(figures)
-# set-up the classifier and cv structure
-clf = make_pipeline(StandardScaler(), LogisticRegressionCV(max_iter=10000))
-clf = SlidingEstimator(clf, n_jobs=jobs, scoring=scoring, verbose=True)
-cv = StratifiedKFold(folds, shuffle=True)
 # get times
 epoch_fname = DATA_DIR / lock / 'sub01_0_s-epo.fif'
 epochs = mne.read_epochs(epoch_fname, verbose=verbose)
@@ -56,38 +51,25 @@ del epochs
 labels = mne.read_labels_from_annot(subject='sub01', parc='aparc', hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
 label_names = [label.name for label in labels]
 del labels
+# set-up the classifier and cv structure
+clf = make_pipeline(StandardScaler(), LogisticRegressionCV(max_iter=10000))
+clf = SlidingEstimator(clf, n_jobs=jobs, scoring=scoring, verbose=verbose)
+cv = StratifiedKFold(folds, shuffle=True)
 # to store dissimilarity distances
 pred_decod_dict = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(list))))
 combinations = ['one_two', 'one_three', 'one_four', 'two_three', 'two_four', 'three_four']
 
-subject_num = int(os.environ["SLURM_ARRAY_TASK_ID"])
-subject = subjects[subject_num]
-
-# for subject in subjects:
-# read epochs
-epo_dir = data_path / lock
-epo_fnames = [epo_dir / f"{f}" for f in sorted(os.listdir(epo_dir)) if ".fif" in f and subject in f]
-all_epo = [mne.read_epochs(fname, preload=True, verbose=verbose) for fname in epo_fnames]
-# read behav files
-beh_dir = data_path / "behav"
-beh_fnames = [beh_dir / f"{f}" for f in sorted(os.listdir(beh_dir)) if ".pkl" in f and subject in f]
-all_beh = [pd.read_pickle(fname).reset_index() for fname in beh_fnames]
-# get bem and src files
-bem_fname = RESULTS_DIR / "bem" / f"{subject}-bem.fif"
-src_fname = RESULTS_DIR / "src" / f"{subject}-src.fif"
-src = mne.read_source_spaces(src_fname, verbose=verbose)
-# get labels
-labels = mne.read_labels_from_annot(subject=subject, parc='aparc', hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
-# get subject's repeated sequence
-raw_beh_dir = RAW_DATA_DIR / subject / 'behav_data'
-sequence = get_sequence(raw_beh_dir)
-
-for trial_type in trial_types:
-    
-    ensure_dir(figures / trial_type)
-    all_in_seqs, all_out_seqs = [], []
-    true_pred_means, false_pred_means = [], []
-
+for subject in subjects:
+    # read epochs
+    epo_dir = data_path / lock
+    epo_fnames = [epo_dir / f"{f}" for f in sorted(os.listdir(epo_dir)) if ".fif" in f and subject in f]
+    all_epo = [mne.read_epochs(fname, preload=True, verbose=verbose) for fname in epo_fnames]
+    # read behav files
+    beh_dir = data_path / "behav"
+    beh_fnames = [beh_dir / f"{f}" for f in sorted(os.listdir(beh_dir)) if ".pkl" in f and subject in f]
+    all_beh = [pd.read_pickle(fname).reset_index() for fname in beh_fnames]
+    # get labels
+    labels = mne.read_labels_from_annot(subject=subject, parc='aparc', hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
     for session_id, session in enumerate(sessions):
         # get session behav and epoch
         if session_id == 0:
@@ -99,14 +81,9 @@ for trial_type in trial_types:
         if lock == 'button': 
             epoch_bsl_fname = data_path / "bsl" / f"{subject}_{session_id}_bl-epo.fif"
             epoch_bsl = mne.read_epochs(epoch_bsl_fname, verbose=verbose)
-        # make forward solution    
-        trans_fname = res_path / "trans" / lock / f"{subject}-trans-{session_id}.fif"
-        fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,
-                                        src=src, bem=bem_fname,
-                                        meg=True, eeg=False,
-                                        mindist=5.0,
-                                        n_jobs=jobs,
-                                        verbose=verbose)
+        # read forward solution    
+        fwd_fname = res_path / "fwd" / lock / f"{subject}-fwd-{session_id}.fif"
+        fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
         # compute data covariance matrix on evoked data
         data_cov = mne.compute_covariance(epoch, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
         # compute noise covariance
@@ -123,7 +100,7 @@ for trial_type in trial_types:
         stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
         
         for ilabel, label in enumerate(labels):
-            print(subject, trial_type, session, label.name)            
+            print(f"{ilabel+1}/{len(labels)}", subject, session, label.name)            
             # get stcs in label
             stcs_data = list()
             for stc in stcs:
@@ -175,7 +152,7 @@ for trial_type in trial_types:
             for combi, similarity in zip(combinations, similarities):
                 pred_decod_dict[label.name][trial_type][session_id][combi].append(similarity)
 
-##### Step_decoding dataframe #####
+##### Pred decoding dataframe #####
 time_points = range(len(times))
 index = pd.MultiIndex.from_product([label_names, trial_types, range(5), combinations], names=['label', 'trial_type', 'session', 'similarities'])
 pred_df = pd.DataFrame(index=index, columns=time_points)

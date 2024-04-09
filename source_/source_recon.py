@@ -12,13 +12,15 @@ method = 'lcmv'
 lock = 'stim'
 trial_type = 'pattern'
 movie = False
-overwrite = True
+overwrite = False
 
 subjects = SUBJS
 epochs_list = EPOCHS
 data_path = DATA_DIR
 subjects_dir = FREESURFER_DIR
 res_path = RESULTS_DIR
+
+jobs = 4
 
 # create results directory
 folders = ["stcs", "bem", "src", "trans", "fwd"]
@@ -39,8 +41,9 @@ for subject in subjects:
         src = mne.setup_source_space(subject, spacing='oct6',
                                         subjects_dir=subjects_dir,
                                         add_dist=True,
-                                        n_jobs=-1)
+                                        n_jobs=jobs)
         src.save(src_fname, overwrite=overwrite)
+    src = mne.read_source_spaces(src_fname)
     # bem model
     bem_fname = os.path.join(res_path, "bem", "%s-bem.fif" % (subject))
     if not op.exists(bem_fname) or overwrite:
@@ -73,10 +76,6 @@ for subject in subjects:
         two_pattern = epoch[np.where((behav['positions']==2) & (behav['trialtypes']==filt))[0]]
         three_pattern = epoch[np.where((behav['positions']==3) & (behav['trialtypes']==filt))[0]]
         four_pattern = epoch[np.where((behav['positions']==4) & (behav['trialtypes']==filt))[0]]
-        # check = 0
-        # for pat in [one_pattern, two_pattern, three_pattern, four_pattern]:
-        #     check += len(pat)
-        # assert check == len(epoch)
         # create trans file
         trans_fname = os.path.join(res_path, "trans", lock,  "%s-trans-%s.fif" % (subject, epoch_num))
         if not op.exists(trans_fname) or overwrite:
@@ -86,6 +85,15 @@ for subject in subjects:
             coreg.omit_head_shape_points(distance=5.0 / 1000)
             coreg.fit_icp(n_iterations=100, verbose=True)
             mne.write_trans(trans_fname, coreg.trans, overwrite=overwrite)
+        fwd_fname = op.join(res_path, "fwd", lock, "%s-fwd-%s.fif" % (subject, epoch_num))
+        if not op.exists(fwd_fname):
+            fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,
+                                            src=src, bem=bem_fname,
+                                            meg=True, eeg=False,
+                                            mindist=5.0,
+                                            n_jobs=jobs,
+                                            verbose=True)
+            mne.write_forward_solution(fwd_fname, fwd, overwrite=True)
             
         # compute source estimate with beamformer algorithm, on evoked data, for each stimulus
         for pat, num in zip([one_pattern, two_pattern, three_pattern, four_pattern], [1, 2, 3, 4]):
@@ -110,7 +118,7 @@ for subject in subjects:
                                                 src=src, bem=bem_fname,
                                                 meg=True, eeg=False,
                                                 mindist=5.0,
-                                                n_jobs=1)
+                                                n_jobs=jobs)
                 mne.write_forward_solution(fwd_fname, fwd, overwrite=overwrite)
             else:
                 fwd = mne.read_forward_solution(fwd_fname)        

@@ -16,7 +16,6 @@ import statsmodels.api as sm
 from sklearn.covariance import LedoitWolf
 from mne.beamformer import make_lcmv, apply_lcmv_epochs
 from collections import defaultdict
-from tqdm.auto import tqdm
 
 # params
 # trial_types = ["all", "pattern", "random"]
@@ -31,30 +30,26 @@ folds = 10
 chance = 0.25
 threshold = 0.05
 scoring = "accuracy"
-hemi = 'lh'
+hemi = 'both'
 params = "new_decoding"
 verbose = "error"
-jobs = -1
+jobs = 15
 # figures dir
 figures = RESULTS_DIR / 'figures' / lock / params / 'source' / trial_type
 ensure_dir(figures)
-# set-up the classifier and cv structure
-clf = make_pipeline(StandardScaler(), LogisticRegressionCV(max_iter=10000))
-clf = SlidingEstimator(clf, n_jobs=jobs, scoring=scoring, verbose=True)
-cv = StratifiedKFold(folds, shuffle=True)
 # get times
 epoch_fname = DATA_DIR / lock / 'sub01_0_s-epo.fif'
 epochs = mne.read_epochs(epoch_fname, verbose=verbose)
 times = epochs.times
 del epochs
-# get len label names
+# get label names
 labels = mne.read_labels_from_annot(subject='sub01', parc='aparc', hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
 label_names = [label.name for label in labels]
 del labels
-# to store cross-val multiscore
-scores_dict = defaultdict(lambda: lambda: defaultdict(list)) 
-# to store dissimilarity distances
-rsa_dict = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+# set-up the classifier and cv structure
+clf = make_pipeline(StandardScaler(), LogisticRegressionCV(max_iter=10000))
+clf = SlidingEstimator(clf, n_jobs=jobs, scoring=scoring, verbose=verbose)
+cv = StratifiedKFold(folds, shuffle=True)
 combinations = ['one_two', 'one_three', 'one_four', 'two_three', 'two_four', 'three_four']
 
 for subject in subjects:
@@ -66,16 +61,13 @@ for subject in subjects:
     beh_dir = data_path / "behav"
     beh_fnames = [beh_dir / f"{f}" for f in sorted(os.listdir(beh_dir)) if ".pkl" in f and subject in f]
     all_beh = [pd.read_pickle(fname).reset_index() for fname in beh_fnames]
-    # get bem and src files
-    bem_fname = RESULTS_DIR / "bem" / f"{subject}-bem.fif"
-    src_fname = RESULTS_DIR / "src" / f"{subject}-src.fif"
-    src = mne.read_source_spaces(src_fname, verbose=verbose)
     # get labels
     labels = mne.read_labels_from_annot(subject=subject, parc='aparc', hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
-    # get subject's repeated sequence
-    raw_beh_dir = RAW_DATA_DIR / subject / 'behav_data'
-    sequence = get_sequence(raw_beh_dir)
-            
+    # to store cross-val multiscore
+    scores_dict = defaultdict(lambda: defaultdict(list)) 
+    # to store dissimilarity distances
+    rsa_dict = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))        
+    
     for session_id, session in enumerate(sessions):
         # get session behav and epoch
         if session_id == 0:
@@ -87,14 +79,9 @@ for subject in subjects:
         if lock == 'button': 
             epoch_bsl_fname = data_path / "bsl" / f"{subject}_{session_id}_bl-epo.fif"
             epoch_bsl = mne.read_epochs(epoch_bsl_fname, verbose=verbose)
-        # make forward solution    
-        trans_fname = res_path / "trans" / lock / f"{subject}-trans-{session_id}.fif"
-        fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,
-                                        src=src, bem=bem_fname,
-                                        meg=True, eeg=False,
-                                        mindist=5.0,
-                                        n_jobs=jobs,
-                                        verbose=verbose)
+        # read forward solution    
+        fwd_fname = res_path / "fwd" / lock / f"{subject}-fwd-{session_id}.fif"
+        fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
         # compute data covariance matrix on evoked data
         data_cov = mne.compute_covariance(epoch, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
         # compute noise covariance
@@ -111,7 +98,7 @@ for subject in subjects:
         stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
         
         for ilabel, label in enumerate(labels):
-            print(subject, trial_type, session, label.name)            
+            print(f"{str(ilabel+1).zfill(2)}/{len(labels)}", subject, session, label.name)            
             # get stcs in label
             stcs_data = list()
             for stc in stcs:
@@ -131,11 +118,10 @@ for subject in subjects:
                 X = stcs_data
                 y = behav.positions            
             assert X.shape[0] == y.shape[0]
-            
             # cross-val multiscore decoding
-            scores = cross_val_multiscore(clf, X, y, cv=cv)
+            scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=verbose)
             scores_dict[label.name][session_id].append(scores.mean(0).flatten())
-            
+
             # prepare design matrix
             ntrials = len(X)
             nconditions = len(set(y))
@@ -151,7 +137,7 @@ for subject in subjects:
             
             coefs = np.zeros((nconditions, verticies, ntimes))
             resids = np.zeros_like(data)
-            for vertex in tqdm(range(verticies)):
+            for vertex in range(verticies):
                 for itime in range(ntimes):
                     Y = data[:, vertex, itime]                    
                     model = sm.OLS(endog=Y, exog=design_matrix, missing="raise")
@@ -160,7 +146,7 @@ for subject in subjects:
                     resids[:, vertex, itime] = results.resid
 
             rdm_times = np.zeros((nconditions, nconditions, ntimes))
-            for itime in tqdm(range(ntimes)):
+            for itime in range(ntimes):
                 response = coefs[:, :, itime]
                 residuals = resids[:, :, itime]
                 
@@ -207,6 +193,8 @@ for subject in subjects:
                 average_scores = np.mean(scores_list, axis=0)
                 scores_df.loc[(label.name, session_id), :] = average_scores.flatten()
     scores_df.to_csv(figures / f"{subject}_scores.csv", sep="\t")
+    key = "scores"
+    scores_df.to_hdf(figures / f"{subject}_scores.h5", key=key, mode='w')
 
     ##### RSA dataframe #####
     index = pd.MultiIndex.from_product([label_names, range(5), combinations], names=['label', 'session', 'similarities'])
@@ -219,7 +207,9 @@ for subject in subjects:
                     rsa_scores = np.mean(rsa_list, axis=0)
                     rsa_df.loc[(label.name, session_id, similarity), :] = rsa_scores.flatten()
     rsa_df.to_csv(figures / f"{subject}_rsa.csv", sep="\t")
-        
+    key = 'rsa'
+    rsa_df.to_csv(figures / f"{subject}_rsa.h5", key=key, mode="w")
+
 # ###### plot decoding scores #######
 # max_value = scores_df.max().max()
 # min_value = scores_df.min().min()
