@@ -26,14 +26,14 @@ subjects = SUBJS
 sessions = ['practice', 'b1', 'b2', 'b3', 'b4']
 subjects_dir = FREESURFER_DIR
 res_path = RESULTS_DIR
-folds = 10
+folds = 5
 chance = 0.25
 threshold = 0.05
 scoring = "accuracy"
-hemi = 'both'
+hemi = 'lh'
 params = "new_decoding"
-verbose = "error"
-jobs = 15
+verbose = True
+jobs = -1
 # figures dir
 figures = RESULTS_DIR / 'figures' / lock / params / 'source' / trial_type
 ensure_dir(figures)
@@ -46,13 +46,9 @@ del epochs
 labels = mne.read_labels_from_annot(subject='sub01', parc='aparc', hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
 label_names = [label.name for label in labels]
 del labels
-# set-up the classifier and cv structure
-clf = make_pipeline(StandardScaler(), LogisticRegressionCV(max_iter=500000))
-clf = SlidingEstimator(clf, n_jobs=jobs, scoring=scoring, verbose=verbose)
-cv = StratifiedKFold(folds, shuffle=True)
 combinations = ['one_two', 'one_three', 'one_four', 'two_three', 'two_four', 'three_four']
 
-for subject in subjects:
+for subject in subjects[1:2]:
     # read epochs
     epo_dir = data_path / lock
     epo_fnames = [epo_dir / f"{f}" for f in sorted(os.listdir(epo_dir)) if ".fif" in f and subject in f]
@@ -68,7 +64,7 @@ for subject in subjects:
     # to store dissimilarity distances
     rsa_dict = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))        
     
-    for session_id, session in enumerate(sessions):
+    for session_id, session in enumerate(sessions[:1]):
         # get session behav and epoch
         if session_id == 0:
             session = 'prac'
@@ -97,7 +93,12 @@ for subject in subjects:
                         pick_ori=None, rank=rank, reduce_rank=True, verbose=verbose)
         stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
         
-        for ilabel, label in enumerate(labels):
+        for ilabel, label in enumerate(labels[:5]):
+            # set-up the classifier and cv structure
+            clf = make_pipeline(StandardScaler(), LogisticRegressionCV(max_iter=500000))
+            clf = SlidingEstimator(clf, n_jobs=jobs, scoring=scoring, verbose=verbose)
+            cv = StratifiedKFold(folds, shuffle=True)
+
             print(f"{str(ilabel+1).zfill(2)}/{len(labels)}", subject, session, label.name)            
             # get stcs in label
             stcs_data = list()

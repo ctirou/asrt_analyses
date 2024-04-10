@@ -33,10 +33,12 @@ for subject in subjects[:1]:
     max_value = scores_df.max().max()
     min_value = scores_df.min().min()
     
-    fig, axs = plt.subplots(nrows=10, ncols=4, sharey=True, layout='constrained')
+    nrows=5
+    ncols=1
+    fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex= True, layout='constrained')
     axs = axs.flatten()
     
-    for ilab, label in enumerate(label_names):
+    for ilab, label in enumerate(label_names[:5]):
         per_sess = []
             
         for session_id, session in enumerate(sessions[:1]):
@@ -50,7 +52,7 @@ for subject in subjects[:1]:
         axs[ilab].axhline(chance, color='black', ls='dashed', alpha=.5)
         axs[ilab].set_ylim(round(min_value, 2)-0.015, round(max_value, 2)+0.015)
     
-    for j in range(ilab+1, 10*4):
+    for j in range(ilab+1, nrows*ncols):
         axs[j].axis('off')
             
     plt.show()

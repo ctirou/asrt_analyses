@@ -5,22 +5,14 @@ import pandas as pd
 import mne
 from mne.decoding import SlidingEstimator
 from sklearn.pipeline import make_pipeline
-from sklearn.model_selection import StratifiedKFold, train_test_split
+from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegressionCV
 from sklearn.metrics import confusion_matrix
-from jr.gat import scorer_spearman
-from sklearn.metrics import make_scorer
 from base import *
 from config import *
-from sklearn.metrics import accuracy_score
-from scipy.spatial.distance import pdist, squareform
-from scipy.stats import ttest_1samp, zscore
-import statsmodels.api as sm
-from sklearn.covariance import LedoitWolf
 from mne.beamformer import make_lcmv, apply_lcmv_epochs
 from collections import defaultdict
-from tqdm.auto import tqdm
 
 # params
 trial_types = ["all", "pattern", "random"]
@@ -31,14 +23,14 @@ subjects = SUBJS
 sessions = ['practice', 'b1', 'b2', 'b3', 'b4']
 subjects_dir = FREESURFER_DIR
 res_path = RESULTS_DIR
-folds = 10
+folds = 5
 chance = 0.25
 threshold = 0.05
 scoring = "accuracy"
 hemi = 'both'
-params = "step_decoding"
+params = "pred_decoding"
 verbose = True
-jobs = 10
+jobs = -1
 # figures dir
 figures = RESULTS_DIR / 'figures' / lock / 'decoding' / params / 'source'
 ensure_dir(figures)
@@ -59,7 +51,7 @@ cv = StratifiedKFold(folds, shuffle=True)
 pred_decod_dict = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(list))))
 combinations = ['one_two', 'one_three', 'one_four', 'two_three', 'two_four', 'three_four']
 
-for subject in subjects:
+for subject in subjects[1:2]:
     # read epochs
     epo_dir = data_path / lock
     epo_fnames = [epo_dir / f"{f}" for f in sorted(os.listdir(epo_dir)) if ".fif" in f and subject in f]
@@ -70,7 +62,7 @@ for subject in subjects:
     all_beh = [pd.read_pickle(fname).reset_index() for fname in beh_fnames]
     # get labels
     labels = mne.read_labels_from_annot(subject=subject, parc='aparc', hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
-    for session_id, session in enumerate(sessions):
+    for session_id, session in enumerate(sessions[:1]):
         # get session behav and epoch
         if session_id == 0:
             session = 'prac'
@@ -99,7 +91,7 @@ for subject in subjects:
                         pick_ori=None, rank=rank, reduce_rank=True, verbose=verbose)
         stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
         
-        for ilabel, label in enumerate(labels):
+        for ilabel, label in enumerate(labels[:5]):
             print(f"{ilabel+1}/{len(labels)}", subject, session, label.name)            
             # get stcs in label
             stcs_data = list()
@@ -121,7 +113,6 @@ for subject in subjects:
                 y = behav.positions
             y = y.reset_index(drop=True)            
             assert X.shape[0] == y.shape[0]
-            
             
             pred = np.zeros((len(y), X.shape[-1]))
             # there is only randoms in practice sessions
