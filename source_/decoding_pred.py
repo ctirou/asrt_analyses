@@ -37,7 +37,7 @@ threshold = 0.05
 scoring = "accuracy"
 hemi = 'both'
 params = "step_decoding"
-verbose = "error"
+verbose = True
 jobs = 10
 # figures dir
 figures = RESULTS_DIR / 'figures' / lock / 'decoding' / params / 'source'
@@ -118,8 +118,10 @@ for subject in subjects:
                 y = behav.positions[random]
             else:
                 X = stcs_data
-                y = behav.positions            
+                y = behav.positions
+            y = y.reset_index(drop=True)            
             assert X.shape[0] == y.shape[0]
+            
             
             pred = np.zeros((len(y), X.shape[-1]))
             # there is only randoms in practice sessions
@@ -165,25 +167,4 @@ for label in labels:
                         scores = np.mean(scores_list, axis=0)
                         pred_df.loc[(label.name, trial_type, session_id, similarity), :] = scores.flatten()
 pred_df.to_csv(figures / f"{subject}_pred.csv", sep="\t")
-        
-    
-# ###### plot decoding scores #######
-# max_value = scores_df.max().max()
-# min_value = scores_df.min().min()
-# sco = list()
-# for sub in subjects[:2]:
-#     for i in range(1):
-#         sco.append(np.array(scores_df.loc[(label_names[0], sub, 'all', i), :]))
-#         # plt.plot(times, scores_df.loc[(label_names[0], sub, 'all', i), :], label=sub)
-# sco = np.array(sco)
-# pval = decod_stats(sco)
-# sig = pval - threshold
-# plt.subplots(1, 1, figsize=(10, 5))
-# plt.plot(times, sco.mean(0).flatten(), label='mean')
-# plt.fill_between(times, chance, sco.mean(0).flatten(), where=sig)
-# plt.title(label_names[0])
-# plt.axvspan(0, 0.2, color='grey', alpha=.2)
-# plt.axhline(chance, color='black', ls='dashed', alpha=.5)
-# plt.ylim(round(min_value, 2)-0.01, round(max_value, 2)+0.01)
-# plt.legend()
-# plt.show()
+pred_df.to_hdf(figures / f"{subject}_pred.h5", key='pred', mode='w')

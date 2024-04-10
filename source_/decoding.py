@@ -47,7 +47,7 @@ labels = mne.read_labels_from_annot(subject='sub01', parc='aparc', hemi=hemi, su
 label_names = [label.name for label in labels]
 del labels
 # set-up the classifier and cv structure
-clf = make_pipeline(StandardScaler(), LogisticRegressionCV(max_iter=10000))
+clf = make_pipeline(StandardScaler(), LogisticRegressionCV(max_iter=500000))
 clf = SlidingEstimator(clf, n_jobs=jobs, scoring=scoring, verbose=verbose)
 cv = StratifiedKFold(folds, shuffle=True)
 combinations = ['one_two', 'one_three', 'one_four', 'two_three', 'two_four', 'three_four']
@@ -208,25 +208,5 @@ for subject in subjects:
                     rsa_df.loc[(label.name, session_id, similarity), :] = rsa_scores.flatten()
     rsa_df.to_csv(figures / f"{subject}_rsa.csv", sep="\t")
     key = 'rsa'
-    rsa_df.to_csv(figures / f"{subject}_rsa.h5", key=key, mode="w")
-
-# ###### plot decoding scores #######
-# max_value = scores_df.max().max()
-# min_value = scores_df.min().min()
-# sco = list()
-# for sub in subjects[:2]:
-#     for i in range(1):
-#         sco.append(np.array(scores_df.loc[(label_names[0], sub, 'all', i), :]))
-#         # plt.plot(times, scores_df.loc[(label_names[0], sub, 'all', i), :], label=sub)
-# sco = np.array(sco)
-# pval = decod_stats(sco)
-# sig = pval - threshold
-# plt.subplots(1, 1, figsize=(10, 5))
-# plt.plot(times, sco.mean(0).flatten(), label='mean')
-# plt.fill_between(times, chance, sco.mean(0).flatten(), where=sig)
-# plt.title(label_names[0])
-# plt.axvspan(0, 0.2, color='grey', alpha=.2)
-# plt.axhline(chance, color='black', ls='dashed', alpha=.5)
-# plt.ylim(round(min_value, 2)-0.01, round(max_value, 2)+0.01)
-# plt.legend()
-# plt.show()
+    rsa_df.to_hdf(figures / f"{subject}_rsa.h5", key=key, mode="w")
+    
