@@ -93,12 +93,11 @@ for subject in subjects[1:2]:
                         pick_ori=None, rank=rank, reduce_rank=True, verbose=verbose)
         stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
         
-        for ilabel, label in enumerate(labels[:5]):
+        for ilabel, label in enumerate(labels):
             # set-up the classifier and cv structure
             clf = make_pipeline(StandardScaler(), LogisticRegressionCV(max_iter=500000))
             clf = SlidingEstimator(clf, n_jobs=jobs, scoring=scoring, verbose=verbose)
-            cv = StratifiedKFold(folds, shuffle=True)
-
+            cv = StratifiedKFold(folds, shuffle=True)                
             print(f"{str(ilabel+1).zfill(2)}/{len(labels)}", subject, session, label.name)            
             # get stcs in label
             stcs_data = list()
@@ -182,7 +181,7 @@ for subject in subjects[1:2]:
             
             for combi, similarity in zip(combinations, similarities):
                 rsa_dict[label.name][session_id][combi].append(similarity)
-
+    
     ##### Decoding dataframe #####
     time_points = range(len(times))
     index = pd.MultiIndex.from_product([label_names, range(5)], names=['label', 'session'])
