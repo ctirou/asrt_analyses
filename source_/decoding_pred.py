@@ -23,16 +23,16 @@ subjects = SUBJS
 sessions = ['practice', 'b1', 'b2', 'b3', 'b4']
 subjects_dir = FREESURFER_DIR
 res_path = RESULTS_DIR
-folds = 5
+folds = 10
 chance = 0.25
 threshold = 0.05
 scoring = "accuracy"
 hemi = 'both'
 params = "pred_decoding"
-verbose = True
+verbose = "error"
 jobs = -1
 # figures dir
-figures = RESULTS_DIR / 'figures' / lock / 'decoding' / params / 'source'
+figures = RESULTS_DIR / 'figures' / lock / params / 'source' / trial_type
 ensure_dir(figures)
 # get times
 epoch_fname = DATA_DIR / lock / 'sub01_0_s-epo.fif'
@@ -43,15 +43,11 @@ del epochs
 labels = mne.read_labels_from_annot(subject='sub01', parc='aparc', hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
 label_names = [label.name for label in labels]
 del labels
-# set-up the classifier and cv structure
-clf = make_pipeline(StandardScaler(), LogisticRegressionCV(max_iter=10000))
-clf = SlidingEstimator(clf, n_jobs=jobs, scoring=scoring, verbose=verbose)
-cv = StratifiedKFold(folds, shuffle=True)
-# to store dissimilarity distances
-pred_decod_dict = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(list))))
 combinations = ['one_two', 'one_three', 'one_four', 'two_three', 'two_four', 'three_four']
 
-for subject in subjects[1:2]:
+for subject in subjects:
+    # to store dissimilarity distances
+    pred_decod_dict = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
     # read epochs
     epo_dir = data_path / lock
     epo_fnames = [epo_dir / f"{f}" for f in sorted(os.listdir(epo_dir)) if ".fif" in f and subject in f]
@@ -62,7 +58,8 @@ for subject in subjects[1:2]:
     all_beh = [pd.read_pickle(fname).reset_index() for fname in beh_fnames]
     # get labels
     labels = mne.read_labels_from_annot(subject=subject, parc='aparc', hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
-    for session_id, session in enumerate(sessions[:1]):
+    
+    for session_id, session in enumerate(sessions):
         # get session behav and epoch
         if session_id == 0:
             session = 'prac'
@@ -91,8 +88,12 @@ for subject in subjects[1:2]:
                         pick_ori=None, rank=rank, reduce_rank=True, verbose=verbose)
         stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
         
-        for ilabel, label in enumerate(labels[:5]):
-            print(f"{ilabel+1}/{len(labels)}", subject, session, label.name)            
+        for ilabel, label in enumerate(labels):
+            print(f"{ilabel+1}/{len(labels)}", subject, session, label.name)
+            # set-up the classifier and cv structure
+            clf = make_pipeline(StandardScaler(), LogisticRegressionCV(max_iter=10000))
+            clf = SlidingEstimator(clf, n_jobs=jobs, scoring=scoring, verbose=verbose)
+            cv = StratifiedKFold(folds, shuffle=True)
             # get stcs in label
             stcs_data = list()
             for stc in stcs:
@@ -143,19 +144,18 @@ for subject in subjects[1:2]:
                             two_three_similarity, two_four_similarity, three_four_similarity]
             
             for combi, similarity in zip(combinations, similarities):
-                pred_decod_dict[label.name][trial_type][session_id][combi].append(similarity)
+                pred_decod_dict[label.name][session_id][combi].append(similarity)
 
-##### Pred decoding dataframe #####
-time_points = range(len(times))
-index = pd.MultiIndex.from_product([label_names, trial_types, range(5), combinations], names=['label', 'trial_type', 'session', 'similarities'])
-pred_df = pd.DataFrame(index=index, columns=time_points)
-for label in labels:
-        for trial_type in trial_types:
-            for session_id in range(len(sessions)):
-                for isim, similarity in enumerate(combinations):
-                    scores_list = pred_decod_dict[label.name][trial_type][session_id][similarity]
-                    if scores_list:
-                        scores = np.mean(scores_list, axis=0)
-                        pred_df.loc[(label.name, trial_type, session_id, similarity), :] = scores.flatten()
-pred_df.to_csv(figures / f"{subject}_pred.csv", sep="\t")
-pred_df.to_hdf(figures / f"{subject}_pred.h5", key='pred', mode='w')
+    ##### Pred decoding dataframe #####
+    time_points = range(len(times))
+    index = pd.MultiIndex.from_product([label_names, range(len(sessions)), combinations], names=['label', 'session', 'similarities'])
+    pred_df = pd.DataFrame(index=index, columns=time_points)
+    for label in labels:
+        for session_id in range(len(sessions)):
+            for isim, similarity in enumerate(combinations):
+                scores_list = pred_decod_dict[label.name][session_id][similarity]
+                if scores_list:
+                    scores = np.mean(scores_list, axis=0)
+                    pred_df.loc[(label.name, session_id, similarity), :] = scores.flatten()
+    pred_df.to_csv(figures / f"{subject}_pred.csv", sep="\t")
+    pred_df.to_hdf(figures / f"{subject}_pred.h5", key='pred', mode='w')

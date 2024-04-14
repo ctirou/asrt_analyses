@@ -26,11 +26,11 @@ subjects = SUBJS
 sessions = ['practice', 'b1', 'b2', 'b3', 'b4']
 subjects_dir = FREESURFER_DIR
 res_path = RESULTS_DIR
-folds = 5
+folds = 10
 chance = 0.25
 threshold = 0.05
 scoring = "accuracy"
-hemi = 'lh'
+hemi = 'both'
 params = "new_decoding"
 verbose = True
 jobs = -1
@@ -48,7 +48,7 @@ label_names = [label.name for label in labels]
 del labels
 combinations = ['one_two', 'one_three', 'one_four', 'two_three', 'two_four', 'three_four']
 
-for subject in subjects[1:2]:
+for subject in subjects:
     # read epochs
     epo_dir = data_path / lock
     epo_fnames = [epo_dir / f"{f}" for f in sorted(os.listdir(epo_dir)) if ".fif" in f and subject in f]
@@ -64,7 +64,7 @@ for subject in subjects[1:2]:
     # to store dissimilarity distances
     rsa_dict = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))        
     
-    for session_id, session in enumerate(sessions[:1]):
+    for session_id, session in enumerate(sessions):
         # get session behav and epoch
         if session_id == 0:
             session = 'prac'
@@ -184,7 +184,7 @@ for subject in subjects[1:2]:
     
     ##### Decoding dataframe #####
     time_points = range(len(times))
-    index = pd.MultiIndex.from_product([label_names, range(5)], names=['label', 'session'])
+    index = pd.MultiIndex.from_product([label_names, range(len(sessions))], names=['label', 'session'])
     scores_df = pd.DataFrame(index=index, columns=time_points)
     for label in labels:
         for session_id in range(len(sessions)):
@@ -193,11 +193,10 @@ for subject in subjects[1:2]:
                 average_scores = np.mean(scores_list, axis=0)
                 scores_df.loc[(label.name, session_id), :] = average_scores.flatten()
     scores_df.to_csv(figures / f"{subject}_scores.csv", sep="\t")
-    key = "scores"
-    scores_df.to_hdf(figures / f"{subject}_scores.h5", key=key, mode='w')
+    scores_df.to_hdf(figures / f"{subject}_scores.h5", key='scores', mode='w')
 
     ##### RSA dataframe #####
-    index = pd.MultiIndex.from_product([label_names, range(5), combinations], names=['label', 'session', 'similarities'])
+    index = pd.MultiIndex.from_product([label_names, range(len(sessions)), combinations], names=['label', 'session', 'similarities'])
     rsa_df = pd.DataFrame(index=index, columns=time_points)
     for label in labels:
         for session_id in range(len(sessions)):
@@ -207,6 +206,5 @@ for subject in subjects[1:2]:
                     rsa_scores = np.mean(rsa_list, axis=0)
                     rsa_df.loc[(label.name, session_id, similarity), :] = rsa_scores.flatten()
     rsa_df.to_csv(figures / f"{subject}_rsa.csv", sep="\t")
-    key = 'rsa'
-    rsa_df.to_hdf(figures / f"{subject}_rsa.h5", key=key, mode="w")
+    rsa_df.to_hdf(figures / f"{subject}_rsa.h5", key='rsa', mode="w")
     
