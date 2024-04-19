@@ -26,7 +26,7 @@ ensure_dir(figures)
 
 all_in_seqs, all_out_seqs = [], []
 
-for subject in subjects:
+for subject in subjects[:2]:
     
     # all_in_seqs, all_out_seqs = [], []
     
