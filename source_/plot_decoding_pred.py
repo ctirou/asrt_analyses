@@ -6,6 +6,8 @@ from base import *
 from config import *
 import matplotlib.pyplot as plt
 from mne import read_labels_from_annot, read_epochs
+from scipy.stats import ttest_1samp, spearmanr
+from tqdm.auto import tqdm
 
 trial_type = "pattern"
 subjects = SUBJS
@@ -28,7 +30,8 @@ blocks = ['prac', 'b1', 'b2', 'b3', 'b4']
 similarity_names = ['one_two', 'one_three', 'one_four', 'two_three', 'two_four', 'three_four']        
 
 in_seqs, out_seqs = [], []
-label_d = {}
+decod_in_lab = {}
+corr_in_lab = {}
 
 # get label names
 labels = read_labels_from_annot(subject='sub01', parc='aparc', hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
@@ -119,8 +122,45 @@ for ilabel, label in enumerate(label_names):
     
     all_in_seq = np.array(all_in_seqs)
     all_out_seq = np.array(all_out_seqs)
-    
     diff_inout = np.squeeze(all_in_seq.mean(axis=1) - all_out_seq.mean(axis=1))
     # np.save(res_dir / f"{label}.npy", diff_inout)
+    decod_in_lab[label] = diff_inout
     
-    label_d[label] = diff_inout
+    all_rhos = []
+    for sub in range(len(subjects)):
+        rhos = []
+        for t in range(len(times)):
+            rhos.append(spearmanr([0, 1, 2, 3, 4], diff_inout[sub, :, t]))
+        all_rhos.append(rhos)
+    all_rhos = np.array(all_rhos)
+    corr_in_lab[label] = all_rhos
+    
+nrows, ncols = 7, 10
+
+fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='constrained')
+for ax, label in zip(axs.flat, label_names):
+    practice = decod_in_lab[label][:, 0, :].mean(0)
+    learning = decod_in_lab[label][:, 1:, :].mean((0, 1))
+    
+    ax.plot(times, practice, label='practice')
+    ax.plot(times, learning, label='learning')
+    ax.set_title(label)
+    ax.axvspan(0, 0.2, color='grey', alpha=.2)
+    ax.axhline(0, color='black', ls='dashed', alpha=.5)
+    # axs[ilab].set_ylim(round(min_value, 2)-0.015, round(max_value, 2)+0.015)
+    # axs[ilabel].legend()
+# for j in range(ilabel+1, nrows*ncols):
+#     axs[j].axis('off')
+plt.show()
+
+
+fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharex=True, sharey=True)
+for ax, label in zip(axs.flat, label_names):
+    rho = corr_in_lab[label][:, :, 0].mean(0)
+    ax.plot(times, rho, label='rho')
+    ax.axvspan(0, 0.2, color='grey', alpha=.2)
+    ax.axhline(0, color='black', ls='dashed', alpha=.5)
+    ax.set_title(label)
+# for j in range(ilabel+1, nrows*ncols):
+#     axs[j].axis('off')
+plt.show()
