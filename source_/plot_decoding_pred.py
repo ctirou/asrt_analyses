@@ -25,19 +25,22 @@ times = epochs.times
 del epochs
 
 blocks = ['prac', 'b1', 'b2', 'b3', 'b4']
-similarities = ['one_two', 'one_three', 'one_four', 'two_three', 'two_four', 'three_four']        
+similarity_names = ['one_two', 'one_three', 'one_four', 'two_three', 'two_four', 'three_four']        
 
 in_seqs, out_seqs = [], []
+label_d = {}
 
 # get label names
 labels = read_labels_from_annot(subject='sub01', parc='aparc', hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
 label_names = [label.name for label in labels]
 
-for label in label_names[:1]:
+for ilabel, label in enumerate(label_names):
+    
+    print(f"{ilabel+1}/{len(label_names)}", label)
     
     all_in_seqs, all_out_seqs = [], []
     
-    for subject in subjects[:1]:
+    for subject in subjects:
         
         one_two_similarities = list()
         one_three_similarities = list()
@@ -52,8 +55,8 @@ for label in label_names[:1]:
         scores_df = pd.read_hdf(res_dir / f"{subject}_pred.h5", key='pred')
         scores_df = scores_df.groupby(level=['label', 'session', 'similarities']).first()
         
-        new_index = pd.MultiIndex.from_product([scores_df.index.levels[0], scores_df.index.levels[1], similarities], 
-                                       names=scores_df.index.names)
+        new_index = pd.MultiIndex.from_product([scores_df.index.levels[0], scores_df.index.levels[1], similarity_names], 
+                                       names=scores_df.index.names)   
         scores_df = scores_df.reindex(new_index)
         
         # max_value = scores_df.max().max()
@@ -77,7 +80,7 @@ for label in label_names[:1]:
             one_two, one_three, one_four, two_three, two_four, three_four = [], [], [], [], [], []
             # similarities_list = [one_two, one_three, one_four, two_three, two_four, three_four]
         
-            for sim, sim_list in zip(similarities, [one_four, one_three, one_two, three_four, two_four, two_three]):
+            for sim, sim_list in zip(similarity_names, [one_four, one_three, one_two, three_four, two_four, two_three]):
                 sim_list.append(scores_df.loc[(label, session_id, sim), :])
 
             for all_sims, sim_list in zip([one_two_similarities, one_three_similarities, one_four_similarities, two_three_similarities, two_four_similarities, three_four_similarities], 
@@ -113,3 +116,11 @@ for label in label_names[:1]:
         # for j in range(ilab+1, nrows*ncols):
         #     axs[j].axis('off')
         # plt.show()
+    
+    all_in_seq = np.array(all_in_seqs)
+    all_out_seq = np.array(all_out_seqs)
+    
+    diff_inout = np.squeeze(all_in_seq.mean(axis=1) - all_out_seq.mean(axis=1))
+    # np.save(res_dir / f"{label}.npy", diff_inout)
+    
+    label_d[label] = diff_inout
