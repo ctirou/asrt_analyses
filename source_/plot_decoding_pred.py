@@ -1,7 +1,6 @@
 import os
 import numpy as np
 import pandas as pd
-from jr.gat import scorer_spearman
 from base import *
 from config import *
 import matplotlib.pyplot as plt
