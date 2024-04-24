@@ -13,7 +13,7 @@ subjects = SUBJS
 lock = "stim"
 params = "pred_decoding"
 sessions = EPOCHS
-res_dir = RESULTS_DIR / 'figures' / lock / 'decoding' / params / 'source' / trial_type
+res_dir = RESULTS_DIR / 'figures' / lock / 'old_decoding' / params / 'source' / trial_type
 subjects_dir = FREESURFER_DIR
 verbose = "error"
 hemi = 'both'
@@ -30,6 +30,7 @@ similarity_names = ['one_two', 'one_three', 'one_four', 'two_three', 'two_four',
 
 in_seqs, out_seqs = [], []
 decod_in_lab = {}
+decod_in_lab2 = {}
 corr_in_lab = {}
 
 # get label names
@@ -38,7 +39,7 @@ label_names = [label.name for label in labels]
 
 for ilabel, label in enumerate(label_names):
     
-    print(f"{ilabel+1}/{len(label_names)}", label)
+    print(f"{str(ilabel+1).zfill(2)}/{len(label_names)}", label)
     
     all_in_seqs, all_out_seqs = [], []
     
@@ -60,27 +61,10 @@ for ilabel, label in enumerate(label_names):
         new_index = pd.MultiIndex.from_product([scores_df.index.levels[0], scores_df.index.levels[1], similarity_names], 
                                        names=scores_df.index.names)   
         scores_df = scores_df.reindex(new_index)
-        
-        # max_value = scores_df.max().max()
-        # min_value = scores_df.min().min()
-        
-        # nrows=10
-        # ncols=16
-        
-        # fig, axs = plt.subplots(nrows=nrows, ncols=ncols, 
-        #                         sharey=True, 
-        #                         sharex=False,
-        #                         squeeze=False,
-        #                         layout='constrained')
-        # axs = axs.flatten()
-        
-        # in_labels = []
-        # for ilab, label in enumerate(label_names[:1]):
-            
+                    
         for session_id, session in enumerate(sessions):
             
             one_two, one_three, one_four, two_three, two_four, three_four = [], [], [], [], [], []
-            # similarities_list = [one_two, one_three, one_four, two_three, two_four, three_four]
         
             for sim, sim_list in zip(similarity_names, [one_four, one_three, one_two, three_four, two_four, two_three]):
                 sim_list.append(scores_df.loc[(label, session_id, sim), :])
@@ -96,46 +80,26 @@ for ilabel, label in enumerate(label_names):
         in_seq, out_seq = get_inout_seq(sequence, similarities)
         all_in_seqs.append(in_seq)
         all_out_seqs.append(out_seq)
-        
-        #     per_sess = []
-                
-        #     for session_id, session in enumerate(sessions):
-        #         per_sess.append(np.array(scores_df.loc[(label, session_id), :]))
-        
-        #     per_sess = np.array(per_sess)
-
-        #     for i, block in zip(range(5), blocks):
-        #         axs[ilab].plot(times, per_sess[i].T, )
             
-        #     axs[ilab].set_title(label)
-        #     axs[ilab].axvspan(0, 0.2, color='grey', alpha=.2)
-        #     axs[ilab].axhline(chance, color='black', ls='dashed', alpha=.5)
-        #     axs[ilab].set_ylim(round(min_value, 2)-0.015, round(max_value, 2)+0.015)
-
-        # in_labels.append(per_sess)
-        # in_labels = np.array(in_labels)
-            
-        # for j in range(ilab+1, nrows*ncols):
-        #     axs[j].axis('off')
-        # plt.show()
-    
     all_in_seq = np.array(all_in_seqs)
     all_out_seq = np.array(all_out_seqs)
     diff_inout = np.squeeze(all_in_seq.mean(axis=1) - all_out_seq.mean(axis=1))
-    # np.save(res_dir / f"{label}.npy", diff_inout)
     decod_in_lab[label] = diff_inout
     
-    all_rhos = []
-    for sub in range(len(subjects)):
-        rhos = []
-        for t in range(len(times)):
-            rhos.append(spearmanr([0, 1, 2, 3, 4], diff_inout[sub, :, t]))
-        all_rhos.append(rhos)
-    all_rhos = np.array(all_rhos)
-    corr_in_lab[label] = all_rhos
+    decod_in_lab2[label] = [np.squeeze(all_in_seq).mean(axis=1), np.squeeze(all_out_seq).mean(axis=1)]
+    
+    # all_rhos = []
+    # for sub in range(len(subjects)):
+    #     rhos = []
+    #     for t in range(len(times)):
+    #         rhos.append(spearmanr([0, 1, 2, 3, 4], diff_inout[sub, :, t]))
+    #     all_rhos.append(rhos)
+    # all_rhos = np.array(all_rhos)
+    # corr_in_lab[label] = all_rhos
     
 nrows, ncols = 7, 10
 
+# plot diff in/out
 fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='constrained')
 for ax, label in zip(axs.flat, label_names):
     practice = decod_in_lab[label][:, 0, :].mean(0)
@@ -146,20 +110,28 @@ for ax, label in zip(axs.flat, label_names):
     ax.set_title(label)
     ax.axvspan(0, 0.2, color='grey', alpha=.2)
     ax.axhline(0, color='black', ls='dashed', alpha=.5)
-    # axs[ilab].set_ylim(round(min_value, 2)-0.015, round(max_value, 2)+0.015)
-    # axs[ilabel].legend()
-# for j in range(ilabel+1, nrows*ncols):
-#     axs[j].axis('off')
+    ax.legend()
 plt.show()
 
-
-fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharex=True, sharey=True)
+# plot in vs out
+fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='constrained')
 for ax, label in zip(axs.flat, label_names):
-    rho = corr_in_lab[label][:, :, 0].mean(0)
-    ax.plot(times, rho, label='rho')
+    ins = decod_in_lab2[label][0].mean(axis=(0, 1))
+    outs = decod_in_lab2[label][1].mean(axis=(0, 1))
+    ax.plot(times, ins, label='in_seq') 
+    ax.plot(times, outs, label='out_seq')
     ax.axvspan(0, 0.2, color='grey', alpha=.2)
-    ax.axhline(0, color='black', ls='dashed', alpha=.5)
     ax.set_title(label)
-# for j in range(ilabel+1, nrows*ncols):
-#     axs[j].axis('off')
+    ax.legend()
 plt.show()
+
+
+# correlations
+# fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharex=True, sharey=True)
+# for ax, label in zip(axs.flat, label_names):
+#     rho = corr_in_lab[label][:, :, 0].mean(0)
+#     ax.plot(times, rho, label='rho')
+#     ax.axvspan(0, 0.2, color='grey', alpha=.2)
+#     ax.axhline(0, color='black', ls='dashed', alpha=.5)
+#     ax.set_title(label)
+# plt.show()

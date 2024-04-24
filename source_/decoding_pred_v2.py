@@ -7,7 +7,7 @@ from sklearn.pipeline import make_pipeline
 from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegressionCV
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, roc_auc_score
 from base import *
 from config import *
 from mne.beamformer import make_lcmv, apply_lcmv_epochs
@@ -23,14 +23,14 @@ subjects = SUBJS
 sessions = ['practice', 'b1', 'b2', 'b3', 'b4']
 subjects_dir = FREESURFER_DIR
 res_path = RESULTS_DIR
-folds = 3
+folds = 10
 chance = 0.25
 threshold = 0.05
 scoring = "accuracy"
 parc='aparc'
 hemi = 'both'
 params = "pred_decoding"
-verbose = True
+verbose = "error"
 jobs = -1
 
 # figures dir
@@ -51,14 +51,18 @@ clf = make_pipeline(StandardScaler(), LogisticRegressionCV(max_iter=10000))
 clf = SlidingEstimator(clf, n_jobs=jobs, scoring=scoring, verbose=verbose)
 cv = StratifiedKFold(folds, shuffle=True)
 
+decod_in_lab = dict()
+
 # for ilabel in range(68):
-for ilabel in range(1):
+for ilabel in range(68):
+        
+    sims_in_label, decod_in_subs = [], []
 
-    sims_in_label = []
-
-    for subject in subjects[:1]:
+    for subject in subjects:
         
         sims_in_sub = []
+        
+        decod_in_sess = []
         
         # read epochs
         epo_dir = data_path / lock
@@ -126,14 +130,21 @@ for ilabel in range(1):
             assert X.shape[0] == y.shape[0]
             
             pred = np.zeros((len(y), X.shape[-1]))
+            pred_rock = np.zeros((len(y), X.shape[-1], len(set(y))))
             # there is only randoms in practice sessions
             for train, test in cv.split(X, y):
                 clf.fit(X[train], y[train])
-                pred[test] = np.array(clf.predict(X[test]))
-            cms = list()
+                pred[test] = np.array(clf.predict(X[test], verbose=verbose))
+                pred_rock[test] = np.array(clf.predict_proba(X[test], verbose=verbose))
+                
+            cms, scores = list(), list()
             for t in range(X.shape[-1]):
                 cms.append(confusion_matrix(y, pred[:, t], normalize='true', labels=clf.classes_))
+                scores.append(roc_auc_score(y, pred_rock[:, t, :], multi_class='ovr'))
             
+            scores = np.array(scores)
+            np.save(figures / f'{label.name}_{subject}_{session_id}-scores.npy', scores)
+
             one_two_similarity = list()
             one_three_similarity = list()
             one_four_similarity = list() 
@@ -156,13 +167,16 @@ for ilabel in range(1):
             similarities = np.array(similarities)
             sims_in_sub.append(similarities)
             
-            np.save(figures / f'{label}_{subject}_{session_id}.npy', similarities)
+            np.save(figures / f'{label.name}_{subject}_{session_id}-rsa.npy', similarities)
         
         sims_in_sub = np.array(sims_in_sub)
         sims_in_label.append(np.array(sims_in_sub))
         
-    sims_in_label = np.array(sims_in_label)
-    np.save(figures / f'{label.name}.npy', sims_in_label)
+        decod_in_sess = np.array(decod_in_sess)
+        
+        
+    # sims_in_label = np.array(sims_in_label)
+    # np.save(figures / f'{label.name}.npy', sims_in_label)
     
     # # need diff_inout for this, per sub
     # all_rhos = []

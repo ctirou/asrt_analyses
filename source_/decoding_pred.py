@@ -8,7 +8,7 @@ from sklearn.pipeline import make_pipeline
 from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegressionCV
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, roc_auc_score
 from base import *
 from config import *
 from mne.beamformer import make_lcmv, apply_lcmv_epochs
@@ -44,6 +44,8 @@ labels = mne.read_labels_from_annot(subject='sub01', parc='aparc', hemi=hemi, su
 label_names = [label.name for label in labels]
 del labels
 combinations = ['one_two', 'one_three', 'one_four', 'two_three', 'two_four', 'three_four']
+
+decod_in_lab = {}
 
 for subject in subjects:
     # to store dissimilarity distances
@@ -120,9 +122,11 @@ for subject in subjects:
             for train, test in cv.split(X, y):
                 clf.fit(X[train], y[train])
                 pred[test] = np.array(clf.predict(X[test]))
-            cms = list()
+            
+            cms, scores = [], []
             for t in range(X.shape[-1]):
                 cms.append(confusion_matrix(y, pred[:, t], normalize='true', labels=clf.classes_))
+                scores.append(roc_auc_score(y, pred[:, t], multi_class='ovr')) 
             
             one_two_similarity = list()
             one_three_similarity = list()
@@ -157,5 +161,4 @@ for subject in subjects:
                 if scores_list:
                     scores = np.mean(scores_list, axis=0)
                     pred_df.loc[(label.name, session_id, similarity), :] = scores.flatten()
-    pred_df.to_csv(figures / f"{subject}_pred.csv", sep="\t")
     pred_df.to_hdf(figures / f"{subject}_pred.h5", key='pred', mode='w')
