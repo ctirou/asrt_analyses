@@ -70,6 +70,34 @@ def get_inout_seq(sequence, similarities):
             out_seq.append(similarity)
     return np.array(in_seq), np.array(out_seq)
 
+
+def get_best_pairs(sequence, similarities):
+    import numpy as np
+    # create list of possible pairs
+    pairs_in_sequence, pairs_out_sequence = [], []
+    pairs_in_sequence.append(str(sequence[0]) + str(sequence[1]))
+    pairs_in_sequence.append(str(sequence[1]) + str(sequence[2]))
+    pairs_in_sequence.append(str(sequence[2]) + str(sequence[3]))
+    pairs_in_sequence.append(str(sequence[3]) + str(sequence[0]))
+    
+    pairs_out_sequence.append(str(sequence[0]) + str(sequence[2]))
+    pairs_out_sequence.append(str(sequence[1]) + str(sequence[3]))
+
+    in_seq, out_seq = [], []
+    pairs = ['12', '13', '14', '23', '24', '34']
+    rev_pairs = ['21', '31', '41', '32', '42', '43']
+    
+    index = [0, 2]
+    best_pairs = [val for idx, val in enumerate(pairs_in_sequence) if idx in index]
+    
+    # look which are in, which are out
+    for pair, rev_pair, similarity in zip(pairs, rev_pairs, similarities):
+        if ((pair in best_pairs) or (rev_pair in best_pairs)):
+            in_seq.append(similarity)
+        elif ((pair in pairs_out_sequence) or (rev_pair in pairs_out_sequence)):
+            out_seq.append(similarity)
+    return np.array(in_seq), np.array(out_seq)
+    
 def get_inseq(sequence):
     # create list of possible pairs
     pairs_in_sequence = list()

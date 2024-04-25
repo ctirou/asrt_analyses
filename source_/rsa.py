@@ -31,9 +31,9 @@ chance = 0.25
 threshold = 0.05
 scoring = "accuracy"
 hemi = 'both'
-params = "new_decoding"
-verbose = True
-jobs = -1
+params = "RSA"
+verbose = "error"
+jobs = 15
 # figures dir
 figures = RESULTS_DIR / 'figures' / lock / params / 'source' / trial_type
 ensure_dir(figures)
@@ -48,7 +48,13 @@ label_names = [label.name for label in labels]
 del labels
 combinations = ['one_two', 'one_three', 'one_four', 'two_three', 'two_four', 'three_four']
 
+# # set-up the classifier and cv structure
+# clf = make_pipeline(StandardScaler(), LogisticRegressionCV(max_iter=500000))
+# clf = SlidingEstimator(clf, n_jobs=jobs, scoring=scoring, verbose=verbose)
+# cv = StratifiedKFold(folds, shuffle=True)
+
 for subject in subjects:
+    
     # read epochs
     epo_dir = data_path / lock
     epo_fnames = [epo_dir / f"{f}" for f in sorted(os.listdir(epo_dir)) if ".fif" in f and subject in f]
@@ -59,12 +65,14 @@ for subject in subjects:
     all_beh = [pd.read_pickle(fname).reset_index() for fname in beh_fnames]
     # get labels
     labels = mne.read_labels_from_annot(subject=subject, parc='aparc', hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
-    # to store cross-val multiscore
-    scores_dict = defaultdict(lambda: defaultdict(list)) 
     # to store dissimilarity distances
-    rsa_dict = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))        
+    rsa_dict = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
     
+    # # to store cross-val multiscore
+    # scores_dict = defaultdict(lambda: defaultdict(list)) 
+            
     for session_id, session in enumerate(sessions):
+        
         # get session behav and epoch
         if session_id == 0:
             session = 'prac'
@@ -93,11 +101,8 @@ for subject in subjects:
                         pick_ori=None, rank=rank, reduce_rank=True, verbose=verbose)
         stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
         
+        # loop across labels
         for ilabel, label in enumerate(labels):
-            # set-up the classifier and cv structure
-            clf = make_pipeline(StandardScaler(), LogisticRegressionCV(max_iter=500000))
-            clf = SlidingEstimator(clf, n_jobs=jobs, scoring=scoring, verbose=verbose)
-            cv = StratifiedKFold(folds, shuffle=True)                
             print(f"{str(ilabel+1).zfill(2)}/{len(labels)}", subject, session, label.name)            
             # get stcs in label
             stcs_data = list()
@@ -105,7 +110,6 @@ for subject in subjects:
                 stcs_data.append(stc.in_label(label).data)
             stcs_data = np.array(stcs_data)
             assert len(stcs_data) == len(behav)
-        
             if trial_type == 'pattern':
                 pattern = behav.trialtypes == 1
                 X = stcs_data[pattern]
@@ -118,9 +122,10 @@ for subject in subjects:
                 X = stcs_data
                 y = behav.positions            
             assert X.shape[0] == y.shape[0]
-            # cross-val multiscore decoding
-            scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=verbose)
-            scores_dict[label.name][session_id].append(scores.mean(0).flatten())
+            
+            # # cross-val multiscore decoding
+            # scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=verbose)
+            # scores_dict[label.name][session_id].append(scores.mean(0).flatten())
 
             # prepare design matrix
             ntrials = len(X)
@@ -182,18 +187,19 @@ for subject in subjects:
             for combi, similarity in zip(combinations, similarities):
                 rsa_dict[label.name][session_id][combi].append(similarity)
     
-    ##### Decoding dataframe #####
     time_points = range(len(times))
-    index = pd.MultiIndex.from_product([label_names, range(len(sessions))], names=['label', 'session'])
-    scores_df = pd.DataFrame(index=index, columns=time_points)
-    for label in labels:
-        for session_id in range(len(sessions)):
-            scores_list = scores_dict[label.name][session_id]
-            if scores_list:
-                average_scores = np.mean(scores_list, axis=0)
-                scores_df.loc[(label.name, session_id), :] = average_scores.flatten()
-    scores_df.to_csv(figures / f"{subject}_scores.csv", sep="\t")
-    scores_df.to_hdf(figures / f"{subject}_scores.h5", key='scores', mode='w')
+    
+    ##### Decoding dataframe #####
+    # index = pd.MultiIndex.from_product([label_names, range(len(sessions))], names=['label', 'session'])
+    # scores_df = pd.DataFrame(index=index, columns=time_points)
+    # for label in labels:
+    #     for session_id in range(len(sessions)):
+    #         scores_list = scores_dict[label.name][session_id]
+    #         if scores_list:
+    #             average_scores = np.mean(scores_list, axis=0)
+    #             scores_df.loc[(label.name, session_id), :] = average_scores.flatten()
+    # scores_df.to_csv(figures / f"{subject}_scores.csv", sep="\t")
+    # scores_df.to_hdf(figures / f"{subject}_scores.h5", key='scores', mode='w')
 
     ##### RSA dataframe #####
     index = pd.MultiIndex.from_product([label_names, range(len(sessions)), combinations], names=['label', 'session', 'similarities'])
@@ -205,6 +211,4 @@ for subject in subjects:
                 if rsa_list:
                     rsa_scores = np.mean(rsa_list, axis=0)
                     rsa_df.loc[(label.name, session_id, similarity), :] = rsa_scores.flatten()
-    rsa_df.to_csv(figures / f"{subject}_rsa.csv", sep="\t")
     rsa_df.to_hdf(figures / f"{subject}_rsa.h5", key='rsa', mode="w")
-    

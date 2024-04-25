@@ -109,9 +109,7 @@ for ilabel in range(68):
             print(f"{ilabel+1}/{len(labels)}", subject, session, label.name)
             
             # get stcs in label
-            stcs_data = list()
-            for stc in stcs:
-                stcs_data.append(stc.in_label(label).data)
+            stcs_data = [stc.in_label(label).data for stc in stcs]
             stcs_data = np.array(stcs_data)
             assert len(stcs_data) == len(behav)
         
@@ -134,13 +132,15 @@ for ilabel in range(68):
             # there is only randoms in practice sessions
             for train, test in cv.split(X, y):
                 clf.fit(X[train], y[train])
-                pred[test] = np.array(clf.predict(X[test], verbose=verbose))
-                pred_rock[test] = np.array(clf.predict_proba(X[test], verbose=verbose))
+                pred[test] = np.array(clf.predict(X[test]))
+                pred_rock[test] = np.array(clf.predict_proba(X[test]))
                 
             cms, scores = list(), list()
             for t in range(X.shape[-1]):
                 cms.append(confusion_matrix(y, pred[:, t], normalize='true', labels=clf.classes_))
                 scores.append(roc_auc_score(y, pred_rock[:, t, :], multi_class='ovr'))
+                
+                
             
             scores = np.array(scores)
             np.save(figures / f'{label.name}_{subject}_{session_id}-scores.npy', scores)
@@ -153,6 +153,7 @@ for ilabel in range(68):
             three_four_similarity = list()
             
             c = np.array(cms)
+            
             for itime in range(len(times)):
                 one_two_similarity.append(c[itime, 0, 1])
                 one_three_similarity.append(c[itime, 0, 2])

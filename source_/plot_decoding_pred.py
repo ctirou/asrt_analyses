@@ -101,7 +101,7 @@ nrows, ncols = 7, 10
 
 # plot diff in/out
 fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='constrained')
-for ax, label in zip(axs.flat, label_names):
+for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
     practice = decod_in_lab[label][:, 0, :].mean(0)
     learning = decod_in_lab[label][:, 1:, :].mean((0, 1))
     
@@ -110,19 +110,36 @@ for ax, label in zip(axs.flat, label_names):
     ax.set_title(label)
     ax.axvspan(0, 0.2, color='grey', alpha=.2)
     ax.axhline(0, color='black', ls='dashed', alpha=.5)
-    ax.legend()
+    
+    if i == 0:
+        legend = ax.legend()
+        plt.setp(legend.get_texts(), fontsize=8)  # Adjust legend size
+    
+    for tick in ax.xaxis.get_major_ticks():  # Adjust x-axis label size
+        tick.label.set_fontsize(8)
+    for tick in ax.yaxis.get_major_ticks():  # Adjust y-axis label size
+        tick.label.set_fontsize(8)
 plt.show()
 
 # plot in vs out
 fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='constrained')
-for ax, label in zip(axs.flat, label_names):
+for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
     ins = decod_in_lab2[label][0].mean(axis=(0, 1))
     outs = decod_in_lab2[label][1].mean(axis=(0, 1))
     ax.plot(times, ins, label='in_seq') 
     ax.plot(times, outs, label='out_seq')
     ax.axvspan(0, 0.2, color='grey', alpha=.2)
+    ax.axhline(chance, color='black', ls='dashed', alpha=.5)
+    
     ax.set_title(label)
-    ax.legend()
+    if i == 0:
+        legend = ax.legend()
+        plt.setp(legend.get_texts(), fontsize=8)  # Adjust legend size
+    
+    for tick in ax.xaxis.get_major_ticks():  # Adjust x-axis label size
+        tick.label.set_fontsize(8)
+    for tick in ax.yaxis.get_major_ticks():  # Adjust y-axis label size
+        tick.label.set_fontsize(8)
 plt.show()
 
 

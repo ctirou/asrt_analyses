@@ -80,12 +80,13 @@ for ilabel, label in enumerate(label_names):
             tstore = np.array(tstore)
             ave_score.append(tstore)
                     
-        
         for all_sims in [one_two_similarities, one_three_similarities, one_four_similarities, two_three_similarities, two_four_similarities, three_four_similarities]:
             all_sims = np.array(all_sims)
             
         similarities = [one_two_similarities, one_three_similarities, one_four_similarities, two_three_similarities, two_four_similarities, three_four_similarities]
+        
         in_seq, out_seq = get_inout_seq(sequence, similarities)
+        
         all_in_seqs.append(in_seq)
         all_out_seqs.append(out_seq)
         
@@ -114,7 +115,7 @@ nrows, ncols = 7, 10
 
 # plot rsa
 fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='constrained')
-for ax, label in zip(axs.flat, label_names):
+for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
     practice = rsa_in_lab[label][:, 0, :].mean(0)
     learning = rsa_in_lab[label][:, 1:5, :].mean((0, 1))
     
@@ -123,14 +124,26 @@ for ax, label in zip(axs.flat, label_names):
     ax.set_title(label)
     ax.axvspan(0, 0.2, color='grey', alpha=.2)
     ax.axhline(0, color='black', ls='dashed', alpha=.5)
-    ax.legend()
+    if i == 0:
+        legend = ax.legend()
+        plt.setp(legend.get_texts(), fontsize=8)  # Adjust legend size
+    
+    for tick in ax.xaxis.get_major_ticks():  # Adjust x-axis label size
+        tick.label.set_fontsize(8)
+    for tick in ax.yaxis.get_major_ticks():  # Adjust y-axis label size
+        tick.label.set_fontsize(8)
 plt.show()
 
 # plot decoding
 fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='constrained')
-for ax, label in zip(axs.flat, label_names):
+for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
     ax.plot(times, decod_in_lab[label][0])
     ax.set_title(label)
     ax.axvspan(0, 0.2, color='grey', alpha=.2)
     ax.axhline(chance, color='black', ls='dashed', alpha=.5)
+    
+    for tick in ax.xaxis.get_major_ticks():  # Adjust x-axis label size
+        tick.label.set_fontsize(8)
+    for tick in ax.yaxis.get_major_ticks():  # Adjust y-axis label size
+        tick.label.set_fontsize(8)
 plt.show()
