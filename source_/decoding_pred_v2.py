@@ -2,12 +2,12 @@ import os
 import numpy as np
 import pandas as pd
 import mne
-from mne.decoding import SlidingEstimator
+from mne.decoding import SlidingEstimator, cross_val_multiscore
 from sklearn.pipeline import make_pipeline
 from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegressionCV
-from sklearn.metrics import confusion_matrix, roc_auc_score, ConfusionMatrixDisplay
+from sklearn.metrics import confusion_matrix, roc_auc_score, ConfusionMatrixDisplay, accuracy_score
 from base import *
 from config import *
 from mne.beamformer import make_lcmv, apply_lcmv_epochs
@@ -53,6 +53,8 @@ for ilabel in range(68):
         
     sims_in_label, decod_in_subs = [], []
 
+    ilabel = 6
+    
     for subject in subjects:
         
         sims_in_sub = []
@@ -70,6 +72,7 @@ for ilabel in range(68):
         # get labels
         labels = mne.read_labels_from_annot(subject=subject, parc=parc, hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
         label = labels[ilabel]
+        
         
         for session_id, session in enumerate(sessions):
                         
@@ -145,32 +148,34 @@ for ilabel in range(68):
 
             c = np.array(cms).T
             
-            fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(20, 4), layout='tight')
+            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 4), layout='tight')
+            fig.suptitle(f'{label.name} // {subject} // {session}')
             
             ax1.plot(times, scores)
             ax1.set_ylabel('roc-auc')
             ax1.axvspan(0, 0.2, color='grey', alpha=.2)
             ax1.axhline(chance, color='black', ls='dashed', alpha=.5)
             
-            cax = ax2.imshow(c.mean(-1), cmap='viridis')
-            ax2.set_xticks(np.arange(len(set(y))), labels=set(y))
-            ax2.set_yticks(np.arange(len(set(y))), labels=set(y))
-            cax.set_clim(0, 1)
-            for i in range(len(set(y))):
-                for j in range(len(set(y))):
-                    text = ax2.text(j, i, round(c[:, i, j].mean(0), 2),
-                                   ha='center', va='center', color='w')
-            ax2.set_title(f'{subject}_{session}')
-
             # ConfusionMatrixDisplay.from_estimator(clf, pred[test], y[test]).plot()
             disp = ConfusionMatrixDisplay(c.mean(-1), display_labels=set(y))
-            disp.plot(ax=ax3)
+            disp.plot(ax=ax2)
             disp.im_.set_clim(0, 1)  # Set colorbar limits
-            
+
+            # cax = ax3.imshow(c.mean(-1), cmap='viridis')
+            # ax3.set_xticks(np.arange(len(set(y))), labels=set(y))
+            # ax3.set_yticks(np.arange(len(set(y))), labels=set(y))
+            # cax.set_clim(0, 1)
+            # for i in range(len(set(y))):
+            #     for j in range(len(set(y))):
+            #         text = ax3.text(j, i, round(c[i, j, :].mean(-1), 2),
+            #                        ha='center', va='center', color='w')
+            # ax3.set_ylabel("True label")
+            # ax3.set_xlabel("Predicted label")
+
             plt.show()
-            
-            fig.savefig(res_dir / "")
-                                   
+            fig.savefig(figures / f"{label.name}_{subject}_{session}.png")
+            # plt.close()
+              
             one_two_similarity = list()
             one_three_similarity = list()
             one_four_similarity = list() 
