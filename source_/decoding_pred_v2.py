@@ -7,12 +7,13 @@ from sklearn.pipeline import make_pipeline
 from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegressionCV
-from sklearn.metrics import confusion_matrix, roc_auc_score
+from sklearn.metrics import confusion_matrix, roc_auc_score, ConfusionMatrixDisplay
 from base import *
 from config import *
 from mne.beamformer import make_lcmv, apply_lcmv_epochs
 from collections import defaultdict
 from scipy.stats import ttest_1samp, spearmanr
+import matplotlib.pyplot as plt
 
 # params
 trial_types = ["all", "pattern", "random"]
@@ -24,13 +25,13 @@ sessions = ['practice', 'b1', 'b2', 'b3', 'b4']
 subjects_dir = FREESURFER_DIR
 res_path = RESULTS_DIR
 folds = 10
-chance = 0.25
+chance = 0.5
 threshold = 0.05
 scoring = "accuracy"
 parc='aparc'
 hemi = 'both'
 params = "pred_decoding"
-verbose = "error"
+verbose = True
 jobs = -1
 
 # figures dir
@@ -46,14 +47,8 @@ ensure_dir(figures / 'corr')
 
 combinations = ['one_two', 'one_three', 'one_four', 'two_three', 'two_four', 'three_four']
 
-# set-up the classifier and cv structure
-clf = make_pipeline(StandardScaler(), LogisticRegressionCV(max_iter=10000))
-clf = SlidingEstimator(clf, n_jobs=jobs, scoring=scoring, verbose=verbose)
-cv = StratifiedKFold(folds, shuffle=True)
-
 decod_in_lab = dict()
 
-# for ilabel in range(68):
 for ilabel in range(68):
         
     sims_in_label, decod_in_subs = [], []
@@ -127,6 +122,11 @@ for ilabel in range(68):
             y = y.reset_index(drop=True)            
             assert X.shape[0] == y.shape[0]
             
+            # set-up the classifier and cv structure
+            clf = make_pipeline(StandardScaler(), LogisticRegressionCV(max_iter=10000))
+            clf = SlidingEstimator(clf, n_jobs=jobs, scoring=scoring, verbose=verbose)
+            cv = StratifiedKFold(folds, shuffle=True)
+            
             pred = np.zeros((len(y), X.shape[-1]))
             pred_rock = np.zeros((len(y), X.shape[-1], len(set(y))))
             # there is only randoms in practice sessions
@@ -137,23 +137,47 @@ for ilabel in range(68):
                 
             cms, scores = list(), list()
             for t in range(X.shape[-1]):
-                cms.append(confusion_matrix(y, pred[:, t], normalize='true', labels=clf.classes_))
-                scores.append(roc_auc_score(y, pred_rock[:, t, :], multi_class='ovr'))
+                cms.append(confusion_matrix(y[test], pred[test, t], normalize='true', labels=clf.classes_))
+                scores.append(roc_auc_score(y[test], pred_rock[test, t, :], multi_class='ovr'))
                 
-                
-            
             scores = np.array(scores)
-            np.save(figures / f'{label.name}_{subject}_{session_id}-scores.npy', scores)
+            # np.save(figures / f'{label.name}_{subject}_{session_id}-scores.npy', scores)
 
+            c = np.array(cms).T
+            
+            fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(20, 4), layout='tight')
+            
+            ax1.plot(times, scores)
+            ax1.set_ylabel('roc-auc')
+            ax1.axvspan(0, 0.2, color='grey', alpha=.2)
+            ax1.axhline(chance, color='black', ls='dashed', alpha=.5)
+            
+            cax = ax2.imshow(c.mean(-1), cmap='viridis')
+            ax2.set_xticks(np.arange(len(set(y))), labels=set(y))
+            ax2.set_yticks(np.arange(len(set(y))), labels=set(y))
+            cax.set_clim(0, 1)
+            for i in range(len(set(y))):
+                for j in range(len(set(y))):
+                    text = ax2.text(j, i, round(c[:, i, j].mean(0), 2),
+                                   ha='center', va='center', color='w')
+            ax2.set_title(f'{subject}_{session}')
+
+            # ConfusionMatrixDisplay.from_estimator(clf, pred[test], y[test]).plot()
+            disp = ConfusionMatrixDisplay(c.mean(-1), display_labels=set(y))
+            disp.plot(ax=ax3)
+            disp.im_.set_clim(0, 1)  # Set colorbar limits
+            
+            plt.show()
+            
+            fig.savefig(res_dir / "")
+                                   
             one_two_similarity = list()
             one_three_similarity = list()
             one_four_similarity = list() 
             two_three_similarity = list()
             two_four_similarity = list()
             three_four_similarity = list()
-            
-            c = np.array(cms)
-            
+                        
             for itime in range(len(times)):
                 one_two_similarity.append(c[itime, 0, 1])
                 one_three_similarity.append(c[itime, 0, 2])
@@ -174,7 +198,6 @@ for ilabel in range(68):
         sims_in_label.append(np.array(sims_in_sub))
         
         decod_in_sess = np.array(decod_in_sess)
-        
         
     # sims_in_label = np.array(sims_in_label)
     # np.save(figures / f'{label.name}.npy', sims_in_label)
