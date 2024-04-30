@@ -24,7 +24,7 @@ subjects = SUBJS
 sessions = ['practice', 'b1', 'b2', 'b3', 'b4']
 subjects_dir = FREESURFER_DIR
 res_path = RESULTS_DIR
-folds = 10
+folds = 2
 chance = 0.5
 threshold = 0.05
 scoring = "accuracy"
@@ -73,6 +73,7 @@ for ilabel in range(68):
         labels = mne.read_labels_from_annot(subject=subject, parc=parc, hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
         label = labels[ilabel]
         
+        all_session_cms, all_session_scores = [], []
         
         for session_id, session in enumerate(sessions):
                         
@@ -144,9 +145,11 @@ for ilabel in range(68):
                 scores.append(roc_auc_score(y[test], pred_rock[test, t, :], multi_class='ovr'))
                 
             scores = np.array(scores)
+            all_session_scores.append(scores)
             # np.save(figures / f'{label.name}_{subject}_{session_id}-scores.npy', scores)
 
             c = np.array(cms).T
+            all_session_cms.append(c)
             
             fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 4), layout='tight')
             fig.suptitle(f'{label.name} // {subject} // {session}')
@@ -155,6 +158,7 @@ for ilabel in range(68):
             ax1.set_ylabel('roc-auc')
             ax1.axvspan(0, 0.2, color='grey', alpha=.2)
             ax1.axhline(chance, color='black', ls='dashed', alpha=.5)
+            ax1.set_ylim(0.2, 0.8)
             
             # ConfusionMatrixDisplay.from_estimator(clf, pred[test], y[test]).plot()
             disp = ConfusionMatrixDisplay(c.mean(-1), display_labels=set(y))
@@ -172,9 +176,9 @@ for ilabel in range(68):
             # ax3.set_ylabel("True label")
             # ax3.set_xlabel("Predicted label")
 
-            plt.show()
+            # plt.show()
             fig.savefig(figures / f"{label.name}_{subject}_{session}.png")
-            # plt.close()
+            plt.close()
               
             one_two_similarity = list()
             one_three_similarity = list()
@@ -184,12 +188,12 @@ for ilabel in range(68):
             three_four_similarity = list()
                         
             for itime in range(len(times)):
-                one_two_similarity.append(c[itime, 0, 1])
-                one_three_similarity.append(c[itime, 0, 2])
-                one_four_similarity.append(c[itime, 0, 3])
-                two_three_similarity.append(c[itime, 1, 2])
-                two_four_similarity.append(c[itime, 1, 3])
-                three_four_similarity.append(c[itime, 2, 3])
+                one_two_similarity.append(c[0, 1, itime])
+                one_three_similarity.append(c[0, 2, itime])
+                one_four_similarity.append(c[0, 3, itime])
+                two_three_similarity.append(c[1, 2, itime])
+                two_four_similarity.append(c[1, 3, itime])
+                three_four_similarity.append(c[2, 3, itime])
                                 
             similarities = [one_two_similarity, one_three_similarity, one_four_similarity, 
                             two_three_similarity, two_four_similarity, three_four_similarity]
@@ -197,13 +201,50 @@ for ilabel in range(68):
             similarities = np.array(similarities)
             sims_in_sub.append(similarities)
             
-            np.save(figures / f'{label.name}_{subject}_{session_id}-rsa.npy', similarities)
+            # np.save(figures / f'{label.name}_{subject}_{session_id}-rsa.npy', similarities)
+        
+        all_session_cms = np.array(all_session_cms)
+        all_session_scores = np.array(all_session_scores)
         
         sims_in_sub = np.array(sims_in_sub)
         sims_in_label.append(np.array(sims_in_sub))
         
         decod_in_sess = np.array(decod_in_sess)
         
+        best_time = [i for i, j in enumerate(times) if 0 <= j <= 0.2]
+        
+        fig, axs = plt.subplots(2, 5, layout='tight', figsize=(23, 7))
+        fig.suptitle(f'{label.name} // {subject}')
+        for i, (ax, session) in enumerate(zip(axs.flat[:5], sessions)):
+            ax.plot(times, all_session_scores[i])
+            ax.axvspan(0, 0.2, color='grey', alpha=.2)
+            ax.axhline(0, color='black', ls='dashed', alpha=.5)
+            ax.set_title(session)
+            ax.axvspan(0, 0.2, color='grey', alpha=.2)
+            ax.axhline(chance, color='black', ls='dashed', alpha=.5)
+            ax.set_ylim(0.2, 0.8)
+            
+            if i   != 0:
+                ax.set_yticklabels([])
+
+        
+        for i, ax in zip(range(5), axs.flat[5:]):
+            # cax = ax.imshow(all_session_cms[i].mean(-1), cmap='viridis')
+            # ax.set_xticks(np.arange(len(set(y))), labels=set(y))
+            # ax.set_yticks(np.arange(len(set(y))), labels=set(y))
+            # cax.set_clim(0, 1)
+            # for i in range(len(set(y))):
+            #     for j in range(len(set(y))):
+            #         text = ax.text(j, i, round(c[i, j, :].mean(-1), 2),
+            #                        ha='center', va='center', color='w')
+            # ax.set_ylabel("True label")
+            # ax.set_xlabel("Predicted label")
+            
+            disp = ConfusionMatrixDisplay(all_session_cms[i, :, :, 40:80].mean(-1), display_labels=set(y))
+            disp.plot(ax=ax)
+            disp.im_.set_clim(0, 1)  # Set colorbar limits
+
+
     # sims_in_label = np.array(sims_in_label)
     # np.save(figures / f'{label.name}.npy', sims_in_label)
     

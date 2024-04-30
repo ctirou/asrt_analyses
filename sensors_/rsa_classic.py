@@ -52,17 +52,6 @@ for trial_type in ['pattern']:
                 sampling_freq = epochs.info['sfreq']
                 info = mne.create_info(n_component, ch_types='mag', sfreq=sampling_freq)
                 epochs = mne.EpochsArray(pca_data, info = info, events=epochs.events, event_id=epochs.event_id)
-            # # Quality Check: Check that decoding of arrows is working 
-            # positions = behav['positions']
-            # cv = StratifiedKFold(5, shuffle=True)
-            # clf = make_pipeline(StandardScaler(), LogisticRegression(max_iter=10000))
-            # clf = SlidingEstimator(clf, scoring='accuracy', n_jobs=2)
-            # X = epochs.get_data()
-            # y = positions
-            # scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=False)
-            # plt.plot(epochs.times, scores.mean(0))
-            # plt.show()
-            # plt.close()
             if trial_type == 'pattern':
                 one_pattern = epochs[np.where((behav['positions']==1) & (behav['trialtypes']==1))[0]].get_data().mean(axis=0)
                 two_pattern = epochs[np.where((behav['positions']==2) & (behav['trialtypes']==1))[0]].get_data().mean(axis=0)
