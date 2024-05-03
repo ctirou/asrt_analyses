@@ -14,6 +14,7 @@ from mne.beamformer import make_lcmv, apply_lcmv_epochs
 from collections import defaultdict
 from scipy.stats import ttest_1samp, spearmanr
 import matplotlib.pyplot as plt
+import gc
 
 # params
 trial_types = ["all", "pattern", "random"]
@@ -49,17 +50,13 @@ combinations = ['one_two', 'one_three', 'one_four', 'two_three', 'two_four', 'th
 
 decod_in_lab = dict()
 
-for ilabel in range(68):
+for ilabel in range(68): # put in subjects and divide
         
     sims_in_label, decod_in_subs = [], []
-
-    ilabel = 6
     
     for subject in subjects:
         
-        sims_in_sub = []
-        
-        decod_in_sess = []
+        sims_in_sub, decod_in_sess = [], []
         
         # read epochs
         epo_dir = data_path / lock
@@ -74,6 +71,9 @@ for ilabel in range(68):
         label = labels[ilabel]
         
         all_session_cms, all_session_scores = [], []
+        
+        #### get stimuli proportions
+        print_proportions(subject, all_beh)
         
         for session_id, session in enumerate(sessions):
                         
@@ -127,9 +127,9 @@ for ilabel in range(68):
             assert X.shape[0] == y.shape[0]
             
             # set-up the classifier and cv structure
-            clf = make_pipeline(StandardScaler(), LogisticRegressionCV(max_iter=10000))
-            clf = SlidingEstimator(clf, n_jobs=jobs, scoring=scoring, verbose=verbose)
-            cv = StratifiedKFold(folds, shuffle=True)
+            clf = make_pipeline(StandardScaler(), LogisticRegressionCV(max_iter=10000)) # use JAX maybe
+            clf = SlidingEstimator(clf, n_jobs=jobs, scoring=scoring, verbose=verbose) # get time of one sample (slide), try with less jobs maybe ?
+            cv = StratifiedKFold(folds, shuffle=True)   
             
             pred = np.zeros((len(y), X.shape[-1]))
             pred_rock = np.zeros((len(y), X.shape[-1], len(set(y))))
@@ -148,7 +148,7 @@ for ilabel in range(68):
             all_session_scores.append(scores)
             # np.save(figures / f'{label.name}_{subject}_{session_id}-scores.npy', scores)
 
-            c = np.array(cms).T
+            c = np.array(cms).T # don't tramspose, take peak decoding performance
             all_session_cms.append(c)
             
             fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 4), layout='tight')
@@ -202,7 +202,7 @@ for ilabel in range(68):
             sims_in_sub.append(similarities)
             
             # np.save(figures / f'{label.name}_{subject}_{session_id}-rsa.npy', similarities)
-        
+                    
         all_session_cms = np.array(all_session_cms)
         all_session_scores = np.array(all_session_scores)
         
@@ -257,3 +257,5 @@ for ilabel in range(68):
     #     all_rhos.append(rhos)
     # all_rhos = np.array(all_rhos)
     # np.save(figures / 'corr' / f'{label}_rhos.npy', all_rhos)
+
+    gc.collect() # only works if vars are deleted

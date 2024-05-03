@@ -15,27 +15,25 @@ from sklearn.metrics import make_scorer
 from base import *
 from config import *
 import pandas as pd
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import roc_auc_score
 from scipy.stats import ttest_1samp
 
 trial_types = ["all", "pattern", "random"]
+trial_type = "pattern"
 data_path = DATA_DIR
 lock = "stim"
-subject = "sub01"
 subjects = SUBJS
 folds = 10
-chance = 0.25
+chance = 0.5
 threshold = 0.05
 scoring = "accuracy"
+verbose = "error"
+sessions = EPOCHS
+params = "pred_decoding"
+jobs = 15
 
-params = "step_decoding"
-figures = RESULTS_DIR / 'figures' / lock / 'decoding' / params
+figures = RESULTS_DIR / 'figures' / lock / params / 'sensors' / trial_type
 ensure_dir(figures)
-
-# set-up the classifier and cv structure
-clf = make_pipeline(StandardScaler(), LogisticRegressionCV(max_iter=10000))
-clf = SlidingEstimator(clf, n_jobs=-1, scoring=scoring, verbose=True)
-cv = StratifiedKFold(folds, shuffle=True)
 
 true_pred_means, false_pred_means = [], []
 all_in_seqs, all_out_seqs = [], []
@@ -65,39 +63,38 @@ for subject in subjects:
     # get sequence
     raw_beh_dir = RAW_DATA_DIR / subject / 'behav_data'
     sequence = get_sequence(raw_beh_dir)
-
     
+    all_session_cms, all_session_scores = [], []
+
     for i, epo_fname in zip(range(5), ['practice', 'b1', 'b2', 'b3', 'b4']): 
     
         X = all_epo[i].get_data()
         y = np.array(all_beh[i].positions)
         assert X.shape[0] == y.shape[0]
 
+        # set-up the classifier and cv structure
+        clf = make_pipeline(StandardScaler(), LogisticRegressionCV(max_iter=10000))
+        clf = SlidingEstimator(clf, n_jobs=jobs, scoring=scoring, verbose=verbose)
+        cv = StratifiedKFold(folds, shuffle=True)
+        
         pred = np.zeros((len(y), X.shape[-1]))
+        pred_rock = np.zeros((len(y), X.shape[-1], len(set(y))))
         # there is only randoms in practice sessions
         for train, test in cv.split(X, y):
             clf.fit(X[train], y[train])
             pred[test] = np.array(clf.predict(X[test]))
-        cms = list()
+            pred_rock[test] = np.array(clf.predict_proba(X[test]))
+            
+        cms, scores = list(), list()
         for t in range(X.shape[-1]):
-            cms.append(confusion_matrix(y, pred[:, t], normalize='true', labels=clf.classes_))
+            cms.append(confusion_matrix(y[test], pred[test, t], normalize='true', labels=clf.classes_))
+            scores.append(roc_auc_score(y[test], pred_rock[test, t, :], multi_class='ovr'))
+            
+        scores = np.array(scores)
+        all_session_scores.append(scores)
 
-        # disp = ConfusionMatrixDisplay(confusion_matrix=cms[0], display_labels=clf.classes_)
-        # disp.plot()
-
-        true_pred, false_pred = np.zeros((len(times), len(clf.classes_), len(clf.classes_))), np.zeros((len(times), len(clf.classes_), len(clf.classes_)))
-        for t in range(len(times)):
-            for i in range(len(clf.classes_)):
-                for j in range(len(clf.classes_)):
-                    if i == j:
-                        if cms[t][i, j] not in true_pred[t]:
-                            true_pred[t][i, j] = cms[t][i, j] 
-                    else:
-                        if cms[t][i, j] not in true_pred[t]:
-                            false_pred[t][i, j] = cms[t][i, j]
-
-        true_pred_means.append(np.array([np.mean(true_pred[t][true_pred[t] != 0]) for t in range(len(times))]))
-        false_pred_means.append(np.array([np.mean(false_pred[t][false_pred[t] != 0]) for t in range(len(times))]))
+        c = np.array(cms).T
+        all_session_cms.append(c)
         
         one_two_similarity = list()
         one_three_similarity = list()
@@ -106,14 +103,13 @@ for subject in subjects:
         two_four_similarity = list()
         three_four_similarity = list()
         
-        c = np.array(cms)
         for itime in range(len(times)):
-            one_two_similarity.append(c[itime, 0, 1])
-            one_three_similarity.append(c[itime, 0, 2])
-            one_four_similarity.append(c[itime, 0, 3])
-            two_three_similarity.append(c[itime, 1, 2])
-            two_four_similarity.append(c[itime, 1, 3])
-            three_four_similarity.append(c[itime, 2, 3])
+            one_two_similarity.append(c[0, 1, itime])
+            one_three_similarity.append(c[0, 2, itime])
+            one_four_similarity.append(c[0, 3, itime])
+            two_three_similarity.append(c[1, 2, itime])
+            two_four_similarity.append(c[1, 3, itime])
+            three_four_similarity.append(c[2, 3, itime])
 
         one_two_similarity = np.array(one_two_similarity)
         one_three_similarity = np.array(one_three_similarity)
@@ -136,11 +132,44 @@ for subject in subjects:
     two_four_similarities = np.array(two_four_similarities)   
     three_four_similarities = np.array(three_four_similarities)
 
-    similarities = [one_two_similarities, one_three_similarities, one_four_similarities, two_three_similarities, two_four_similarities, three_four_similarities]
+    similarities = [one_two_similarities, one_three_similarities, one_four_similarities, 
+                    two_three_similarities, two_four_similarities, three_four_similarities]
 
     in_seq, out_seq = get_inout_seq(sequence, similarities)
     all_in_seqs.append(in_seq)
     all_out_seqs.append(out_seq)
+    
+    all_session_cms = np.array(all_session_cms)
+    all_session_scores = np.array(all_session_scores)
+    
+    fig, axs = plt.subplots(2, 5, layout='tight', figsize=(23, 7))
+    fig.suptitle(f'{subject}')
+    for i, (ax, session) in enumerate(zip(axs.flat[:5], sessions)):
+        ax.plot(times, all_session_scores[i])
+        ax.set_title(session)
+        ax.axvspan(0, 0.2, color='grey', alpha=.2)
+        ax.axhline(chance, color='black', ls='dashed', alpha=.5)
+        ax.set_ylim(0, 1)
+        ax.grid(True)
+    
+    for i, ax in zip(range(5), axs.flat[5:]):
+        # cax = ax.imshow(all_session_cms[i].mean(-1), cmap='viridis')
+        # ax.set_xticks(np.arange(len(set(y))), labels=set(y))
+        # ax.set_yticks(np.arange(len(set(y))), labels=set(y))
+        # cax.set_clim(0, 1)
+        # for i in range(len(set(y))):
+        #     for j in range(len(set(y))):
+        #         text = ax.text(j, i, round(c[i, j, :].mean(-1), 2),
+        #                        ha='center', va='center', color='w')
+        # ax.set_ylabel("True label")
+        # ax.set_xlabel("Predicted label")
+        
+        disp = ConfusionMatrixDisplay(all_session_cms[i, :, :, 40:80].mean(-1), display_labels=set(y))
+        disp.plot(ax=ax)
+        disp.im_.set_clim(0, 1)  # Set colorbar limits
+
+    plt.savefig(figures / f"{subject}-cm.png")
+    plt.close()
 
 # true vs false predictions
 true_pred_means = np.array(true_pred_means).mean(axis=0).T

@@ -107,3 +107,13 @@ def get_inseq(sequence):
     pairs_in_sequence.append(str(sequence[3]) + str(sequence[0]))
     
     return pairs_in_sequence
+
+def print_proportions(subject, all_beh):
+    import numpy as np
+    #### get stimuli proportions
+    print(f"###############    {subject}")
+    for i, sess in zip(range(5), ['prac', 'b1', 'b2', 'b3', 'b4']):
+        print(f"{sess}    ----------------------")
+        unique, values = np.unique(all_beh[i].positions, return_counts=True)
+        for un, val in zip(unique, values):
+            print(un, round((val/np.sum(values)*100), 2)) 
