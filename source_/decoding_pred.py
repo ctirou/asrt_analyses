@@ -50,6 +50,8 @@ combinations = ['one_two', 'one_three', 'one_four', 'two_three', 'two_four', 'th
 
 decod_in_lab = dict()
 
+gc.collect()
+
 for ilabel in range(68): # put in subjects and divide
         
     sims_in_label, decod_in_subs = [], []
