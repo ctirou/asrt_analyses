@@ -41,7 +41,7 @@ ensure_dir(figures)
 # get times
 epoch_fname = DATA_DIR / lock / 'sub01_0_s-epo.fif'
 epochs = mne.read_epochs(epoch_fname, verbose=verbose)
-times = epochs.times
+times = epochs.times[::3]
 del epochs
 
 ensure_dir(figures / 'corr')
@@ -60,32 +60,28 @@ for ilabel in range(68): # put in subjects and divide
         
         sims_in_sub, decod_in_sess = [], []
         
-        # read epochs
-        epo_dir = data_path / lock
-        epo_fnames = [epo_dir / f"{f}" for f in sorted(os.listdir(epo_dir)) if ".fif" in f and subject in f]
-        all_epo = [mne.read_epochs(fname, preload=True, verbose=verbose) for fname in epo_fnames]
-        # read behav files
-        beh_dir = data_path / "behav"
-        beh_fnames = [beh_dir / f"{f}" for f in sorted(os.listdir(beh_dir)) if ".pkl" in f and subject in f]
-        all_beh = [pd.read_pickle(fname).reset_index() for fname in beh_fnames]
         # get labels
         labels = mne.read_labels_from_annot(subject=subject, parc=parc, hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
         label = labels[ilabel]
         
         all_session_cms, all_session_scores = [], []
-        
-        #### get stimuli proportions
-        print_proportions(subject, all_beh)
-        
+                
         for session_id, session in enumerate(sessions):
+            
+            # read stim epoch
+            epoch_fname = data_path / lock / f"{subject}_{session_id}_s-epo.fif"
+            epoch = mne.read_epochs(epoch_fname, preload=True, verbose=True)
+            
+            # read behav
+            behav_fname = data_path / "behav" / f"{subject}_{session_id}.pkl"
+            behav = pd.read_pickle(behav_fname).reset_index()
                         
             # get session behav and epoch
             if session_id == 0:
                 session = 'prac'
             else:
                 session = 'sess-%s' % (str(session_id).zfill(2))
-            behav = all_beh[session_id]
-            epoch = all_epo[session_id]
+
             if lock == 'button': 
                 epoch_bsl_fname = data_path / "bsl" / f"{subject}_{session_id}_bl-epo.fif"
                 epoch_bsl = mne.read_epochs(epoch_bsl_fname, verbose=verbose)
@@ -106,6 +102,8 @@ for ilabel in range(68): # put in subjects and divide
             filters = make_lcmv(info, fwd, data_cov=data_cov, noise_cov=noise_cov,
                             pick_ori=None, rank=rank, reduce_rank=True, verbose=verbose)
             stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
+            
+            del epoch, fwd, data_cov, noise_cov, rank, filters
                         
             print(f"{ilabel+1}/{len(labels)}", subject, session, label.name)
             
@@ -129,28 +127,31 @@ for ilabel in range(68): # put in subjects and divide
             assert X.shape[0] == y.shape[0]
             
             # set-up the classifier and cv structure
-            clf = make_pipeline(StandardScaler(), LogisticRegressionCV(max_iter=10000)) # use JAX maybe
-            clf = SlidingEstimator(clf, n_jobs=jobs, scoring=scoring, verbose=verbose) # get time of one sample (slide), try with less jobs maybe ?
-            cv = StratifiedKFold(folds, shuffle=True)   
+            # clf = make_pipeline(StandardScaler(), LogisticRegressionCV(max_iter=10000)) # use JAX maybe
+            # clf = SlidingEstimator(clf, n_jobs=jobs, scoring=scoring, verbose=verbose) # get time of one sample (slide), try with less jobs maybe ?
+            # cv = StratifiedKFold(folds, shuffle=True)   
             
-            pred = np.zeros((len(y), X.shape[-1]))
-            pred_rock = np.zeros((len(y), X.shape[-1], len(set(y))))
-            # there is only randoms in practice sessions
-            for train, test in cv.split(X, y):
-                clf.fit(X[train], y[train])
-                pred[test] = np.array(clf.predict(X[test]))
-                pred_rock[test] = np.array(clf.predict_proba(X[test]))
+            # pred = np.zeros((len(y), X.shape[-1]))
+            # pred_rock = np.zeros((len(y), X.shape[-1], len(set(y))))
+            # # there is only randoms in practice sessions
+            # for train, test in cv.split(X, y):
+            #     clf.fit(X[train], y[train])
+            #     pred[test] = np.array(clf.predict(X[test]))
+            #     pred_rock[test] = np.array(clf.predict_proba(X[test]))
+                
+            X_decim = X[:, :, ::3]
+            test, pred, pred_rock = make_predictions(X_decim, y, folds, jobs, scoring, verbose) 
                 
             cms, scores = list(), list()
-            for t in range(X.shape[-1]):
-                cms.append(confusion_matrix(y[test], pred[test, t], normalize='true', labels=clf.classes_))
+            for t in range(X_decim.shape[-1]):
+                cms.append(confusion_matrix(y[test], pred[test, t], normalize='true', labels=[1, 2, 3, 4]))
                 scores.append(roc_auc_score(y[test], pred_rock[test, t, :], multi_class='ovr'))
                 
             scores = np.array(scores)
             all_session_scores.append(scores)
             # np.save(figures / f'{label.name}_{subject}_{session_id}-scores.npy', scores)
 
-            c = np.array(cms).T # don't tramspose, take peak decoding performance
+            c = np.array(cms) # don't tramspose, take peak decoding performance
             all_session_cms.append(c)
             
             fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 4), layout='tight')
@@ -163,7 +164,7 @@ for ilabel in range(68): # put in subjects and divide
             ax1.set_ylim(0.2, 0.8)
             
             # ConfusionMatrixDisplay.from_estimator(clf, pred[test], y[test]).plot()
-            disp = ConfusionMatrixDisplay(c.mean(-1), display_labels=set(y))
+            disp = ConfusionMatrixDisplay(c.mean(0), display_labels=set(y))
             disp.plot(ax=ax2)
             disp.im_.set_clim(0, 1)  # Set colorbar limits
 
@@ -190,12 +191,12 @@ for ilabel in range(68): # put in subjects and divide
             three_four_similarity = list()
                         
             for itime in range(len(times)):
-                one_two_similarity.append(c[0, 1, itime])
-                one_three_similarity.append(c[0, 2, itime])
-                one_four_similarity.append(c[0, 3, itime])
-                two_three_similarity.append(c[1, 2, itime])
-                two_four_similarity.append(c[1, 3, itime])
-                three_four_similarity.append(c[2, 3, itime])
+                one_two_similarity.append(c[itime, 0, 1])
+                one_three_similarity.append(c[itime, 0, 2])
+                one_four_similarity.append(c[itime, 0, 3])
+                two_three_similarity.append(c[itime, 1, 2])
+                two_four_similarity.append(c[itime, 1, 3])
+                three_four_similarity.append(c[itime, 2, 3])
                                 
             similarities = [one_two_similarity, one_three_similarity, one_four_similarity, 
                             two_three_similarity, two_four_similarity, three_four_similarity]
@@ -204,6 +205,8 @@ for ilabel in range(68): # put in subjects and divide
             sims_in_sub.append(similarities)
             
             # np.save(figures / f'{label.name}_{subject}_{session_id}-rsa.npy', similarities)
+            
+            gc.collect()
                     
         all_session_cms = np.array(all_session_cms)
         all_session_scores = np.array(all_session_scores)
