@@ -8,7 +8,7 @@ from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegressionCV
 from sklearn.metrics import confusion_matrix, roc_auc_score, ConfusionMatrixDisplay, accuracy_score
-from base import *
+from base import ensure_dir, make_predictions
 from config import *
 from mne.beamformer import make_lcmv, apply_lcmv_epochs
 from collections import defaultdict
