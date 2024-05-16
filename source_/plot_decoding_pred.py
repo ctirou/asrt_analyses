@@ -9,16 +9,16 @@ from scipy.stats import ttest_1samp, spearmanr
 from tqdm.auto import tqdm
 from sklearn.metrics import confusion_matrix, roc_auc_score, ConfusionMatrixDisplay, accuracy_score
 
-
 trial_type = "pattern"
 subjects = SUBJS
 lock = "stim"
-params = "pred_decoding"
-sessions = EPOCHS
+analysis = "pred_decoding"
+res_path = RESULTS_DIR
 subjects_dir = FREESURFER_DIR
 verbose = "error"
 hemi = 'both'
 chance = .5
+plt.style.use('dark_background')
 
 # get times
 epoch_fname = DATA_DIR / lock / 'sub01_0_s-epo.fif'
@@ -26,7 +26,7 @@ epochs = read_epochs(epoch_fname, verbose=verbose)
 times = epochs.times
 del epochs
 
-blocks = ['prac', 'b1', 'b2', 'b3', 'b4']
+sessions = ['practice', 'b1', 'b2', 'b3', 'b4']
 similarity_names = ['one_two', 'one_three', 'one_four', 'two_three', 'two_four', 'three_four']        
 
 in_seqs, out_seqs = [], []
@@ -37,21 +37,19 @@ corr_in_lab = {}
 # get label names
 labels = read_labels_from_annot(subject='sub01', parc='aparc', hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
 label_names = [label.name for label in labels]
+del labels
 
-for ilabel, label in enumerate(label_names):
+figures = res_path / 'source' / lock / trial_type / 'figures'
+ensure_dir(figures)
+
+for ilabel, label in enumerate(label_names[:1]):
     
-    if ilabel in [1, 19, 34, 47]:
-        continue
-
     print(f"{str(ilabel+1).zfill(2)}/{len(label_names)}", label)
     
     all_in_seqs, all_out_seqs = [], []
     
     for subject in subjects[:1]:
-    
-        res_dir = RESULTS_DIR / 'figures' / lock / params / 'source' / trial_type / subject
-        ensure_dir(res_dir / "plots")
-    
+        
         one_two_similarities = list()
         one_three_similarities = list()
         one_four_similarities = list() 
@@ -63,46 +61,53 @@ for ilabel, label in enumerate(label_names):
         sequence = get_sequence(behav_dir)
         
         sub_scores, sub_rsa, sub_cms = [], [], []
-                            
         for session_id, session in enumerate(sessions):
             
-            sub_scores.append(np.load(res_dir / f"{label}_{subject}_{session_id}-scores.npy"))
-            sub_rsa.append(np.load(res_dir / f"{label}_{subject}_{session_id}-rsa.npy"))
-            sub_cms.append(np.load(res_dir / f"{label}_{subject}_{session_id}-cm.npy") )
+            res_dir = res_path / analysis / 'source' / lock / trial_type / label / subject / session
+            sub_scores.append(np.load(res_dir / "scores.npy"))
+            sub_cms.append(np.load(res_dir / "cms.npy") )
+            sub_rsa.append(np.load(res_dir / "rsa.npy"))
             
         sub_scores = np.array(sub_scores)
         sub_cms = np.array(sub_cms)
-            
+
         sub_rsa = np.array(sub_rsa)
         one_two, one_three, one_four, two_three, two_four, three_four = [], [], [], [], [], []
-        for sim, sim_list in enumerate([one_four, one_three, one_two, three_four, two_four, two_three]):
-            sim_list.append(sub_rsa[session_id, sim, :])
-        for all_sims, sim_list in zip([one_two_similarities, one_three_similarities, one_four_similarities, two_three_similarities, two_four_similarities, three_four_similarities], 
-                                        [one_two, one_three, one_four, two_three, two_four, three_four]):
+        for session_id, _ in enumerate(sessions):
+            for sim, sim_list in enumerate([one_four, one_three, one_two, three_four, two_four, two_three]):
+                sim_list.append(sub_rsa[session_id, sim, :])
+        
+        for all_sims, sim_list in zip(
+            [one_two_similarities, one_three_similarities, one_four_similarities, two_three_similarities, two_four_similarities, three_four_similarities], 
+            [one_two, one_three, one_four, two_three, two_four, three_four]):
                 all_sims.append(np.array(sim_list))
         
-        
-        for all_sims in [one_two_similarities, one_three_similarities, one_four_similarities, two_three_similarities, two_four_similarities, three_four_similarities]:
-            all_sims = np.array(all_sims)
+        # for all_sims in [one_two_similarities, one_three_similarities, one_four_similarities, two_three_similarities, two_four_similarities, three_four_similarities]:
+        #     all_sims = np.array(all_sims)
             
         similarities = [one_two_similarities, one_three_similarities, one_four_similarities, two_three_similarities, two_four_similarities, three_four_similarities]
         in_seq, out_seq = get_inout_seq(sequence, similarities)
         all_in_seqs.append(np.array(in_seq))
         all_out_seqs.append(np.array(out_seq))
         
+        ensure_dir(figures / "summary")
         fig, axs = plt.subplots(2, 5, layout='tight', figsize=(23, 7), sharey=False)
-        fig.suptitle(f'{label} // {subject}')
-        for i, (ax, session) in enumerate(zip(axs.flat[:5], sessions)):
-            ax.plot(times, sub_scores[i])
-            ax.axvspan(0, 0.2, color='grey', alpha=.2)
-            ax.set_title(session)
-            ax.axhline(chance, color='black', ls='dashed', alpha=.5)
-            ax.set_ylim(0, 1)
-        for i, ax in zip(range(5), axs.flat[5:]):        
-            disp = ConfusionMatrixDisplay(sub_cms[i, :, :, 40:80].mean(-1), display_labels=[1, 2, 3, 4])
-            disp.plot(ax=ax)
+        fig.suptitle(f'{subject} / ${label}$')
+        for i, (ax1, ax2, session) in enumerate(zip(axs.flat[:5], axs.flat[5:], sessions)):
+            ax1.plot(times, sub_scores[i])
+            ax1.axvspan(0, 0.2, color='grey', alpha=.2)
+            ax1.set_title(session)
+            ax1.axhline(chance, color='white', ls='dashed', alpha=.5)
+            ax1.set_ylim(0, 1)
+            ax1.grid(True, color='grey', alpha=0.3)
+            max_score = np.argmax(sub_scores[i])
+            ax1.annotate(f'Max Score: {sub_scores[i][max_score]:.2f}', xy=(0.1, 0.9), xycoords='axes fraction')
+            ax1.annotate('', xy=(times[max_score], sub_scores[i][max_score]), xytext=(times[max_score], sub_scores[i][max_score] + 0.1),
+                        arrowprops=dict(arrowstyle='->', color='white'))
+            disp = ConfusionMatrixDisplay(sub_cms[i, max_score, :, :], display_labels=[1, 2, 3, 4])
+            disp.plot(ax=ax2)
             disp.im_.set_clim(0, 1)  # Set colorbar limits
-        plt.savefig(res_dir / 'plots' / f"cms_{label}_{subject}.png")
+        plt.savefig(figures / 'summary' / f"{subject}-sum.png")
         plt.close()
 
     all_in_seq = np.array(all_in_seqs)
