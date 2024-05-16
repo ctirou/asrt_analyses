@@ -15,15 +15,19 @@ from collections import defaultdict
 from scipy.stats import ttest_1samp, spearmanr
 import matplotlib.pyplot as plt
 import gc
-from tensorflow import keras
-from tensorflow.keras import layers
-from tensorflow.keras import models
-from tensorflow.keras.utils import to_categorical, set_random_seed
-from jax import jit, grad, vmap, device_put, random
-import jax.numpy as jnp
-from jax.lib import xla_bridge
-from functools import partial
+# from tensorflow import keras
+# from tensorflow.keras import layers
+# from tensorflow.keras import models
+# from tensorflow.keras.utils import to_categorical, set_random_seed
+# from jax import jit, grad, vmap, device_put, random
+# import jax.numpy as jnp
+# from jax.lib import xla_bridge
+# from functools import partial
 import time
+
+from joblib import parallel_backend
+from ray.util.joblib import register_ray
+register_ray()
 
 ## Check if tensorflow finds GPU
 # import tensorflow as tf
@@ -38,7 +42,7 @@ subjects = SUBJS
 sessions = ['practice', 'b1', 'b2', 'b3', 'b4']
 subjects_dir = FREESURFER_DIR
 res_path = RESULTS_DIR
-folds = 2
+folds = 5
 chance = 0.5
 threshold = 0.05
 # scoring = "accuracy"
@@ -157,7 +161,8 @@ for subject in subjects:
             print("X shape :", X.shape)
             
             if method == "classic":
-                test, pred, pred_rock = make_predictions(X, y, folds, jobs, scoring, verbose) 
+                with parallel_backend("ray"):
+                    test, pred, pred_rock = make_predictions(X, y, folds, jobs, scoring, verbose) 
             
             elif method == "nn":
                 y -= 1
