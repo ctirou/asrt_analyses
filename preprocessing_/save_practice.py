@@ -11,17 +11,19 @@ import numpy as np
 import mne
 from mne.preprocessing import ICA
 from Levenshtein import editops
-from autoreject import AutoReject, Ransac
 import pandas as pd
 import warnings
+from base import ensure_dir
 from config import RAW_DATA_DIR, DATA_DIR
+import gc
 
 subjects = ['sub01', 'sub02', 'sub04', 'sub07', 'sub08', 'sub09',
             'sub10', 'sub12', 'sub13', 'sub14', 'sub15']
 
+subjects = ['sub14']
+
 # To run on cluster
-# path = '/sps/crnl/Romain/ASRT_MEG/data/preprocessed'
-# path_data = '/sps/crnl/Romain/ASRT_MEG/data/raws'
+
 # subject_num = int(os.environ["SLURM_ARRAY_TASK_ID"])
 # subject = subjects[subject_num]
 
@@ -29,6 +31,9 @@ def int_to_unicode(array):
         return ''.join([str(chr(int(ii))) for ii in array]) #permet de convertir int en unicode (pour editops)
 
 mode_ICA = False
+overwrite = True
+verbose = True
+jobs = 10
 
 # Set path
 path = DATA_DIR
@@ -43,9 +48,8 @@ meg_sessions = ['2_PRACTICE']
 # Create preprocessed sub-folders
 folders = ['stim', 'button', 'behav', 'bsl']
 for fold in folders:
-        if not op.exists(op.join(path, fold)):
-                os.mkdir(op.join(path, fold))      
-
+        ensure_dir(path / fold)
+        
 # Loop across subjects
 for subject in subjects:
         # Sort behav files
@@ -59,7 +63,7 @@ for subject in subjects:
                 raw_fname = op.join(path_data, subject, 'meg_data', meg_session, 'results', 'c,rfDC_EEG')
                 hs_fname = op.join(path_data, subject, "meg_data", meg_session, "hs_file")
                 config_fname = op.join(path_data, subject, "meg_data", meg_session, "config")
-                raw = mne.io.read_raw_bti(raw_fname, preload=True, config_fname=config_fname, head_shape_fname=hs_fname, verbose=True)
+                raw = mne.io.read_raw_bti(raw_fname, preload=True, config_fname=config_fname, head_shape_fname=hs_fname, verbose=verbose)
                 # Set some channel types and rename them
                 raw.set_channel_types({'EEG 001': 'ecg',
                                 'VEOG': 'eog',
@@ -72,7 +76,7 @@ for subject in subjects:
                 raw.drop_channels(to_drop)
                 if mode_ICA:
                         # Save a filtered version of the raw to run the ICA on
-                        filt_raw = raw.copy().filter(l_freq=1., h_freq=None, n_jobs=10)
+                        filt_raw = raw.copy().filter(l_freq=1., h_freq=None, n_jobs=jobs)
                         reject = dict(mag=5e-12)
                         # Initialize the ICA asking for 30 components
                         # ica = ICA(n_components=30, method='infomax', fit_params=dict(extended=True))
@@ -85,16 +89,16 @@ for subject in subjects:
                         hbeat_indices, hbeat_scores = ica.find_bads_ecg(filt_raw, ch_name='ECG 001')
                         # Exclude bad components and apply it to the unfiltered raw
                         ica.exclude = np.unique(np.concatenate([veog_indices, heog_indices, hbeat_indices]))
-                        ica.apply(raw)
                         # Filter raw
-                raw.filter(0.1, 30, n_jobs=10)     
+                        ica.apply(raw)
+                raw.filter(0.1, 30, n_jobs=jobs)     
                 # Select events of interest (only photodiode for good triplets and correct answers)
                 if subject == 'sub06' and meg_session == '6_EPOCH_4':
-                        events = mne.find_events(raw, shortest_event=1, verbose=True)
+                        events = mne.find_events(raw, shortest_event=1, verbose=verbose)
                 elif subject == 'sub08' and meg_session == '4_EPOCH_2':
-                        events = mne.find_events(raw, shortest_event=1, verbose=True)
+                        events = mne.find_events(raw, shortest_event=1, verbose=verbose)
                 elif subject == 'sub14' and meg_session == '3_EPOCH_1':
-                        events = mne.find_events(raw, shortest_event=1, verbose=True)
+                        events = mne.find_events(raw, shortest_event=1, verbose=verbose)
                 elif subject == 'sub11': # sub11 has wrong triggers so we need to read a txt file with correct events
                         file_path = op.join(path_data, subject, 'meg_data', meg_session, 'events_info.txt')
                         ev = open(file_path, 'r')
@@ -109,7 +113,7 @@ for subject in subjects:
                                 end.append(int(line.split()[column_names.index('value')]))
                         events = np.vstack([np.array(samples), np.array(start), np.array(end)]).T 
                 else:
-                        events = mne.find_events(raw, verbose=True)
+                        events = mne.find_events(raw, verbose=verbose)
                 events_stim = list()
                 events_button = list()
                 triggs = [546]
@@ -172,15 +176,11 @@ for subject in subjects:
                 # Create epochs time locked on stimulus onset and button response, and baseline epochs
                 reject = dict(mag=5e-12)
                 picks = mne.pick_types(raw.info, meg=True, eeg=False, eog=True, stim=False)
-                epochs_stim = mne.Epochs(raw, events_stim, tmin=-0.2, tmax=0.6, baseline=(-.2, 0), preload=True, picks=picks, decim=20, reject=reject, verbose=True)                   
-                epochs_button = mne.Epochs(raw, events_button, tmin=-0.2, tmax=0.6, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=True)                        
+                epochs_stim = mne.Epochs(raw, events_stim, tmin=-0.2, tmax=0.6, baseline=(-.2, 0), preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)                   
+                epochs_button = mne.Epochs(raw, events_button, tmin=-0.2, tmax=0.6, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)                        
                 # Free memory
-                # del raw
-                # Automatic rejection of bad epochs
-                # ar = AutoReject(n_jobs=-1)
-                # epochs_stim = ar.fit_transform(epochs_stim)
-                # rsc = Ransac(n_jobs=-1)
-                # epochs_stim = rsc.fit_transform(epochs_stim)
+                del raw
+                gc.collect()
                 # Check similarity between epochs and behavior
                 for df, df_column, epochs in zip([stim_df, button_df], ['triplets', 'expec_triggers'], [epochs_stim, epochs_button]):
                         changes = editops(int_to_unicode(df[df_column]), int_to_unicode(epochs.events[:, 2]))
@@ -210,6 +210,11 @@ for subject in subjects:
                                 elif change[0] == 'delete':
                                         del_from_stimdf.append(change[1])
                                         del_from_stimepo.append(change[1])
+                                elif change[0] == 'replace':
+                                        del_from_stimdf.append(change[1])
+                                        del_from_stimepo.append(change[1])
+                                        del_from_buttondf.append(change[2])
+                                        del_from_buttonepo.append(change[2])
                         stim_df.drop(stim_df.index[del_from_stimdf], inplace=True)
                         button_df.drop(button_df.index[del_from_buttondf], inplace=True)
                         epochs_stim.drop(del_from_stimepo)
@@ -218,7 +223,7 @@ for subject in subjects:
                 changes = editops(int_to_unicode(stim_df['triplets']), int_to_unicode(epochs_stim.events[:, 2]))
                 if len(changes) != 0:
                         warnings.warn("Behav file and stim epochs have different shapes.")
-                changes = editops(int_to_unicode(stim_df['expec_triggers']), int_to_unicode(epochs_button.events[:, 2]))
+                changes = editops(int_to_unicode(button_df['expec_triggers']), int_to_unicode(epochs_button.events[:, 2]))
                 if len(changes) != 0:
                         warnings.warn("Behav file and button epochs have different shapes.")
                 # Apply baseline from before the stimulus in the epochs_button
@@ -228,9 +233,9 @@ for subject in subjects:
                 bsl_data = np.mean(bsl_data, axis=2)
                 epochs_button._data[:, bsl_channels, :] -= bsl_data[:, :, np.newaxis]
                 # Save epochs 
-                epochs_stim.save(op.join(path, 'stim', f'{subject}_{session_num}_s-epo.fif'), overwrite=True)
-                epochs_button.save(op.join(path, 'button', f'{subject}_{session_num}_b-epo.fif'), overwrite=True)
-                epochs_baseline.save(op.join(path, 'bsl', f'{subject}_{session_num}_bl-epo.fif'), overwrite=True)
+                epochs_stim.save(op.join(path, 'stim', f'{subject}-{session_num}-epo.fif'), overwrite=overwrite)
+                epochs_button.save(op.join(path, 'button', f'{subject}-{session_num}-epo.fif'), overwrite=overwrite)
+                epochs_baseline.save(op.join(path, 'bsl', f'{subject}-{session_num}-epo.fif'), overwrite=overwrite)
                 # Save behavioral data
                 behav_df = stim_df
-                behav_df.to_pickle(op.join(path, 'behav', f'{subject}_{session_num}.pkl'))
+                behav_df.to_pickle(op.join(path, 'behav', f'{subject}-{session_num}.pkl'))

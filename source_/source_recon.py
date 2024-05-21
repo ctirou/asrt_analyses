@@ -6,9 +6,9 @@ import mne
 from base import *
 from config import *
 
-lock = 'button'
-movie = False
+lock = 'stim'
 overwrite = True
+jobs = 10
 
 subjects = SUBJS
 epochs_list = EPOCHS
@@ -16,7 +16,6 @@ data_path = DATA_DIR
 subjects_dir = FREESURFER_DIR
 res_path = RESULTS_DIR
 
-jobs = 10
 
 # create results directory
 folders = ["stcs", "bem", "src", "trans", "fwd"]
@@ -51,18 +50,12 @@ for subject in subjects:
         mne.bem.write_bem_solution(bem_fname, bem, overwrite=overwrite)
     # loop across all epochs
     for epoch_num, epo in enumerate(epochs_list):
-        # read behav and epoch files
-        behav_fname = op.join(data_path, "behav/%s_%s.pkl" % (subject, epoch_num))
+        # read behav
+        behav_fname = data_path / "behav" / f"{subject}-{epoch_num}.pkl"
         behav = pd.read_pickle(behav_fname)
-        if lock == 'stim':
-            epoch_fname = op.join(data_path, "%s/%s_%s_s-epo.fif" % (lock, subject, epoch_num))
-        else:
-            epoch_fname = op.join(data_path, "%s/%s_%s_b-epo.fif" % (lock, subject, epoch_num))
+        # read epoch
+        epoch_fname = data_path / lock / f"{subject}-{epoch_num}-epo.fif"        
         epoch = mne.read_epochs(epoch_fname)
-        # open and read baseline epoch for button press epochs correction
-        if lock == 'button': 
-            epoch_bsl_fname = op.join(data_path, "bsl/%s_%s_bl-epo.fif" % (subject, epoch_num))
-            epoch_bsl = mne.read_epochs(epoch_bsl_fname)                                                        
         # create trans file
         trans_fname = os.path.join(res_path, "trans", lock, "%s-%s-trans.fif" % (subject, epoch_num))
         if not op.exists(trans_fname) or overwrite:
