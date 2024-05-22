@@ -56,6 +56,7 @@ for subject in subjects:
         behav_sessions = sorted([f for f in behav_files_filter if '_eASRT_Epoch' in f])
         # Loop across sessions
         for session_num, (meg_session, behav_session) in enumerate(zip(meg_sessions, behav_sessions)):
+                print(subject, meg_session)
                 # Read the raw data
                 raw_fname = op.join(path_data, subject, 'meg_data', meg_session, 'results', 'c,rfDC_EEG')
                 hs_fname = op.join(path_data, subject, "meg_data", meg_session, "hs_file")
@@ -78,17 +79,17 @@ for subject in subjects:
                         reject = dict(mag=5e-12)
                         # Initialize the ICA asking for 30 components
                         # ica = ICA(n_components=30, method='infomax', fit_params=dict(extended=True))
-                        ica = ICA(n_components=30, method='fastica', max_iter=5000)
+                        ica = ICA(n_components=30, method='fastica', verbose=verbose)
                         # Fit the ica on the filtered raw
-                        ica.fit(filt_raw, reject=reject)
+                        ica.fit(filt_raw, reject=reject, verbose=verbose)
                         # Find the bad components based on the VEOG, HEOG and hearbeat
-                        veog_indices, veog_scores = ica.find_bads_eog(filt_raw, ch_name='VEOG')
-                        heog_indices, heog_scores = ica.find_bads_eog(filt_raw, ch_name='HEOG')
-                        hbeat_indices, hbeat_scores = ica.find_bads_ecg(filt_raw, ch_name='ECG 001')
+                        veog_indices, veog_scores = ica.find_bads_eog(filt_raw, ch_name='VEOG', verbose=verbose)
+                        heog_indices, heog_scores = ica.find_bads_eog(filt_raw, ch_name='HEOG', verbose=verbose)
+                        hbeat_indices, hbeat_scores = ica.find_bads_ecg(filt_raw, ch_name='ECG 001', verbose=verbose)
                         # Exclude bad components and apply it to the unfiltered raw
                         ica.exclude = np.unique(np.concatenate([veog_indices, heog_indices, hbeat_indices]))
                         # Filter raw
-                        ica.apply(raw)
+                        ica.apply(raw, verbose=verbose)
                 raw.filter(0.1, 30, n_jobs=jobs)     
                 # Select events of interest (only photodiode for good triplets and correct answers)
                 if subject == 'sub06' and meg_session == '6_EPOCH_4':
@@ -175,8 +176,8 @@ for subject in subjects:
                 behav_df = pd.DataFrame(behav_dict)
                 # Indices of good triplets 
                 good_triplets = np.where((behav_dict['triplets']==30) |
-                                        (behav_dict['triplets']==32) |
-                                        (behav_dict['triplets']==34))[0]
+                                         (behav_dict['triplets']==32) |
+                                         (behav_dict['triplets']==34))[0]
                 behav_df = behav_df.reindex(index = good_triplets)
                 stim_df = behav_df.copy()
                 button_df = behav_df.copy()

@@ -22,7 +22,7 @@ lock = "stim"
 sessions = ['practice', 'b1', 'b2', 'b3', 'b4']
 subjects_dir = FREESURFER_DIR
 res_path = RESULTS_DIR
-folds = 5
+folds = 10
 scoring = "roc_auc"
 parc='aparc'
 hemi = 'both'
@@ -35,7 +35,7 @@ method = "logReg"
 chance = 0.5
 
 # get times
-epoch_fname = DATA_DIR / lock / 'sub01_0_s-epo.fif'
+epoch_fname = DATA_DIR / lock / 'sub01-0-epo.fif'
 epochs = mne.read_epochs(epoch_fname, verbose=verbose)
 times = epochs.times
     
@@ -55,13 +55,13 @@ for subject in subjects[:4]:
             res_dir = res_path / analysis / 'source' / lock / trial_type / subject / session
             ensure_dir(res_dir)    
             # read stim epoch
-            epoch_fname = data_path / lock / f"{subject}_{session_id}_s-epo.fif"
+            epoch_fname = data_path / lock / f"{subject}-{session_id}-epo.fif"
             epoch = mne.read_epochs(epoch_fname, preload=True, verbose=verbose)
             # read behav
-            behav_fname = data_path / "behav" / f"{subject}_{session_id}.pkl"
+            behav_fname = data_path / "behav" / f"{subject}-{session_id}.pkl"
             behav = pd.read_pickle(behav_fname).reset_index()
                 
-            X = epoch.get_data(copy=False)
+            X = epoch.get_data()
             y = behav.positions
             y = y.reset_index(drop=True)            
             assert X.shape[0] == y.shape[0]
@@ -113,9 +113,9 @@ for subject in subjects[:4]:
             np.save(res_dir / 'rsa.npy', similarities)
             sub_rsa.append(similarities)
             
-            # del X, y, clf, cv, train, test, pred, pred_rock, cms, cms_arr, scores, similarities
-            # del one_two_similarity, one_three_similarity, one_four_similarity, two_three_similarity, two_four_similarity, three_four_similarity
-            # gc.collect()
+            del X, y, clf, cv, train, test, pred, pred_rock, cms, cms_arr, scores, similarities
+            del one_two_similarity, one_three_similarity, one_four_similarity, two_three_similarity, two_four_similarity, three_four_similarity
+            gc.collect()
             
         sub_cms = np.array(sub_cms)
         sub_scores = np.array(sub_scores)

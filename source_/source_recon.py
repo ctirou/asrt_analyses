@@ -6,16 +6,15 @@ import mne
 from base import *
 from config import *
 
-lock = 'stim'
+lock = 'button'
 overwrite = True
-jobs = 10
+jobs = -1
 
 subjects = SUBJS
 epochs_list = EPOCHS
 data_path = DATA_DIR
 subjects_dir = FREESURFER_DIR
 res_path = RESULTS_DIR
-
 
 # create results directory
 folders = ["stcs", "bem", "src", "trans", "fwd"]
@@ -32,7 +31,7 @@ for f in folders:
 for subject in subjects:
     # source space
     src_fname = op.join(res_path, "src", "%s-src.fif" % subject)
-    if not op.exists(src_fname) or False:
+    if not op.exists(src_fname) or overwrite:
         src = mne.setup_source_space(subject, spacing='oct6',
                                         subjects_dir=subjects_dir,
                                         add_dist=True,
@@ -41,7 +40,7 @@ for subject in subjects:
     src = mne.read_source_spaces(src_fname)
     # bem model
     bem_fname = os.path.join(res_path, "bem", "%s-bem.fif" % (subject))
-    if not op.exists(bem_fname) or False:
+    if not op.exists(bem_fname) or overwrite:
         conductivity = (.3,)
         model = mne.make_bem_model(subject=subject, ico=4,
                                 conductivity=conductivity,
