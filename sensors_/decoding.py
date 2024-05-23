@@ -31,6 +31,7 @@ verbose = True
 jobs = -1
 
 method = "logReg"
+solver = "lbfgs"
 
 chance = 0.5
 
@@ -42,17 +43,17 @@ times = epochs.times
 del epochs, epoch_fname
 gc.collect()
 
-for subject in subjects[:4]:
+for subject in subjects[:1]:
         
-    solvers = ['lbfgs', 'newton-cholesky']
-    for solver in solvers:
+    Cys = [1, 5, 10]
+    for Cy in Cys:
         
         sub_scores, sub_cms, sub_rsa = [], [], []
 
         for session_id, session in enumerate(sessions):
             
             # results dir
-            res_dir = res_path / analysis / 'source' / lock / trial_type / subject / session
+            res_dir = res_path / analysis / 'sensors' / lock / trial_type / subject / session
             ensure_dir(res_dir)    
             # read stim epoch
             epoch_fname = data_path / lock / f"{subject}-{session_id}-epo.fif"
@@ -122,7 +123,7 @@ for subject in subjects[:4]:
         sub_rsa = np.array(sub_rsa)
         
         fig, axs = plt.subplots(2, 5, layout='tight', figsize=(23, 7), sharey=False)
-        fig.suptitle(f'{subject} / ${solver}$')
+        fig.suptitle(f'{subject} / ${Cy}$')
         for i, (ax1, ax2, session) in enumerate(zip(axs.flat[:5], axs.flat[5:], sessions)):
             ax1.plot(times, sub_scores[i])
             ax1.axvspan(0, 0.2, color='grey', alpha=.2)
@@ -138,5 +139,5 @@ for subject in subjects[:4]:
             disp = ConfusionMatrixDisplay(sub_cms[i, max_score, :, :], display_labels=[1, 2, 3, 4])
             disp.plot(ax=ax2)
             disp.im_.set_clim(0, 1)  # Set colorbar limits
-        plt.savefig(res_dir / f"{solver}_{subject}.png")
+        plt.savefig(res_path / analysis / 'sensors' / lock / trial_type / f"{subject}_{Cy}.png")
         plt.close()
