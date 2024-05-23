@@ -249,7 +249,6 @@ for ilabel in range(68): # put in subjects and divide
             disp.plot(ax=ax)
             disp.im_.set_clim(0, 1)  # Set colorbar limits
 
-
     # sims_in_label = np.array(sims_in_label)
     # np.save(figures / f'{label.name}.npy', sims_in_label)
     

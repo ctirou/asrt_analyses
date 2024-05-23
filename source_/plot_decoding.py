@@ -1,13 +1,10 @@
-import os
+import os.path as op
 import numpy as np
-import pandas as pd
-from base import *
+from base import ensure_dir, decod_stats, get_sequence, get_inout_seq
 from config import *
 import matplotlib.pyplot as plt
 from mne import read_labels_from_annot, read_epochs
 from scipy.stats import ttest_1samp, spearmanr
-from tqdm.auto import tqdm
-from sklearn.metrics import ConfusionMatrixDisplay
 import gc
 
 trial_type = "pattern"
@@ -19,7 +16,6 @@ subjects_dir = FREESURFER_DIR
 verbose = "error"
 hemi = 'both'
 chance = .5
-plt.style.use('dark_background')
 
 summary = False
 
@@ -35,6 +31,7 @@ in_seqs, out_seqs = [], []
 decod_in_lab = {}
 decod_in_lab2 = {}
 corr_in_lab = {}
+decoding = dict()
 
 # get label names
 labels = read_labels_from_annot(subject='sub01', parc='aparc', hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
@@ -50,6 +47,8 @@ for ilabel, label in enumerate(label_names):
     print(f"{str(ilabel+1).zfill(2)}/{len(label_names)}", label)
     
     all_in_seqs, all_out_seqs = [], []
+
+    decoding[label] = list()
     
     for subject in subjects:
         
@@ -62,7 +61,7 @@ for ilabel, label in enumerate(label_names):
         
         behav_dir = RAW_DATA_DIR / subject / 'behav_data'
         sequence = get_sequence(behav_dir)
-        
+                
         sub_scores, sub_rsa, sub_cms = [], [], []
         for session_id, session in enumerate(sessions):
             
@@ -94,6 +93,7 @@ for ilabel, label in enumerate(label_names):
         all_out_seqs.append(np.array(out_seq))
         
         if summary:
+            from sklearn.metrics import ConfusionMatrixDisplay
             ensure_dir(figures / "summary" / label)
             fig, axs = plt.subplots(2, 5, layout='tight', figsize=(23, 7), sharey=False)
             fig.suptitle(f'{subject} / ${label}$')
@@ -114,7 +114,11 @@ for ilabel, label in enumerate(label_names):
                 disp.im_.set_clim(0, 1)  # Set colorbar limits
             plt.savefig(figures / "summary" / label / f"{subject}.png")
             plt.close()
+            
+        decoding[label].append(sub_scores)
 
+    decoding[label] = np.array(decoding[label])
+        
     all_in_seq = np.array(all_in_seqs)
     all_out_seq = np.array(all_out_seqs)
     diff_inout = np.squeeze(all_in_seq.mean(axis=1) - all_out_seq.mean(axis=1))
@@ -122,14 +126,18 @@ for ilabel, label in enumerate(label_names):
     
     decod_in_lab2[label] = [np.squeeze(all_in_seq).mean(axis=1), np.squeeze(all_out_seq).mean(axis=1)]
     
-    # all_rhos = []
-    # for sub in range(len(subjects)):
-    #     rhos = []
-    #     for t in range(len(times)):
-    #         rhos.append(spearmanr([0, 1, 2, 3, 4], diff_inout[sub, :, t]))
-    #     all_rhos.append(rhos)
-    # all_rhos = np.array(all_rhos)
-    # corr_in_lab[label] = all_rhos
+    if not op.exists(res_path / analysis / 'source' / lock / trial_type / label / "corr.npy"):
+        corr = []
+        for sub in range(len(subjects)):
+            rhos = []
+            for t in range(len(times)):
+                rhos.append(spearmanr([0, 1, 2, 3, 4], diff_inout[sub, :, t]))
+            corr.append(rhos)
+        corr = np.array(corr)
+        np.save(res_path / analysis / 'source' / lock / trial_type / label / "corr.npy", corr)
+
+    corr = np.load(res_path / analysis / 'source' / lock / trial_type / label / "corr.npy")
+    corr_in_lab[label] = corr
         
 nrows, ncols = 7, 10
 
@@ -142,48 +150,64 @@ for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
     
     ax.plot(times, practice, label='practice')
     ax.plot(times, learning, label='learning')
-    ax.set_title(f"${label}$")
+    ax.set_title(f"${label}$", fontsize=8)
     ax.axvspan(0, 0.2, color='grey', alpha=.2)
     ax.axhline(0, color='black', ls='dashed', alpha=.5)
-    
     if i == 0:
         legend = ax.legend()
-        plt.setp(legend.get_texts(), fontsize=8)  # Adjust legend size
-    
-    # for tick in ax.xaxis.get_major_ticks():  # Adjust x-axis label size
-    #     tick.label.set_fontsize(8)
-    # for tick in ax.yaxis.get_major_ticks():  # Adjust y-axis label size
-    #     tick.label.set_fontsize(8)
+        plt.setp(legend.get_texts(), fontsize=7)  # Adjust legend size
 plt.savefig(figures / f"diff_in_out.pdf")
 plt.close()
 
 # plot in vs out
 fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(40, 13))
-fig.suptitle("in vs out")
+fig.suptitle("in vs out decoding")
 for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
     ins = decod_in_lab2[label][0].mean(axis=(0, 1))
     outs = decod_in_lab2[label][1].mean(axis=(0, 1))
     ax.plot(times, ins, label='in_seq') 
     ax.plot(times, outs, label='out_seq')
     ax.axvspan(0, 0.2, color='grey', alpha=.2)    
-    ax.set_title(f"${label}$")
+    ax.set_title(f"${label}$", fontsize=8)
     if i == 0:
         legend = ax.legend()
-        plt.setp(legend.get_texts(), fontsize=8)  # Adjust legend size
-    
-    # for tick in ax.xaxis.get_major_ticks():  # Adjust x-axis label size
-    #     tick.label.set_fontsize(8)
-    # for tick in ax.yaxis.get_major_ticks():  # Adjust y-axis label size
-    #     tick.label.set_fontsize(8)
+        plt.setp(legend.get_texts(), fontsize=7)  # Adjust legend size
 plt.savefig(figures / f"in_vs_out.pdf")
 plt.close()
 
 # correlations
-# fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharex=True, sharey=True)
-# for ax, label in zip(axs.flat, label_names):
-#     rho = corr_in_lab[label][:, :, 0].mean(0)
-#     ax.plot(times, rho, label='rho')
-#     ax.axvspan(0, 0.2, color='grey', alpha=.2)
-#     ax.axhline(0, color='black', ls='dashed', alpha=.5)
-#     ax.set_title(label)
-# plt.show()
+fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(40, 13))
+fig.suptitle("correlations")
+for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
+    rho = corr_in_lab[label][:, :, 0]
+    ax.plot(times, rho.mean(0), label='rho')
+    ax.axvspan(0, 0.2, color='grey', alpha=.2)
+    ax.axhline(0, color='black', ls='dashed', alpha=.5)
+    ax.set_title(f"${label}$", fontsize=8)
+    if i == 0:
+        legend = ax.legend()
+        plt.setp(legend.get_texts(), fontsize=7)  # Adjust legend size
+    p_values = decod_stats(rho)
+    p_values_unc = ttest_1samp(rho, axis=0, popmean=0)[1]
+    sig = p_values < 0.05
+    sig_unc = p_values_unc < 0.05
+    ax.fill_between(times, 0, rho.mean(0), where=sig_unc, color='C2', alpha=1)
+    ax.fill_between(times, 0, rho.mean(0), where=sig, alpha=0.3)
+plt.savefig(figures / "correlations.pdf")
+plt.close()
+
+# decoding
+fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(40, 13))
+fig.suptitle("decoding")
+for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
+    score = decoding[label][:, 1:5, :]
+    ax.plot(times, score.mean((0, 1)), label='roc_auc')
+    ax.axvspan(0, 0.2, color='grey', alpha=.2)
+    ax.axhline(chance, color='black', ls='dashed', alpha=.5)
+    ax.set_title(f"${label}$", fontsize=8)    
+    p_values = decod_stats(score.mean(1) - chance)
+    p_values_unc = ttest_1samp(score, axis=0, popmean=0)[1]
+    sig = p_values < 0.05
+    ax.fill_between(times, chance, score.mean((0, 1)), where=sig, alpha=.4)
+plt.savefig(figures / "decoding.pdf")
+plt.close()
