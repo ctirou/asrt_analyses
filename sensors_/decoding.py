@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 plt.style.use('dark_background')
 
 # params
-subjects = SUBJS # done : none
+subjects = SUBJS
 
 trial_type = 'pattern' # "all", "pattern", or "random"
 data_path = DATA_DIR
@@ -131,7 +131,7 @@ for subject in subjects[:1]:
             ax1.axhline(chance, color='white', ls='dashed', alpha=.5)
             ax1.set_ylim(0, 1)
             ax1.grid(True, color='grey', alpha=0.3)
-            times_win = np.where((times >= 0) & (times <= 0.2))[0]
+            times_win = np.where((times > 0) & (times <= 0.2))[0]
             max_score = np.argmax(sub_scores[i][times_win]) + np.where(times==0)[0][0]
             ax1.annotate(f'Max Score: {sub_scores[i][max_score]:.2f}', xy=(0.1, 0.9), xycoords='axes fraction')
             ax1.annotate('', xy=(times[max_score], sub_scores[i][max_score]), xytext=(times[max_score], sub_scores[i][max_score] + 0.1),

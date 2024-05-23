@@ -7,7 +7,8 @@ import matplotlib.pyplot as plt
 from mne import read_labels_from_annot, read_epochs
 from scipy.stats import ttest_1samp, spearmanr
 from tqdm.auto import tqdm
-from sklearn.metrics import confusion_matrix, roc_auc_score, ConfusionMatrixDisplay, accuracy_score
+from sklearn.metrics import ConfusionMatrixDisplay
+import gc
 
 trial_type = "pattern"
 subjects = SUBJS
@@ -20,14 +21,15 @@ hemi = 'both'
 chance = .5
 plt.style.use('dark_background')
 
+summary = False
+
 # get times
-epoch_fname = DATA_DIR / lock / 'sub01_0_s-epo.fif'
+epoch_fname = DATA_DIR / lock / 'sub01-0-epo.fif'
 epochs = read_epochs(epoch_fname, verbose=verbose)
 times = epochs.times
 del epochs
 
-sessions = ['practice', 'b1', 'b2', 'b3', 'b4']
-similarity_names = ['one_two', 'one_three', 'one_four', 'two_three', 'two_four', 'three_four']        
+sessions = ['Practice', 'Block_1', 'Block_2', 'Block_3', 'Block_4']
 
 in_seqs, out_seqs = [], []
 decod_in_lab = {}
@@ -39,16 +41,17 @@ labels = read_labels_from_annot(subject='sub01', parc='aparc', hemi=hemi, subjec
 label_names = [label.name for label in labels]
 del labels
 
-figures = res_path / 'source' / lock / trial_type / 'figures'
+figures = res_path / "figures" / analysis / 'source' / lock / trial_type
 ensure_dir(figures)
+gc.collect()
 
-for ilabel, label in enumerate(label_names[:1]):
+for ilabel, label in enumerate(label_names):
     
     print(f"{str(ilabel+1).zfill(2)}/{len(label_names)}", label)
     
     all_in_seqs, all_out_seqs = [], []
     
-    for subject in subjects[:1]:
+    for subject in subjects:
         
         one_two_similarities = list()
         one_three_similarities = list()
@@ -90,25 +93,27 @@ for ilabel, label in enumerate(label_names[:1]):
         all_in_seqs.append(np.array(in_seq))
         all_out_seqs.append(np.array(out_seq))
         
-        ensure_dir(figures / "summary")
-        fig, axs = plt.subplots(2, 5, layout='tight', figsize=(23, 7), sharey=False)
-        fig.suptitle(f'{subject} / ${label}$')
-        for i, (ax1, ax2, session) in enumerate(zip(axs.flat[:5], axs.flat[5:], sessions)):
-            ax1.plot(times, sub_scores[i])
-            ax1.axvspan(0, 0.2, color='grey', alpha=.2)
-            ax1.set_title(session)
-            ax1.axhline(chance, color='white', ls='dashed', alpha=.5)
-            ax1.set_ylim(0, 1)
-            ax1.grid(True, color='grey', alpha=0.3)
-            max_score = np.argmax(sub_scores[i])
-            ax1.annotate(f'Max Score: {sub_scores[i][max_score]:.2f}', xy=(0.1, 0.9), xycoords='axes fraction')
-            ax1.annotate('', xy=(times[max_score], sub_scores[i][max_score]), xytext=(times[max_score], sub_scores[i][max_score] + 0.1),
-                        arrowprops=dict(arrowstyle='->', color='white'))
-            disp = ConfusionMatrixDisplay(sub_cms[i, max_score, :, :], display_labels=[1, 2, 3, 4])
-            disp.plot(ax=ax2)
-            disp.im_.set_clim(0, 1)  # Set colorbar limits
-        plt.savefig(figures / 'summary' / f"{subject}-sum.png")
-        plt.close()
+        if summary:
+            ensure_dir(figures / "summary" / label)
+            fig, axs = plt.subplots(2, 5, layout='tight', figsize=(23, 7), sharey=False)
+            fig.suptitle(f'{subject} / ${label}$')
+            times_win = np.where((times >= 0) & (times <= 0.2))[0]
+            for i, (ax1, ax2, session) in enumerate(zip(axs.flat[:5], axs.flat[5:], sessions)):
+                ax1.plot(times, sub_scores[i])
+                ax1.axvspan(0, 0.2, color='grey', alpha=.2)
+                ax1.set_title(session)
+                ax1.axhline(chance, color='white', ls='dashed', alpha=.5)
+                ax1.set_ylim(0.2, 0.8)
+                ax1.grid(True, color='grey', alpha=0.3)
+                max_score = np.argmax(sub_scores[i][times_win]) + np.where(times==0)[0][0]
+                ax1.annotate(f'Max Score: {sub_scores[i][max_score]:.2f}', xy=(0.1, 0.9), xycoords='axes fraction')
+                ax1.annotate('', xy=(times[max_score], sub_scores[i][max_score]), xytext=(times[max_score], sub_scores[i][max_score] + 0.1),
+                            arrowprops=dict(arrowstyle='->', color='white'))
+                disp = ConfusionMatrixDisplay(sub_cms[i, max_score, :, :], display_labels=[1, 2, 3, 4])
+                disp.plot(ax=ax2)
+                disp.im_.set_clim(0, 1)  # Set colorbar limits
+            plt.savefig(figures / "summary" / label / f"{subject}.png")
+            plt.close()
 
     all_in_seq = np.array(all_in_seqs)
     all_out_seq = np.array(all_out_seqs)
@@ -129,14 +134,15 @@ for ilabel, label in enumerate(label_names[:1]):
 nrows, ncols = 7, 10
 
 # plot diff in/out
-fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='constrained')
+fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(40, 13))
+fig.suptitle("Difference in/out")
 for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
     practice = decod_in_lab[label][:, 0, :].mean(0)
     learning = decod_in_lab[label][:, 1:, :].mean((0, 1))
     
     ax.plot(times, practice, label='practice')
     ax.plot(times, learning, label='learning')
-    ax.set_title(label)
+    ax.set_title(f"${label}$")
     ax.axvspan(0, 0.2, color='grey', alpha=.2)
     ax.axhline(0, color='black', ls='dashed', alpha=.5)
     
@@ -144,33 +150,32 @@ for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
         legend = ax.legend()
         plt.setp(legend.get_texts(), fontsize=8)  # Adjust legend size
     
-    for tick in ax.xaxis.get_major_ticks():  # Adjust x-axis label size
-        tick.label.set_fontsize(8)
-    for tick in ax.yaxis.get_major_ticks():  # Adjust y-axis label size
-        tick.label.set_fontsize(8)
-plt.savefig(res_dir / 'plots' / f"diff_in_out.png")
+    # for tick in ax.xaxis.get_major_ticks():  # Adjust x-axis label size
+    #     tick.label.set_fontsize(8)
+    # for tick in ax.yaxis.get_major_ticks():  # Adjust y-axis label size
+    #     tick.label.set_fontsize(8)
+plt.savefig(figures / f"diff_in_out.pdf")
 plt.close()
 
 # plot in vs out
-fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='constrained')
+fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(40, 13))
+fig.suptitle("in vs out")
 for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
     ins = decod_in_lab2[label][0].mean(axis=(0, 1))
     outs = decod_in_lab2[label][1].mean(axis=(0, 1))
     ax.plot(times, ins, label='in_seq') 
     ax.plot(times, outs, label='out_seq')
-    ax.axvspan(0, 0.2, color='grey', alpha=.2)
-    ax.axhline(chance, color='black', ls='dashed', alpha=.5)
-    
-    ax.set_title(label)
+    ax.axvspan(0, 0.2, color='grey', alpha=.2)    
+    ax.set_title(f"${label}$")
     if i == 0:
         legend = ax.legend()
         plt.setp(legend.get_texts(), fontsize=8)  # Adjust legend size
     
-    for tick in ax.xaxis.get_major_ticks():  # Adjust x-axis label size
-        tick.label.set_fontsize(8)
-    for tick in ax.yaxis.get_major_ticks():  # Adjust y-axis label size
-        tick.label.set_fontsize(8)
-plt.savefig(res_dir / 'plots' / f"in_vs_out.png")
+    # for tick in ax.xaxis.get_major_ticks():  # Adjust x-axis label size
+    #     tick.label.set_fontsize(8)
+    # for tick in ax.yaxis.get_major_ticks():  # Adjust y-axis label size
+    #     tick.label.set_fontsize(8)
+plt.savefig(figures / f"in_vs_out.pdf")
 plt.close()
 
 # correlations
