@@ -28,7 +28,7 @@ for f in folders:
     else:
         ensure_dir(os.path.join(res_path, f))
 
-for subject in subjects:
+for subject in subjects[2:]:
     # source space
     src_fname = op.join(res_path, "src", "%s-src.fif" % subject)
     if not op.exists(src_fname) or False:
@@ -57,7 +57,7 @@ for subject in subjects:
         epoch = mne.read_epochs(epoch_fname)
         # create trans file
         trans_fname = os.path.join(res_path, "trans", lock, "%s-%s-trans.fif" % (subject, epoch_num))
-        if not op.exists(trans_fname) or False:
+        if not op.exists(trans_fname) or overwrite:
             coreg = mne.coreg.Coregistration(epoch.info, subject, subjects_dir)
             coreg.fit_fiducials(verbose=True)
             coreg.fit_icp(n_iterations=6, verbose=True)

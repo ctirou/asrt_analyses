@@ -139,3 +139,22 @@ def make_predictions(X, y, folds, jobs, scoring, verbose):
         pred_rock[test] = np.array(clf.predict_proba(X[test]))
 
     return test, pred, pred_rock
+
+def gat_stats(X):
+    from mne.stats import spatio_temporal_cluster_1samp_test
+    """Statistical test applied across subjects"""
+    # check input
+    X = np.array(X)
+    X = X[:, :, None] if X.ndim == 2 else X
+
+    # stats function report p_value for each cluster
+    T_obs_, clusters, p_values, _ = spatio_temporal_cluster_1samp_test(
+        X, out_type='mask',
+        n_permutations=2**12, n_jobs=-1, verbose=False)
+
+    # format p_values to get same dimensionality as X
+    p_values_ = np.ones_like(X[0]).T
+    for cluster, pval in zip(clusters, p_values):
+        p_values_[cluster.T] = pval
+
+    return np.squeeze(p_values_).T
