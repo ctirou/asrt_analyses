@@ -7,9 +7,9 @@ from mne import read_labels_from_annot, read_epochs
 from scipy.stats import ttest_1samp, spearmanr
 import gc
 
+lock = "button"
 trial_type = "pattern"
 subjects = SUBJS
-lock = "stim"
 analysis = "pred_decoding"
 res_path = RESULTS_DIR
 subjects_dir = FREESURFER_DIR
@@ -27,7 +27,6 @@ del epochs
 
 sessions = ['Practice', 'Block_1', 'Block_2', 'Block_3', 'Block_4']
 
-in_seqs, out_seqs = [], []
 decod_in_lab = {}
 decod_in_lab2 = {}
 corr_in_lab = {}
@@ -45,9 +44,7 @@ gc.collect()
 for ilabel, label in enumerate(label_names):
     
     print(f"{str(ilabel+1).zfill(2)}/{len(label_names)}", label)
-    
     all_in_seqs, all_out_seqs = [], []
-
     decoding[label] = list()
     
     for subject in subjects:
@@ -83,10 +80,7 @@ for ilabel, label in enumerate(label_names):
             [one_two_similarities, one_three_similarities, one_four_similarities, two_three_similarities, two_four_similarities, three_four_similarities], 
             [one_two, one_three, one_four, two_three, two_four, three_four]):
                 all_sims.append(np.array(sim_list))
-        
-        # for all_sims in [one_two_similarities, one_three_similarities, one_four_similarities, two_three_similarities, two_four_similarities, three_four_similarities]:
-        #     all_sims = np.array(all_sims)
-            
+                    
         similarities = [one_two_similarities, one_three_similarities, one_four_similarities, two_three_similarities, two_four_similarities, three_four_similarities]
         in_seq, out_seq = get_inout_seq(sequence, similarities)
         all_in_seqs.append(np.array(in_seq))
@@ -116,14 +110,12 @@ for ilabel, label in enumerate(label_names):
             plt.close()
             
         decoding[label].append(sub_scores)
-
     decoding[label] = np.array(decoding[label])
         
     all_in_seq = np.array(all_in_seqs)
     all_out_seq = np.array(all_out_seqs)
     diff_inout = np.squeeze(all_in_seq.mean(axis=1) - all_out_seq.mean(axis=1))
     decod_in_lab[label] = diff_inout
-    
     decod_in_lab2[label] = [np.squeeze(all_in_seq).mean(axis=1), np.squeeze(all_out_seq).mean(axis=1)]
     
     if not op.exists(res_path / analysis / 'source' / lock / trial_type / label / "corr.npy"):
@@ -135,7 +127,6 @@ for ilabel, label in enumerate(label_names):
             corr.append(rhos)
         corr = np.array(corr)
         np.save(res_path / analysis / 'source' / lock / trial_type / label / "corr.npy", corr)
-
     corr = np.load(res_path / analysis / 'source' / lock / trial_type / label / "corr.npy")
     corr_in_lab[label] = corr
         
@@ -143,45 +134,45 @@ nrows, ncols = 7, 10
 
 # plot diff in/out
 fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(40, 13))
-fig.suptitle("Difference in/out")
+fig.suptitle(f"${lock}$ / ${trial_type}$ / diff_in_out")
 for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
     practice = decod_in_lab[label][:, 0, :].mean(0)
     learning = decod_in_lab[label][:, 1:, :].mean((0, 1))
-    
     ax.plot(times, practice, label='practice')
     ax.plot(times, learning, label='learning')
     ax.set_title(f"${label}$", fontsize=8)
-    ax.axvspan(0, 0.2, color='grey', alpha=.2)
     ax.axhline(0, color='black', ls='dashed', alpha=.5)
     if i == 0:
         legend = ax.legend()
         plt.setp(legend.get_texts(), fontsize=7)  # Adjust legend size
+    if lock == 'stim':
+        ax.axvspan(0, 0.2, color='grey', alpha=.2)        
 plt.savefig(figures / f"diff_in_out.pdf")
 plt.close()
 
 # plot in vs out
 fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(40, 13))
-fig.suptitle("in vs out decoding")
+fig.suptitle(f"${lock}$ / ${trial_type}$ / in_vs_out_decoding")
 for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
     ins = decod_in_lab2[label][0].mean(axis=(0, 1))
     outs = decod_in_lab2[label][1].mean(axis=(0, 1))
-    ax.plot(times, ins, label='in_seq') 
-    ax.plot(times, outs, label='out_seq')
-    ax.axvspan(0, 0.2, color='grey', alpha=.2)    
+    ax.plot(times, ins, label='in') 
+    ax.plot(times, outs, label='out')
     ax.set_title(f"${label}$", fontsize=8)
     if i == 0:
         legend = ax.legend()
         plt.setp(legend.get_texts(), fontsize=7)  # Adjust legend size
+    if lock == 'stim':
+        ax.axvspan(0, 0.2, color='grey', alpha=.2)
 plt.savefig(figures / f"in_vs_out.pdf")
 plt.close()
 
 # correlations
 fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(40, 13))
-fig.suptitle("correlations")
+fig.suptitle(f"${lock}$ / ${trial_type}$ / correlations")
 for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
     rho = corr_in_lab[label][:, :, 0]
     ax.plot(times, rho.mean(0), label='rho')
-    ax.axvspan(0, 0.2, color='grey', alpha=.2)
     ax.axhline(0, color='black', ls='dashed', alpha=.5)
     ax.set_title(f"${label}$", fontsize=8)
     if i == 0:
@@ -193,21 +184,25 @@ for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
     sig_unc = p_values_unc < 0.05
     ax.fill_between(times, 0, rho.mean(0), where=sig_unc, color='C2', alpha=1)
     ax.fill_between(times, 0, rho.mean(0), where=sig, alpha=0.3)
+    if lock == 'stim':
+        ax.axvspan(0, 0.2, color='grey', alpha=.2)
 plt.savefig(figures / "correlations.pdf")
 plt.close()
 
 # decoding
 fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(40, 13))
-fig.suptitle("decoding")
+fig.suptitle(f"${lock}$ / ${trial_type}$ / decoding")
 for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
     score = decoding[label][:, 1:5, :]
+    score = decoding[label][:, :, :]
     ax.plot(times, score.mean((0, 1)), label='roc_auc')
-    ax.axvspan(0, 0.2, color='grey', alpha=.2)
     ax.axhline(chance, color='black', ls='dashed', alpha=.5)
     ax.set_title(f"${label}$", fontsize=8)    
     p_values = decod_stats(score.mean(1) - chance)
     p_values_unc = ttest_1samp(score, axis=0, popmean=0)[1]
     sig = p_values < 0.05
     ax.fill_between(times, chance, score.mean((0, 1)), where=sig, alpha=.4)
+    if lock == 'stim':
+        ax.axvspan(0, 0.2, color='grey', alpha=.2)
 plt.savefig(figures / "decoding.pdf")
 plt.close()
