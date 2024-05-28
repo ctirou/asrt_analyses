@@ -48,7 +48,7 @@ for fold in folders:
         ensure_dir(path / fold)
 
 # Loop across subjects
-for subject in subjects:
+for subject in subjects[2:]:
         # Sort behav files
         path_to_behav_dir = f'{path_data}/{subject}/behav_data'
         behav_dir = os.listdir(path_to_behav_dir)
@@ -70,9 +70,8 @@ for subject in subjects:
                 raw.rename_channels({'UTL 001': 'MISC 001',
                                 'EEG 001': 'ECG 001'})
                 # Channels 059 and 173 are flat in sub01, check for others before removing
-                if subject in ['sub01', 'sub02']:
-                        to_drop = ['MISC 001', 'MEG 059', 'MEG 173']
-                        raw.drop_channels(to_drop)
+                to_drop = ['MISC 001', 'MEG 059', 'MEG 173']
+                raw.drop_channels(to_drop)
                 if mode_ICA:
                         # Save a filtered version of the raw to run the ICA on
                         filt_raw = raw.copy().filter(l_freq=1., h_freq=None, n_jobs=jobs)

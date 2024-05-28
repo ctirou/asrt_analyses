@@ -6,7 +6,7 @@ import mne
 from base import *
 from config import *
 
-lock = 'button'
+lock = 'stim'
 overwrite = True
 jobs = -1
 
@@ -31,7 +31,7 @@ for f in folders:
 for subject in subjects:
     # source space
     src_fname = op.join(res_path, "src", "%s-src.fif" % subject)
-    if not op.exists(src_fname) or overwrite:
+    if not op.exists(src_fname) or False:
         src = mne.setup_source_space(subject, spacing='oct6',
                                         subjects_dir=subjects_dir,
                                         add_dist=True,
@@ -40,7 +40,7 @@ for subject in subjects:
     src = mne.read_source_spaces(src_fname)
     # bem model
     bem_fname = os.path.join(res_path, "bem", "%s-bem.fif" % (subject))
-    if not op.exists(bem_fname) or overwrite:
+    if not op.exists(bem_fname) or False:
         conductivity = (.3,)
         model = mne.make_bem_model(subject=subject, ico=4,
                                 conductivity=conductivity,
@@ -48,25 +48,26 @@ for subject in subjects:
         bem = mne.make_bem_solution(model)
         mne.bem.write_bem_solution(bem_fname, bem, overwrite=overwrite)
     # loop across all epochs
-    for epoch_num, epo in enumerate(epochs_list):
-        # read epoch
-        epoch_fname = data_path / lock / f"{subject}-{epoch_num}-epo.fif"        
-        epoch = mne.read_epochs(epoch_fname)
-        # create trans file
-        trans_fname = os.path.join(res_path, "trans", lock, "%s-%s-trans.fif" % (subject, epoch_num))
-        if not op.exists(trans_fname) or overwrite:
-            coreg = mne.coreg.Coregistration(epoch.info, subject, subjects_dir)
-            coreg.fit_fiducials(verbose=True)
-            coreg.fit_icp(n_iterations=6, verbose=True)
-            coreg.omit_head_shape_points(distance=5.0 / 1000)
-            coreg.fit_icp(n_iterations=100, verbose=True)
-            mne.write_trans(trans_fname, coreg.trans, overwrite=overwrite)
-        fwd_fname = op.join(res_path, "fwd", lock, "%s-%s-fwd.fif" % (subject, epoch_num))
-        if not op.exists(fwd_fname) or overwrite:
-            fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,
-                                            src=src, bem=bem_fname,
-                                            meg=True, eeg=False,
-                                            mindist=5.0,
-                                            n_jobs=jobs,
-                                            verbose=True)
-            mne.write_forward_solution(fwd_fname, fwd, overwrite=overwrite)
+    for lock in ['stim', 'button']:
+        for epoch_num, epo in enumerate(epochs_list):
+            # read epoch
+            epoch_fname = data_path / lock / f"{subject}-{epoch_num}-epo.fif"        
+            epoch = mne.read_epochs(epoch_fname)
+            # create trans file
+            trans_fname = os.path.join(res_path, "trans", lock, "%s-%s-trans.fif" % (subject, epoch_num))
+            if not op.exists(trans_fname) or overwrite:
+                coreg = mne.coreg.Coregistration(epoch.info, subject, subjects_dir)
+                coreg.fit_fiducials(verbose=True)
+                coreg.fit_icp(n_iterations=6, verbose=True)
+                coreg.omit_head_shape_points(distance=5.0 / 1000)
+                coreg.fit_icp(n_iterations=100, verbose=True)
+                mne.write_trans(trans_fname, coreg.trans, overwrite=overwrite)
+            fwd_fname = op.join(res_path, "fwd", lock, "%s-%s-fwd.fif" % (subject, epoch_num))
+            if not op.exists(fwd_fname) or overwrite:
+                fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,
+                                                src=src, bem=bem_fname,
+                                                meg=True, eeg=False,
+                                                mindist=5.0,
+                                                n_jobs=jobs,
+                                                verbose=True)
+                mne.write_forward_solution(fwd_fname, fwd, overwrite=overwrite)

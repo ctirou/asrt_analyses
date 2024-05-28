@@ -5,7 +5,7 @@ from base import ensure_dir
 from config import *
 import gc
 
-lock = 'stim'
+lock = 'button'
 overwrite = True
 jobs = -1
 
@@ -31,7 +31,7 @@ for f in folders:
 for subject in subjects:
     # source space
     src_fname = op.join(res_path, "src", "%s-src.fif" % subject)
-    if not op.exists(src_fname) or overwrite:
+    if not op.exists(src_fname) or False:
         src = mne.setup_source_space(subject, spacing='oct6',
                                         subjects_dir=subjects_dir,
                                         add_dist=True,
@@ -40,7 +40,7 @@ for subject in subjects:
     src = mne.read_source_spaces(src_fname)
     # bem model
     bem_fname = os.path.join(res_path, "bem", "%s-bem.fif" % (subject))
-    if not op.exists(bem_fname) or overwrite:
+    if not op.exists(bem_fname) or False:
         conductivity = (.3,)
         model = mne.make_bem_model(subject=subject, ico=4,
                                 conductivity=conductivity,
@@ -73,7 +73,7 @@ for subject in subjects:
                                         verbose=True)
         mne.write_forward_solution(fwd_fname, fwd, overwrite=overwrite)
     
-    del src_fname, src, bem_fname, bem
+    del src_fname, src, bem_fname
     del epo_dir, epo_fnames, all_epo, epoch
     del trans_fname, fwd_fname, fwd
     gc.collect()
