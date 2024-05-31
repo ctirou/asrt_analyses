@@ -9,15 +9,15 @@ import gc
 from pathlib import Path
 import pandas as pd
 
+analysis = "RSA"
 lock = "stim"
 trial_type = "pattern"
 subjects = SUBJS
-analysis = "concatenated"
 res_path = RESULTS_DIR
 subjects_dir = FREESURFER_DIR
 verbose = "error"
 hemi = 'both'
-chance = .5
+chance = .25
 
 summary = False
 
@@ -65,7 +65,7 @@ for ilabel, label in enumerate(label_names):
         behav_dir = RAW_DATA_DIR / subject / 'behav_data'
         sequence = get_sequence(behav_dir)
                 
-        scores_dir = res_path / analysis / 'source' / lock / trial_type / label / subject
+        scores_dir = res_path / 'concatenated' / 'source' / lock / trial_type / label / subject
         sub_scores = np.load(scores_dir / "scores.npy")
         
         rsa_dir = res_path / analysis / 'source' / lock / trial_type
@@ -96,19 +96,86 @@ for ilabel, label in enumerate(label_names):
     rsa_in_lab[label] = diff_inout
 
     decoding[label] = np.array(decoding[label])
-                
+    
+    # decoding
+    chance = 25
+    fig, ax = plt.subplots(figsize=(7, 4))
+    if lock == 'stim':
+        ax.axvspan(0, 0.2, color='grey', alpha=.2, label='stimulus')
+    score = decoding[label] * 100
+    sem = np.std(score, axis=0) / np.sqrt(len(subjects))
+    m1 = np.array(score.mean(0) + np.array(sem))
+    m2 = np.array(score.mean(0) - np.array(sem))
+    ax.axhline(chance, color='black', ls='dashed', alpha=.5, label='chance')
+    ax.set_title(f"${label}$", fontsize=13)    
+    p_values = decod_stats(score - chance)
+    sig = p_values < 0.05
+    ax.fill_between(times, m1, m2, color='0.6')
+    ax.fill_between(times, m1, m2, color='#1f77b4', where=sig, alpha=1)
+    ax.fill_between(times, chance, m2, where=sig, color='#1f77b4', alpha=0.7, label='significant')
+    ax.set_ylim(20, 45)
+    yticks = ax.get_yticks()
+    yticks = yticks[1:-1]  # Remove first and last element
+    ax.set_yticks(yticks)  # Set new y-ticks
+    if ilabel == 0:
+        legend = ax.legend(loc='best')
+        plt.setp(legend.get_texts(), fontsize=9)  # Adjust legend size
+        ax.set_ylabel("Accuracy (%)")
+        ax.set_xlabel("Time (s)")
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    plt.savefig(figures / f"{label}_decoding.pdf", transparent=True)
+    plt.close()
+
+    # rsa
+    fig, ax = plt.subplots(figsize=(7, 4))
+    if lock == 'stim':
+        ax.axvspan(0, 0.2, color='grey', alpha=.2, label='stimulus')
+    practice = np.array(rsa_in_lab[label][:, 0, :], dtype=float) * (-1)
+    prac_sem = np.std(practice, axis=0) / np.sqrt(len(subjects))
+    prac_m1 = np.array(practice.mean(0) + np.array(prac_sem))
+    prac_m2 = np.array(practice.mean(0) - np.array(prac_sem))
+    learning = np.array(rsa_in_lab[label][:, 1:, :], dtype=float) * (-1)
+    diff_sem = np.std(learning, axis = (0, 1)) / np.sqrt(len(subjects))
+    diff_m1 = np.array(learning.mean((0, 1)) + np.array(diff_sem))
+    diff_m2 = np.array(learning.mean((0, 1)) - np.array(diff_sem))
+    ax.fill_between(times, prac_m1, prac_m2, color='C7', alpha=.5, label='Pre-learning')
+    ax.fill_between(times, diff_m1, diff_m2, color='#d627', alpha=.7, label='Learning')
+    diff = learning.mean(1) - practice
+    p_values_unc = ttest_1samp(diff, axis=0, popmean=0)[1]
+    sig_unc = p_values_unc < .05
+    # pv2 = decod_stats(diff)
+    # sig2 = pv2 < .05
+    # ax.fill_between(times, diff_m1, diff_m2, where=sig2, color='#d62728', alpha=1)
+    ax.fill_between(times, diff_m1, diff_m2, where=sig_unc, color='black', alpha=0.3)
+    ax.set_title(f"${label}$", fontsize=13)
+    ax.axhline(0, color='black', ls='dashed', alpha=.3)
+    ax.set_ylim(-0.2, 0.2)
+    yticks = ax.get_yticks()
+    yticks = yticks[1:-1]  # Remove first and last element
+    ax.set_yticks(yticks)  # Set new y-ticks
+    if ilabel == 0:
+        legend = ax.legend(loc='best')
+        plt.setp(legend.get_texts(), fontsize=9)  # Adjust legend size
+        ax.set_ylabel("Similarity index")
+        ax.set_xlabel("Time (s)")
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    plt.savefig(figures / f"{label}_rsa.pdf", transparent=True)
+    plt.close()
+    
+    
 nrows, ncols = 3, 6
 
 # plt.style.use('dark_background')
 
 # decoding
-chance = 0.25
 fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(20, 7))
-fig.suptitle(f"${lock}$ / ${trial_type}$ / decoding")
+# fig.suptitle(f"${lock}$ / ${trial_type}$ / decoding")
 for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
     if lock == 'stim':
         ax.axvspan(0, 0.2, color='grey', alpha=.2)
-    score = decoding[label]
+    score = decoding[label] * 100
     sem = np.std(score, axis=0) / np.sqrt(len(subjects))
     m1 = np.array(score.mean(0) + np.array(sem))
     m2 = np.array(score.mean(0) - np.array(sem))
@@ -119,64 +186,67 @@ for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
     ax.fill_between(times, m1, m2, color='0.6')
     ax.fill_between(times, m1, m2, color='#1f77b4', where=sig, alpha=1)
     ax.fill_between(times, chance, m2, where=sig, color='#1f77b4', alpha=0.7, label='significant')
-plt.savefig(figures / f"best_decoding_{lock}_{trial_type}.pdf")
+    if i == 0:
+        legend = ax.legend()
+        plt.setp(legend.get_texts(), fontsize=7)  # Adjust legend size
+plt.savefig(figures / f"mean_best_decoding.pdf", transparent=True)
 plt.close()
 
 # plot diff in/out
 fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(20, 7))
-fig.suptitle(f"${lock}$ / ${trial_type}$ / diff_in_out")
+# fig.suptitle(f"${lock}$ / ${trial_type}$ / diff_in_out")
 for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
     if lock == 'stim':
         ax.axvspan(0, 0.2, color='grey', alpha=.2)        
     
-    practice = rsa_in_lab[label][:, 0, :]
+    practice = np.array(rsa_in_lab[label][:, 0, :], dtype=float) * (-1)
     prac_sem = np.std(practice, axis=0) / np.sqrt(len(subjects))
     prac_m1 = np.array(practice.mean(0) + np.array(prac_sem))
     prac_m2 = np.array(practice.mean(0) - np.array(prac_sem))
     
-    learning = rsa_in_lab[label][:, 1:, :]
-    diff_sem = np.std(learning, axis = (0, 1))/np.sqrt(len(subjects))
+    learning = np.array(rsa_in_lab[label][:, 1:, :], dtype=float) * (-1)
+    diff_sem = np.std(learning, axis = (0, 1)) / np.sqrt(len(subjects))
     diff_m1 = np.array(learning.mean((0, 1)) + np.array(diff_sem))
     diff_m2 = np.array(learning.mean((0, 1)) - np.array(diff_sem))
         
-    ax.fill_between(times, diff_m1, diff_m2, color='#d62728', alpha=.6)
-    ax.fill_between(times, prac_m1, prac_m2, color='C7', alpha=.6)
+    ax.fill_between(times, prac_m1, prac_m2, color='C7', alpha=.5, label='pre-learning')
+    ax.fill_between(times, diff_m1, diff_m2, color='#d627', alpha=.7, label='learning')
 
     diff = learning.mean(1) - practice
     p_values_unc = ttest_1samp(diff, axis=0, popmean=0)[1]
     sig_unc = p_values_unc < .05
-    pv2 = decod_stats(diff)
-    sig2 = pv2 < .05
-    ax.fill_between(times, 0, learning.mean((0, 1)), where=sig_unc, color='#d62728', alpha=0.2)
-    ax.fill_between(times, 0, learning.mean((0, 1)), where=sig2, color='#d62728', alpha=0.3)
+    # pv2 = decod_stats(diff)
+    # sig2 = pv2 < .05
+    # ax.fill_between(times, diff_m1, diff_m2, where=sig2, color='#d62728', alpha=1)
+    ax.fill_between(times, diff_m1, diff_m2, where=sig_unc, color='black', alpha=0.3)
     
     ax.set_title(f"${label}$", fontsize=8)
-    ax.axhline(0, color='black', ls='dashed', alpha=.5)
+    ax.axhline(0, color='black', ls='dashed', alpha=.3)
     if i == 0:
         legend = ax.legend()
         plt.setp(legend.get_texts(), fontsize=7)  # Adjust legend size
-plt.savefig(figures / f"diff_in_out.pdf")
+plt.savefig(figures / f"mean_best_rsa.pdf", transparent=True)
 plt.close()
 
 
-# correlations
-fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(40, 13))
-fig.suptitle(f"${lock}$ / ${trial_type}$ / correlations")
-for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
-    rho = corr_in_lab[label][:, :, 0]
-    ax.plot(times, rho.mean(0), label='rho')
-    ax.axhline(0, color='black', ls='dashed', alpha=.5)
-    ax.set_title(f"${label}$", fontsize=8)
-    if i == 0:
-        legend = ax.legend()
-        plt.setp(legend.get_texts(), fontsize=7)  # Adjust legend size
-    p_values = decod_stats(rho)
-    p_values_unc = ttest_1samp(rho, axis=0, popmean=0)[1]
-    sig = p_values < 0.05
-    sig_unc = p_values_unc < 0.05
-    ax.fill_between(times, 0, rho.mean(0), where=sig_unc, color='C2', alpha=1)
-    ax.fill_between(times, 0, rho.mean(0), where=sig, alpha=0.3)
-    if lock == 'stim':
-        ax.axvspan(0, 0.2, color='grey', alpha=.2)
-plt.savefig(figures / "correlations.pdf")
-plt.close()
+# # correlations
+# fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(40, 13))
+# fig.suptitle(f"${lock}$ / ${trial_type}$ / correlations")
+# for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
+#     rho = corr_in_lab[label][:, :, 0]
+#     ax.plot(times, rho.mean(0), label='rho')
+#     ax.axhline(0, color='black', ls='dashed', alpha=.5)
+#     ax.set_title(f"${label}$", fontsize=8)
+#     if i == 0:
+#         legend = ax.legend()
+#         plt.setp(legend.get_texts(), fontsize=7)  # Adjust legend size
+#     p_values = decod_stats(rho)
+#     p_values_unc = ttest_1samp(rho, axis=0, popmean=0)[1]
+#     sig = p_values < 0.05
+#     sig_unc = p_values_unc < 0.05
+#     ax.fill_between(times, 0, rho.mean(0), where=sig_unc, color='C2', alpha=1)
+#     ax.fill_between(times, 0, rho.mean(0), where=sig, alpha=0.3)
+#     if lock == 'stim':
+#         ax.axvspan(0, 0.2, color='grey', alpha=.2)
+# plt.savefig(figures / "correlations.pdf")
+# plt.close()
