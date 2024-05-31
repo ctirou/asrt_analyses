@@ -10,7 +10,7 @@ lock = 'stim'
 fold = 'K10'
 subjects = SUBJS
 
-epoch_fname = op.join('/Users/coum/Desktop/pred_asrt/stim/sub01_1_s-epo.fif')
+epoch_fname = op.join('/Users/coum/Desktop/pred_asrt/stim/sub01-0-epo.fif')
 epoch = read_epochs(epoch_fname, verbose=False)
 times = epoch.times
 del epoch

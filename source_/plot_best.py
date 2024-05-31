@@ -1,0 +1,182 @@
+import os.path as op
+import numpy as np
+from base import ensure_dir, decod_stats, get_sequence, get_inout_seq
+from config import *
+import matplotlib.pyplot as plt
+from mne import read_labels_from_annot, read_epochs
+from scipy.stats import ttest_1samp, spearmanr
+import gc
+from pathlib import Path
+import pandas as pd
+
+lock = "stim"
+trial_type = "pattern"
+subjects = SUBJS
+analysis = "concatenated"
+res_path = RESULTS_DIR
+subjects_dir = FREESURFER_DIR
+verbose = "error"
+hemi = 'both'
+chance = .5
+
+summary = False
+
+# get times
+epoch_fname = DATA_DIR / lock / 'sub01-0-epo.fif'
+epochs = read_epochs(epoch_fname, verbose=verbose)
+times = epochs.times
+del epochs
+
+sessions = ['Practice', 'Block_1', 'Block_2', 'Block_3', 'Block_4']
+
+decod_in_lab = {}
+decod_in_lab2 = {}
+corr_in_lab = {}
+decoding = dict()
+rsa_in_lab = {}
+
+# get label names
+best_regions = [6, 7, 12, 13, 14, 15, 20, 21, 22, 23, 26, 27, 42, 43, 50, 51, 58, 59]
+labels = read_labels_from_annot(subject='sub01', parc='aparc', hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
+label_names = [label.name for ilabel, label in enumerate(labels) if ilabel in best_regions]
+del labels
+
+figures = res_path / "figures" / analysis / 'source' / lock / trial_type
+ensure_dir(figures)
+gc.collect()
+
+similarity_names = ['one_two', 'one_three', 'one_four', 'two_three', 'two_four', 'three_four']
+
+for ilabel, label in enumerate(label_names):
+        
+    print(f"{str(ilabel+1).zfill(2)}/{len(label_names)}", label)
+    all_in_seqs, all_out_seqs = [], []
+    decoding[label] = list()
+    
+    for subject in subjects:
+        
+        one_two_similarities = list()
+        one_three_similarities = list()
+        one_four_similarities = list() 
+        two_three_similarities = list()
+        two_four_similarities = list() 
+        three_four_similarities = list()
+        
+        behav_dir = RAW_DATA_DIR / subject / 'behav_data'
+        sequence = get_sequence(behav_dir)
+                
+        scores_dir = res_path / analysis / 'source' / lock / trial_type / label / subject
+        sub_scores = np.load(scores_dir / "scores.npy")
+        
+        rsa_dir = res_path / analysis / 'source' / lock / trial_type
+        rsa_df = pd.read_hdf(rsa_dir / f"{subject}_rsa.h5", key='rsa')
+        for session_id, session in enumerate(sessions):
+            one_two, one_three, one_four, two_three, two_four, three_four = [], [], [], [], [], []
+            for sim, sim_list in zip(similarity_names, [one_four, one_three, one_two, three_four, two_four, two_three]):
+                sim_list.append(rsa_df.loc[(label, session_id, sim), :])
+            for all_sims, sim_list in zip([one_two_similarities, one_three_similarities, one_four_similarities, two_three_similarities, two_four_similarities, three_four_similarities], 
+                                          [one_two, one_three, one_four, two_three, two_four, three_four]):
+                    all_sims.append(np.array(sim_list))
+                
+        for all_sims in [one_two_similarities, one_three_similarities, one_four_similarities, two_three_similarities, two_four_similarities, three_four_similarities]:
+            all_sims = np.array(all_sims)
+            
+        similarities = [one_two_similarities, one_three_similarities, one_four_similarities, two_three_similarities, two_four_similarities, three_four_similarities]
+        
+        in_seq, out_seq = get_inout_seq(sequence, similarities)
+        
+        all_in_seqs.append(in_seq)
+        all_out_seqs.append(out_seq)
+        
+        decoding[label].append(sub_scores)
+                
+    all_in_seq = np.array(all_in_seqs)
+    all_out_seq = np.array(all_out_seqs)
+    diff_inout = np.squeeze(all_in_seq.mean(axis=1) - all_out_seq.mean(axis=1))
+    rsa_in_lab[label] = diff_inout
+
+    decoding[label] = np.array(decoding[label])
+                
+nrows, ncols = 3, 6
+
+# plt.style.use('dark_background')
+
+# decoding
+chance = 0.25
+fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(20, 7))
+fig.suptitle(f"${lock}$ / ${trial_type}$ / decoding")
+for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
+    if lock == 'stim':
+        ax.axvspan(0, 0.2, color='grey', alpha=.2)
+    score = decoding[label]
+    sem = np.std(score, axis=0) / np.sqrt(len(subjects))
+    m1 = np.array(score.mean(0) + np.array(sem))
+    m2 = np.array(score.mean(0) - np.array(sem))
+    ax.axhline(chance, color='black', ls='dashed', alpha=.5)
+    ax.set_title(f"${label}$", fontsize=8)    
+    p_values = decod_stats(score - chance)
+    sig = p_values < 0.05
+    ax.fill_between(times, m1, m2, color='0.6')
+    ax.fill_between(times, m1, m2, color='#1f77b4', where=sig, alpha=1)
+    ax.fill_between(times, chance, m2, where=sig, color='#1f77b4', alpha=0.7, label='significant')
+plt.savefig(figures / f"best_decoding_{lock}_{trial_type}.pdf")
+plt.close()
+
+# plot diff in/out
+fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(20, 7))
+fig.suptitle(f"${lock}$ / ${trial_type}$ / diff_in_out")
+for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
+    if lock == 'stim':
+        ax.axvspan(0, 0.2, color='grey', alpha=.2)        
+    
+    practice = rsa_in_lab[label][:, 0, :]
+    prac_sem = np.std(practice, axis=0) / np.sqrt(len(subjects))
+    prac_m1 = np.array(practice.mean(0) + np.array(prac_sem))
+    prac_m2 = np.array(practice.mean(0) - np.array(prac_sem))
+    
+    learning = rsa_in_lab[label][:, 1:, :]
+    diff_sem = np.std(learning, axis = (0, 1))/np.sqrt(len(subjects))
+    diff_m1 = np.array(learning.mean((0, 1)) + np.array(diff_sem))
+    diff_m2 = np.array(learning.mean((0, 1)) - np.array(diff_sem))
+        
+    ax.fill_between(times, diff_m1, diff_m2, color='#d62728', alpha=.6)
+    ax.fill_between(times, prac_m1, prac_m2, color='C7', alpha=.6)
+
+    diff = learning.mean(1) - practice
+    p_values_unc = ttest_1samp(diff, axis=0, popmean=0)[1]
+    sig_unc = p_values_unc < .05
+    pv2 = decod_stats(diff)
+    sig2 = pv2 < .05
+    ax.fill_between(times, 0, learning.mean((0, 1)), where=sig_unc, color='#d62728', alpha=0.2)
+    ax.fill_between(times, 0, learning.mean((0, 1)), where=sig2, color='#d62728', alpha=0.3)
+    
+    ax.set_title(f"${label}$", fontsize=8)
+    ax.axhline(0, color='black', ls='dashed', alpha=.5)
+    if i == 0:
+        legend = ax.legend()
+        plt.setp(legend.get_texts(), fontsize=7)  # Adjust legend size
+plt.savefig(figures / f"diff_in_out.pdf")
+plt.close()
+
+
+# correlations
+fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(40, 13))
+fig.suptitle(f"${lock}$ / ${trial_type}$ / correlations")
+for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
+    rho = corr_in_lab[label][:, :, 0]
+    ax.plot(times, rho.mean(0), label='rho')
+    ax.axhline(0, color='black', ls='dashed', alpha=.5)
+    ax.set_title(f"${label}$", fontsize=8)
+    if i == 0:
+        legend = ax.legend()
+        plt.setp(legend.get_texts(), fontsize=7)  # Adjust legend size
+    p_values = decod_stats(rho)
+    p_values_unc = ttest_1samp(rho, axis=0, popmean=0)[1]
+    sig = p_values < 0.05
+    sig_unc = p_values_unc < 0.05
+    ax.fill_between(times, 0, rho.mean(0), where=sig_unc, color='C2', alpha=1)
+    ax.fill_between(times, 0, rho.mean(0), where=sig, alpha=0.3)
+    if lock == 'stim':
+        ax.axvspan(0, 0.2, color='grey', alpha=.2)
+plt.savefig(figures / "correlations.pdf")
+plt.close()

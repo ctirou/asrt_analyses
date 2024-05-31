@@ -8,10 +8,10 @@ from scipy.stats import ttest_1samp, spearmanr
 import gc
 from pathlib import Path
 
-lock = "button"
+lock = "stim"
 trial_type = "pattern"
 subjects = SUBJS
-analysis = "decoding_cvm"
+analysis = "concatenated"
 res_path = RESULTS_DIR
 subjects_dir = FREESURFER_DIR
 verbose = "error"
@@ -63,13 +63,14 @@ for ilabel, label in enumerate(label_names):
         sub_scores, sub_rsa, sub_cms = [], [], []
         for session_id, session in enumerate(sessions):
             
-            res_dir = res_path / analysis / 'source' / lock / trial_type / label / subject / session
+            # res_dir = res_path / analysis / 'source' / lock / trial_type / label / subject / session
+            res_dir = res_path / analysis / 'source' / lock / trial_type / label / subject
             
-            other_dir = Path('/Users/coum/Desktop/decoding_cvm')
+            # other_dir = Path('/Users/coum/Desktop/decoding_cvm')
             
-            # sub_scores.append(np.load(res_dir / "scores.npy"))
+            sub_scores.append(np.load(res_dir / "scores.npy"))
             
-            sub_scores.append(np.load(other_dir / 'source' / lock / trial_type / label / subject / session / "scores.npy"))
+            # sub_scores.append(np.load(other_dir / 'source' / lock / trial_type / label / subject / session / "scores.npy"))
             # sub_cms.append(np.load(other_dir / 'source' / lock / trial_type / label / subject / session / "cms.npy") )
             # sub_rsa.append(np.load(other_dir / 'source' / lock / trial_type / label / subject / session / "rsa.npy"))
             
@@ -138,6 +139,26 @@ for ilabel, label in enumerate(label_names):
         
 nrows, ncols = 7, 10
 
+# decoding
+chance = 0.25
+fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(40, 13))
+fig.suptitle(f"${lock}$ / ${trial_type}$ / decoding")
+for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
+    # score = decoding[label][:, 1:5, :]
+    score = decoding[label][:, :, :]
+    # ax.plot(times, score.mean((0, 1)), label='roc_auc')
+    ax.plot(times, score.mean((0, 1)), label='acc')
+    ax.axhline(chance, color='black', ls='dashed', alpha=.5)
+    ax.set_title(f"${label}$", fontsize=8)    
+    p_values = decod_stats(score.mean(1) - chance)
+    p_values_unc = ttest_1samp(score, axis=0, popmean=0)[1]
+    sig = p_values < 0.05
+    ax.fill_between(times, chance, score.mean((0, 1)), where=sig, alpha=.4)
+    if lock == 'stim':
+        ax.axvspan(0, 0.2, color='grey', alpha=.2)
+plt.savefig(figures / f"decoding_{lock}_{trial_type}.pdf")
+plt.close()
+
 # plot diff in/out
 fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(40, 13))
 fig.suptitle(f"${lock}$ / ${trial_type}$ / diff_in_out")
@@ -193,24 +214,4 @@ for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
     if lock == 'stim':
         ax.axvspan(0, 0.2, color='grey', alpha=.2)
 plt.savefig(figures / "correlations.pdf")
-plt.close()
-
-# decoding
-chance = 0.25
-fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(40, 13))
-fig.suptitle(f"${lock}$ / ${trial_type}$ / decoding")
-for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
-    # score = decoding[label][:, 1:5, :]
-    score = decoding[label][:, :, :]
-    # ax.plot(times, score.mean((0, 1)), label='roc_auc')
-    ax.plot(times, score.mean((0, 1)), label='acc')
-    ax.axhline(chance, color='black', ls='dashed', alpha=.5)
-    ax.set_title(f"${label}$", fontsize=8)    
-    p_values = decod_stats(score.mean(1) - chance)
-    p_values_unc = ttest_1samp(score, axis=0, popmean=0)[1]
-    sig = p_values < 0.05
-    ax.fill_between(times, chance, score.mean((0, 1)), where=sig, alpha=.4)
-    if lock == 'stim':
-        ax.axvspan(0, 0.2, color='grey', alpha=.2)
-plt.savefig(figures / f"decoding_{lock}_{trial_type}.pdf")
 plt.close()
