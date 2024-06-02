@@ -20,8 +20,6 @@ verbose = "error"
 hemi = 'both'
 chance = 25
 
-per_label = False
-
 # get times
 epoch_fname = DATA_DIR / lock / 'sub01-0-epo.fif'
 epochs = read_epochs(epoch_fname, verbose=verbose)
@@ -95,96 +93,38 @@ for ilabel, label in enumerate(label_names):
     all_out_seq = np.array(all_out_seqs)
     diff_inout = np.squeeze(all_in_seq.mean(axis=1) - all_out_seq.mean(axis=1))
     rsa_in_lab[label] = diff_inout
-
-    decoding[label] = np.array(decoding[label])
-    if per_label:
-        # decoding
-        fig, ax = plt.subplots(figsize=(7, 4))
-        if lock == 'stim':
-            ax.axvspan(0, 0.2, color='grey', alpha=.2, label='stimulus')
-        score = decoding[label] * 100
-        sem = np.std(score, axis=0) / np.sqrt(len(subjects))
-        m1 = np.array(score.mean(0) + np.array(sem))
-        m2 = np.array(score.mean(0) - np.array(sem))
-        ax.axhline(chance, color='black', ls='dashed', alpha=.5, label='chance')
-        ax.set_title(f"${label}$", fontsize=13)    
-        p_values = decod_stats(score - chance)
-        sig = p_values < 0.05
-        ax.fill_between(times, m1, m2, color='0.6')
-        ax.fill_between(times, m1, m2, color='#1f77b4', where=sig, alpha=1)
-        ax.fill_between(times, chance, m2, where=sig, color='#1f77b4', alpha=0.7, label='significant')
-        ax.set_ylim(20, 45)
-        yticks = ax.get_yticks()
-        yticks = yticks[1:-1]  # Remove first and last element
-        ax.set_yticks(yticks)  # Set new y-ticks
-        if ilabel == 0:
-            legend = ax.legend(loc='best')
-            plt.setp(legend.get_texts(), fontsize=9)  # Adjust legend size
-            ax.set_ylabel("Accuracy (%)")
-            ax.set_xlabel("Time (s)")
-        ax.spines["top"].set_visible(False)
-        ax.spines["right"].set_visible(False)
-        plt.savefig(figures / f"{label}_decoding.pdf", transparent=True)
-        plt.close()
-
-        # rsa
-        fig, ax = plt.subplots(figsize=(7, 4))
-        if lock == 'stim':
-            ax.axvspan(0, 0.2, color='grey', alpha=.2, label='stimulus')
-        practice = np.array(rsa_in_lab[label][:, 0, :], dtype=float) * (-1)
-        prac_sem = np.std(practice, axis=0) / np.sqrt(len(subjects))
-        prac_m1 = np.array(practice.mean(0) + np.array(prac_sem))
-        prac_m2 = np.array(practice.mean(0) - np.array(prac_sem))
-        learning = np.array(rsa_in_lab[label][:, 1:, :], dtype=float) * (-1)
-        diff_sem = np.std(learning, axis = (0, 1)) / np.sqrt(len(subjects))
-        diff_m1 = np.array(learning.mean((0, 1)) + np.array(diff_sem))
-        diff_m2 = np.array(learning.mean((0, 1)) - np.array(diff_sem))
-        ax.fill_between(times, prac_m1, prac_m2, color='C7', alpha=.5, label='Pre-learning')
-        ax.fill_between(times, diff_m1, diff_m2, color='#d627', alpha=.7, label='Learning')
-        diff = learning.mean(1) - practice
-        p_values_unc = ttest_1samp(diff, axis=0, popmean=0)[1]
-        sig_unc = p_values_unc < .05
-        # pv2 = decod_stats(diff)
-        # sig2 = pv2 < .05
-        # ax.fill_between(times, diff_m1, diff_m2, where=sig2, color='#d62728', alpha=1)
-        ax.fill_between(times, diff_m1, diff_m2, where=sig_unc, color='black', alpha=0.3)
-        ax.set_title(f"${label}$", fontsize=13)
-        ax.axhline(0, color='black', ls='dashed', alpha=.3)
-        ax.set_ylim(-0.2, 0.2)
-        yticks = ax.get_yticks()
-        yticks = yticks[1:-1]  # Remove first and last element
-        ax.set_yticks(yticks)  # Set new y-ticks
-        if ilabel == 0:
-            legend = ax.legend(loc='best')
-            plt.setp(legend.get_texts(), fontsize=9)  # Adjust legend size
-            ax.set_ylabel("Similarity index")
-            ax.set_xlabel("Time (s)")
-        ax.spines["top"].set_visible(False)
-        ax.spines["right"].set_visible(False)
-        plt.savefig(figures / f"{label}_rsa.pdf", transparent=True)
-        plt.close()
     
-# #1f77b4 #b45c1f
-# #084887 #F9AB55 
+    decoding[label] = np.array(decoding[label])
+    
+# #1f77b4 #b45c1f #b41f77 ##1fb45c
 # #e4572e #29335c #F3A712 #A8C686 #669BBC
-# #F79256 #00B2CA #1D4E89
+# #F79256 #00B2CA #1D4E89 
+# #084887 #F9AB55 
 
 color1 = "#1f77b4"
 color2 = "#F79256"
-
 color3 = "C7"
 
+# plt.rcParams['text.usetex'] = True
+
+# decoding
 for ilabel in tqdm(range(len(label_names))):
     if ilabel % 2 == 0:
-        # decoding
-        fig, axs = plt.subplots(2, 1, figsize=(6.5, 4), sharex=True)
+        fig, axs = plt.subplots(2, 1, figsize=(6, 4), sharex=True)
         fig.subplots_adjust(hspace=0)
         label = label_names[ilabel]
-        fig.suptitle(f"{label.capitalize()[:-3]}", y=0.95)
-        axs[0].set_title("$Left$\n$hemi.$", fontsize=10, x=0.15, y=0.70)
-        axs[0].axhline(chance, color='black', ls='dashed', alpha=.7, label='Chance', zorder=-1)
+        # fig.suptitle(f"{label.capitalize()[:-3]}", weight='bold', y=0.98, ha='left')
+        for i in range(2):
+            axs[i].set_ylim(20, 45)
+            yticks = axs[i].get_yticks()
+            yticks = yticks[1:-1]  # Remove first and last element
+            axs[i].set_yticks(yticks)  # Set new y-ticks
+            axs[i].set_ylabel("Accuracy (%)")
+            axs[i].spines["top"].set_visible(False)
+            axs[i].spines["right"].set_visible(False)
+        axs[0].axhline(chance, color='black', ls='dashed', alpha=.7, zorder=-1)
         if lock == 'stim':
-            axs[0].axvspan(0, 0.2, facecolor='grey', alpha=.2, label='Stimulus', lw=0, zorder=1)
+            axs[0].axvspan(0, 0.2, facecolor='grey', alpha=.2, lw=0, zorder=1)
             axs[1].axvspan(0, 0.2, facecolor='grey', alpha=.2, lw=0, zorder=1)
         score = decoding[label] * 100
         sem = np.std(score, axis=0) / np.sqrt(len(subjects))
@@ -193,7 +133,7 @@ for ilabel in tqdm(range(len(label_names))):
         p_values = decod_stats(score - chance)
         sig = p_values < 0.05
         axs[0].fill_between(times, m1, m2, facecolor='0.6')
-        axs[0].fill_between(times, m1, m2, facecolor=color1, where=sig, alpha=1, label='Significance')
+        axs[0].fill_between(times, m1, m2, facecolor=color1, where=sig, alpha=1)
         axs[0].fill_between(times, chance, m2, facecolor=color1, where=sig, alpha=0.7)
         axs[0].spines["bottom"].set_visible(False)
         axs[0].xaxis.set_ticks_position('none')  # New line: remove x-ticks of the upper plot
@@ -205,29 +145,22 @@ for ilabel in tqdm(range(len(label_names))):
         m2 = np.array(score2.mean(0) - np.array(sem))
         p_values = decod_stats(score2 - chance)
         sig = p_values < 0.05
-        axs[1].set_title("$Right$\n$hemi.$", fontsize=10, x=0.15, y=0.70)
         axs[1].axhline(chance, color='black', ls='dashed', alpha=.7, zorder=-1)
         axs[1].fill_between(times, m1, m2, facecolor='0.6')
-        axs[1].fill_between(times, m1, m2, facecolor=color2, where=sig, alpha=1, label='Significance')
+        axs[1].fill_between(times, m1, m2, facecolor=color2, where=sig, alpha=1)
         axs[1].fill_between(times, chance, m2, facecolor=color2, where=sig, alpha=0.7)
         axs[1].set_xlabel("Time (s)")
-        for i in range(2):
-            axs[i].set_ylim(20, 45)
-            yticks = axs[i].get_yticks()
-            yticks = yticks[1:-1]  # Remove first and last element
-            axs[i].spines["top"].set_visible(False)
-            axs[i].spines["right"].set_visible(False)
-            axs[i].set_yticks(yticks)  # Set new y-ticks
-            axs[i].set_ylabel("Accuracy (%)")
-            if ilabel == 0:
-                legend = axs[i].legend(loc='best', frameon=False)
-                plt.setp(legend.get_texts(), fontsize=8)  # Adjust legend size
+        if ilabel == 0:
+            axs[0].text(0.1, 46, "$Stimulus$", fontsize=9, zorder=10, ha='center')
+            axs[1].text(0.6, 22, "$Chance$", fontsize=9, zorder=10, ha='center')
+            axs[0].text(0.23, 40, "Left hemisphere", fontsize=10, color=color1, ha='left', weight='normal', style='italic')
+            axs[1].text(0.23, 40, "Right hemisphere", fontsize=10, color=color2, ha='left', weight='normal', style='italic')
         plt.savefig(figures / f"{label[:-3]}_decoding.pdf", transparent=True)
         plt.close()
         
+# RSA
 for ilabel in tqdm(range(len(label_names))):
     if ilabel % 2 == 0:
-        # RSA
         fig, axs = plt.subplots(2, 1, figsize=(6.5, 4), sharex=True)
         fig.subplots_adjust(hspace=0)
         label = label_names[ilabel]
