@@ -114,18 +114,22 @@ for ilabel in tqdm(range(len(label_names))):
         fig.subplots_adjust(hspace=0)
         label = label_names[ilabel]
         # fig.suptitle(f"{label.capitalize()[:-3]}", weight='bold', y=0.98, ha='left')
+        axs[0].text(-0.19, 40, f"{label.capitalize()[:-3]}",
+                    weight='semibold', style='italic', ha='left',
+                    bbox=dict(facecolor='none', edgecolor='black', boxstyle='round,pad=1'))
         for i in range(2):
             axs[i].set_ylim(20, 45)
             yticks = axs[i].get_yticks()
             yticks = yticks[1:-1]  # Remove first and last element
             axs[i].set_yticks(yticks)  # Set new y-ticks
-            axs[i].set_ylabel("Accuracy (%)")
             axs[i].spines["top"].set_visible(False)
             axs[i].spines["right"].set_visible(False)
-        axs[0].axhline(chance, color='black', ls='dashed', alpha=.7, zorder=-1)
-        if lock == 'stim':
-            axs[0].axvspan(0, 0.2, facecolor='grey', alpha=.2, lw=0, zorder=1)
-            axs[1].axvspan(0, 0.2, facecolor='grey', alpha=.2, lw=0, zorder=1)
+            axs[i].axhline(chance, color='black', ls='dashed', alpha=.7, zorder=-1)
+            axs[i].text(0.6, 22.5, "$Chance$", fontsize=9, zorder=10, ha='center')
+            if lock == 'stim':
+                axs[i].axvspan(0, 0.2, facecolor='grey', alpha=.2, lw=0, zorder=1)
+            if ilabel == 0:
+                axs[i].set_ylabel("Accuracy (%)")
         score = decoding[label] * 100
         sem = np.std(score, axis=0) / np.sqrt(len(subjects))
         m1 = np.array(score.mean(0) + np.array(sem))
@@ -145,31 +149,39 @@ for ilabel in tqdm(range(len(label_names))):
         m2 = np.array(score2.mean(0) - np.array(sem))
         p_values = decod_stats(score2 - chance)
         sig = p_values < 0.05
-        axs[1].axhline(chance, color='black', ls='dashed', alpha=.7, zorder=-1)
         axs[1].fill_between(times, m1, m2, facecolor='0.6')
         axs[1].fill_between(times, m1, m2, facecolor=color2, where=sig, alpha=1)
         axs[1].fill_between(times, chance, m2, facecolor=color2, where=sig, alpha=0.7)
         axs[1].set_xlabel("Time (s)")
-        if ilabel == 0:
-            axs[0].text(0.1, 46, "$Stimulus$", fontsize=9, zorder=10, ha='center')
-            axs[1].text(0.6, 22, "$Chance$", fontsize=9, zorder=10, ha='center')
-            axs[0].text(0.23, 40, "Left hemisphere", fontsize=10, color=color1, ha='left', weight='normal', style='italic')
-            axs[1].text(0.23, 40, "Right hemisphere", fontsize=10, color=color2, ha='left', weight='normal', style='italic')
+        # if ilabel == 0:
+        axs[0].text(0.1, 46, "$Stimulus$", fontsize=9, zorder=10, ha='center')
+        axs[0].text(0.23, 40, "Left hemisphere", fontsize=10, color=color1, ha='left', weight='normal', style='italic')
+        axs[1].text(0.23, 40, "Right hemisphere", fontsize=10, color=color2, ha='left', weight='normal', style='italic')
         plt.savefig(figures / f"{label[:-3]}_decoding.pdf", transparent=True)
         plt.close()
         
 # RSA
 for ilabel in tqdm(range(len(label_names))):
     if ilabel % 2 == 0:
-        fig, axs = plt.subplots(2, 1, figsize=(6.5, 4), sharex=True)
+        fig, axs = plt.subplots(2, 1, figsize=(6, 4), sharex=True)
         fig.subplots_adjust(hspace=0)
         label = label_names[ilabel]
-        fig.suptitle(f"{label.capitalize()[:-3]}", y=0.95)
-        axs[0].set_title("$Left$\n$hemi.$", fontsize=10, x=0.15, y=0.70)
-        axs[0].axhline(0, color='black', ls='dashed', alpha=.7, zorder=-1)
-        if lock == 'stim':
-            axs[0].axvspan(0, 0.2, facecolor='grey', alpha=.2, label='Stimulus', lw=0, zorder=1)
-            axs[1].axvspan(0, 0.2, facecolor='grey', alpha=.2, lw=0, zorder=1)    
+        # fig.suptitle(f"{label.capitalize()[:-3]}", y=0.95)
+        axs[1].text(-0.19, 0.22, f"{label.capitalize()[:-3]}",
+                    weight='semibold', style='italic', ha='left',
+                    bbox=dict(facecolor='none', edgecolor='black', boxstyle='round,pad=1'))
+        for i in range(2):
+            axs[i].set_ylim(-0.3, 0.2)
+            yticks = axs[i].get_yticks()
+            yticks = yticks[1:-1]  # Remove first and last element
+            axs[i].spines["top"].set_visible(False)
+            axs[i].spines["right"].set_visible(False)
+            axs[i].set_yticks(yticks)  # Set new y-ticks
+            axs[i].axhline(0, color='black', ls='dashed', alpha=.7, zorder=-1)
+            if lock == 'stim':
+                axs[i].axvspan(0, 0.2, facecolor='grey', alpha=.2, lw=0, zorder=1)    
+            if ilabel == 0:
+                axs[i].set_ylabel("Similarity index")
         practice = np.array(rsa_in_lab[label][:, 0, :], dtype=float) * (-1)
         prac_sem = np.std(practice, axis=0) / np.sqrt(len(subjects))
         prac_m1 = np.array(practice.mean(0) + np.array(prac_sem))
@@ -199,7 +211,7 @@ for ilabel in tqdm(range(len(label_names))):
         diff_sem = np.std(learning, axis = (0, 1)) / np.sqrt(len(subjects))
         diff_m1 = np.array(learning.mean((0, 1)) + np.array(diff_sem))
         diff_m2 = np.array(learning.mean((0, 1)) - np.array(diff_sem))
-        axs[1].fill_between(times, prac_m1, prac_m2, facecolor=color3, alpha=.5)
+        axs[1].fill_between(times, prac_m1, prac_m2, facecolor=color3, alpha=.5, label='Pre-learning')
         axs[1].fill_between(times, diff_m1, diff_m2, facecolor=color2, alpha=.8, label='Learning')
         diff = learning.mean(1) - practice
         p_values_unc = ttest_1samp(diff, axis=0, popmean=0)[1]
@@ -208,27 +220,20 @@ for ilabel in tqdm(range(len(label_names))):
         sig2 = pv2 < .05
         axs[1].fill_between(times, diff_m1, diff_m2, where=sig2, color='#d62728', alpha=1)
         axs[1].fill_between(times, diff_m1, diff_m2, where=sig_unc, color='black', alpha=1)
-        axs[1].set_title("$Right$\n$hemi.$", fontsize=10, x=0.15, y=0.70)
-        axs[1].axhline(0, color='black', ls='dashed', alpha=.7, zorder=-1)        
         axs[1].set_xlabel("Time (s)")
-        for i in range(2):
-            axs[i].set_ylim(-0.3, 0.2)
-            yticks = axs[i].get_yticks()
-            yticks = yticks[1:-1]  # Remove first and last element
-            axs[i].spines["top"].set_visible(False)
-            axs[i].spines["right"].set_visible(False)
-            axs[i].set_yticks(yticks)  # Set new y-ticks
-            axs[i].set_ylabel("Similarity index")
-        if ilabel == 0:
-            legend = axs[0].legend(loc='best', frameon=False)
-            plt.setp(legend.get_texts(), fontsize=8)  # Adjust legend size            
-            legend = axs[1].legend(loc='lower right', frameon=False)
-            plt.setp(legend.get_texts(), fontsize=8)  # Adjust legend size
+        axs[0].text(0.1, 0.22, "$Stimulus$", fontsize=9, zorder=10, ha='center')
+        # axs[0].text(0.23, 0.2, "Left hemisphere", fontsize=10, color=color1, ha='left', weight='normal', style='italic')
+        # axs[1].text(0.23, 0.2, "Right hemisphere", fontsize=10, color=color2, ha='left', weight='normal', style='italic')
+        legend = axs[0].legend(loc='lower right', frameon=False)
+        plt.setp(legend.get_texts(), fontsize=8)  # Adjust legend size
+        legend = axs[1].legend(loc='lower right', frameon=False)
+        plt.setp(legend.get_texts(), fontsize=8)  # Adjust legend size
         plt.savefig(figures / f"{label[:-3]}_rsa.pdf", transparent=True)
         plt.close()
 
 nrows, ncols = 3, 6
 # decoding
+print("mean decoding figure...")
 fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(20, 7))
 # fig.suptitle(f"${lock}$ / ${trial_type}$ / decoding")
 for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
@@ -252,6 +257,7 @@ plt.savefig(figures / f"mean_best_decoding.pdf", transparent=True)
 plt.close()
 
 # plot diff in/out
+print("mean rsa figure...")
 fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(20, 7))
 # fig.suptitle(f"${lock}$ / ${trial_type}$ / diff_in_out")
 for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
