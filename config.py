@@ -13,3 +13,4 @@ FREESURFER_DIR = Path('/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.
 
 PRED_PATH = Path('/Users/coum/Desktop/pred_asrt')
 PRED_PATH_SSD = Path('/Volumes/Ultra_Touch/pred_asrt')
+PRED_PATH_MB = Path('/Users/coum/Desktop/pred_asrt')

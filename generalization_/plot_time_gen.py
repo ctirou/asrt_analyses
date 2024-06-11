@@ -117,11 +117,11 @@ ax.axhline(0, color="k")
 cbar = plt.colorbar(im, ax=ax)
 cbar.set_label("accuracy")
 
-# pval = gat_stats(contrast)
-# sig = np.array(pval < 0.05)
-# xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
-# plt.contour(xx, yy, sig, colors='Gray', levels=[0],
-#                     linestyles='solid', linewidths=1)
+pval = gat_stats(contrast)
+sig = np.array(pval < 0.05)
+xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
+plt.contour(xx, yy, sig, colors='Gray', levels=[0],
+                    linestyles='solid', linewidths=1)
 
 fig.savefig(op.join(figures, "mean_contrast.png"))
 

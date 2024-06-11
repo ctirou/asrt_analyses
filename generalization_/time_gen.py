@@ -1,14 +1,11 @@
 import mne
 import os.path as op
-import os
 import numpy as np
-from mne.decoding import SlidingEstimator, cross_val_multiscore, CSP, GeneralizingEstimator
+from mne.decoding import cross_val_multiscore, GeneralizingEstimator
 from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import LogisticRegression, Ridge
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
-from sklearn.naive_bayes import GaussianNB
+from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import make_pipeline
-from sklearn.model_selection import KFold, StratifiedKFold, RepeatedKFold, RepeatedStratifiedKFold, train_test_split
+from sklearn.model_selection import StratifiedKFold
 import pandas as pd
 from base import ensure_dir
 from config import *
@@ -35,7 +32,6 @@ jobs = -1
 res_dir = res_path / analysis / 'sensors' / lock / trial_type
 ensure_dir(res_dir)
 
-# 1 ---------- Test clasic sliding estimators
 clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
 clf = GeneralizingEstimator(clf, scoring=scoring, n_jobs=jobs, verbose=verbose)
 cv = StratifiedKFold(folds, shuffle=True)
@@ -47,7 +43,8 @@ for subject in subjects:
     
     print(subject)
     
-    for epoch_num, epo in enumerate(epochs_list):
+    # for epoch_num, epo in enumerate(epochs_list):
+    for epoch_num, epo in zip([1, 2, 3, 4], epochs_list[1:]):
 
         behav = pd.read_pickle(op.join(data_path / 'behav' / f'{subject}-{epoch_num}.pkl'))
         epoch_fname = op.join(data_path / lock / f"{subject}-{epoch_num}-epo.fif")
@@ -84,7 +81,7 @@ for subject in subjects:
     gc.collect()
     
     scores = cross_val_multiscore(clf, X, y, cv=cv)
-    np.save(res_dir / f"{subject}_scores.npy", scores.mean(0))
+    np.save(res_dir / f"{subject}-scores.npy", scores.mean(0))
     
     del X, y, scores
     gc.collect()

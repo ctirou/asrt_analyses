@@ -222,8 +222,6 @@ for ilabel in tqdm(range(len(label_names))):
         axs[1].fill_between(times, diff_m1, diff_m2, where=sig_unc, color='black', alpha=1)
         axs[1].set_xlabel("Time (s)")
         axs[0].text(0.1, 0.22, "$Stimulus$", fontsize=9, zorder=10, ha='center')
-        # axs[0].text(0.23, 0.2, "Left hemisphere", fontsize=10, color=color1, ha='left', weight='normal', style='italic')
-        # axs[1].text(0.23, 0.2, "Right hemisphere", fontsize=10, color=color2, ha='left', weight='normal', style='italic')
         legend = axs[0].legend(loc='lower right', frameon=False)
         plt.setp(legend.get_texts(), fontsize=8)  # Adjust legend size
         legend = axs[1].legend(loc='lower right', frameon=False)
