@@ -28,6 +28,7 @@ folds = 10
 solver = 'lbfgs'
 scoring = "accuracy"
 parc='aparc'
+parc='aseg'
 hemi = 'both'
 verbose = "error"
 jobs = -1

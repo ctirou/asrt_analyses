@@ -5,8 +5,9 @@ from base import ensure_dir
 from config import *
 import gc
 
-lock = 'button'
-overwrite = True
+lock = 'stim'
+overwrite = False
+verbose = True
 jobs = -1
 
 subjects = SUBJS
@@ -15,6 +16,8 @@ data_path = DATA_DIR
 subjects_dir = FREESURFER_DIR
 res_path = RESULTS_DIR / "concatenated"
 ensure_dir(res_path)
+
+volume_src = True
 
 # create results directory
 folders = ["stcs", "bem", "src", "trans", "fwd"]
@@ -29,31 +32,65 @@ for f in folders:
         ensure_dir(os.path.join(res_path, f))
 
 for subject in subjects:
-    # source space
-    src_fname = op.join(res_path, "src", "%s-src.fif" % subject)
-    if not op.exists(src_fname) or False:
-        src = mne.setup_source_space(subject, spacing='oct6',
-                                        subjects_dir=subjects_dir,
-                                        add_dist=True,
-                                        n_jobs=jobs)
-        src.save(src_fname, overwrite=overwrite)
-    src = mne.read_source_spaces(src_fname)
+    
     # bem model
     bem_fname = os.path.join(res_path, "bem", "%s-bem.fif" % (subject))
-    if not op.exists(bem_fname) or False:
+    if not op.exists(bem_fname) or overwrite:
         conductivity = (.3,)
         model = mne.make_bem_model(subject=subject, ico=4,
                                 conductivity=conductivity,
                                 subjects_dir=subjects_dir)
         bem = mne.make_bem_solution(model)
         mne.bem.write_bem_solution(bem_fname, bem, overwrite=overwrite)
+    
+    # cortex source space
+    src_fname = op.join(res_path, "src", "%s-src.fif" % subject)
+    if not op.exists(src_fname) or overwrite:
+        src = mne.setup_source_space(subject, spacing='oct6',
+                                        subjects_dir=subjects_dir,
+                                        add_dist=True,
+                                        n_jobs=jobs)
+        
+        if volume_src:
+            # volume source space
+            aseg_fname = subjects_dir / subject / 'mri' / 'aseg.mgz'
+            aseg_labels = mne.get_volume_labels_from_aseg(aseg_fname)
+            
+            volume_label = ["Left-Hippocampus", "Right-Hippocampus"]
+            aseg_src = mne.setup_volume_source_space(
+                subject,
+                bem=bem_fname,
+                mri=aseg_fname,
+                volume_label=volume_label,
+                subjects_dir=subjects_dir,
+                # n_jobs=jobs,
+                verbose=verbose)
+            
+            # for visualization
+            src += aseg_src
+            
+            fig = mne.viz.plot_alignment(
+                subject=subject,
+                subjects_dir=subjects_dir,
+                surfaces="white",
+                coord_frame="mri",
+                src=aseg_src)
+    
+            mne.viz.set_3d_view(
+                fig, azimuth=180, elevation=90, distance=0.30, focalpoint=(-0.03, -0.01, 0.03))    
+            
+        src.save(src_fname, overwrite=overwrite)
+    
+    src = mne.read_source_spaces(src_fname)
+        
     # read epochs and concatenate    
     epo_dir = data_path / lock
     epo_fnames = [epo_dir / f'{f}' for f in sorted(os.listdir(epo_dir)) if '.fif' in f and subject in f]
     all_epo = [mne.read_epochs(fname, preload=True, verbose="error") for fname in epo_fnames]
-    for epoch in all_epo: # see mne.preprocessing.maxwell_filter to realign the runs to a common head position. On raw data.
+    for epoch in all_epo:
         epoch.info['dev_head_t'] = all_epo[0].info['dev_head_t']
     epoch = mne.concatenate_epochs(all_epo)
+    
     # create trans file
     trans_fname = os.path.join(res_path, "trans", lock, "%s-trans.fif" % (subject))
     if not op.exists(trans_fname) or overwrite:

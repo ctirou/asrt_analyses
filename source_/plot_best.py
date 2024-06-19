@@ -167,9 +167,9 @@ for ilabel in tqdm(range(len(label_names))):
         fig.subplots_adjust(hspace=0)
         label = label_names[ilabel]
         # fig.suptitle(f"{label.capitalize()[:-3]}", y=0.95)
-        axs[1].text(-0.19, 0.22, f"{label.capitalize()[:-3]}",
-                    weight='semibold', style='italic', ha='left',
-                    bbox=dict(facecolor='none', edgecolor='black', boxstyle='round,pad=1'))
+        # axs[1].text(-0.19, 0.22, f"{label.capitalize()[:-3]}",
+        #             weight='semibold', style='italic', ha='left',
+        #             bbox=dict(facecolor='none', edgecolor='black', boxstyle='round,pad=1'))
         for i in range(2):
             axs[i].set_ylim(-0.3, 0.2)
             yticks = axs[i].get_yticks()
