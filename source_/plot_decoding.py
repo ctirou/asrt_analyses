@@ -34,8 +34,9 @@ corr_in_lab = {}
 decoding = dict()
 
 # get label names
+best_regions = [6, 7, 12, 13, 14, 15, 20, 21, 22, 23, 26, 27, 42, 43, 50, 51, 58, 59]
 labels = read_labels_from_annot(subject='sub01', parc='aparc', hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
-label_names = [label.name for label in labels]
+label_names = [label.name for ilabel, label in enumerate(labels) if ilabel in best_regions]
 del labels
 
 figures = res_path / "figures" / analysis / 'source' / lock / trial_type
@@ -119,11 +120,11 @@ for ilabel, label in enumerate(label_names):
         decoding[label].append(sub_scores)
     decoding[label] = np.array(decoding[label])
         
-    # all_in_seq = np.array(all_in_seqs)
-    # all_out_seq = np.array(all_out_seqs)
-    # diff_inout = np.squeeze(all_in_seq.mean(axis=1) - all_out_seq.mean(axis=1))
-    # decod_in_lab[label] = diff_inout
-    # decod_in_lab2[label] = [np.squeeze(all_in_seq).mean(axis=1), np.squeeze(all_out_seq).mean(axis=1)]
+    all_in_seq = np.array(all_in_seqs)
+    all_out_seq = np.array(all_out_seqs)
+    diff_inout = np.squeeze(all_in_seq.mean(axis=1) - all_out_seq.mean(axis=1))
+    decod_in_lab[label] = diff_inout
+    decod_in_lab2[label] = [np.squeeze(all_in_seq).mean(axis=1), np.squeeze(all_out_seq).mean(axis=1)]
     
     # if not op.exists(res_path / analysis / 'source' / lock / trial_type / label / "corr.npy"):
     #     corr = []

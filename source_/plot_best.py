@@ -28,11 +28,11 @@ del epochs
 
 sessions = ['Practice', 'Block_1', 'Block_2', 'Block_3', 'Block_4']
 
-decod_in_lab = {}
-decod_in_lab2 = {}
-corr_in_lab = {}
 decoding = dict()
+pred_decoding = {}
 rsa_in_lab = {}
+corr_dict = {}
+corr_2 = {}
 
 # get label names
 best_regions = [6, 7, 12, 13, 14, 15, 20, 21, 22, 23, 26, 27, 42, 43, 50, 51, 58, 59]
@@ -95,6 +95,34 @@ for ilabel, label in enumerate(label_names):
     rsa_in_lab[label] = diff_inout
     
     decoding[label] = np.array(decoding[label])
+    pred_decoding[label] = [np.squeeze(all_in_seq).mean(axis=1), np.squeeze(all_out_seq).mean(axis=1)]
+    
+    corr_path = res_path / analysis / 'source' / lock / trial_type / f"{label}_corr.npy"
+    if not op.exists(corr_path):
+        corr = []
+        for sub in range(len(subjects)):
+            rhos = []
+            for t in range(len(times)):
+                rhos.append(spearmanr([0, 1, 2, 3, 4], diff_inout[sub, :, t]))
+            corr.append(rhos)
+        corr = np.array(corr)
+        np.save(corr_path, corr)
+    corr = np.load(corr_path)
+    corr_dict[label] = corr
+
+    # corr_path = res_path / analysis / 'source' / lock / trial_type / f"{label}_corr_pred.npy"
+    # if not op.exists(corr_path):
+    #     corr = []
+    #     for sub in range(len(subjects)):
+    #         rhos = []
+    #         for t in range(len(times)):
+    #             rhos.append(spearmanr([0, 1, 2, 3, 4], diff_inout[sub, :, t]))
+    #         corr.append(rhos)
+    #     corr = np.array(corr)
+    #     np.save(corr_path, corr)
+    # corr = np.load(corr_path)
+    # corr[label] = corr
+    
     
 # #1f77b4 #b45c1f #b41f77 ##1fb45c
 # #e4572e #29335c #F3A712 #A8C686 #669BBC
@@ -291,25 +319,42 @@ for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
 plt.savefig(figures / f"mean_best_rsa.pdf", transparent=True)
 plt.close()
 
+# plot in vs out
+fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(20, 7))
+fig.suptitle(f"${lock}$ / ${trial_type}$ / in_vs_out_decoding")
+for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
+    ins = pred_decoding[label][0].mean(axis=(0, 1))
+    outs = pred_decoding[label][1].mean(axis=(0, 1))
+    ax.plot(times, ins, label='in') 
+    ax.plot(times, outs, label='out')
+    ax.set_title(f"${label}$", fontsize=8)
+    if i == 0:
+        legend = ax.legend()
+        plt.setp(legend.get_texts(), fontsize=7)  # Adjust legend size
+    if lock == 'stim':
+        ax.axvspan(0, 0.2, color='grey', alpha=.2)
+plt.savefig(figures / f"in_vs_out.pdf")
+plt.close()
 
-# # correlations
-# fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(40, 13))
-# fig.suptitle(f"${lock}$ / ${trial_type}$ / correlations")
-# for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
-#     rho = corr_in_lab[label][:, :, 0]
-#     ax.plot(times, rho.mean(0), label='rho')
-#     ax.axhline(0, color='black', ls='dashed', alpha=.5)
-#     ax.set_title(f"${label}$", fontsize=8)
-#     if i == 0:
-#         legend = ax.legend()
-#         plt.setp(legend.get_texts(), fontsize=7)  # Adjust legend size
-#     p_values = decod_stats(rho)
-#     p_values_unc = ttest_1samp(rho, axis=0, popmean=0)[1]
-#     sig = p_values < 0.05
-#     sig_unc = p_values_unc < 0.05
-#     ax.fill_between(times, 0, rho.mean(0), where=sig_unc, color='C2', alpha=1)
-#     ax.fill_between(times, 0, rho.mean(0), where=sig, alpha=0.3)
-#     if lock == 'stim':
-#         ax.axvspan(0, 0.2, color='grey', alpha=.2)
-# plt.savefig(figures / "correlations.pdf")
-# plt.close()
+
+# correlations
+fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(20, 7))
+fig.suptitle(f"${lock}$ / ${trial_type}$ / correlations")
+for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
+    rho = corr_dict[label][:, :, 0]
+    ax.plot(times, rho.mean(0), label='rho')
+    ax.axhline(0, color='black', ls='dashed', alpha=.5)
+    ax.set_title(f"${label}$", fontsize=8)
+    if i == 0:
+        legend = ax.legend()
+        plt.setp(legend.get_texts(), fontsize=7)  # Adjust legend size
+    p_values = decod_stats(rho)
+    p_values_unc = ttest_1samp(rho, axis=0, popmean=0)[1]
+    sig = p_values < 0.05
+    sig_unc = p_values_unc < 0.05
+    ax.fill_between(times, 0, rho.mean(0), where=sig_unc, color='C2', alpha=1)
+    ax.fill_between(times, 0, rho.mean(0), where=sig, alpha=0.3)
+    if lock == 'stim':
+        ax.axvspan(0, 0.2, color='grey', alpha=.2)
+plt.savefig(figures / "correlations.pdf", transparent=True)
+plt.close()
