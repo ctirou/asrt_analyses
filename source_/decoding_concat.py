@@ -30,7 +30,7 @@ scoring = "accuracy"
 parc='aparc'
 parc='aseg'
 hemi = 'both'
-verbose = "error"
+verbose = True
 jobs = -1
 
 # get times
@@ -63,7 +63,7 @@ for subject in subjects:
         epoch_bsl = mne.concatenate_epochs(all_bsl)
 
     # read forward solution    
-    fwd_fname = res_path / analysis / "fwd" / lock / f"{subject}-fwd.fif"
+    fwd_fname = res_path / analysis / "fwd" / lock / f"{subject}+aseg-fwd.fif"
     fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
     # compute data covariance matrix on evoked data
     data_cov = mne.compute_covariance(epoch, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
@@ -86,6 +86,10 @@ for subject in subjects:
     cv = StratifiedKFold(folds, shuffle=True)
 
     labels = mne.read_labels_from_annot(subject=subject, parc=parc, hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
+    
+    lut_file = "/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt/freesurfer/sub01/label/lh.BN_Atlas.annot"
+    # labels = mne.read_labels_from_annot(subject=subject, parc="BN_Atlas", hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
+    labels = mne.read_labels_from_annot(subject=subject, annot_fname=lut_file, subjects_dir=subjects_dir, verbose=verbose)
 
     del epoch, fwd, fwd_fname, data_cov, noise_cov, rank, info, filters
     gc.collect()

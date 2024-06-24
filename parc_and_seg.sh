@@ -25,9 +25,9 @@ for Subject in "${subjects[@]}"; do
     mris_anatomical_stats -mgz -cortex $SUBJECTS_DIR/$Subject/label/rh.cortex.label -f $SUBJECTS_DIR/$Subject/stats/rh.BN_Atlas.stats -b -a $SUBJECTS_DIR/$Subject/label/rh.BN_Atlas.annot -c $SUBJECTS_DIR/BN_Atlas_210_LUT.txt $Subject rh white
     aparcstats2table -s $Subject --hemi rh --parc BN_Atlas --meas thickness --tablefile ./$Subject/rh.thickness.txt
     ### mapping BN_atlas subcortex to subjects 
-    mri_ca_label $SUBJECTS_DIR/$Subject/mri/brain.mgz $SUBJECTS_DIR/$Subject/mri/transforms/talairach.m3z $SUBJECTS_DIR/BN_Atlas_subcortex.gca $SUBJECTS_DIR/$Subject/mri/BN_Atlas_subcotex.mgz
+    mri_ca_label $SUBJECTS_DIR/$Subject/mri/brain.mgz $SUBJECTS_DIR/$Subject/mri/transforms/talairach.m3z $SUBJECTS_DIR/BN_Atlas_subcortex.gca $SUBJECTS_DIR/$Subject/mri/BN_Atlas_subcortex_aseg.mgz
     ### Segmentation stats
-    mri_segstats --seg $SUBJECTS_DIR/$Subject/mri/BN_Atlas_subcotex.mgz --ctab $SUBJECTS_DIR/BN_Atlas_246_LUT.txt --excludeid 0 --sum $SUBJECTS_DIR/$Subject/stats/BN_Atlas_subcotex.stats
+    mri_segstats --seg $SUBJECTS_DIR/$Subject/mri/BN_Atlas_subcotex.mgz --ctab $SUBJECTS_DIR/BN_Atlas_246_LUT.txt --excludeid 0 --sum $SUBJECTS_DIR/$Subject/stats/BN_Atlas_subcortex_aseg.stats
     echo "$Subject processing completed."
 done
 echo "All subjects processed."
