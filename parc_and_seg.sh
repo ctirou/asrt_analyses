@@ -14,8 +14,7 @@ source $FREESURFER_HOME/SetUpFreeSurfer.sh
 
 subjects=("sub01" "sub02" "sub04" "sub07" "sub08" "sub09" "sub10" "sub12" "sub13" "sub14" "sub15")
 for Subject in "${subjects[@]}"; do
-    echo "Processing $Subject..."
-    mkdir -p ./$Subject
+    echo "################## Processing $Subject... ##################"
     ## mapping BN_atlas cortex to subjects
     mris_ca_label -l $SUBJECTS_DIR/$Subject/label/lh.cortex.label $Subject lh $SUBJECTS_DIR/$Subject/surf/lh.sphere.reg $SUBJECTS_DIR/lh.BN_Atlas.gcs $SUBJECTS_DIR/$Subject/label/lh.BN_Atlas.annot
     mris_ca_label -l $SUBJECTS_DIR/$Subject/label/rh.cortex.label $Subject rh $SUBJECTS_DIR/$Subject/surf/rh.sphere.reg $SUBJECTS_DIR/rh.BN_Atlas.gcs $SUBJECTS_DIR/$Subject/label/rh.BN_Atlas.annot
@@ -62,7 +61,7 @@ for Subject in "${subjects[@]}"; do
     ### mapping BN_atlas subcortex to subjects 
     mri_ca_label $SUBJECTS_DIR/$Subject/mri/brain.mgz $SUBJECTS_DIR/$Subject/mri/transforms/talairach.m3z $SUBJECTS_DIR/BN_Atlas_subcortex.gca $SUBJECTS_DIR/$Subject/mri/BN_Atlas_subcortex_aseg.mgz
     ### Segmentation stats
-    mri_segstats --seg $SUBJECTS_DIR/$Subject/mri/BN_Atlas_subcotex.mgz --ctab $SUBJECTS_DIR/BN_Atlas_246_LUT.txt --excludeid 0 --sum $SUBJECTS_DIR/$Subject/stats/BN_Atlas_subcortex_aseg.stats
-    echo "$Subject processing completed."
+    mri_segstats --seg $SUBJECTS_DIR/$Subject/mri/BN_Atlas_subcortex_aseg.mgz --ctab $SUBJECTS_DIR/BN_Atlas_246_LUT.txt --excludeid 0 --sum $SUBJECTS_DIR/$Subject/stats/BN_Atlas_subcortex_aseg.stats
+    echo "################## $Subject processing completed. ##################"
 done
-echo "All subjects processed."
+echo "################## All subjects processed. ##################"

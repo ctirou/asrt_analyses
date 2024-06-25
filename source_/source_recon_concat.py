@@ -6,7 +6,7 @@ from config import *
 import gc
 
 lock = 'stim'
-overwrite = False
+overwrite = True
 verbose = True
 jobs = -1
 
@@ -41,7 +41,7 @@ for subject in subjects:
                                 conductivity=conductivity,
                                 subjects_dir=subjects_dir)
         bem = mne.make_bem_solution(model)
-        mne.bem.write_bem_solution(bem_fname, bem, verbose=verbose)
+        mne.bem.write_bem_solution(bem_fname, bem, overwrite=True, verbose=verbose)
     
     # cortex source space
     src_fname = op.join(res_path, "src", "%s-src.fif" % subject)
@@ -53,12 +53,10 @@ for subject in subjects:
                                         add_dist=True,
                                         n_jobs=jobs,
                                         verbose=verbose)
-    else:
-        src = mne.read_source_spaces(src_fname, verbose=verbose)
-        
+                
         if volume_src:
             # volume source space
-            aseg_fname = subjects_dir / subject / 'mri' / 'BN_Atlas_subcotex_aseg.mgz'
+            aseg_fname = subjects_dir / subject / 'mri' / 'BN_Atlas_subcortex_aseg.mgz'
             aseg_labels = mne.get_volume_labels_from_aseg(aseg_fname)
             
             # volume_label = ["Left-Hippocampus", "Right-Hippocampus"]
@@ -73,16 +71,16 @@ for subject in subjects:
             
             src += aseg_src
             
-            # for visualization
-            fig = mne.viz.plot_alignment(
-                subject=subject,
-                subjects_dir=subjects_dir,
-                surfaces="white",
-                coord_frame="mri",
-                src=aseg_src)
+            # # for visualization
+            # fig = mne.viz.plot_alignment(
+            #     subject=subject,
+            #     subjects_dir=subjects_dir,
+            #     surfaces="white",
+            #     coord_frame="mri",
+            #     src=aseg_src)
     
-            mne.viz.set_3d_view(
-                fig, azimuth=180, elevation=90, distance=0.30, focalpoint=(-0.03, -0.01, 0.03))
+            # mne.viz.set_3d_view(
+            #     fig, azimuth=180, elevation=90, distance=0.30, focalpoint=(-0.03, -0.01, 0.03))
                         
         mne.write_source_spaces(src_fname, src, overwrite=True, verbose=verbose)
     
@@ -115,7 +113,7 @@ for subject in subjects:
                                         mindist=5.0,
                                         n_jobs=jobs,
                                         verbose=True)        
-        mne.write_forward_solution(fwd_fname, fwd, overwrite=overwrite)
+        mne.write_forward_solution(fwd_fname, fwd, overwrite=True)
     
     del src_fname, src, bem_fname
     del epo_dir, epo_fnames, all_epo, epoch

@@ -87,9 +87,9 @@ for subject in subjects:
 
     labels = mne.read_labels_from_annot(subject=subject, parc=parc, hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
     
-    lut_file = "/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt/freesurfer/sub01/label/lh.BN_Atlas.annot"
-    # labels = mne.read_labels_from_annot(subject=subject, parc="BN_Atlas", hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
-    labels = mne.read_labels_from_annot(subject=subject, annot_fname=lut_file, subjects_dir=subjects_dir, verbose=verbose)
+    # lut_file = "/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt/freesurfer/sub01/label/lh.BN_Atlas.annot"
+    labels = mne.read_labels_from_annot(subject=subject, parc="BN_Atlas", hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
+    # labels = mne.read_labels_from_annot(subject=subject, annot_fname=lut_file, subjects_dir=subjects_dir, verbose=verbose)
 
     del epoch, fwd, fwd_fname, data_cov, noise_cov, rank, info, filters
     gc.collect()
