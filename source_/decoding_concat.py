@@ -28,7 +28,7 @@ folds = 10
 solver = 'lbfgs'
 scoring = "accuracy"
 parc='aparc'
-parc='aseg'
+# parc='aseg'
 hemi = 'both'
 verbose = True
 jobs = -1
@@ -63,7 +63,7 @@ for subject in subjects:
         epoch_bsl = mne.concatenate_epochs(all_bsl)
 
     # read forward solution    
-    fwd_fname = res_path / analysis / "fwd" / lock / f"{subject}+aseg-fwd.fif"
+    fwd_fname = res_path / analysis / "fwd" / lock / f"{subject}-mixed-fwd.fif"
     fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
     # compute data covariance matrix on evoked data
     data_cov = mne.compute_covariance(epoch, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
@@ -87,8 +87,11 @@ for subject in subjects:
 
     labels = mne.read_labels_from_annot(subject=subject, parc=parc, hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
     
-    # lut_file = "/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt/freesurfer/sub01/label/lh.BN_Atlas.annot"
-    labels = mne.read_labels_from_annot(subject=subject, parc="BN_Atlas", hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
+    ROI_labels = mne.read_labels_from_annot(subject, "BN_Atlas", subjects_dir=subjects_dir)
+        
+    lut_file = "/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt/freesurfer/BN_Atlas_246_LUT.txt"
+    lut_lab = mne.read_freesurfer_lut(lut_file)
+    
     # labels = mne.read_labels_from_annot(subject=subject, annot_fname=lut_file, subjects_dir=subjects_dir, verbose=verbose)
 
     del epoch, fwd, fwd_fname, data_cov, noise_cov, rank, info, filters
@@ -102,9 +105,19 @@ for subject in subjects:
         ensure_dir(res_dir)
         
         # get stcs in label
-        stcs_data = [stc.in_label(label).data for stc in stcs]
+        # stcs_data = [stc.in_label(label).data for stc in stcs] # stc.in_label() doesn't work anymore for volume source space    
+        stcs_data = mne.extract_label_time_course(stcs, labels, src=fwd['src'], mode='auto', verbose=verbose)
+        
         stcs_data = np.array(stcs_data)
         assert len(stcs_data) == len(behav)
+
+        import matplotlib.pyplot as plt
+        fig, axes = plt.subplots(1, layout="constrained")
+        axes.plot(times, stcs_data[0][-1, :].T, "r", label="Brain-stem")
+        axes.plot(times, stcs_data[0][0, :], "k", label="bankssts-lh")
+        axes.set(xlabel="Time (ms)", ylabel="MNE current (nAm)")
+        axes.legend()
+        plt.show()
 
         if trial_type == 'pattern':
             pattern = behav.trialtypes == 1

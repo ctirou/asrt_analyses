@@ -6,7 +6,7 @@ from config import *
 import gc
 
 lock = 'stim'
-overwrite = True
+overwrite = False
 verbose = True
 jobs = -1
 
@@ -20,12 +20,9 @@ ensure_dir(res_path)
 volume_src = True
 
 # create results directory
-folders = ["stcs", "bem", "src", "trans", "fwd"]
+folders = ["bem", "src", "trans", "fwd"]
 for f in folders:
-    if f == "stcs":
-        path = os.path.join(res_path, "stcs", lock)
-        ensure_dir(path)
-    elif f in folders[-2:]:
+    if f in folders[-2:]:
         path = op.join(res_path, f, lock)
         ensure_dir(path)
     else:
@@ -34,19 +31,22 @@ for f in folders:
 for subject in subjects:
     
     # bem model
-    bem_fname = os.path.join(res_path, "bem", "%s-bem.fif" % (subject))
+    bem_fname = os.path.join(res_path, "bem", "%s-bem-sol.fif" % (subject))
+    model_fname = os.path.join(res_path, "bem", "%s-bem.fif" % (subject))
     if not op.exists(bem_fname) or overwrite:
         conductivity = (.3,)
         model = mne.make_bem_model(subject=subject, ico=4,
                                 conductivity=conductivity,
                                 subjects_dir=subjects_dir)
+        mne.write_bem_surfaces(model_fname, model, overwrite=True, verbose=verbose)
+        
         bem = mne.make_bem_solution(model)
         mne.bem.write_bem_solution(bem_fname, bem, overwrite=True, verbose=verbose)
     
     # cortex source space
     src_fname = op.join(res_path, "src", "%s-src.fif" % subject)
     if volume_src:
-        src_fname = src_fname.replace("-src.fif", "+aseg-src.fif")    
+        src_fname = src_fname.replace("-src.fif", "-mixed-src.fif")    
     if not op.exists(src_fname) or overwrite:
         src = mne.setup_source_space(subject, spacing='oct6',
                                         subjects_dir=subjects_dir,
@@ -54,20 +54,28 @@ for subject in subjects:
                                         n_jobs=jobs,
                                         verbose=verbose)
                 
+        src.plot(subjects_dir=subjects_dir)        
+                
         if volume_src:
             # volume source space
-            aseg_fname = subjects_dir / subject / 'mri' / 'BN_Atlas_subcortex_aseg.mgz'
-            aseg_labels = mne.get_volume_labels_from_aseg(aseg_fname)
+            aseg_fname = subjects_dir / subject / 'mri' / 'BN_Atlas_subcotex_aseg.mgz'
+            lut_file = "/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt/freesurfer/BN_Atlas_246_LUT.txt"
+            lut_lab = mne.read_freesurfer_lut(lut_file)
+            # aseg_fname = subjects_dir / subject / 'mri' / 'aseg.mgz'
+            aseg_labels = mne.get_volume_labels_from_aseg(aseg_fname, atlas_ids=lut_lab[0])
             
-            # volume_label = ["Left-Hippocampus", "Right-Hippocampus"]
+            hipp_labels = ['rHipp_L', 'rHipp_R', 'cHipp_L', 'cHipp_R']
+            
             aseg_src = mne.setup_volume_source_space(
                 subject,
-                bem=bem_fname,
+                bem=model_fname,
                 mri=aseg_fname,
-                volume_label=aseg_labels,
+                volume_label=hipp_labels,
                 subjects_dir=subjects_dir,
                 n_jobs=jobs,
                 verbose=verbose)
+            
+            aseg_src.plot(subjects_dir=subjects_dir)
             
             src += aseg_src
             
@@ -103,9 +111,11 @@ for subject in subjects:
         coreg.omit_head_shape_points(distance=5.0 / 1000)
         coreg.fit_icp(n_iterations=100, verbose=True)
         mne.write_trans(trans_fname, coreg.trans, overwrite=overwrite)
+    
+    # compute forward solution
     fwd_fname = op.join(res_path, "fwd", lock, "%s-fwd.fif" % (subject))
     if volume_src:
-        fwd_fname = fwd_fname.replace("-fwd.fif", "+aseg-fwd.fif")
+        fwd_fname = fwd_fname.replace("-fwd.fif", "-mixed-fwd.fif")
     if not op.exists(fwd_fname) or overwrite:
         fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,
                                         src=src, bem=bem_fname,

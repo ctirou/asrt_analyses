@@ -12,6 +12,8 @@ export FREESURFER_HOME="/Applications/freesurfer/7.3.2"
 export SUBJECTS_DIR=/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt/freesurfer
 source $FREESURFER_HOME/SetUpFreeSurfer.sh
 
+Subject="sub01"
+
 subjects=("sub01" "sub02" "sub04" "sub07" "sub08" "sub09" "sub10" "sub12" "sub13" "sub14" "sub15")
 for Subject in "${subjects[@]}"; do
     echo "################## Processing $Subject... ##################"
