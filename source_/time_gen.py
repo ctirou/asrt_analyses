@@ -16,7 +16,7 @@ import gc
 data_path = PRED_PATH
 analysis = 'time_generalization'
 subjects, epochs_list = SUBJS, EPOCHS
-lock = 'button'
+lock = 'stim'
 folds = 10
 solver = 'lbfgs'
 scoring = "accuracy"
@@ -32,7 +32,7 @@ for subject in subjects:
     for trial_type in ['pattern', 'random']:
         all_epochs = list()
         all_behavs = list()
-        print(subject)
+        print(f"############## Processing {subject}... ##############")
         for epoch_num, epo in zip([1, 2, 3, 4], epochs_list[1:]):
             behav = pd.read_pickle(op.join(data_path, 'behav', f'{subject}-{epoch_num}.pkl'))
             epoch_fname = op.join(data_path, lock, f"{subject}-{epoch_num}-epo.fif")

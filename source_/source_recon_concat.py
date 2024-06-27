@@ -6,9 +6,9 @@ from config import *
 import gc
 
 lock = 'stim'
-overwrite = False
+overwrite = True
 verbose = True
-jobs = -1
+jobs = 15
 
 subjects = SUBJS
 epochs_list = EPOCHS
@@ -53,46 +53,38 @@ for subject in subjects:
                                         add_dist=True,
                                         n_jobs=jobs,
                                         verbose=verbose)
-                
-        src.plot(subjects_dir=subjects_dir)        
-                
+                                
+        # volume source space
         if volume_src:
-            # volume source space
-            aseg_fname = subjects_dir / subject / 'mri' / 'BN_Atlas_subcotex_aseg.mgz'
-            lut_file = "/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt/freesurfer/BN_Atlas_246_LUT.txt"
-            lut_lab = mne.read_freesurfer_lut(lut_file)
-            # aseg_fname = subjects_dir / subject / 'mri' / 'aseg.mgz'
-            aseg_labels = mne.get_volume_labels_from_aseg(aseg_fname, atlas_ids=lut_lab[0])
             
-            hipp_labels = ['rHipp_L', 'rHipp_R', 'cHipp_L', 'cHipp_R']
+            ## Brainnetome atlas -- does not work for now
+            # aseg_fname = subjects_dir / subject / 'mri' / 'BN_Atlas_subcotex_aseg.mgz'
+            # lut_file = "/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt/freesurfer/BN_Atlas_246_LUT.txt"
+            # lut_lab = mne.read_freesurfer_lut(lut_file)
+            # aseg_labels = mne.get_volume_labels_from_aseg(aseg_fname, atlas_ids=lut_lab[0])
+            # volume_labels = ['rHipp_L', 'rHipp_R', 'cHipp_L', 'cHipp_R']
             
-            aseg_src = mne.setup_volume_source_space(
+            # Freesurfer default aseg atlas
+            aseg_fname = subjects_dir / subject / 'mri' / 'aseg.mgz'
+            aseg_labels = mne.get_volume_labels_from_aseg(aseg_fname)
+            volume_labels = ["Left-Cerebellum-Cortex", "Right-Cerebellum-Cortex",
+                             "Left-Thalamus-Proper", "Right-Thalamus-Proper",
+                             "Left-Hippocampus", "Right-Hippocampus"]
+            
+            vol_src = mne.setup_volume_source_space(
                 subject,
                 bem=model_fname,
                 mri=aseg_fname,
-                volume_label=hipp_labels,
+                volume_label=volume_labels,
                 subjects_dir=subjects_dir,
                 n_jobs=jobs,
                 verbose=verbose)
-            
-            aseg_src.plot(subjects_dir=subjects_dir)
-            
-            src += aseg_src
-            
-            # # for visualization
-            # fig = mne.viz.plot_alignment(
-            #     subject=subject,
-            #     subjects_dir=subjects_dir,
-            #     surfaces="white",
-            #     coord_frame="mri",
-            #     src=aseg_src)
-    
-            # mne.viz.set_3d_view(
-            #     fig, azimuth=180, elevation=90, distance=0.30, focalpoint=(-0.03, -0.01, 0.03))
-                        
+                    
+            src += vol_src
+                
         mne.write_source_spaces(src_fname, src, overwrite=True, verbose=verbose)
-    
-    src = mne.read_source_spaces(src_fname, verbose=verbose)
+    else:
+        src = mne.read_source_spaces(src_fname, verbose=verbose)
         
     # read epochs and concatenate    
     epo_dir = data_path / lock
@@ -104,13 +96,14 @@ for subject in subjects:
     
     # create trans file
     trans_fname = os.path.join(res_path, "trans", lock, "%s-trans.fif" % (subject))
-    if not op.exists(trans_fname) or overwrite:
+    # if not op.exists(trans_fname) or overwrite:
+    if not op.exists(trans_fname) or False:
         coreg = mne.coreg.Coregistration(epoch.info, subject, subjects_dir)
         coreg.fit_fiducials(verbose=True)
         coreg.fit_icp(n_iterations=6, verbose=True)
         coreg.omit_head_shape_points(distance=5.0 / 1000)
         coreg.fit_icp(n_iterations=100, verbose=True)
-        mne.write_trans(trans_fname, coreg.trans, overwrite=overwrite)
+        mne.write_trans(trans_fname, coreg.trans, overwrite=True)
     
     # compute forward solution
     fwd_fname = op.join(res_path, "fwd", lock, "%s-fwd.fif" % (subject))

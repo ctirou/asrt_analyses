@@ -7,17 +7,19 @@ import numpy as np
 from mne import read_epochs
 from scipy.stats import spearmanr
 from tqdm.auto import tqdm
+
 analysis = "time_generalization"
-data_path = os.getenv("PRED_PATH")
+data_path = PRED_PATH
 subjects, epochs_list = SUBJS, EPOCHS
 lock = 'stim'
 summary = False
-epoch_fname = '/Users/romainquentin/Desktop/data/pred_asrt/stim/sub01-0-epo.fif'
+epoch_fname = data_path / lock / 'sub01-0-epo.fif'
 epoch = read_epochs(epoch_fname, verbose=False)
 times = epoch.times
 del epoch
 results_dir = op.join(data_path, 'results')
 figure_dir = op.join(data_path, 'figure_results')
+ensure_dir(figure_dir)
 
 # load patterns and randoms time-generalization on all epochs
 patterns, randoms = [], []
@@ -28,6 +30,7 @@ for subject in tqdm(subjects):
     randoms.append(random)
 patterns = np.array(patterns)
 randoms = np.array(randoms)
+
 # plot pattern
 fig, ax = plt.subplots(1, 1, figsize=(16, 7))
 im = ax.imshow(
@@ -47,6 +50,7 @@ ax.axhline(0, color="k")
 cbar = plt.colorbar(im, ax=ax)
 cbar.set_label("accuracy")
 fig.savefig(op.join(figure_dir, "mean_pattern.png"))
+
 # plot random
 fig, ax = plt.subplots(1, 1, figsize=(16, 7))
 im = ax.imshow(
@@ -66,10 +70,13 @@ ax.axhline(0, color="k")
 cbar = plt.colorbar(im, ax=ax)
 cbar.set_label("accuracy")
 fig.savefig(op.join(figure_dir, "mean_random.png"))
+
 # plot contrast with significance
 contrasts = patterns - randoms
+
 pval = gat_stats(contrasts)
 sig = np.array(pval < 0.05)
+
 fig, ax = plt.subplots(1, 1, figsize=(16, 7))
 im = ax.imshow(
     contrasts.mean(0),
@@ -91,7 +98,6 @@ xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
 ax.contour(xx, yy, sig, colors='Gray', levels=[0],
                     linestyles='solid', linewidths=1)
 fig.savefig(op.join(figure_dir, "mean_contrast.png"))
-
 
 # look at the correlations
 all_patterns, all_randoms = [], []

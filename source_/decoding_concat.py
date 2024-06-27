@@ -87,13 +87,6 @@ for subject in subjects:
 
     labels = mne.read_labels_from_annot(subject=subject, parc=parc, hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
     
-    ROI_labels = mne.read_labels_from_annot(subject, "BN_Atlas", subjects_dir=subjects_dir)
-        
-    lut_file = "/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt/freesurfer/BN_Atlas_246_LUT.txt"
-    lut_lab = mne.read_freesurfer_lut(lut_file)
-    
-    # labels = mne.read_labels_from_annot(subject=subject, annot_fname=lut_file, subjects_dir=subjects_dir, verbose=verbose)
-
     del epoch, fwd, fwd_fname, data_cov, noise_cov, rank, info, filters
     gc.collect()
 
@@ -105,19 +98,22 @@ for subject in subjects:
         ensure_dir(res_dir)
         
         # get stcs in label
-        # stcs_data = [stc.in_label(label).data for stc in stcs] # stc.in_label() doesn't work anymore for volume source space    
-        stcs_data = mne.extract_label_time_course(stcs, labels, src=fwd['src'], mode='auto', verbose=verbose)
+        stcs_data = [stc.in_label(label).data for stc in stcs] # stc.in_label() doesn't work anymore for volume source space    
         
         stcs_data = np.array(stcs_data)
         assert len(stcs_data) == len(behav)
 
-        import matplotlib.pyplot as plt
-        fig, axes = plt.subplots(1, layout="constrained")
-        axes.plot(times, stcs_data[0][-1, :].T, "r", label="Brain-stem")
-        axes.plot(times, stcs_data[0][0, :], "k", label="bankssts-lh")
-        axes.set(xlabel="Time (ms)", ylabel="MNE current (nAm)")
-        axes.legend()
-        plt.show()
+        # import matplotlib.pyplot as plt
+        # fig, axes = plt.subplots(1, layout="constrained")
+        # axes.plot(times, stcs_data[0][6, :].T, "b", label="L_cuneus")
+        # axes.plot(times, stcs_data[0][7, :].T, "g", label="R_cuneus")
+        
+        # axes.plot(times, stcs_data[0][-1, :].T, "r", label="R_HPC")
+        # axes.plot(times, stcs_data[0][-2, :].T, "k", label="L_HPC")
+        # # axes.plot(times, stcs_data[0][0, :], "k", label="bankssts-lh")
+        # axes.set(xlabel="Time (ms)", ylabel="MNE current (nAm)")
+        # axes.legend()
+        # plt.show()
 
         if trial_type == 'pattern':
             pattern = behav.trialtypes == 1
@@ -141,3 +137,52 @@ for subject in subjects:
             
         del X, y, scores
         gc.collect()
+    
+    labels = mne.read_labels_from_annot(subject=subject, parc=parc, hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
+        
+    stcs_data = mne.extract_label_time_course(stcs, labels, src=fwd['src'], mode=None, allow_empty=True, verbose=verbose)
+    stcs_data = np.array(stcs_data, dtype=object)
+    print(stcs_data.shape)        
+    assert len(stcs_data) == len(behav)
+    
+    volume_labels = ["Left-Cerebellum-Cortex", "Right-Cerebellum-Cortex",
+                    "Left-Thalamus-Proper", "Right-Thalamus-Proper",
+                    "Left-Hippocampus", "Right-Hippocampus"]
+    labels += volume_labels
+    
+    for ilabel, label in enumerate(labels):
+        if ilabel > len(labels) - len(volume_labels) - 1:
+            label_fname = label
+        else:
+            label_fname = label.name
+
+        print(subject, f"{str(ilabel+1).zfill(2)}/{len(labels)}", label_fname)
+        
+        if ilabel > 67:
+            
+            # results dir
+            res_dir = res_path / analysis / 'source' / lock / trial_type / label_fname / subject
+            ensure_dir(res_dir)
+            
+            if trial_type == 'pattern':
+                pattern = behav.trialtypes == 1
+                X = stcs_data[pattern][:, ilabel, :]
+                y = behav.positions[pattern]
+            elif trial_type == 'random':
+                random = behav.trialtypes == 2
+                X = stcs_data[random][:, ilabel, :]
+                y = behav.positions[random]
+            else:
+                X = stcs_data[:, ilabel, :]
+                y = behav.positions
+            y = y.reset_index(drop=True)            
+            assert X.shape[0] == y.shape[0]
+
+            del stcs_data
+            gc.collect()
+            
+            scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=verbose)
+            np.save(res_dir / "scores.npy", scores.mean(0))
+                
+            del X, y, scores
+            gc.collect()
