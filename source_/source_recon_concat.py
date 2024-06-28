@@ -5,11 +5,11 @@ from base import ensure_dir
 from config import *
 import gc
 
-lock = 'stim'
 overwrite = True
 verbose = True
-jobs = 15
+jobs = -1
 
+locks = ['stim', 'button']
 subjects = SUBJS
 epochs_list = EPOCHS
 data_path = DATA_DIR
@@ -17,46 +17,44 @@ subjects_dir = FREESURFER_DIR
 res_path = RESULTS_DIR / "concatenated"
 ensure_dir(res_path)
 
-volume_src = True
+for lock in locks:
 
-# create results directory
-folders = ["bem", "src", "trans", "fwd"]
-for f in folders:
-    if f in folders[-2:]:
-        path = op.join(res_path, f, lock)
-        ensure_dir(path)
-    else:
-        ensure_dir(os.path.join(res_path, f))
+    # create results directory
+    folders = ["bem", "src", "trans", "fwd"]
+    for f in folders:
+        if f in folders[-2:]:
+            path = op.join(res_path, f, lock)
+            ensure_dir(path)
+        else:
+            ensure_dir(os.path.join(res_path, f))
 
-for subject in subjects:
-    
-    # bem model
-    bem_fname = op.join(res_path, "bem", "%s-bem-sol.fif" % (subject))
-    model_fname = op.join(res_path, "bem", "%s-bem.fif" % (subject))
-    if not op.exists(bem_fname) or overwrite:
-        conductivity = (.3,)
-        model = mne.make_bem_model(subject=subject, ico=4,
-                                conductivity=conductivity,
-                                subjects_dir=subjects_dir)
-        mne.write_bem_surfaces(model_fname, model, overwrite=True, verbose=verbose)
+    for subject in subjects:
         
-        bem = mne.make_bem_solution(model)
-        mne.bem.write_bem_solution(bem_fname, bem, overwrite=True, verbose=verbose)
-    
-    # cortex source space
-    src_fname = op.join(res_path, "src", "%s-src.fif" % subject)
-    if volume_src:
-        src_fname = src_fname.replace("-src.fif", "-mixed-src.fif")    
-    if not op.exists(src_fname) or overwrite:
-        src = mne.setup_source_space(subject, spacing='oct6',
-                                        subjects_dir=subjects_dir,
-                                        add_dist=True,
-                                        n_jobs=jobs,
-                                        verbose=verbose)
-                                
-        # volume source space
-        if volume_src:
+        # bem model
+        bem_fname = op.join(res_path, "bem", "%s-bem-sol.fif" % (subject))
+        model_fname = op.join(res_path, "bem", "%s-bem.fif" % (subject))
+        if not op.exists(bem_fname) or False:
+            conductivity = (.3,)
+            model = mne.make_bem_model(subject=subject, ico=4,
+                                    conductivity=conductivity,
+                                    subjects_dir=subjects_dir)
+            mne.write_bem_surfaces(model_fname, model, overwrite=True, verbose=verbose)
             
+            bem = mne.make_bem_solution(model)
+            mne.bem.write_bem_solution(bem_fname, bem, overwrite=True, verbose=verbose)
+        
+        # cortex source space
+        src_fname = op.join(res_path, "src", "%s-src.fif" % subject)
+        if not op.exists(src_fname) or overwrite:
+            src = mne.setup_source_space(subject, spacing='oct6',
+                                            subjects_dir=subjects_dir,
+                                            add_dist=True,
+                                            n_jobs=jobs,
+                                            verbose=verbose)
+                                    
+        # volume source space
+        vol_src_fname = op.join(res_path, "src", "%s-vol-src.fif" % subject)
+        if not op.exists(vol_src_fname) or overwrite:
             ## Brainnetome atlas -- does not work for now
             # aseg_fname = subjects_dir / subject / 'mri' / 'BN_Atlas_subcotex_aseg.mgz'
             # lut_file = "/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt/freesurfer/BN_Atlas_246_LUT.txt"
@@ -64,16 +62,15 @@ for subject in subjects:
             # aseg_labels = mne.get_volume_labels_from_aseg(aseg_fname, atlas_ids=lut_lab[0])
             # volume_labels = ['rHipp_L', 'rHipp_R', 'cHipp_L', 'cHipp_R']
             
-            # Freesurfer default aseg atlas
-            aseg_fname = subjects_dir / subject / 'mri' / 'aparc+aseg.mgz'
-            aseg_labels = mne.get_volume_labels_from_aseg(aseg_fname)
+            ## Freesurfer default aseg atlas
+            # aseg_fname = subjects_dir / subject / 'mri' / 'aparc+aseg.mgz'
+            # aseg_labels = mne.get_volume_labels_from_aseg(aseg_fname)
             
-            roi_labels = ["Left-Cerebellum-Cortex", "Right-Cerebellum-Cortex",
-                          "Left-Thalamus-Proper", "Right-Thalamus-Proper",
+            vol_labels = ["Left-Amygdala", "Right-Amygdala", 
+                          "Left-Cerebellum-Cortex", "Right-Cerebellum-Cortex", 
+                          "Left-Thalamus-Proper", "Right-Thalamus-Proper", 
                           "Left-Hippocampus", "Right-Hippocampus"]
-            
-            vol_labels = [lab for lab in aseg_labels if lab.startswith("ctx") or lab in roi_labels]
-            
+                    
             vol_src = mne.setup_volume_source_space(
                 subject,
                 bem=model_fname,
@@ -82,63 +79,60 @@ for subject in subjects:
                 subjects_dir=subjects_dir,
                 n_jobs=jobs,
                 verbose=verbose)
-                    
-            src += vol_src
+            
+        mixed_src = src + vol_src
         
-        # don't need to save actually        
-        mne.write_source_spaces(src_fname, src, overwrite=True, verbose=verbose)
-        vol_src_fname = op.join(res_path, "src", "%s-vol-src.fif" % subject)
-        mne.write_source_spaces(vol_src_fname, vol_src, overwrite=True, verbose=verbose)
-    else:
-        src = mne.read_source_spaces(src_fname, verbose=verbose)
+        # read epochs and concatenate    
+        epo_dir = data_path / lock
+        epo_fnames = [epo_dir / f'{f}' for f in sorted(os.listdir(epo_dir)) if '.fif' in f and subject in f]
+        all_epo = [mne.read_epochs(fname, preload=True, verbose="error") for fname in epo_fnames]
+        for epoch in all_epo:
+            epoch.info['dev_head_t'] = all_epo[0].info['dev_head_t']
+        epoch = mne.concatenate_epochs(all_epo)
         
-    # read epochs and concatenate    
-    epo_dir = data_path / lock
-    epo_fnames = [epo_dir / f'{f}' for f in sorted(os.listdir(epo_dir)) if '.fif' in f and subject in f]
-    all_epo = [mne.read_epochs(fname, preload=True, verbose="error") for fname in epo_fnames]
-    for epoch in all_epo:
-        epoch.info['dev_head_t'] = all_epo[0].info['dev_head_t']
-    epoch = mne.concatenate_epochs(all_epo)
-    
-    # create trans file
-    trans_fname = os.path.join(res_path, "trans", lock, "%s-trans.fif" % (subject))
-    # if not op.exists(trans_fname) or overwrite:
-    if not op.exists(trans_fname) or False:
-        coreg = mne.coreg.Coregistration(epoch.info, subject, subjects_dir)
-        coreg.fit_fiducials(verbose=True)
-        coreg.fit_icp(n_iterations=6, verbose=True)
-        coreg.omit_head_shape_points(distance=5.0 / 1000)
-        coreg.fit_icp(n_iterations=100, verbose=True)
-        mne.write_trans(trans_fname, coreg.trans, overwrite=True)
-    
-    # compute forward solution
-    fwd_fname = op.join(res_path, "fwd", lock, "%s-fwd.fif" % (subject))
-    if volume_src:
-        fwd_fname = fwd_fname.replace("-fwd.fif", "-mixed-fwd.fif")
-    if not op.exists(fwd_fname) or overwrite:
-        fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,
-                                        src=src, bem=bem_fname,
-                                        meg=True, eeg=False,
-                                        mindist=5.0,
-                                        n_jobs=jobs,
-                                        verbose=True)        
-        mne.write_forward_solution(fwd_fname, fwd, overwrite=True)
+        # create trans file
+        trans_fname = os.path.join(res_path, "trans", lock, "%s-trans.fif" % (subject))
+        # if not op.exists(trans_fname) or overwrite:
+        if not op.exists(trans_fname) or False:
+            coreg = mne.coreg.Coregistration(epoch.info, subject, subjects_dir)
+            coreg.fit_fiducials(verbose=True)
+            coreg.fit_icp(n_iterations=6, verbose=True)
+            coreg.omit_head_shape_points(distance=5.0 / 1000)
+            coreg.fit_icp(n_iterations=100, verbose=True)
+            mne.write_trans(trans_fname, coreg.trans, overwrite=True)
+        
+        # compute forward solution
+        fwd_fname = op.join(res_path, "fwd", lock, "%s-fwd.fif" % (subject))
+        if not op.exists(fwd_fname) or overwrite:
+            fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,
+                                            src=src, bem=bem_fname,
+                                            meg=True, eeg=False,
+                                            mindist=5.0,
+                                            n_jobs=jobs,
+                                            verbose=True)        
+            mne.write_forward_solution(fwd_fname, fwd, overwrite=True)
+        
+        vol_fwd_fname = op.join(res_path, "fwd", lock, "%s-vol-fwd.fif" % (subject))
+        if not op.exists(vol_fwd_fname) or overwrite:
+            vol_fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,
+                                            src=vol_src, bem=bem_fname,
+                                            meg=True, eeg=False,
+                                            mindist=5.0,
+                                            n_jobs=jobs,
+                                            verbose=True)        
+            mne.write_forward_solution(vol_fwd_fname, vol_fwd, overwrite=True, verbose=verbose)
 
-        vol_fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,
-                                        src=vol_src, bem=bem_fname,
-                                        meg=True, eeg=False,
-                                        mindist=5.0,
-                                        n_jobs=jobs,
-                                        verbose=True)        
-        
-        vol_fwd_fname = op.join(res_path, "fwd", lock, f"{subject}-vol-fwd.h5")
-        mne.write_forward_solution(vol_fwd_fname, vol_fwd, overwrite=True, verbose=verbose)
-        
-        ## too big, > 2GB so file is truncated when saved in .fif 
-        vol_fwd.save(vol_fwd_fname, overwrite=True)
-        vol_fwd_fname = op.join(res_path, "fwd", lock, "%s-vol-fwd.h5" % (subject))
-
-    del src_fname, src, bem_fname
-    del epo_dir, epo_fnames, all_epo, epoch
-    del trans_fname, fwd_fname, fwd
-    gc.collect()
+        mixed_fwd_fname = op.join(res_path, "fwd", lock, "%s-mixed-fwd.fif" % (subject))
+        if not op.exists(vol_fwd_fname) or overwrite:
+            mixed_fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,
+                                            src=mixed_src, bem=bem_fname,
+                                            meg=True, eeg=False,
+                                            mindist=5.0,
+                                            n_jobs=jobs,
+                                            verbose=True)        
+            mne.write_forward_solution(mixed_fwd_fname, mixed_fwd, overwrite=True, verbose=verbose)
+            
+        del src_fname, src, vol_src, mixed_src, bem_fname
+        del epo_dir, epo_fnames, all_epo, epoch
+        del trans_fname, fwd_fname, fwd, vol_fwd, mixed_fwd
+        gc.collect()

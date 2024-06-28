@@ -139,7 +139,7 @@ def make_predictions(X, y, folds, jobs, scoring, verbose):
 
     return test, pred, pred_rock
 
-def gat_stats(X):
+def gat_stats(X, jobs):
     from mne.stats import spatio_temporal_cluster_1samp_test
     """Statistical test applied across subjects"""
     # check input
@@ -149,7 +149,7 @@ def gat_stats(X):
     # stats function report p_value for each cluster
     T_obs_, clusters, p_values, _ = spatio_temporal_cluster_1samp_test(
         X, out_type='mask',
-        n_permutations=2**12, n_jobs=-1, verbose=True)
+        n_permutations=2**12, n_jobs=jobs, verbose=True)
 
     # format p_values to get same dimensionality as X
     p_values_ = np.ones_like(X[0]).T

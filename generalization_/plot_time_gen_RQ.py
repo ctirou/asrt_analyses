@@ -11,15 +11,17 @@ from tqdm.auto import tqdm
 analysis = "time_generalization"
 data_path = PRED_PATH
 subjects, epochs_list = SUBJS, EPOCHS
-lock = 'stim'
-summary = False
+lock = 'button'
+jobs = -1
+
+# get times
 epoch_fname = data_path / lock / 'sub01-0-epo.fif'
 epoch = read_epochs(epoch_fname, verbose=False)
 times = epoch.times
 del epoch
-results_dir = op.join(data_path, 'results')
+
 figure_dir = op.join(data_path, 'figure_results')
-ensure_dir(figure_dir)
+ensure_dir(figure_dir / lock)
 
 # load patterns and randoms time-generalization on all epochs
 patterns, randoms = [], []
@@ -49,7 +51,7 @@ ax.axvline(0, color="k")
 ax.axhline(0, color="k")
 cbar = plt.colorbar(im, ax=ax)
 cbar.set_label("accuracy")
-fig.savefig(op.join(figure_dir, "mean_pattern.png"))
+fig.savefig(op.join(figure_dir, lock, "mean_pattern.png"))
 
 # plot random
 fig, ax = plt.subplots(1, 1, figsize=(16, 7))
@@ -69,12 +71,12 @@ ax.axvline(0, color="k")
 ax.axhline(0, color="k")
 cbar = plt.colorbar(im, ax=ax)
 cbar.set_label("accuracy")
-fig.savefig(op.join(figure_dir, "mean_random.png"))
+fig.savefig(op.join(figure_dir, lock, "mean_random.png"))
 
 # plot contrast with significance
 contrasts = patterns - randoms
 
-pval = gat_stats(contrasts)
+pval = gat_stats(contrasts, jobs)
 sig = np.array(pval < 0.05)
 
 fig, ax = plt.subplots(1, 1, figsize=(16, 7))
@@ -90,14 +92,14 @@ im = ax.imshow(
 ax.set_xlabel("Testing Time (s)")
 ax.set_ylabel("Training Time (s)")
 ax.set_title("Temporal generalization")
-ax.axvline(0, color="k")
-ax.axhline(0, color="k")
 cbar = plt.colorbar(im, ax=ax)
 cbar.set_label("accuracy")
 xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
 ax.contour(xx, yy, sig, colors='Gray', levels=[0],
                     linestyles='solid', linewidths=1)
-fig.savefig(op.join(figure_dir, "mean_contrast.png"))
+ax.axvline(0, color="k")
+ax.axhline(0, color="k")
+fig.savefig(op.join(figure_dir, lock, "mean_contrast.png"))
 
 # look at the correlations
 all_patterns, all_randoms = [], []
@@ -139,15 +141,15 @@ for trial_type, time_gen in zip(['pattern', 'random'], [all_patterns, all_random
     ax.set_xlabel("Testing Time (s)")
     ax.set_ylabel("Training Time (s)")
     ax.set_title("Temporal generalization")
-    ax.axvline(0, color="k")
-    ax.axhline(0, color="k")
     cbar = plt.colorbar(im, ax=ax)
     cbar.set_label('Spearman correlation')
     # add significance
-    pval = gat_stats(rhos)
+    pval = gat_stats(rhos, jobs)
     sig = np.array(pval < 0.05)
     xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
     ax.contour(xx, yy, sig, colors='Gray', levels=[0],
                         linestyles='solid', linewidths=1)
-    fig.savefig(op.join(figure_dir, f"mean_rho_{trial_type}.png"))
+    ax.axvline(0, color="k")
+    ax.axhline(0, color="k")
+    fig.savefig(op.join(figure_dir, lock, f"mean_rho_{trial_type}.png"))
 

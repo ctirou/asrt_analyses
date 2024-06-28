@@ -12,6 +12,7 @@ from config import *
 from mne.beamformer import make_lcmv, apply_lcmv_epochs
 import gc
 import os
+from tqdm.auto import tqdm
 
 # params
 subjects = SUBJS
@@ -64,7 +65,7 @@ for subject in subjects:
 
     # read forward solution    
     fwd_fname = res_path / analysis / "fwd" / lock / f"{subject}-mixed-fwd.fif"
-    fwd_fname = res_path / analysis / "fwd" / lock / f"{subject}-vol-fwd.h5"
+    fwd_fname = res_path / analysis / "fwd" / lock / f"{subject}-vol-fwd.fif"
     fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
     # compute data covariance matrix on evoked data
     data_cov = mne.compute_covariance(epoch, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
@@ -91,6 +92,9 @@ for subject in subjects:
     del epoch, fwd, fwd_fname, data_cov, noise_cov, rank, info, filters
     gc.collect()
 
+    label_path = "/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt/freesurfer/sub01/mri/aseg.mgz"
+    stc = stcs[0].extract_label_time_course(labels=label_path, src=fwd['src'], mode=None)
+    
     for ilabel, label in enumerate(labels):
         
         print(subject, f"{str(ilabel+1).zfill(2)}/{len(labels)}", label.name)
@@ -101,7 +105,7 @@ for subject in subjects:
         # get stcs in label
         stcs_data = [stc.in_label(label).data for stc in stcs] # stc.in_label() doesn't work anymore for volume source space    
         
-        atlas_path = "/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt/freesurfer/sub01/mri/aparc+aseg.mgz"
+        atlas_path = "/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt/freesurfer/sub01/mri/aseg.mgz"
         stcs_data = [stc.in_label(label, mri=atlas_path, src=fwd['src']).data for stc in stcs] # stc.in_label() doesn't work anymore for volume source space    
         
         stcs_data = np.array(stcs_data)
@@ -190,3 +194,51 @@ for subject in subjects:
                 
             del X, y, scores
             gc.collect()
+
+    
+    labels = mne.get_volume_labels_from_src(fwd['src'], subject, subjects_dir)
+
+    # Initialize a dictionary to hold time courses for each label
+    label_time_courses = {}
+
+    # Loop through each STC (source time course) for each epoch
+    for stc in tqdm(stcs):
+        # Extract data from the STC
+        stc_data = stc.data  # shape: (n_vertices, n_times)
+
+        # Loop through each label to extract the time course
+        # for ilabel, label in enumerate(labels):
+        for ilabel, label in zip([2, 3, 4, 5, 6, 7], labels):
+            # Get the vertices in the label
+            label_vertices = np.intersect1d(stc.vertices[ilabel], label.vertices)
+            
+            if len(label_vertices) == 0:
+                continue
+
+            # Get indices of these vertices in the STC data
+            indices = np.searchsorted(stc.vertices[ilabel], label_vertices)
+
+            # Extract the time courses for these vertices
+            vertices_time_courses = stc_data[indices, :]
+
+            # Store the time courses in the dictionary
+            if label.name not in label_time_courses:
+                label_time_courses[label.name] = []
+            label_time_courses[label.name].append(vertices_time_courses)
+
+    # Convert lists to numpy arrays for convenience
+    for label in label_time_courses:
+        label_time_courses[label] = np.array(label_time_courses[label])  # shape: (n_epochs, n_vertices_in_label, n_times)
+
+label = labels[0]
+pattern = behav.trialtypes == 1
+X = label_time_courses[label.name][pattern]
+y = behav.positions[pattern]
+scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=verbose)
+
+import matplotlib.pyplot as plt
+plt.plot(times, scores.mean(0).T)
+plt.title(label.name)
+plt.axvline(x=0, color='black', linestyle='--')
+plt.axhline(y=0.25, color='black', linestyle='--')
+plt.show()
