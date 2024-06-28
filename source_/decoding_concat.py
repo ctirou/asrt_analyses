@@ -64,6 +64,7 @@ for subject in subjects:
 
     # read forward solution    
     fwd_fname = res_path / analysis / "fwd" / lock / f"{subject}-mixed-fwd.fif"
+    fwd_fname = res_path / analysis / "fwd" / lock / f"{subject}-vol-fwd.h5"
     fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
     # compute data covariance matrix on evoked data
     data_cov = mne.compute_covariance(epoch, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
@@ -99,6 +100,9 @@ for subject in subjects:
         
         # get stcs in label
         stcs_data = [stc.in_label(label).data for stc in stcs] # stc.in_label() doesn't work anymore for volume source space    
+        
+        atlas_path = "/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt/freesurfer/sub01/mri/aparc+aseg.mgz"
+        stcs_data = [stc.in_label(label, mri=atlas_path, src=fwd['src']).data for stc in stcs] # stc.in_label() doesn't work anymore for volume source space    
         
         stcs_data = np.array(stcs_data)
         assert len(stcs_data) == len(behav)

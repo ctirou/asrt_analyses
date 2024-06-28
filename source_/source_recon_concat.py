@@ -31,8 +31,8 @@ for f in folders:
 for subject in subjects:
     
     # bem model
-    bem_fname = os.path.join(res_path, "bem", "%s-bem-sol.fif" % (subject))
-    model_fname = os.path.join(res_path, "bem", "%s-bem.fif" % (subject))
+    bem_fname = op.join(res_path, "bem", "%s-bem-sol.fif" % (subject))
+    model_fname = op.join(res_path, "bem", "%s-bem.fif" % (subject))
     if not op.exists(bem_fname) or overwrite:
         conductivity = (.3,)
         model = mne.make_bem_model(subject=subject, ico=4,
@@ -65,24 +65,30 @@ for subject in subjects:
             # volume_labels = ['rHipp_L', 'rHipp_R', 'cHipp_L', 'cHipp_R']
             
             # Freesurfer default aseg atlas
-            aseg_fname = subjects_dir / subject / 'mri' / 'aseg.mgz'
+            aseg_fname = subjects_dir / subject / 'mri' / 'aparc+aseg.mgz'
             aseg_labels = mne.get_volume_labels_from_aseg(aseg_fname)
-            volume_labels = ["Left-Cerebellum-Cortex", "Right-Cerebellum-Cortex",
-                             "Left-Thalamus-Proper", "Right-Thalamus-Proper",
-                             "Left-Hippocampus", "Right-Hippocampus"]
+            
+            roi_labels = ["Left-Cerebellum-Cortex", "Right-Cerebellum-Cortex",
+                          "Left-Thalamus-Proper", "Right-Thalamus-Proper",
+                          "Left-Hippocampus", "Right-Hippocampus"]
+            
+            vol_labels = [lab for lab in aseg_labels if lab.startswith("ctx") or lab in roi_labels]
             
             vol_src = mne.setup_volume_source_space(
                 subject,
                 bem=model_fname,
-                mri=aseg_fname,
-                volume_label=volume_labels,
+                mri="aparc+aseg.mgz",
+                volume_label=vol_labels,
                 subjects_dir=subjects_dir,
                 n_jobs=jobs,
                 verbose=verbose)
                     
             src += vol_src
-                
+        
+        # don't need to save actually        
         mne.write_source_spaces(src_fname, src, overwrite=True, verbose=verbose)
+        vol_src_fname = op.join(res_path, "src", "%s-vol-src.fif" % subject)
+        mne.write_source_spaces(vol_src_fname, vol_src, overwrite=True, verbose=verbose)
     else:
         src = mne.read_source_spaces(src_fname, verbose=verbose)
         
@@ -117,7 +123,21 @@ for subject in subjects:
                                         n_jobs=jobs,
                                         verbose=True)        
         mne.write_forward_solution(fwd_fname, fwd, overwrite=True)
-    
+
+        vol_fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,
+                                        src=vol_src, bem=bem_fname,
+                                        meg=True, eeg=False,
+                                        mindist=5.0,
+                                        n_jobs=jobs,
+                                        verbose=True)        
+        
+        vol_fwd_fname = op.join(res_path, "fwd", lock, f"{subject}-vol-fwd.h5")
+        mne.write_forward_solution(vol_fwd_fname, vol_fwd, overwrite=True, verbose=verbose)
+        
+        ## too big, > 2GB so file is truncated when saved in .fif 
+        vol_fwd.save(vol_fwd_fname, overwrite=True)
+        vol_fwd_fname = op.join(res_path, "fwd", lock, "%s-vol-fwd.h5" % (subject))
+
     del src_fname, src, bem_fname
     del epo_dir, epo_fnames, all_epo, epoch
     del trans_fname, fwd_fname, fwd
