@@ -7,7 +7,7 @@ from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import confusion_matrix, roc_auc_score
-from base import ensure_dir
+from base import ensure_dir, get_volume_estimate_time_course
 from config import *
 from mne.beamformer import make_lcmv, apply_lcmv_epochs
 import gc
@@ -64,9 +64,10 @@ for subject in subjects:
         epoch_bsl = mne.concatenate_epochs(all_bsl)
 
     # read forward solution    
-    fwd_fname = res_path / analysis / "fwd" / lock / f"{subject}-mixed-fwd.fif"
-    fwd_fname = res_path / analysis / "fwd" / lock / f"{subject}-vol-fwd.fif"
-    fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
+    fwd_fname = res_path / analysis / "fwd" / lock / f"{subject}-mixed-lh-fwd.fif"
+    fwd = mne.read_forward_solution(fwd_fname, ordered=False, verbose=verbose)
+    # labels = mne.get_volume_labels_from_src(fwd['src'], subject, subjects_dir)
+    
     # compute data covariance matrix on evoked data
     data_cov = mne.compute_covariance(epoch, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
     # compute noise covariance
@@ -91,9 +92,6 @@ for subject in subjects:
     
     del epoch, fwd, fwd_fname, data_cov, noise_cov, rank, info, filters
     gc.collect()
-
-    label_path = "/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt/freesurfer/sub01/mri/aseg.mgz"
-    stc = stcs[0].extract_label_time_course(labels=label_path, src=fwd['src'], mode=None)
     
     for ilabel, label in enumerate(labels):
         
@@ -103,25 +101,9 @@ for subject in subjects:
         ensure_dir(res_dir)
         
         # get stcs in label
-        stcs_data = [stc.in_label(label).data for stc in stcs] # stc.in_label() doesn't work anymore for volume source space    
-        
-        atlas_path = "/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt/freesurfer/sub01/mri/aseg.mgz"
-        stcs_data = [stc.in_label(label, mri=atlas_path, src=fwd['src']).data for stc in stcs] # stc.in_label() doesn't work anymore for volume source space    
-        
+        stcs_data = [stc.in_label(label).data for stc in stcs] # stc.in_label() doesn't work anymore for volume source space            
         stcs_data = np.array(stcs_data)
         assert len(stcs_data) == len(behav)
-
-        # import matplotlib.pyplot as plt
-        # fig, axes = plt.subplots(1, layout="constrained")
-        # axes.plot(times, stcs_data[0][6, :].T, "b", label="L_cuneus")
-        # axes.plot(times, stcs_data[0][7, :].T, "g", label="R_cuneus")
-        
-        # axes.plot(times, stcs_data[0][-1, :].T, "r", label="R_HPC")
-        # axes.plot(times, stcs_data[0][-2, :].T, "k", label="L_HPC")
-        # # axes.plot(times, stcs_data[0][0, :], "k", label="bankssts-lh")
-        # axes.set(xlabel="Time (ms)", ylabel="MNE current (nAm)")
-        # axes.legend()
-        # plt.show()
 
         if trial_type == 'pattern':
             pattern = behav.trialtypes == 1
@@ -146,56 +128,6 @@ for subject in subjects:
         del X, y, scores
         gc.collect()
     
-    labels = mne.read_labels_from_annot(subject=subject, parc=parc, hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
-        
-    stcs_data = mne.extract_label_time_course(stcs, labels, src=fwd['src'], mode=None, allow_empty=True, verbose=verbose)
-    stcs_data = np.array(stcs_data, dtype=object)
-    print(stcs_data.shape)        
-    assert len(stcs_data) == len(behav)
-    
-    volume_labels = ["Left-Cerebellum-Cortex", "Right-Cerebellum-Cortex",
-                    "Left-Thalamus-Proper", "Right-Thalamus-Proper",
-                    "Left-Hippocampus", "Right-Hippocampus"]
-    labels += volume_labels
-    
-    for ilabel, label in enumerate(labels):
-        if ilabel > len(labels) - len(volume_labels) - 1:
-            label_fname = label
-        else:
-            label_fname = label.name
-
-        print(subject, f"{str(ilabel+1).zfill(2)}/{len(labels)}", label_fname)
-        
-        if ilabel > 67:
-            
-            # results dir
-            res_dir = res_path / analysis / 'source' / lock / trial_type / label_fname / subject
-            ensure_dir(res_dir)
-            
-            if trial_type == 'pattern':
-                pattern = behav.trialtypes == 1
-                X = stcs_data[pattern][:, ilabel, :]
-                y = behav.positions[pattern]
-            elif trial_type == 'random':
-                random = behav.trialtypes == 2
-                X = stcs_data[random][:, ilabel, :]
-                y = behav.positions[random]
-            else:
-                X = stcs_data[:, ilabel, :]
-                y = behav.positions
-            y = y.reset_index(drop=True)            
-            assert X.shape[0] == y.shape[0]
-
-            del stcs_data
-            gc.collect()
-            
-            scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=verbose)
-            np.save(res_dir / "scores.npy", scores.mean(0))
-                
-            del X, y, scores
-            gc.collect()
-
-    
     labels = mne.get_volume_labels_from_src(fwd['src'], subject, subjects_dir)
 
     # Initialize a dictionary to hold time courses for each label
@@ -207,16 +139,15 @@ for subject in subjects:
         stc_data = stc.data  # shape: (n_vertices, n_times)
 
         # Loop through each label to extract the time course
-        # for ilabel, label in enumerate(labels):
-        for ilabel, label in zip([2, 3, 4, 5, 6, 7], labels):
+        for ilabel, label in enumerate(labels):
             # Get the vertices in the label
-            label_vertices = np.intersect1d(stc.vertices[ilabel], label.vertices)
+            label_vertices = np.intersect1d(stc.vertices[ilabel+2], label.vertices)
             
             if len(label_vertices) == 0:
                 continue
 
             # Get indices of these vertices in the STC data
-            indices = np.searchsorted(stc.vertices[ilabel], label_vertices)
+            indices = np.searchsorted(stc.vertices[ilabel+2], label_vertices)
 
             # Extract the time courses for these vertices
             vertices_time_courses = stc_data[indices, :]
@@ -230,15 +161,34 @@ for subject in subjects:
     for label in label_time_courses:
         label_time_courses[label] = np.array(label_time_courses[label])  # shape: (n_epochs, n_vertices_in_label, n_times)
 
-label = labels[0]
-pattern = behav.trialtypes == 1
-X = label_time_courses[label.name][pattern]
-y = behav.positions[pattern]
-scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=verbose)
+label_tc = get_volume_estimate_time_course(stcs, fwd, subject, subjects_dir)
+
+scores_df = dict()
+
+for label in labels: 
+    print(label.name)
+    pattern = behav.trialtypes == 1
+    X = label_time_courses[label.name][pattern]
+    y = behav.positions[pattern]
+    scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=verbose)
+    scores_df[label.name] = scores.mean(0).T
 
 import matplotlib.pyplot as plt
+nrows, ncols = 4, 7
+fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(40, 13))
+for i, (ax, label) in enumerate(zip(axs.flat, labels)):
+    ax.plot(times, scores_df[label.name])
+    ax.axhline(.25, color='black', ls='dashed', alpha=.5)
+    ax.set_title(f"${label.name}$", fontsize=8)    
+    ax.axvspan(0, 0.2, color='grey', alpha=.2)
+plt.show()
+fig.savefig(f"/Users/coum/Desktop/test_sub_decoding-lh.pdf")
+plt.close()
+
 plt.plot(times, scores.mean(0).T)
 plt.title(label.name)
 plt.axvline(x=0, color='black', linestyle='--')
 plt.axhline(y=0.25, color='black', linestyle='--')
 plt.show()
+# plt.save(f"/Users/coum/Desktop/test_sub_decoding/{label.name}.pdf")
+# plt.close()

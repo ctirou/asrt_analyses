@@ -63,24 +63,32 @@ for lock in locks:
             # volume_labels = ['rHipp_L', 'rHipp_R', 'cHipp_L', 'cHipp_R']
             
             ## Freesurfer default aseg atlas
-            # aseg_fname = subjects_dir / subject / 'mri' / 'aparc+aseg.mgz'
-            # aseg_labels = mne.get_volume_labels_from_aseg(aseg_fname)
+            aseg_fname = subjects_dir / subject / 'mri' / 'aseg.mgz'
+            aseg_labels = mne.get_volume_labels_from_aseg(aseg_fname)
             
-            vol_labels = ["Left-Amygdala", "Right-Amygdala", 
-                          "Left-Cerebellum-Cortex", "Right-Cerebellum-Cortex", 
-                          "Left-Thalamus-Proper", "Right-Thalamus-Proper", 
-                          "Left-Hippocampus", "Right-Hippocampus"]
+            vol_labels_lh = [l for l in aseg_labels if not l.startswith(('Right', 'Unknown'))]
+            vol_labels_rh = [l for l in aseg_labels if l.startswith('Right')]
                     
-            vol_src = mne.setup_volume_source_space(
+            vol_src_lh = mne.setup_volume_source_space(
                 subject,
                 bem=model_fname,
-                mri="aparc+aseg.mgz",
-                volume_label=vol_labels,
+                mri="aseg.mgz",
+                volume_label=vol_labels_lh,
+                subjects_dir=subjects_dir,
+                n_jobs=jobs,
+                verbose=verbose)
+
+            vol_src_rh = mne.setup_volume_source_space(
+                subject,
+                bem=model_fname,
+                mri="aseg.mgz",
+                volume_label=vol_labels_rh,
                 subjects_dir=subjects_dir,
                 n_jobs=jobs,
                 verbose=verbose)
             
-        mixed_src = src + vol_src
+        mixed_src_lh = src + vol_src_lh
+        mixed_src_rh = src + vol_src_rh
         
         # read epochs and concatenate    
         epo_dir = data_path / lock
@@ -102,37 +110,57 @@ for lock in locks:
             mne.write_trans(trans_fname, coreg.trans, overwrite=True)
         
         # compute forward solution
-        fwd_fname = op.join(res_path, "fwd", lock, "%s-fwd.fif" % (subject))
-        if not op.exists(fwd_fname) or overwrite:
-            fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,
-                                            src=src, bem=bem_fname,
-                                            meg=True, eeg=False,
-                                            mindist=5.0,
-                                            n_jobs=jobs,
-                                            verbose=True)        
-            mne.write_forward_solution(fwd_fname, fwd, overwrite=True)
+        # fwd_fname = op.join(res_path, "fwd", lock, "%s-fwd.fif" % (subject))
+        # if not op.exists(fwd_fname) or overwrite:
+        #     fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,
+        #                                     src=src, bem=bem_fname,
+        #                                     meg=True, eeg=False,
+        #                                     mindist=5.0,
+        #                                     n_jobs=jobs,
+        #                                     verbose=True)        
+        #     mne.write_forward_solution(fwd_fname, fwd, overwrite=True)
         
-        vol_fwd_fname = op.join(res_path, "fwd", lock, "%s-vol-fwd.fif" % (subject))
-        if not op.exists(vol_fwd_fname) or overwrite:
-            vol_fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,
-                                            src=vol_src, bem=bem_fname,
+        vol_fwd_fname_lh = op.join(res_path, "fwd", lock, "%s-vol-lh-fwd.fif" % (subject))
+        if not op.exists(vol_fwd_fname_lh) or overwrite:
+            vol_fwd_lh = mne.make_forward_solution(epoch.info, trans=trans_fname,
+                                            src=vol_src_lh, bem=bem_fname,
                                             meg=True, eeg=False,
                                             mindist=5.0,
                                             n_jobs=jobs,
                                             verbose=True)        
-            mne.write_forward_solution(vol_fwd_fname, vol_fwd, overwrite=True, verbose=verbose)
+            mne.write_forward_solution(vol_fwd_fname_lh, vol_fwd_lh, overwrite=True, verbose=verbose)
 
-        mixed_fwd_fname = op.join(res_path, "fwd", lock, "%s-mixed-fwd.fif" % (subject))
-        if not op.exists(vol_fwd_fname) or overwrite:
-            mixed_fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,
-                                            src=mixed_src, bem=bem_fname,
+        vol_fwd_fname_rh = op.join(res_path, "fwd", lock, "%s-vol-rh-fwd.fif" % (subject))
+        if not op.exists(vol_fwd_fname_rh) or overwrite:
+            vol_fwd_rh = mne.make_forward_solution(epoch.info, trans=trans_fname,
+                                            src=vol_src_rh, bem=bem_fname,
                                             meg=True, eeg=False,
                                             mindist=5.0,
                                             n_jobs=jobs,
                                             verbose=True)        
-            mne.write_forward_solution(mixed_fwd_fname, mixed_fwd, overwrite=True, verbose=verbose)
+            mne.write_forward_solution(vol_fwd_fname_rh, vol_fwd_rh, overwrite=True, verbose=verbose)
+
+        mixed_fwd_fname_lh = op.join(res_path, "fwd", lock, "%s-mixed-lh-fwd.fif" % (subject))
+        if not op.exists(mixed_fwd_fname_lh) or overwrite:
+            mixed_fwd_lh = mne.make_forward_solution(epoch.info, trans=trans_fname,
+                                            src=mixed_src_lh, bem=bem_fname,
+                                            meg=True, eeg=False,
+                                            mindist=5.0,
+                                            n_jobs=jobs,
+                                            verbose=True)        
+            mne.write_forward_solution(mixed_fwd_fname_lh, mixed_fwd_lh, overwrite=True, verbose=verbose)
+
+        mixed_fwd_fname_rh = op.join(res_path, "fwd", lock, "%s-mixed-rh-fwd.fif" % (subject))
+        if not op.exists(mixed_fwd_fname_rh) or overwrite:
+            mixed_fwd_rh = mne.make_forward_solution(epoch.info, trans=trans_fname,
+                                            src=mixed_src_rh, bem=bem_fname,
+                                            meg=True, eeg=False,
+                                            mindist=5.0,
+                                            n_jobs=jobs,
+                                            verbose=True)        
+            mne.write_forward_solution(mixed_fwd_fname_rh, mixed_fwd_rh, overwrite=True, verbose=verbose)
             
-        del src_fname, src, vol_src, mixed_src, bem_fname
+        del src_fname, src, vol_src_lh, vol_src_rh, mixed_src_lh, mixed_src_rh, bem_fname
         del epo_dir, epo_fnames, all_epo, epoch
-        del trans_fname, fwd_fname, fwd, vol_fwd, mixed_fwd
+        del mixed_fwd_lh, mixed_fwd_rh, vol_fwd_lh, vol_fwd_rh
         gc.collect()

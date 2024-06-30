@@ -113,7 +113,7 @@ def get_inseq(sequence):
     
     return pairs_in_sequence
 
-def print_proportions(subject, all_beh):
+def print_proportions(subject, all_beh):    
     #### get stimuli proportions
     print(f"###############    {subject}")
     for i, sess in zip(range(5), ['prac', 'b1', 'b2', 'b3', 'b4']):
@@ -122,7 +122,7 @@ def print_proportions(subject, all_beh):
         for un, val in zip(unique, values):
             print(un, round((val/np.sum(values)*100), 2)) 
 
-def make_predictions(X, y, folds, jobs, scoring, verbose):    
+def make_predictions(X, y, folds, jobs, scoring, verbose):
     # set-up the classifier and cv structure
     clf = make_pipeline(StandardScaler(), LogisticRegressionCV(multi_class="ovr", max_iter=100000, solver='saga', random_state=42)) # use JAX maybe
     # clf = make_pipeline(StandardScaler(), SGDRegressor(loss="squared_error", max_iter=100000, random_state=42)) # use JAX maybe
@@ -140,8 +140,8 @@ def make_predictions(X, y, folds, jobs, scoring, verbose):
     return test, pred, pred_rock
 
 def gat_stats(X, jobs):
-    from mne.stats import spatio_temporal_cluster_1samp_test
     """Statistical test applied across subjects"""
+    from mne.stats import spatio_temporal_cluster_1samp_test
     # check input
     X = np.array(X)
     X = X[:, :, None] if X.ndim == 2 else X
@@ -157,3 +157,61 @@ def gat_stats(X, jobs):
         p_values_[cluster.T] = pval
 
     return np.squeeze(p_values_).T
+
+def get_volume_estimate_time_course(stcs, fwd, subject, subjects_dir):
+    """Extracts time courses for each label from volume source estimates.
+    Args:
+        stcs (list of mne.VolSourceEstimate): List of volume source estimates.
+        fwd (dict): Forward solution.
+        subject (str): Subject name.
+        subjects_dir (str): Path to SUBJECTS_DIR.
+
+    Returns:
+        dict: A dictionary with label names as keys and arrays of shape
+                (n_epochs, n_vertices_in_label, n_times) as values.    
+    """
+    
+    import numpy as np
+    from mne import get_volume_labels_from_src
+    
+    labels = get_volume_labels_from_src(fwd['src'], subject, subjects_dir)
+
+    # Initialize a dictionary to hold time courses for each label
+    label_time_courses = {}
+
+    # Loop through each STC (source time course) for each epoch
+    for stc in stcs:
+        # Extract data from the STC
+        stc_data = stc.data  # shape: (n_vertices, n_times)
+
+        # Loop through each label to extract the time course
+        for ilabel, label in enumerate(labels):
+            
+            print(label.name)
+            
+            if ilabel >= len(stc.vertices):
+                # If ilabel exceeds the number of vertex arrays, break the loop
+                break
+            
+            # Get the vertices in the label
+            label_vertices = np.intersect1d(stc.vertices[ilabel+2], label.vertices)
+            
+            if label_vertices.size == 0:
+                continue
+
+            # Get indices of these vertices in the STC data
+            indices = np.searchsorted(stc.vertices[ilabel+2], label_vertices)
+
+            # Extract the time courses for these vertices
+            vertices_time_courses = stc_data[indices, :]
+
+            # Store the time courses in the dictionary
+            if label.name not in label_time_courses:
+                label_time_courses[label.name] = []
+            label_time_courses[label.name].append(vertices_time_courses)
+
+    # Convert lists to numpy arrays for convenience
+    for label in label_time_courses:
+        label_time_courses[label] = np.array(label_time_courses[label])  # shape: (n_epochs, n_vertices_in_label, n_times)
+
+    return label_time_courses
