@@ -20,7 +20,7 @@ ensure_dir(res_path)
 for lock in locks:
 
     # create results directory
-    folders = ["bem", "src", "trans", "fwd"]
+    folders = ["bem", "trans", "fwd"]
     for f in folders:
         if f in folders[-2:]:
             path = op.join(res_path, f, lock)
@@ -44,59 +44,55 @@ for lock in locks:
             mne.bem.write_bem_solution(bem_fname, bem, overwrite=True, verbose=verbose)
         
         # cortex source space
-        src_fname = op.join(res_path, "src", "%s-src.fif" % subject)
-        if not op.exists(src_fname) or overwrite:
-            src = mne.setup_source_space(subject, spacing='oct6',
-                                            subjects_dir=subjects_dir,
-                                            add_dist=True,
-                                            n_jobs=jobs,
-                                            verbose=verbose)
+        src = mne.setup_source_space(subject, spacing='oct6',
+                                        subjects_dir=subjects_dir,
+                                        add_dist=True,
+                                        n_jobs=jobs,
+                                        verbose=verbose)
                                     
         # volume source space
-        vol_src_fname = op.join(res_path, "src", "%s-vol-src.fif" % subject)
-        if not op.exists(vol_src_fname) or overwrite:
-            ## Brainnetome atlas -- does not work for now
-            # aseg_fname = subjects_dir / subject / 'mri' / 'BN_Atlas_subcotex_aseg.mgz'
-            # lut_file = "/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt/freesurfer/BN_Atlas_246_LUT.txt"
-            # lut_lab = mne.read_freesurfer_lut(lut_file)
-            # aseg_labels = mne.get_volume_labels_from_aseg(aseg_fname, atlas_ids=lut_lab[0])
-            # volume_labels = ['rHipp_L', 'rHipp_R', 'cHipp_L', 'cHipp_R']
-            
-            ## Freesurfer default aseg atlas
-            aseg_fname = subjects_dir / subject / 'mri' / 'aseg.mgz'
-            aseg_labels = mne.get_volume_labels_from_aseg(aseg_fname)
-            
-            vol_labels_lh = [l for l in aseg_labels if l.startswith('Left')]
-            vol_labels_rh = [l for l in aseg_labels if l.startswith('Right')]
-            vol_labels_others = [l for l in aseg_labels if not l.startswith(('Left', 'Right'))]
-                    
-            vol_src_lh = mne.setup_volume_source_space(
-                subject,
-                bem=model_fname,
-                mri="aseg.mgz",
-                volume_label=vol_labels_lh,
-                subjects_dir=subjects_dir,
-                n_jobs=jobs,
-                verbose=verbose)
+        ## Brainnetome atlas -- does not work for now
+        # aseg_fname = subjects_dir / subject / 'mri' / 'BN_Atlas_subcotex_aseg.mgz'
+        # lut_file = "/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt/freesurfer/BN_Atlas_246_LUT.txt"
+        # lut_lab = mne.read_freesurfer_lut(lut_file)
+        # aseg_labels = mne.get_volume_labels_from_aseg(aseg_fname, atlas_ids=lut_lab[0])
+        # volume_labels = ['rHipp_L', 'rHipp_R', 'cHipp_L', 'cHipp_R']
+        
+        ## Freesurfer default aseg atlas
+        aseg_fname = subjects_dir / subject / 'mri' / 'aseg.mgz'
+        aseg_labels = mne.get_volume_labels_from_aseg(aseg_fname)
+        
+        vol_labels_lh = [l for l in aseg_labels if l.startswith('Left')]
+        vol_labels_rh = [l for l in aseg_labels if l.startswith('Right')]
+        vol_labels_others = [l for l in aseg_labels if not l.startswith(('Left', 'Right'))]
+                
+        vol_src_lh = mne.setup_volume_source_space(
+            subject,
+            bem=model_fname,
+            mri="aseg.mgz",
+            volume_label=vol_labels_lh,
+            subjects_dir=subjects_dir,
+            n_jobs=jobs,
+            verbose=verbose)
 
-            vol_src_rh = mne.setup_volume_source_space(
-                subject,
-                bem=model_fname,
-                mri="aseg.mgz",
-                volume_label=vol_labels_rh,
-                subjects_dir=subjects_dir,
-                n_jobs=jobs,
-                verbose=verbose)
+        vol_src_rh = mne.setup_volume_source_space(
+            subject,
+            bem=model_fname,
+            mri="aseg.mgz",
+            volume_label=vol_labels_rh,
+            subjects_dir=subjects_dir,
+            n_jobs=jobs,
+            verbose=verbose)
 
-            vol_src_others = mne.setup_volume_source_space(
-                subject,
-                bem=model_fname,
-                mri="aseg.mgz",
-                volume_label=vol_labels_others,
-                subjects_dir=subjects_dir,
-                n_jobs=jobs,
-                verbose=verbose)
-            
+        vol_src_others = mne.setup_volume_source_space(
+            subject,
+            bem=model_fname,
+            mri="aseg.mgz",
+            volume_label=vol_labels_others,
+            subjects_dir=subjects_dir,
+            n_jobs=jobs,
+            verbose=verbose)
+        
         mixed_src_lh = src + vol_src_lh
         mixed_src_rh = src + vol_src_rh
         mixed_src_others = src + vol_src_others
@@ -150,7 +146,7 @@ for lock in locks:
                                             verbose=True)        
             mne.write_forward_solution(mixed_fwd_fname_others, mixed_fwd_others, overwrite=True, verbose=verbose)
             
-        del src_fname, src, vol_src_lh, vol_src_rh, mixed_src_lh, mixed_src_rh, bem_fname
+        del src, vol_src_lh, vol_src_rh, mixed_src_lh, mixed_src_rh, bem_fname
         del epo_dir, epo_fnames, all_epo, epoch
         del mixed_fwd_lh, mixed_fwd_rh, mixed_fwd_others
         gc.collect()

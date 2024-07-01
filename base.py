@@ -170,48 +170,38 @@ def get_volume_estimate_time_course(stcs, fwd, subject, subjects_dir):
         dict: A dictionary with label names as keys and arrays of shape
                 (n_epochs, n_vertices_in_label, n_times) as values.    
     """
-    
     import numpy as np
     from mne import get_volume_labels_from_src
+    from tqdm.auto import tqdm
     
     labels = get_volume_labels_from_src(fwd['src'], subject, subjects_dir)
-
+    vertices_info = dict()
+    for label in labels:
+        vertices_info[label.name] = len(label.vertices)
     # Initialize a dictionary to hold time courses for each label
     label_time_courses = {}
-
     # Loop through each STC (source time course) for each epoch
-    for stc in stcs:
+    for stc in tqdm(stcs):
         # Extract data from the STC
         stc_data = stc.data  # shape: (n_vertices, n_times)
-
         # Loop through each label to extract the time course
         for ilabel, label in enumerate(labels):
-            
-            print(label.name)
-            
             if ilabel >= len(stc.vertices):
                 # If ilabel exceeds the number of vertex arrays, break the loop
                 break
-            
             # Get the vertices in the label
             label_vertices = np.intersect1d(stc.vertices[ilabel+2], label.vertices)
-            
             if label_vertices.size == 0:
                 continue
-
             # Get indices of these vertices in the STC data
             indices = np.searchsorted(stc.vertices[ilabel+2], label_vertices)
-
             # Extract the time courses for these vertices
             vertices_time_courses = stc_data[indices, :]
-
             # Store the time courses in the dictionary
             if label.name not in label_time_courses:
                 label_time_courses[label.name] = []
             label_time_courses[label.name].append(vertices_time_courses)
-
     # Convert lists to numpy arrays for convenience
     for label in label_time_courses:
-        label_time_courses[label] = np.array(label_time_courses[label])  # shape: (n_epochs, n_vertices_in_label, n_times)
-
-    return label_time_courses
+        label_time_courses[label] = np.array(label_time_courses[label])  # shape: (n_trials, n_vertices_in_label, n_times)
+    return label_time_courses, vertices_info
