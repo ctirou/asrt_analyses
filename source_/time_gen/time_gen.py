@@ -11,12 +11,14 @@ import pandas as pd
 from base import ensure_dir
 from config import *
 import gc
+import sys
 # stim disp = 500 ms
 # RSI = 750 ms in task
 data_path = PRED_PATH
 analysis = 'time_generalization'
 subjects, epochs_list = SUBJS, EPOCHS
-lock = 'button'
+lock = 'stim'
+# lock = sys.argv[1]
 folds = 10
 solver = 'lbfgs'
 scoring = "accuracy"
@@ -57,9 +59,10 @@ for subject in subjects:
             # append epochs
             all_epochs.append(epoch_gen)
             all_behavs.append(behav)
+        
+        # concatenate epochs
         for epoch in all_epochs: # see mne.preprocessing.maxwell_filter to realign the runs to a common head position. On raw data.
             epoch.info['dev_head_t'] = all_epochs[0].info['dev_head_t']
-        # concatenate epochs
         epochs = mne.concatenate_epochs(all_epochs)
         behav_df = pd.concat(all_behavs)    
         meg_data = epochs.get_data()    
