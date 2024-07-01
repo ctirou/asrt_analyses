@@ -117,7 +117,7 @@ for subject in subjects:
             coreg.fit_icp(n_iterations=100, verbose=True)
             mne.write_trans(trans_fname, coreg.trans, overwrite=True)
                 
-        mixed_fwd_fname_lh = op.join(res_path, "fwd", lock, "%s-%i-mixed-lh-fwd.fif" % (subject, epoch_num))
+        mixed_fwd_fname_lh = op.join(res_path, "fwd", lock, "%s-%i-lh-mixed-fwd.fif" % (subject, epoch_num))
         if not op.exists(mixed_fwd_fname_lh) or overwrite:
             mixed_fwd_lh = mne.make_forward_solution(epoch.info, trans=trans_fname,
                                             src=mixed_src_lh, bem=bem_fname,
@@ -127,7 +127,7 @@ for subject in subjects:
                                             verbose=True)        
             mne.write_forward_solution(mixed_fwd_fname_lh, mixed_fwd_lh, overwrite=True, verbose=verbose)
 
-        mixed_fwd_fname_rh = op.join(res_path, "fwd", lock, "%s-%i-mixed-rh-fwd.fif" % (subject, epoch_num))
+        mixed_fwd_fname_rh = op.join(res_path, "fwd", lock, "%s-%i-rh-mixed-fwd.fif" % (subject, epoch_num))
         if not op.exists(mixed_fwd_fname_rh) or overwrite:
             mixed_fwd_rh = mne.make_forward_solution(epoch.info, trans=trans_fname,
                                             src=mixed_src_rh, bem=bem_fname,
@@ -137,7 +137,7 @@ for subject in subjects:
                                             verbose=True)        
             mne.write_forward_solution(mixed_fwd_fname_rh, mixed_fwd_rh, overwrite=True, verbose=verbose)
 
-        mixed_fwd_fname_others = op.join(res_path, "fwd", lock, "%s-%i-mixed-others-fwd.fif" % (subject, epoch_num))
+        mixed_fwd_fname_others = op.join(res_path, "fwd", lock, "%s-%i-others-mixed-fwd.fif" % (subject, epoch_num))
         if not op.exists(mixed_fwd_fname_rh) or overwrite:
             mixed_fwd_others = mne.make_forward_solution(epoch.info, trans=trans_fname,
                                             src=mixed_src_others, bem=bem_fname,
@@ -168,7 +168,7 @@ for subject in subjects:
         coreg.fit_icp(n_iterations=100, verbose=True)
         mne.write_trans(trans_fname, coreg.trans, overwrite=True)
             
-    mixed_fwd_fname_lh = op.join(res_path, "fwd", lock, "%s-all-mixed-lh-fwd.fif" % (subject))
+    mixed_fwd_fname_lh = op.join(res_path, "fwd", lock, "%s-all-lh-mixed-fwd.fif" % (subject))
     if not op.exists(mixed_fwd_fname_lh) or overwrite:
         mixed_fwd_lh = mne.make_forward_solution(epoch.info, trans=trans_fname,
                                         src=mixed_src_lh, bem=bem_fname,
@@ -178,7 +178,7 @@ for subject in subjects:
                                         verbose=True)        
         mne.write_forward_solution(mixed_fwd_fname_lh, mixed_fwd_lh, overwrite=True, verbose=verbose)
 
-    mixed_fwd_fname_rh = op.join(res_path, "fwd", lock, "%s-all-mixed-rh-fwd.fif" % (subject))
+    mixed_fwd_fname_rh = op.join(res_path, "fwd", lock, "%s-all-rh-mixed-fwd.fif" % (subject))
     if not op.exists(mixed_fwd_fname_rh) or overwrite:
         mixed_fwd_rh = mne.make_forward_solution(epoch.info, trans=trans_fname,
                                         src=mixed_src_rh, bem=bem_fname,
@@ -188,7 +188,7 @@ for subject in subjects:
                                         verbose=True)        
         mne.write_forward_solution(mixed_fwd_fname_rh, mixed_fwd_rh, overwrite=True, verbose=verbose)
 
-    mixed_fwd_fname_others = op.join(res_path, "fwd", lock, "%s-all-mixed-others-fwd.fif" % (subject))
+    mixed_fwd_fname_others = op.join(res_path, "fwd", lock, "%s-all-others-mixed-fwd.fif" % (subject))
     if not op.exists(mixed_fwd_fname_rh) or overwrite:
         mixed_fwd_others = mne.make_forward_solution(epoch.info, trans=trans_fname,
                                         src=mixed_src_others, bem=bem_fname,
