@@ -6,13 +6,11 @@ from sklearn.pipeline import make_pipeline
 from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import confusion_matrix, roc_auc_score
 from base import ensure_dir, get_volume_estimate_time_course
 from config import *
 from mne.beamformer import make_lcmv, apply_lcmv_epochs
 import gc
 import os
-from tqdm.auto import tqdm
 
 # params
 subjects = SUBJS
