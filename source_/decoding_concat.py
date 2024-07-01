@@ -129,34 +129,26 @@ for subject in subjects:
         gc.collect()
     
     labels = mne.get_volume_labels_from_src(fwd['src'], subject, subjects_dir)
-
     # Initialize a dictionary to hold time courses for each label
     label_time_courses = {}
-
     # Loop through each STC (source time course) for each epoch
     for stc in tqdm(stcs):
         # Extract data from the STC
         stc_data = stc.data  # shape: (n_vertices, n_times)
-
         # Loop through each label to extract the time course
         for ilabel, label in enumerate(labels):
             # Get the vertices in the label
             label_vertices = np.intersect1d(stc.vertices[ilabel+2], label.vertices)
-            
             if len(label_vertices) == 0:
                 continue
-
             # Get indices of these vertices in the STC data
             indices = np.searchsorted(stc.vertices[ilabel+2], label_vertices)
-
             # Extract the time courses for these vertices
             vertices_time_courses = stc_data[indices, :]
-
             # Store the time courses in the dictionary
             if label.name not in label_time_courses:
                 label_time_courses[label.name] = []
             label_time_courses[label.name].append(vertices_time_courses)
-
     # Convert lists to numpy arrays for convenience
     for label in label_time_courses:
         label_time_courses[label] = np.array(label_time_courses[label])  # shape: (n_epochs, n_vertices_in_label, n_times)
@@ -165,7 +157,7 @@ label_tc = get_volume_estimate_time_course(stcs, fwd, subject, subjects_dir)
 
 scores_df = dict()
 
-for label in labels: 
+for label in labels[1:]: 
     print(label.name)
     pattern = behav.trialtypes == 1
     X = label_time_courses[label.name][pattern]
@@ -174,7 +166,7 @@ for label in labels:
     scores_df[label.name] = scores.mean(0).T
 
 import matplotlib.pyplot as plt
-nrows, ncols = 4, 7
+nrows, ncols = 4, 4
 fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(40, 13))
 for i, (ax, label) in enumerate(zip(axs.flat, labels)):
     ax.plot(times, scores_df[label.name])
