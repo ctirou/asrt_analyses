@@ -31,6 +31,7 @@ clf = GeneralizingEstimator(clf, scoring=scoring, n_jobs=jobs)
 cv = StratifiedKFold(folds, shuffle=True)
 
 for subject in subjects:
+    
     for trial_type in ['pattern', 'random']:
         all_epochs = list()
         all_behavs = list()

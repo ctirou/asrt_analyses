@@ -1,3 +1,5 @@
+import os
+import os.path as op
 import numpy as np
 import pandas as pd
 import mne
@@ -10,7 +12,6 @@ from base import ensure_dir, get_volume_estimate_time_course
 from config import *
 from mne.beamformer import make_lcmv, apply_lcmv_epochs
 import gc
-import os
 
 # params
 subjects = SUBJS
@@ -19,7 +20,7 @@ lock = "stim" # "stim", "button"
 trial_type = 'pattern' # "all", "pattern", or "random"
 data_path = DATA_DIR
 subjects_dir = FREESURFER_DIR
-res_path = RESULTS_DIR / "concatenated"
+res_path = RESULTS_DIR
 ensure_dir(res_path)
 sessions = ['Practice', 'Block_1', 'Block_2', 'Block_3', 'Block_4']
 folds = 10
@@ -38,7 +39,7 @@ gc.collect()
 vertices_df = dict()
 
 for subject in subjects:
-            
+    
     epo_dir = data_path / lock
     epo_fnames = [epo_dir / f'{f}' for f in sorted(os.listdir(epo_dir)) if '.fif' in f and subject in f]
     all_epo = [mne.read_epochs(fname, preload=True, verbose="error") for fname in epo_fnames]
@@ -69,35 +70,52 @@ for subject in subjects:
     info = epoch.info
     # conpute rank
     rank = mne.compute_rank(noise_cov, info=info, rank=None, tol_kind='relative', verbose=verbose)
-
+    # read source space file
+    src_fname = op.join(res_path, "src", "%s-src.fif" % (subject))
+    src = mne.read_source_spaces(src_fname, verbose=verbose)
+    # path to trans file
+    trans_fname = op.join(res_path, "trans", lock, "%s-all-trans.fif" % (subject))
+    # path to bem file
+    bem_fname = op.join(res_path, "bem", "%s-bem-sol.fif" % (subject))
+    
+    # to store info on vertices
     sub_vertices_info = dict()
     
     for hemi in ['lh', 'rh', 'others']:
-
-        # read forward solution    
-        fwd_fname = res_path / "fwd" / lock / f"{subject}-mixed-{hemi}-fwd.fif"
-        fwd = mne.read_forward_solution(fwd_fname, ordered=False, verbose=verbose)
+        
+        # read volume source space and add to src
+        vol_src_fname = op.join(res_path, "src", "%s-%s-vol-src.fif" % (subject, hemi))
+        vol_src = mne.read_source_spaces(vol_src_fname, verbose=verbose)
+        mixed_src = src + vol_src
+        # compute forward solution
+        fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,
+                                        src=mixed_src, bem=bem_fname,
+                                        meg=True, eeg=False,
+                                        mindist=5.0,
+                                        n_jobs=jobs,
+                                        verbose=True)        
+        
         # compute source estimates
         filters = make_lcmv(info, fwd, data_cov=data_cov, noise_cov=noise_cov,
                         pick_ori=None, rank=rank, reduce_rank=True, verbose=verbose)
         stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
-        
-        # set-up the classifier and cv structure
-        clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
-        clf = SlidingEstimator(clf, scoring=scoring, n_jobs=jobs, verbose=verbose)
-        cv = StratifiedKFold(folds, shuffle=True)
-        
+                
         label_tc, vertices_info = get_volume_estimate_time_course(stcs, fwd, subject, subjects_dir)
         labels_list = list(label_tc.keys())
         sub_vertices_info.update(vertices_info)
         
-        del fwd, fwd_fname, filters, stcs
+        del vol_src, mixed_src, fwd, filters, stcs
         gc.collect()
 
+        # set-up the classifier and cv structure
+        clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
+        clf = SlidingEstimator(clf, scoring=scoring, n_jobs=jobs, verbose=verbose)
+        cv = StratifiedKFold(folds, shuffle=True)
+
         for ilabel, label in enumerate(labels_list): 
-            print(subject, f"{str(ilabel+1).zfill(2)}/{len(labels_list)}", label)
+            print(subject, hemi, f"{str(ilabel+1).zfill(2)}/{len(labels_list)}", label)
             # results dir
-            res_dir = res_path / 'source' / lock / trial_type / label.name
+            res_dir = res_path / 'source' / lock / trial_type / label
             ensure_dir(res_dir)
             
             if trial_type == 'pattern':    
