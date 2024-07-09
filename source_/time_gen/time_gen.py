@@ -16,20 +16,23 @@ import sys
 
 # stim disp = 500 ms
 # RSI = 750 ms in task
-data_path = PRED_PATH_SSD
+data_path = PRED_PATH
 analysis = 'time_generalization'
 subjects, epochs_list, subjects_dir = SUBJS, EPOCHS, FREESURFER_DIR
 lock = 'stim'
-# lock = sys.argv[1]
 folds = 10
 solver = 'lbfgs'
 scoring = "accuracy"
 hemi = 'both'
 parc = 'aparc'
 jobs = -1
-verbose = True
+verbose = 'error'
 res_path = data_path / 'results' / 'source'
 ensure_dir(res_path)
+
+# lock = str(sys.argv[1])
+# subject_num = int(sys.argv[2])
+# subject = subjects[subject_num]
 
 # define classifier
 clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
@@ -44,6 +47,8 @@ for subject in subjects:
     bem_fname = op.join(data_path, "bem", "%s-bem-sol.fif" % (subject))
     # get labels
     labels = mne.read_labels_from_annot(subject=subject, parc=parc, hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
+    ilabel = 0
+    label = labels[ilabel]
 
     for trial_type in ['pattern', 'random']:
         all_epochs = list()
@@ -83,16 +88,16 @@ for subject in subjects:
                             pick_ori=None, rank=rank, reduce_rank=True, verbose=verbose)
             stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
 
-            del noise_cov, data_cov, fwd, filters, stcs
+            del noise_cov, data_cov, fwd, filters
             gc.collect()
 
-            for ilabel, label in enumerate(labels):                
-                print(subject, trial_type, epo, f"{str(ilabel+1).zfill(2)}/{len(labels)}", label.name)
+            # for ilabel, label in enumerate(labels):                
+            print(subject, lock, trial_type, epo, f"{str(ilabel+1).zfill(2)}/{len(labels)}", label.name)
 
-                # results dir
-                res_dir = res_path / lock / trial_type / label.name
-                ensure_dir(res_dir)
-
+            # results dir
+            res_dir = res_path / lock / trial_type / label.name
+            ensure_dir(res_dir)
+            if not os.path.exists(res_dir / f"{subject}-{epoch_num}-scores.npy"):
                 # get stcs in label
                 stcs_data = [stc.in_label(label).data for stc in stcs]
                 stcs_data = np.array(stcs_data)
@@ -113,7 +118,7 @@ for subject in subjects:
                 y = y.reset_index(drop=True)            
                 assert X.shape[0] == y.shape[0]
                 scores = cross_val_multiscore(clf, X, y, cv=cv)
-                np.save(op.join(res_dir, f"{subject}-epoch{epoch_num}-scores.npy"), scores.mean(0))
+                np.save(op.join(res_dir, f"{subject}-{epoch_num}-scores.npy"), scores.mean(0))
 
                 del stcs_data, X, y
                 gc.collect()
@@ -121,9 +126,12 @@ for subject in subjects:
             # append epochs
             all_epochs.append(epoch)
             all_behavs.append(behav)
-            all_bsl_epochs.append(epoch_bsl)
+            if lock == 'button':
+                all_bsl_epochs.append(epoch_bsl)
             
-            del epoch, behav, epoch_bsl
+            del epoch, behav
+            if trial_type == 'button':
+                del epoch_bsl
             gc.collect()
         
         # concatenate epochs
@@ -134,10 +142,9 @@ for subject in subjects:
         if lock == 'button': 
             bsl_data = data_path / "bsl"
             epoch_bsl_fnames = [bsl_data / f"{f}" for f in sorted(os.listdir(bsl_data)) if ".fif" in f and subject in f]
-            all_bsl = [mne.read_epochs(fname, preload=True, verbose="error") for fname in epoch_bsl_fnames]
-            for epoch in all_bsl:
-                epoch.info['dev_head_t'] = all_bsl[0].info['dev_head_t']
-            epoch_bsl = mne.concatenate_epochs(all_bsl)
+            for epoch in all_bsl_epochs:
+                epoch.info['dev_head_t'] = all_bsl_epochs[0].info['dev_head_t']
+            epoch_bsl = mne.concatenate_epochs(all_bsl_epochs)
             # compute noise covariance
             noise_cov = mne.compute_covariance(epoch_bsl, method="empirical", rank="info", verbose=verbose)
         else:
@@ -160,29 +167,29 @@ for subject in subjects:
                         pick_ori=None, rank=rank, reduce_rank=True, verbose=verbose)
         stcs = apply_lcmv_epochs(epochs, filters=filters, verbose=verbose)
 
-        for ilabel, label in enumerate(labels):
-            print(subject, trial_type, "all", f"{str(ilabel+1).zfill(2)}/{len(labels)}", label.name)
-            # get stcs in label
-            stcs_data = [stc.in_label(label).data for stc in stcs] # stc.in_label() doesn't work anymore for volume source space            
-            stcs_data = np.array(stcs_data)
-            assert len(stcs_data) == len(behav)
-            behav_data = behav_df.reset_index(drop=True)
-            if trial_type == 'pattern':
-                pattern = behav_data.trialtypes == 1
-                X = stcs_data[pattern]
-                y = behav_data.positions[pattern]
-            elif trial_type == 'random':
-                random = behav_data.trialtypes == 2
-                X = stcs_data[random]
-                y = behav_data.positions[random]
-            else:
-                X = stcs_data
-                y = behav_data.positions    
-            y = y.reset_index(drop=True)            
-            assert X.shape[0] == y.shape[0]
-            del all_epochs, all_behavs, all_bsl_epochs, epochs, behav_df, stcs_data, behav_data
-            gc.collect()
-            scores = cross_val_multiscore(clf, X, y, cv=cv)
-            np.save(op.join(res_dir, f"{subject}-epochall-scores.npy"), scores.mean(0))
-            del X, y, scores
-            gc.collect()
+        # for ilabel, label in enumerate(labels):
+        print(subject, lock, trial_type, "all", f"{str(ilabel+1).zfill(2)}/{len(labels)}", label.name)
+        # get stcs in label
+        stcs_data = [stc.in_label(label).data for stc in stcs] # stc.in_label() doesn't work anymore for volume source space            
+        stcs_data = np.array(stcs_data)
+        behav_data = behav_df.reset_index(drop=True)
+        assert len(stcs_data) == len(behav_data)
+        if trial_type == 'pattern':
+            pattern = behav_data.trialtypes == 1
+            X = stcs_data[pattern]
+            y = behav_data.positions[pattern]
+        elif trial_type == 'random':
+            random = behav_data.trialtypes == 2
+            X = stcs_data[random]
+            y = behav_data.positions[random]
+        else:
+            X = stcs_data
+            y = behav_data.positions    
+        y = y.reset_index(drop=True)            
+        assert X.shape[0] == y.shape[0]
+        del all_epochs, all_behavs, all_bsl_epochs, epochs, behav_df, stcs_data, behav_data
+        gc.collect()
+        scores = cross_val_multiscore(clf, X, y, cv=cv)
+        np.save(op.join(res_dir, f"{subject}-all-scores.npy"), scores.mean(0))
+        del X, y, scores
+        gc.collect()
