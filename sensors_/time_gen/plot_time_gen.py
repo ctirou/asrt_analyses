@@ -9,7 +9,7 @@ from scipy.stats import spearmanr
 from tqdm.auto import tqdm
 
 analysis = "time_generalization"
-data_path = PRED_PATH
+data_path = PRED_PATH_SSD
 subjects, epochs_list = SUBJS, EPOCHS
 lock = 'stim'
 jobs = -1
@@ -32,9 +32,9 @@ for ilabel, label in enumerate(labels):
     # load patterns and randoms time-generalization on all epochs
     patterns, randoms = [], []
     for subject in tqdm(subjects):
-        pattern = np.load(op.join(res_dir, 'pattern', f"{subject}-epochall-scores.npy"))
+        pattern = np.load(op.join(res_dir, label.name, 'pattern', f"{subject}-all-scores.npy"))
         patterns.append(pattern)
-        random = np.load(op.join(res_dir, 'random', f"{subject}-epochall-scores.npy"))
+        random = np.load(op.join(res_dir, label.name, 'random', f"{subject}-all-scores.npy"))
         randoms.append(random)
     patterns = np.array(patterns)
     randoms = np.array(randoms)
@@ -112,9 +112,9 @@ for ilabel, label in enumerate(labels):
     for subject in subjects:
         patterns, randoms = [], []
         for epoch_num in [1, 2, 3, 4]:
-            pattern = np.load(op.join(data_path, 'results', f"{subject}-epoch{epoch_num}-pattern-scores.npy"))
+            pattern = np.load(op.join(res_dir, label.name, 'pattern', f"{subject}-{epoch_num}-scores.npy"))
             patterns.append(pattern)
-            random = np.load(op.join(data_path, 'results', f"{subject}-epoch{epoch_num}-random-scores.npy"))
+            random = np.load(op.join(res_dir, label.name, 'random', f"{subject}-{epoch_num}-scores.npy"))
             randoms.append(random)
         patterns = np.array(patterns)
         randoms = np.array(randoms)

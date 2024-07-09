@@ -28,6 +28,7 @@ solver = 'lbfgs'
 scoring = "accuracy"
 verbose = True
 jobs = -1
+parc = 'aparc'
 
 # get times
 epoch_fname = DATA_DIR / lock / 'sub01-0-epo.fif'
@@ -98,11 +99,36 @@ for subject in subjects:
         # compute source estimates
         filters = make_lcmv(info, fwd, data_cov=data_cov, noise_cov=noise_cov,
                         pick_ori=None, rank=rank, reduce_rank=True, verbose=verbose)
-        stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
+        stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)        
                 
         label_tc, vertices_info = get_volume_estimate_time_course(stcs, fwd, subject, subjects_dir)
-        labels_list = list(label_tc.keys())
+        # subcortex labels
+        labels_subcx = list(label_tc.keys())
         sub_vertices_info.update(vertices_info)
+        
+        ##### see activation time course #####
+        labels_cx = mne.read_labels_from_annot(subject=subject, parc=parc, hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
+        lab_tc = mne.extract_label_time_course(stcs, labels_cx, mixed_src, mode='mean')
+        lab_tc = np.array(lab_tc)
+        
+        all_labels = labels_cx + labels_subcx
+        for i, j in enumerate(all_labels):
+            print(i, j) 
+        
+        import matplotlib.pyplot as plt
+        fig, ax = plt.subplots()
+        for i in range(34, 50):
+            ax.plot(times, lab_tc[:, i, :].mean(0), label=all_labels[i])
+        ax.legend()
+        plt.show()
+        
+        fig, ax = plt.subplots()
+        ax.plot(times, lab_tc[:, 40, :].mean(0), label='thalamus')
+        # ax.plot(times, lab_tc[:, 44, :].mean(0), label='hpc')
+        ax.plot(times, lab_tc[:, 3, :].mean(0), label='cuneus')
+        ax.legend()
+        plt.show()
+        ##### see activation time course #####        
         
         del vol_src, mixed_src, fwd, filters, stcs
         gc.collect()
@@ -112,8 +138,8 @@ for subject in subjects:
         clf = SlidingEstimator(clf, scoring=scoring, n_jobs=jobs, verbose=verbose)
         cv = StratifiedKFold(folds, shuffle=True)
 
-        for ilabel, label in enumerate(labels_list): 
-            print(subject, hemi, f"{str(ilabel+1).zfill(2)}/{len(labels_list)}", label)
+        for ilabel, label in enumerate(labels_subcx): 
+            print(subject, hemi, f"{str(ilabel+1).zfill(2)}/{len(labels_subcx)}", label)
             # results dir
             res_dir = res_path / 'source' / lock / trial_type / label
             ensure_dir(res_dir)
@@ -137,7 +163,7 @@ for subject in subjects:
             del X, y, scores
             gc.collect()
         
-        del label_tc, labels_list
+        del label_tc, labels_subcx
         gc.collect()
             
     vertices_df[subject] = dict(sorted(sub_vertices_info.items()))
