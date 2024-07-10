@@ -39,7 +39,7 @@ clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000,
 clf = GeneralizingEstimator(clf, scoring=scoring, n_jobs=jobs)
 cv = StratifiedKFold(folds, shuffle=True)
 
-for subject in subjects:
+for subject in subjects[1:2]:
     # read source space
     src_fname = op.join(data_path, "src", "%s-src.fif" % (subject))
     src = mne.read_source_spaces(src_fname, verbose=verbose)
@@ -47,13 +47,10 @@ for subject in subjects:
     bem_fname = op.join(data_path, "bem", "%s-bem-sol.fif" % (subject))
     # get labels
     labels = mne.read_labels_from_annot(subject=subject, parc=parc, hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
-    ilabel = 0
-    label = labels[ilabel]
 
     for trial_type in ['pattern', 'random']:
-        all_epochs = list()
-        all_bsl_epochs = list()
         all_behavs = list()
+        all_stcs = list()
         
         for epoch_num, epo in zip([1, 2, 3, 4], epochs_list[1:]):
             # read behav
@@ -61,8 +58,6 @@ for subject in subjects:
             # read epoch
             epoch_fname = op.join(data_path, lock, f"{subject}-{epoch_num}-epo.fif")
             epoch = mne.read_epochs(epoch_fname, verbose=verbose, preload=False)
-            all_epochs.append(epoch)
-            all_behavs.append(behav)
             if lock == 'button': 
                 epoch_bsl_fname = data_path / 'bsl' / f'{subject}_{epoch_num}_bl-epo.fif'
                 epoch_bsl = mne.read_epochs(epoch_bsl_fname, verbose=verbose, preload=False)
@@ -91,105 +86,79 @@ for subject in subjects:
             del noise_cov, data_cov, fwd, filters
             gc.collect()
 
-            # for ilabel, label in enumerate(labels):                
-            print(subject, lock, trial_type, epo, f"{str(ilabel+1).zfill(2)}/{len(labels)}", label.name)
+            for ilabel, label in enumerate(labels):                
+                print(subject, lock, trial_type, epo, f"{str(ilabel+1).zfill(2)}/{len(labels)}", label.name)
 
-            # results dir
-            res_dir = res_path / lock / trial_type / label.name
-            ensure_dir(res_dir)
-            if not os.path.exists(res_dir / f"{subject}-{epoch_num}-scores.npy"):
-                # get stcs in label
-                stcs_data = [stc.in_label(label).data for stc in stcs]
-                stcs_data = np.array(stcs_data)
-                assert len(stcs_data) == len(behav)
-                
-                # run time generalization decoding on unique epoch
-                if trial_type == 'pattern':
-                    pattern = behav.trialtypes == 1
-                    X = stcs_data[pattern]
-                    y = behav.positions[pattern]
-                elif trial_type == 'random':
-                    random = behav.trialtypes == 2
-                    X = stcs_data[random]
-                    y = behav.positions[random]
-                else:
-                    X = stcs_data
-                    y = behav.positions    
-                y = y.reset_index(drop=True)            
-                assert X.shape[0] == y.shape[0]
-                scores = cross_val_multiscore(clf, X, y, cv=cv)
-                np.save(op.join(res_dir, f"{subject}-{epoch_num}-scores.npy"), scores.mean(0))
+                # results dir
+                res_dir = res_path / lock / label.name / trial_type
+                ensure_dir(res_dir)
+                if not os.path.exists(res_dir / f"{subject}-{epoch_num}-scores.npy"):
+                    # get stcs in label
+                    stcs_data = [stc.in_label(label).data for stc in stcs]
+                    stcs_data = np.array(stcs_data)
+                    assert len(stcs_data) == len(behav)
+                    
+                    # run time generalization decoding on unique epoch
+                    if trial_type == 'pattern':
+                        pattern = behav.trialtypes == 1
+                        X = stcs_data[pattern]
+                        y = behav.positions[pattern]
+                    elif trial_type == 'random':
+                        random = behav.trialtypes == 2
+                        X = stcs_data[random]
+                        y = behav.positions[random]
+                    else:
+                        X = stcs_data
+                        y = behav.positions    
+                    y = y.reset_index(drop=True)            
+                    assert X.shape[0] == y.shape[0]
+                    scores = cross_val_multiscore(clf, X, y, cv=cv)
+                    np.save(op.join(res_dir, f"{subject}-{epoch_num}-scores.npy"), scores.mean(0))
 
-                del stcs_data, X, y
-                gc.collect()
+                    del stcs_data, X, y
+                    gc.collect()
             
             # append epochs
-            all_epochs.append(epoch)
             all_behavs.append(behav)
-            if lock == 'button':
-                all_bsl_epochs.append(epoch_bsl)
+            all_stcs.append(stcs)
             
-            del epoch, behav
+            del epoch, behav, stcs
             if trial_type == 'button':
                 del epoch_bsl
             gc.collect()
         
-        # concatenate epochs
-        for epoch in all_epochs: # see mne.preprocessing.maxwell_filter to realign the runs to a common head position. On raw data.
-            epoch.info['dev_head_t'] = all_epochs[0].info['dev_head_t']
-        epochs = mne.concatenate_epochs(all_epochs)
         behav_df = pd.concat(all_behavs)
-        if lock == 'button': 
-            bsl_data = data_path / "bsl"
-            epoch_bsl_fnames = [bsl_data / f"{f}" for f in sorted(os.listdir(bsl_data)) if ".fif" in f and subject in f]
-            for epoch in all_bsl_epochs:
-                epoch.info['dev_head_t'] = all_bsl_epochs[0].info['dev_head_t']
-            epoch_bsl = mne.concatenate_epochs(all_bsl_epochs)
-            # compute noise covariance
-            noise_cov = mne.compute_covariance(epoch_bsl, method="empirical", rank="info", verbose=verbose)
-        else:
-            noise_cov = mne.compute_covariance(epochs, tmin=-.2, tmax=0, method="empirical", rank="info", verbose=verbose)
-        # compute data covariance matrix on evoked data
-        data_cov = mne.compute_covariance(epochs, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
-        # conpute rank
-        rank = mne.compute_rank(noise_cov, info=epochs.info, rank=None, tol_kind='relative', verbose=verbose)
-        # path to trans file
-        trans_fname = os.path.join(data_path, "trans", lock, "%s-all-trans.fif" % (subject))            
-        # compute forward solution
-        fwd = mne.make_forward_solution(epochs.info, trans=trans_fname,
-                                    src=src, bem=bem_fname,
-                                    meg=True, eeg=False,
-                                    mindist=5.0,
-                                    n_jobs=jobs,
-                                    verbose=verbose)
-        # compute source estimates
-        filters = make_lcmv(epochs.info, fwd, data_cov=data_cov, noise_cov=noise_cov,
-                        pick_ori=None, rank=rank, reduce_rank=True, verbose=verbose)
-        stcs = apply_lcmv_epochs(epochs, filters=filters, verbose=verbose)
-
-        # for ilabel, label in enumerate(labels):
-        print(subject, lock, trial_type, "all", f"{str(ilabel+1).zfill(2)}/{len(labels)}", label.name)
-        # get stcs in label
-        stcs_data = [stc.in_label(label).data for stc in stcs] # stc.in_label() doesn't work anymore for volume source space            
-        stcs_data = np.array(stcs_data)
-        behav_data = behav_df.reset_index(drop=True)
-        assert len(stcs_data) == len(behav_data)
-        if trial_type == 'pattern':
-            pattern = behav_data.trialtypes == 1
-            X = stcs_data[pattern]
-            y = behav_data.positions[pattern]
-        elif trial_type == 'random':
-            random = behav_data.trialtypes == 2
-            X = stcs_data[random]
-            y = behav_data.positions[random]
-        else:
-            X = stcs_data
-            y = behav_data.positions    
-        y = y.reset_index(drop=True)            
-        assert X.shape[0] == y.shape[0]
-        del all_epochs, all_behavs, all_bsl_epochs, epochs, behav_df, stcs_data, behav_data
+        all_stcs = np.array(all_stcs)
+        del all_behavs
         gc.collect()
-        scores = cross_val_multiscore(clf, X, y, cv=cv)
-        np.save(op.join(res_dir, f"{subject}-all-scores.npy"), scores.mean(0))
-        del X, y, scores
+        
+        for ilabel, label in enumerate(labels):
+            print(subject, lock, trial_type, "all", f"{str(ilabel+1).zfill(2)}/{len(labels)}", label.name)
+            if not os.path.exists(res_dir / f"{subject}-all-scores.npy"):
+                # get stcs in label
+                stcs_data = [stc.in_label(label).data for stc in all_stcs] # stc.in_label() doesn't work anymore for volume source space            
+                stcs_data = np.array(stcs_data)
+                behav_data = behav_df.reset_index(drop=True)
+                assert len(stcs_data) == len(behav_data)
+                if trial_type == 'pattern':
+                    pattern = behav_data.trialtypes == 1
+                    X = stcs_data[pattern]
+                    y = behav_data.positions[pattern]
+                elif trial_type == 'random':
+                    random = behav_data.trialtypes == 2
+                    X = stcs_data[random]
+                    y = behav_data.positions[random]
+                else:
+                    X = stcs_data
+                    y = behav_data.positions    
+                y = y.reset_index(drop=True)            
+                assert X.shape[0] == y.shape[0]
+                del behav_df, stcs_data, behav_data
+                gc.collect()
+                scores = cross_val_multiscore(clf, X, y, cv=cv)
+                np.save(op.join(res_dir, f"{subject}-all-scores.npy"), scores.mean(0))
+                del X, y, scores, stcs_data
+                gc.collect()
+        
+        del behav_df, all_stcs
         gc.collect()

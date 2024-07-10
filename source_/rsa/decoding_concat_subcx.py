@@ -98,8 +98,8 @@ for subject in subjects:
         
         # compute source estimates
         filters = make_lcmv(info, fwd, data_cov=data_cov, noise_cov=noise_cov,
-                        pick_ori=None, rank=rank, reduce_rank=True, verbose=verbose)
-        stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)        
+                        pick_ori='max-power', weight_norm='nai', rank=rank, reduce_rank=True, verbose=verbose)
+        stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose) # check max_ori_out parameter
                 
         label_tc, vertices_info = get_volume_estimate_time_course(stcs, fwd, subject, subjects_dir)
         # subcortex labels
@@ -113,22 +113,21 @@ for subject in subjects:
         
         all_labels = labels_cx + labels_subcx
         for i, j in enumerate(all_labels):
-            print(i, j) 
+            print(i, j)
         
         import matplotlib.pyplot as plt
         fig, ax = plt.subplots()
         for i in range(34, 50):
             ax.plot(times, lab_tc[:, i, :].mean(0), label=all_labels[i])
         ax.legend()
-        plt.show()
+        # plt.show()
         
         fig, ax = plt.subplots()
         ax.plot(times, lab_tc[:, 40, :].mean(0), label='thalamus')
-        # ax.plot(times, lab_tc[:, 44, :].mean(0), label='hpc')
         ax.plot(times, lab_tc[:, 3, :].mean(0), label='cuneus')
         ax.legend()
-        plt.show()
-        ##### see activation time course #####        
+        # plt.show()
+        ##### see activation time course #####   
         
         del vol_src, mixed_src, fwd, filters, stcs
         gc.collect()

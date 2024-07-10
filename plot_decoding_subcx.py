@@ -33,7 +33,7 @@ vol_labels_others = [l for l in labels if not l.endswith(('lh', 'rh'))]
 
 lh_scores, rh_scores, other_scores = {}, {}, {}
 
-for subject in subjects[:1]:
+for subject in subjects:
     sub_dict = dict()
     
     for hemi, labels_list, label_dict in zip(['lh', 'rh', 'others'], [vol_labels_lh, vol_labels_rh, vol_labels_others], [lh_scores, rh_scores, other_scores]):
