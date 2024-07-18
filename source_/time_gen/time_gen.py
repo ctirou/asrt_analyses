@@ -39,7 +39,7 @@ clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000,
 clf = GeneralizingEstimator(clf, scoring=scoring, n_jobs=jobs)
 cv = StratifiedKFold(folds, shuffle=True)
 
-for subject in subjects[1:2]:
+for subject in subjects:
     # read source space
     src_fname = op.join(data_path, "src", "%s-src.fif" % (subject))
     src = mne.read_source_spaces(src_fname, verbose=verbose)
@@ -88,7 +88,6 @@ for subject in subjects[1:2]:
 
             for ilabel, label in enumerate(labels):                
                 print(subject, lock, trial_type, epo, f"{str(ilabel+1).zfill(2)}/{len(labels)}", label.name)
-
                 # results dir
                 res_dir = res_path / lock / label.name / trial_type
                 ensure_dir(res_dir)
@@ -97,7 +96,6 @@ for subject in subjects[1:2]:
                     stcs_data = [stc.in_label(label).data for stc in stcs]
                     stcs_data = np.array(stcs_data)
                     assert len(stcs_data) == len(behav)
-                    
                     # run time generalization decoding on unique epoch
                     if trial_type == 'pattern':
                         pattern = behav.trialtypes == 1
@@ -120,7 +118,7 @@ for subject in subjects[1:2]:
             
             # append epochs
             all_behavs.append(behav)
-            all_stcs.append(stcs)
+            all_stcs.extend(stcs)
             
             del epoch, behav, stcs
             if trial_type == 'button':
@@ -134,6 +132,10 @@ for subject in subjects[1:2]:
         
         for ilabel, label in enumerate(labels):
             print(subject, lock, trial_type, "all", f"{str(ilabel+1).zfill(2)}/{len(labels)}", label.name)
+            # results dir
+            res_dir = res_path / lock / label.name / trial_type
+            ensure_dir(res_dir)
+
             if not os.path.exists(res_dir / f"{subject}-all-scores.npy"):
                 # get stcs in label
                 stcs_data = [stc.in_label(label).data for stc in all_stcs] # stc.in_label() doesn't work anymore for volume source space            
