@@ -201,7 +201,24 @@ def get_volume_estimate_time_course(stcs, fwd, subject, subjects_dir):
             if label.name not in label_time_courses:
                 label_time_courses[label.name] = []
             label_time_courses[label.name].append(vertices_time_courses)
-    # Convert lists to numpy arrays for convenience
+    # Convert to numpy arrays
     for label in label_time_courses:
         label_time_courses[label] = np.array(label_time_courses[label])  # shape: (n_trials, n_vertices_in_label, n_times)
     return label_time_courses, vertices_info
+
+def rsync_files(source, destination, options=""):
+    import subprocess
+    try:
+        # Construct the rsync command
+        command = f"rsync {options} --ignore-existing {source} {destination}"
+        
+        # Execute the command
+        result = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        
+        # Print the output and errors (if any)
+        print(result.stdout.decode())
+        print(result.stderr.decode())
+        
+        print("Rsync operation completed successfully.")
+    except subprocess.CalledProcessError as e:
+        print(f"An error occurred: {e.stderr.decode()}")

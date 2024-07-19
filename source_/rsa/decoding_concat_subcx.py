@@ -107,7 +107,7 @@ for subject in subjects:
         sub_vertices_info.update(vertices_info)
         
         ##### see activation time course #####
-        labels_cx = mne.read_labels_from_annot(subject=subject, parc=parc, hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
+        labels_cx = mne.read_labels_from_annot(subject=subject, parc=parc, hemi=hemi, subjects_dir=subjects_dir, verbose=verbose) # issue with hemi here, when others
         lab_tc = mne.extract_label_time_course(stcs, labels_cx, mixed_src, mode='mean')
         lab_tc = np.array(lab_tc)
         
@@ -120,13 +120,13 @@ for subject in subjects:
         for i in range(34, 50):
             ax.plot(times, lab_tc[:, i, :].mean(0), label=all_labels[i])
         ax.legend()
-        # plt.show()
+        plt.show()
         
         fig, ax = plt.subplots()
         ax.plot(times, lab_tc[:, 40, :].mean(0), label='thalamus')
         ax.plot(times, lab_tc[:, 3, :].mean(0), label='cuneus')
         ax.legend()
-        # plt.show()
+        plt.show()
         ##### see activation time course #####   
         
         del vol_src, mixed_src, fwd, filters, stcs
