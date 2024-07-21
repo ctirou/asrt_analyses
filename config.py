@@ -10,7 +10,7 @@ DATA_DIR = Path('/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asr
 RESULTS_DIR = Path('/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt/results')
 FREESURFER_DIR = Path('/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt/freesurfer')
 FIGURE_PATH = Path('/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt/figures')
-
+HOME = Path('/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt')
 
 PRED_PATH = Path('/Users/coum/Desktop/pred_asrt')
 PRED_PATH_SSD = Path('/Volumes/Ultra_Touch/pred_asrt')

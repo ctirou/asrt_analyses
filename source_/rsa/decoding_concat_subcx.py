@@ -8,7 +8,7 @@ from sklearn.pipeline import make_pipeline
 from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
-from base import ensure_dir, get_volume_estimate_time_course
+from base import ensure_dir, get_volume_estimate_tc
 from config import *
 from mne.beamformer import make_lcmv, apply_lcmv_epochs
 import gc
@@ -78,10 +78,7 @@ for subject in subjects:
     trans_fname = op.join(res_path, "trans", lock, "%s-all-trans.fif" % (subject))
     # path to bem file
     bem_fname = op.join(res_path, "bem", "%s-bem-sol.fif" % (subject))
-    
-    # to store info on vertices
-    sub_vertices_info = dict()
-    
+        
     for hemi in ['lh', 'rh', 'others']:
         
         # read volume source space and add to src
@@ -97,36 +94,33 @@ for subject in subjects:
                                         verbose=True)        
         
         # compute source estimates
-        filters = make_lcmv(info, fwd, data_cov=data_cov, noise_cov=noise_cov,
-                        pick_ori='max-power', weight_norm='nai', rank=rank, reduce_rank=True, verbose=verbose)
+        # filters = make_lcmv(info, fwd, data_cov=data_cov, noise_cov=noise_cov,
+        #                 pick_ori='max-power', weight_norm='nai', rank=rank, reduce_rank=True, verbose=verbose)
+
+        filters = make_lcmv(info, fwd, data_cov=data_cov, noise_cov=noise_cov, rank=rank, reduce_rank=True, verbose=verbose)
         stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose) # check max_ori_out parameter
-                
-        label_tc, vertices_info = get_volume_estimate_time_course(stcs, fwd, subject, subjects_dir)
+        
+        offsets = np.cumsum([0] + [len(s["vertno"]) for s in vol_src])
+        label_tc = get_volume_estimate_tc(stcs, fwd, offsets, subject, subjects_dir)
+        
         # subcortex labels
         labels_subcx = list(label_tc.keys())
-        sub_vertices_info.update(vertices_info)
         
         ##### see activation time course #####
-        labels_cx = mne.read_labels_from_annot(subject=subject, parc=parc, hemi=hemi, subjects_dir=subjects_dir, verbose=verbose) # issue with hemi here, when others
-        lab_tc = mne.extract_label_time_course(stcs, labels_cx, mixed_src, mode='mean')
-        lab_tc = np.array(lab_tc)
-        
-        all_labels = labels_cx + labels_subcx
-        for i, j in enumerate(all_labels):
-            print(i, j)
-        
-        import matplotlib.pyplot as plt
-        fig, ax = plt.subplots()
-        for i in range(34, 50):
-            ax.plot(times, lab_tc[:, i, :].mean(0), label=all_labels[i])
-        ax.legend()
-        plt.show()
-        
-        fig, ax = plt.subplots()
-        ax.plot(times, lab_tc[:, 40, :].mean(0), label='thalamus')
-        ax.plot(times, lab_tc[:, 3, :].mean(0), label='cuneus')
-        ax.legend()
-        plt.show()
+        # labels_cx = mne.read_labels_from_annot(subject=subject, parc=parc, hemi=hemi, subjects_dir=subjects_dir, verbose=verbose) # issue with hemi here, when others
+        # lab_tc = mne.extract_label_time_course(stcs, labels_cx, mixed_src, mode='mean')
+        # lab_tc = np.array(lab_tc)
+        # import matplotlib.pyplot as plt
+        # fig, ax = plt.subplots()
+        # for i in range(34, 50):
+        #     ax.plot(times, lab_tc[:, i, :].mean(0), label=all_labels[i])
+        # ax.legend()
+        # plt.show()
+        # fig, ax = plt.subplots()
+        # ax.plot(times, lab_tc[:, 40, :].mean(0), label='thalamus')
+        # ax.plot(times, lab_tc[:, 3, :].mean(0), label='cuneus')
+        # ax.legend()
+        # plt.show()
         ##### see activation time course #####   
         
         del vol_src, mixed_src, fwd, filters, stcs
@@ -165,16 +159,3 @@ for subject in subjects:
         del label_tc, labels_subcx
         gc.collect()
             
-    vertices_df[subject] = dict(sorted(sub_vertices_info.items()))
-    
-info_df = pd.DataFrame() 
-for subject, vertices_info in vertices_df.items():
-    for key, value in vertices_info.items():
-        # If the key is not in the DataFrame, add it with the current subject's value
-        if key not in info_df.index:
-            info_df.loc[key, subject] = value
-        else:
-            info_df.at[key, subject] = value
-info_df.replace(0, np.nan, inplace=True)
-# Export the DataFrame to a CSV file
-info_df.to_csv(res_path / 'subcx_vertices_info.csv', sep="\t")

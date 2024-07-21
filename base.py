@@ -206,6 +206,24 @@ def get_volume_estimate_time_course(stcs, fwd, subject, subjects_dir):
         label_time_courses[label] = np.array(label_time_courses[label])  # shape: (n_trials, n_vertices_in_label, n_times)
     return label_time_courses, vertices_info
 
+def get_volume_estimate_tc(stcs, fwd, offsets, subject, subjects_dir):
+    import numpy as np
+    from mne import get_volume_labels_from_src
+    labels = get_volume_labels_from_src(fwd['src'], subject, subjects_dir)
+    # Initialize a dictionary to hold time courses for each label
+    label_time_courses = {}
+    for stc in stcs:
+        stc_data = stc.data  # shape: (n_vertices, n_times)
+        for ilabel, label in enumerate(labels):
+            tc = stc_data[offsets[ilabel]:offsets[ilabel+1]]
+            if label.name not in label_time_courses:
+                label_time_courses[label.name] = []
+            label_time_courses[label.name].append(tc)
+    # Convert to numpy arrays
+    for label in label_time_courses:
+        label_time_courses[label] = np.array(label_time_courses[label])  # shape: (n_trials, n_vertices_in_label, n_times)
+    return label_time_courses
+
 def rsync_files(source, destination, options=""):
     import subprocess
     try:

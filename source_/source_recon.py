@@ -6,13 +6,13 @@ from config import *
 import gc
 import sys
 
-overwrite = True
+overwrite = False
 verbose = True
 jobs = -1
 
 subjects = SUBJS
 epochs_list = EPOCHS
-data_path = PRED_PATH
+data_path = HOME
 subjects_dir = FREESURFER_DIR
 res_path = data_path / 'results'
 ensure_dir(res_path)
@@ -91,13 +91,13 @@ for subject in subjects:
             verbose=verbose)
         mne.write_source_spaces(vol_src_rh_fname, vol_src_rh, overwrite=True)
 
-    vol_src_others_fname = op.join(res_path, "src", "%s-others-vol-src.fif" % (subject))
+    vol_src_others_fname = op.join(res_path, "src", "%s-all-vol-src.h5" % (subject))
     if not op.exists(vol_src_others_fname) or overwrite:
         vol_src_others = mne.setup_volume_source_space(
             subject,
             bem=model_fname,
             mri="aseg.mgz",
-            volume_label=vol_labels_others,
+            volume_label=aseg_labels,
             subjects_dir=subjects_dir,
             n_jobs=jobs,
             verbose=verbose)

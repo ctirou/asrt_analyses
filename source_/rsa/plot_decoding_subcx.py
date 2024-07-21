@@ -46,19 +46,8 @@ for subject in subjects:
             label_dict[label].append(score)
             if label not in sub_dict:
                 sub_dict[label] = score
-        
-        nrows, ncols = 4, 4
-        fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(25, 13))
-        for i, (ax, label) in enumerate(zip(axs.flat, labels_list)):
-            ax.plot(times, sub_dict[label])
-            ax.axhline(.25, color='black', ls='dashed', alpha=.5)
-            ax.set_title(f"${label}$")    
-            ax.axvspan(0, 0.2, color='grey', alpha=.2)
-        fig.savefig(figures / f"{subject}-{hemi}.pdf", transparent=True)
-        plt.close()
-
-all_labels = vol_labels_lh + vol_labels_rh + vol_labels_others
-all_labels = sorted(all_labels)
+                
+all_labels = sorted(vol_labels_lh + vol_labels_rh + vol_labels_others)
 
 nrows, ncols = 9, 5
 fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(15, 13))
@@ -67,5 +56,5 @@ for i, (ax, label) in enumerate(zip(axs.flat, all_labels)):
     ax.axhline(.25, color='black', ls='dashed', alpha=.5)
     ax.set_title(f"${label}$")    
     ax.axvspan(0, 0.2, color='grey', alpha=.2)
-fig.savefig(figures / f"{subject}-all.pdf", transparent=True)
+fig.savefig(figures / f"{subject}-all-none2.pdf", transparent=True)
 plt.close()
