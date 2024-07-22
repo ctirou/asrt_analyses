@@ -6,7 +6,7 @@ from config import *
 import gc
 import sys
 
-overwrite = False
+overwrite = True
 verbose = True
 jobs = -1
 
@@ -73,7 +73,7 @@ for subject in subjects:
             subject,
             bem=model_fname,
             mri="aseg.mgz", # try with T1.mgz
-            volume_label=aseg_labels,
+            volume_label=vol_labels_lh,
             subjects_dir=subjects_dir,
             n_jobs=jobs,
             verbose=verbose)
@@ -91,13 +91,13 @@ for subject in subjects:
             verbose=verbose)
         mne.write_source_spaces(vol_src_rh_fname, vol_src_rh, overwrite=True)
 
-    vol_src_others_fname = op.join(res_path, "src", "%s-all-vol-src.h5" % (subject))
+    vol_src_others_fname = op.join(res_path, "src", "%s-others-vol-src.fif" % (subject))
     if not op.exists(vol_src_others_fname) or overwrite:
         vol_src_others = mne.setup_volume_source_space(
             subject,
             bem=model_fname,
             mri="aseg.mgz",
-            volume_label=aseg_labels,
+            volume_label=vol_labels_others,
             subjects_dir=subjects_dir,
             n_jobs=jobs,
             verbose=verbose)
