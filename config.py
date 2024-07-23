@@ -16,11 +16,24 @@ PRED_PATH = Path('/Users/coum/Desktop/pred_asrt')
 PRED_PATH_SSD = Path('/Volumes/Ultra_Touch/pred_asrt')
 PRED_PATH_MB = Path('/Users/coum/Desktop/pred_asrt')
 
-VOLUME_LABELS = ["Left-Cerebellum-Cortex", 
-                 "Right-Cerebellum-Cortex", 
-                 "Left-Thalamus-Proper", 
-                 "Right-Thalamus-Proper", 
-                 "Left-Hippocampus", 
-                 "Right-Hippocampus",
-                 "CSF",
-                 "Brain-Stem"]
+VOLUME_LABELS = ['Amygdala-lh',
+                  'Amygdala-rh',
+                  'Brain-Stem',
+                  'Caudate-lh',
+                  'Caudate-rh',
+                  'Cerebellum-Cortex-lh',
+                  'Cerebellum-Cortex-rh',
+                  'Cerebellum-White-Matter-lh',
+                  'Cerebellum-White-Matter-rh',
+                  'Hippocampus-lh',
+                  'Hippocampus-rh',
+                  'Lateral-Ventricle-lh',
+                  'Lateral-Ventricle-rh',
+                  'Pallidum-lh',
+                  'Pallidum-rh',
+                  'Putamen-lh',
+                  'Putamen-rh',
+                  'Thalamus-Proper-lh',
+                  'Thalamus-Proper-rh',
+                  'VentralDC-lh',
+                  'VentralDC-rh']
