@@ -69,7 +69,7 @@ for lock in ['stim', 'button']:
             plt.close()
 
 # plot average and run stats
-nrows, ncols = 9, 5
+nrows, ncols = 3, 7
 chance = 25
 color1 = "#1f77b4"
 color2 = "#F79256"

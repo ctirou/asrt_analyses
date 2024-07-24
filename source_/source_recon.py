@@ -6,7 +6,7 @@ from config import *
 import gc
 import sys
 
-overwrite = True
+overwrite = False
 verbose = True
 jobs = -1
 
@@ -27,6 +27,8 @@ for lock in ['stim', 'button']:
         else:
             ensure_dir(os.path.join(res_path, f))
 
+best_labels = [('Left-' + l.replace('-lh', '')) if '-lh' in l else ('Right-' + l.replace('-rh', '')) if '-rh' in l else l for l in VOLUME_LABELS]    
+
 for subject in subjects:
     # bem model
     bem_fname = op.join(res_path, "bem", "%s-bem-sol.fif" % (subject))
@@ -42,14 +44,14 @@ for subject in subjects:
         mne.bem.write_bem_solution(bem_fname, bem, overwrite=True, verbose=verbose)
     
     # cortex source space
-    src_fname = op.join(res_path, "src", "%s-src.fif" % (subject))
-    if not op.exists(src_fname) or overwrite:
-        src = mne.setup_source_space(subject, spacing='oct6',
-                                        subjects_dir=subjects_dir,
-                                        add_dist=True,
-                                        n_jobs=jobs,
-                                        verbose=verbose)
-        mne.write_source_spaces(src_fname, src, overwrite=True)
+    # src_fname = op.join(res_path, "src", "%s-src.fif" % (subject))
+    # if not op.exists(src_fname) or overwrite:
+    #     src = mne.setup_source_space(subject, spacing='oct6',
+    #                                     subjects_dir=subjects_dir,
+    #                                     add_dist=True,
+    #                                     n_jobs=jobs,
+    #                                     verbose=verbose)
+    #     mne.write_source_spaces(src_fname, src, overwrite=True)
                                 
     # volume source space
     ## Brainnetome atlas -- does not work for now
@@ -67,43 +69,55 @@ for subject in subjects:
     vol_labels_rh = [l for l in aseg_labels if l.startswith('Right')]
     vol_labels_others = [l for l in aseg_labels if not l.startswith(('Left', 'Right'))]
     
-    vol_src_lh_fname = op.join(res_path, "src", "%s-lh-vol-src.fif" % (subject))
-    if not op.exists(vol_src_lh_fname) or overwrite:
-        vol_src_lh = mne.setup_volume_source_space(
-            subject,
-            bem=model_fname,
-            mri="aseg.mgz", # try with T1.mgz
-            volume_label=vol_labels_lh,
-            subjects_dir=subjects_dir,
-            n_jobs=jobs,
-            verbose=verbose)
-        mne.write_source_spaces(vol_src_lh_fname, vol_src_lh, overwrite=True)
+    # vol_src_lh_fname = op.join(res_path, "src", "%s-lh-vol-src.fif" % (subject))
+    # if not op.exists(vol_src_lh_fname) or overwrite:
+    #     vol_src_lh = mne.setup_volume_source_space(
+    #         subject,
+    #         bem=model_fname,
+    #         mri="aseg.mgz", # try with T1.mgz
+    #         volume_label=vol_labels_lh,
+    #         subjects_dir=subjects_dir,
+    #         n_jobs=jobs,
+    #         verbose=verbose)
+    #     mne.write_source_spaces(vol_src_lh_fname, vol_src_lh, overwrite=True)
 
-    vol_src_rh_fname = op.join(res_path, "src", "%s-rh-vol-src.fif" % (subject))
-    if not op.exists(vol_src_rh_fname) or overwrite:
-        vol_src_rh = mne.setup_volume_source_space(
-            subject,
-            bem=model_fname,
-            mri="aseg.mgz",
-            volume_label=vol_labels_rh,
-            subjects_dir=subjects_dir,
-            n_jobs=jobs,
-            verbose=verbose)
-        mne.write_source_spaces(vol_src_rh_fname, vol_src_rh, overwrite=True)
+    # vol_src_rh_fname = op.join(res_path, "src", "%s-rh-vol-src.fif" % (subject))
+    # if not op.exists(vol_src_rh_fname) or overwrite:
+    #     vol_src_rh = mne.setup_volume_source_space(
+    #         subject,
+    #         bem=model_fname,
+    #         mri="aseg.mgz",
+    #         volume_label=vol_labels_rh,
+    #         subjects_dir=subjects_dir,
+    #         n_jobs=jobs,
+    #         verbose=verbose)
+    #     mne.write_source_spaces(vol_src_rh_fname, vol_src_rh, overwrite=True)
 
-    vol_src_others_fname = op.join(res_path, "src", "%s-others-vol-src.fif" % (subject))
-    if not op.exists(vol_src_others_fname) or overwrite:
-        vol_src_others = mne.setup_volume_source_space(
-            subject,
-            bem=model_fname,
-            mri="aseg.mgz",
-            volume_label=vol_labels_others,
-            subjects_dir=subjects_dir,
-            n_jobs=jobs,
-            verbose=verbose)
-        mne.write_source_spaces(vol_src_others_fname, vol_src_others, overwrite=True)
+    # vol_src_others_fname = op.join(res_path, "src", "%s-others-vol-src.fif" % (subject))
+    # if not op.exists(vol_src_others_fname) or overwrite:
+    #     vol_src_others = mne.setup_volume_source_space(
+    #         subject,
+    #         bem=model_fname,
+    #         mri="aseg.mgz",
+    #         volume_label=vol_labels_others,
+    #         subjects_dir=subjects_dir,
+    #         n_jobs=jobs,
+    #         verbose=verbose)
+    #     mne.write_source_spaces(vol_src_others_fname, vol_src_others, overwrite=True)
+
+    vol_src_fname = op.join(res_path, "src", "%s-vol-src.fif" % (subject))
+    # if not op.exists(vol_src_others_fname) or overwrite:
+    vol_src = mne.setup_volume_source_space(
+        subject,
+        bem=model_fname,
+        mri="aseg.mgz",
+        volume_label=best_labels,
+        subjects_dir=subjects_dir,
+        n_jobs=jobs,
+        verbose=verbose)
+    mne.write_source_spaces(vol_src_fname, vol_src, overwrite=True)
         
-    del src, vol_src_lh, vol_src_rh, vol_src_others
+    del src, vol_src_lh, vol_src_rh, vol_src_others, vol_src
     gc.collect()
     
     for lock in ['stim', 'button']:

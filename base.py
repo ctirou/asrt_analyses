@@ -13,15 +13,17 @@ def ensure_dir(path):
     if not os.path.exists(path):
         os.makedirs(path)
         
-def decod_stats(X):
+def decod_stats(X, jobs):
     """Statistical test applied across subjects"""
     # check input
     if not isinstance(X, np.ndarray):
         X = np.array(X)
 
+    X = X.astype(np.float64)
+    
     # stats function report p_value for each cluster
     T_obs_, clusters, p_values, _ = permutation_cluster_1samp_test(
-        X, out_type='mask', n_permutations=2**12, n_jobs=6,
+        X, out_type='mask', n_permutations=2**12, n_jobs=jobs,
         verbose=False)
 
     # format p_values to get same dimensionality as X
