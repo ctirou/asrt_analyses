@@ -6,13 +6,13 @@ from config import *
 import gc
 from tqdm.auto import tqdm
 
-lock = 'button'
-trial_type = 'random'
-analysis = 'subcx_decoding'
+lock = 'stim'
+trial_type = 'pattern'
+analysis = 'decoding'
 
 subjects = SUBJS
 subjects_dir = FREESURFER_DIR
-res_path = RESULTS_DIR
+res_path = RESULTS_DIR / analysis / 'source' / lock / trial_type
 figures = FIGURE_PATH / analysis / 'source' / lock / trial_type
 ensure_dir(figures)
 
@@ -25,7 +25,7 @@ gc.collect()
 
 # get labels
 # labels = [l for l in sorted(os.listdir(res_path / 'source' / lock / trial_type)) if not l.startswith(".")]
-labels = VOLUME_LABELS
+labels = SURFACE_LABELS + VOLUME_LABELS
 
 vol_labels_lh = [l for l in labels if l.endswith('lh')]
 vol_labels_rh = [l for l in labels if l.endswith('rh')]
@@ -41,7 +41,7 @@ for lock in ['stim', 'button']:
             sub_dict = dict()
     
             for hemi, labels_list, label_dict in zip(['lh', 'rh', 'others'], [vol_labels_lh, vol_labels_rh, vol_labels_others], [lh_scores, rh_scores, other_scores]):
-                
+            # for ilabel, label in enumerate(labels):    
                 for label in labels_list:
                     if label not in label_dict:
                         label_dict[label] = []

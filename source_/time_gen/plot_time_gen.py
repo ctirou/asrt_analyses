@@ -1,5 +1,5 @@
 import os
-from base import ensure_dir, gat_stats
+from base import ensure_dir, gat_stats, decod_stats
 from config import *
 import os.path as op
 import matplotlib.pyplot as plt
@@ -66,8 +66,8 @@ for ilabel, label in enumerate(label_names):
         cmap="RdBu_r",
         extent=times[[0, -1, 0, -1]],
         aspect=0.5,
-        vmin=.20,
-        vmax=.30)
+        vmin=0.23,
+        vmax=.27)
     ax.set_xlabel("Testing Time (s)")
     ax.set_ylabel("Training Time (s)")
     ax.set_title("Temporal generalization")
@@ -86,7 +86,7 @@ for ilabel, label in enumerate(label_names):
         cmap="RdBu_r",
         extent=times[[0, -1, 0, -1]],
         aspect=0.5,
-        vmin=.20,
+        vmin=-.30,
         vmax=.30)
     ax.set_xlabel("Testing Time (s)")
     ax.set_ylabel("Training Time (s)")
@@ -95,10 +95,18 @@ for ilabel, label in enumerate(label_names):
     ax.axhline(0, color="k")
     cbar = plt.colorbar(im, ax=ax)
     cbar.set_label("accuracy")
-    fig.savefig(figure_dir / label / "mean_random.png")
+    fig.savefig(figure_dir / label / "mean_random.pdf")
 
     # plot contrast with significance
     contrasts = patterns - randoms
+    
+    coco = np.array([np.diag(cock) for cock in contrasts])
+    fig, ax = plt.subplots(1, 1, figsize=(35, 5), layout='tight')
+    pval = decod_stats(coco, -1)
+    sig = pval < 0.05
+    ax.plot(times, np.diag(contrasts.mean(0)), label='contrasts')
+    ax.fill_between(times, 0, np.diag(contrasts.mean(0)), color="grey", alpha=.3, where=sig)
+    fig.savefig(figure_dir / label / "contrast_diag.pdf")
 
     # pval = gat_stats(contrasts, jobs)
     # pval = np.load(res_path / "pval" / label / "contrast-pval.npy")
@@ -112,8 +120,8 @@ for ilabel, label in enumerate(label_names):
         cmap="RdBu_r",
         extent=times[[0, -1, 0, -1]],
         aspect=0.5,
-        vmin=-0.1,
-        vmax=0.1)
+        vmin=-0.05,
+        vmax=0.05)
     ax.set_xlabel("Testing Time (s)")
     ax.set_ylabel("Training Time (s)")
     ax.set_title("Temporal generalization")
