@@ -17,7 +17,7 @@ import os
 subjects = SUBJS
 
 analysis = 'RSA'
-lock = "stim"
+lock = "button"
 trial_type = "pattern"
 data_path = DATA_DIR
 subjects_dir = FREESURFER_DIR
@@ -45,7 +45,7 @@ del epochs
 gc.collect()
 
 combinations = ['one_two', 'one_three', 'one_four', 'two_three', 'two_four', 'three_four']
-for subject in subjects[2:]:
+for subject in subjects:
     
     # to store dissimilarity distances
     rsa_dict = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))

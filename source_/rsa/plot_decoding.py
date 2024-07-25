@@ -7,16 +7,18 @@ from mne import read_labels_from_annot, read_epochs
 from scipy.stats import ttest_1samp, spearmanr
 import gc
 from pathlib import Path
+import numba
 
 lock = "stim"
 trial_type = "pattern"
 subjects = SUBJS
-analysis = "concatenated"
+analysis = "pred_decoding"
 res_path = RESULTS_DIR
 subjects_dir = FREESURFER_DIR
-verbose = "error"
+verbose = True
 hemi = 'both'
 chance = .5
+overwrite = True
 
 summary = False
 
@@ -34,14 +36,21 @@ corr_in_lab = {}
 decoding = dict()
 
 # get label names
-best_regions = [6, 7, 12, 13, 14, 15, 20, 21, 22, 23, 26, 27, 42, 43, 50, 51, 58, 59]
-labels = read_labels_from_annot(subject='sub01', parc='aparc', hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
-label_names = [label.name for ilabel, label in enumerate(labels) if ilabel in best_regions]
-del labels
+label_names = SURFACE_LABELS + VOLUME_LABELS
 
 figures = res_path / "figures" / analysis / 'source' / lock / trial_type
 ensure_dir(figures)
 gc.collect()
+
+@numba.jit
+def spearman_rank_correlation(x, y):
+    n = len(x)
+    rank_x = np.argsort(np.argsort(x))
+    rank_y = np.argsort(np.argsort(y))
+    d = rank_x - rank_y
+    d_squared = np.sum(d * d)
+    rho = 1 - (6 * d_squared) / (n * (n * n - 1))
+    return rho
 
 for ilabel, label in enumerate(label_names):
     
@@ -58,41 +67,39 @@ for ilabel, label in enumerate(label_names):
         two_four_similarities = list() 
         three_four_similarities = list()
         
-        behav_dir = RAW_DATA_DIR / subject / 'behav_data'
+        behav_dir = HOME / "raw_behavs" / subject
         sequence = get_sequence(behav_dir)
                 
         sub_scores, sub_rsa, sub_cms = [], [], []
         for session_id, session in enumerate(sessions):
             
             # res_dir = res_path / analysis / 'source' / lock / trial_type / label / subject / session
-            res_dir = res_path / analysis / 'source' / lock / trial_type / label / subject
+            # res_dir = res_path / analysis / 'source' / lock / trial_type / label / subject
+                    
+            # sub_scores.append(np.load(res_dir / "scores.npy"))
             
-            # other_dir = Path('/Users/coum/Desktop/decoding_cvm')
-            
-            sub_scores.append(np.load(res_dir / "scores.npy"))
-            
-            # sub_scores.append(np.load(other_dir / 'source' / lock / trial_type / label / subject / session / "scores.npy"))
-            # sub_cms.append(np.load(other_dir / 'source' / lock / trial_type / label / subject / session / "cms.npy") )
-            # sub_rsa.append(np.load(other_dir / 'source' / lock / trial_type / label / subject / session / "rsa.npy"))
+            # sub_scores.append(np.load(res_path / 'source' / lock / trial_type / label / subject / session / "scores.npy"))
+            sub_cms.append(np.load(res_path / analysis / 'source' / lock / trial_type / label / subject / session / "cms.npy") )
+            sub_rsa.append(np.load(res_path / analysis / 'source' / lock / trial_type / label / subject / session / "rsa.npy"))
             
         sub_scores = np.array(sub_scores)
-        # sub_cms = np.array(sub_cms)
+        sub_cms = np.array(sub_cms)
 
-        # sub_rsa = np.array(sub_rsa)
-        # one_two, one_three, one_four, two_three, two_four, three_four = [], [], [], [], [], []
-        # for session_id, _ in enumerate(sessions):
-        #     for sim, sim_list in enumerate([one_four, one_three, one_two, three_four, two_four, two_three]):
-        #         sim_list.append(sub_rsa[session_id, sim, :])
+        sub_rsa = np.array(sub_rsa)
+        one_two, one_three, one_four, two_three, two_four, three_four = [], [], [], [], [], []
+        for session_id, _ in enumerate(sessions):
+            for sim, sim_list in enumerate([one_four, one_three, one_two, three_four, two_four, two_three]):
+                sim_list.append(sub_rsa[session_id, sim, :])
         
-        # for all_sims, sim_list in zip(
-        #     [one_two_similarities, one_three_similarities, one_four_similarities, two_three_similarities, two_four_similarities, three_four_similarities], 
-        #     [one_two, one_three, one_four, two_three, two_four, three_four]):
-        #         all_sims.append(np.array(sim_list))
+        for all_sims, sim_list in zip(
+            [one_two_similarities, one_three_similarities, one_four_similarities, two_three_similarities, two_four_similarities, three_four_similarities], 
+            [one_two, one_three, one_four, two_three, two_four, three_four]):
+                all_sims.append(np.array(sim_list))
                     
-        # similarities = [one_two_similarities, one_three_similarities, one_four_similarities, two_three_similarities, two_four_similarities, three_four_similarities]
-        # in_seq, out_seq = get_inout_seq(sequence, similarities)
-        # all_in_seqs.append(np.array(in_seq))
-        # all_out_seqs.append(np.array(out_seq))
+        similarities = [one_two_similarities, one_three_similarities, one_four_similarities, two_three_similarities, two_four_similarities, three_four_similarities]
+        in_seq, out_seq = get_inout_seq(sequence, similarities)
+        all_in_seqs.append(np.array(in_seq))
+        all_out_seqs.append(np.array(out_seq))
         
         if summary:
             from sklearn.metrics import ConfusionMatrixDisplay
@@ -126,19 +133,20 @@ for ilabel, label in enumerate(label_names):
     decod_in_lab[label] = diff_inout
     decod_in_lab2[label] = [np.squeeze(all_in_seq).mean(axis=1), np.squeeze(all_out_seq).mean(axis=1)]
     
-    # if not op.exists(res_path / analysis / 'source' / lock / trial_type / label / "corr.npy"):
-    #     corr = []
-    #     for sub in range(len(subjects)):
-    #         rhos = []
-    #         for t in range(len(times)):
-    #             rhos.append(spearmanr([0, 1, 2, 3, 4], diff_inout[sub, :, t]))
-    #         corr.append(rhos)
-    #     corr = np.array(corr)
-    #     np.save(res_path / analysis / 'source' / lock / trial_type / label / "corr.npy", corr)
-    # corr = np.load(res_path / analysis / 'source' / lock / trial_type / label / "corr.npy")
-    # corr_in_lab[label] = corr
+    if not op.exists(res_path / analysis / 'source' / lock / trial_type / label / "corr.npy") or overwrite:
+        corr = []
+        for sub in range(len(subjects)):
+            rhos = []
+            for t in range(len(times)):
+                rho = spearman_rank_correlation([0, 1, 2, 3, 4], diff_inout[sub, :, t])
+                rhos.append(rho)
+            corr.append(rhos)
+        corr = np.array(corr)
+        np.save(res_path / analysis / 'source' / lock / trial_type / label / "corr.npy", corr)
+    corr = np.load(res_path / analysis / 'source' / lock / trial_type / label / "corr.npy")
+    corr_in_lab[label] = corr
         
-nrows, ncols = 7, 10
+nrows, ncols = 5, 8
 
 # decoding
 chance = 0.25

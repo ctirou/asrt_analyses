@@ -11,7 +11,7 @@ from tqdm.auto import tqdm
 loca = "subcx"
 trial_type = "pattern"
 subjects = SUBJS
-lock = "stim"
+lock = "button"
 analysis = "rsa"
 sessions = EPOCHS
 res_path = RESULTS_DIR
