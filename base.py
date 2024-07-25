@@ -208,6 +208,66 @@ def get_volume_estimate_time_course(stcs, fwd, subject, subjects_dir):
         label_time_courses[label] = np.array(label_time_courses[label])  # shape: (n_trials, n_vertices_in_label, n_times)
     return label_time_courses, vertices_info
 
+def get_labels_from_vol_src(src, subject, subjects_dir):
+    from mne import Label
+    from mne import get_volume_labels_from_aseg
+    """Return a list of Label of segmented volumes included in the src space.
+
+    Parameters
+    ----------
+    src : instance of SourceSpaces
+        The source space containing the volume regions.
+    %(subject)s
+    subjects_dir : str
+        Freesurfer folder of the subjects.
+
+    Returns
+    -------
+    labels_aseg : list of Label
+        List of Label of segmented volumes included in src space.
+    """
+    # from ..label import Label
+
+    # Read the aseg file
+    aseg_fname = op.join(subjects_dir, subject, "mri", "aseg.mgz")
+    all_labels_aseg = get_volume_labels_from_aseg(aseg_fname, return_colors=True)
+
+    if any(np.any(s["type"] != "vol") for s in src):
+        raise ValueError("source spaces have to be of vol type")
+
+    labels_aseg = list()
+    for nr in range(len(src)):
+        vertices = src[nr]["vertno"]
+
+        pos = src[nr]["rr"][src[nr]["vertno"], :]
+        roi_str = src[nr]["seg_name"]
+        try:
+            ind = all_labels_aseg[0].index(roi_str)
+            color = np.array(all_labels_aseg[1][ind]) / 255
+        except ValueError:
+            pass
+
+        if "left" in roi_str.lower():
+            hemi = "lh"
+            roi_str = roi_str.replace("Left-", "") + "-lh"
+        elif "right" in roi_str.lower():
+            hemi = "rh"
+            roi_str = roi_str.replace("Right-", "") + "-rh"
+        else:
+            hemi = "both"
+
+        label = Label(
+            vertices=vertices,
+            pos=pos,
+            hemi=hemi,
+            name=roi_str,
+            color=color,
+            subject=subject,
+        )
+        labels_aseg.append(label)
+
+    return labels_aseg
+
 def get_volume_estimate_tc(stcs, fwd, offsets, subject, subjects_dir):
     import numpy as np
     from mne import get_volume_labels_from_src

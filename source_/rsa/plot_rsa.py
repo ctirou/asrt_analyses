@@ -7,19 +7,24 @@ import matplotlib.pyplot as plt
 from mne import read_labels_from_annot, read_epochs
 from scipy.stats import spearmanr, ttest_1samp
 
+loca = "surf"
 trial_type = "pattern"
 subjects = SUBJS
 lock = "stim"
-params = "RSA"
+analysis = "RSA"
 sessions = EPOCHS
-res_dir = RESULTS_DIR / 'figures' / lock / params / 'source' / trial_type
+res_path = RESULTS_DIR
+# res dir
+res_dir = res_path / analysis / 'source' / lock / trial_type
+figures_dir = HOME / 'figures' / analysis / 'source' / lock / trial_type / loca
 subjects_dir = FREESURFER_DIR
-verbose = 'error'
+verbose = True
 hemi = 'both'
 parc='aparc'
+jobs = -1
 
 # get times
-epoch_fname = DATA_DIR / lock / 'sub01_0_s-epo.fif'
+epoch_fname = DATA_DIR / lock / 'sub01-0-epo.fif'
 epochs = read_epochs(epoch_fname, verbose=verbose)
 times = epochs.times
 del epochs
@@ -33,7 +38,7 @@ corr_in_lab = {}
 
 # get labels
 labels = read_labels_from_annot(subject='sub01', parc=parc, hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
-label_names = [label.name for label in labels]
+label_names = [label.name for label in labels if label.name in SURFACE_LABELS]
 del labels
 
 for ilabel, label in enumerate(label_names):
@@ -51,10 +56,9 @@ for ilabel, label in enumerate(label_names):
         two_four_similarities = list() 
         three_four_similarities = list()
 
-        behav_dir = RAW_DATA_DIR / subject / 'behav_data'
+        behav_dir = HOME / "raw_behavs" / subject
         sequence = get_sequence(behav_dir)
                 
-
         rsa_df = pd.read_hdf(res_dir / f"{subject}_rsa.h5", key='rsa')
         
         for session_id, session in enumerate(sessions):
@@ -90,28 +94,27 @@ for ilabel, label in enumerate(label_names):
     all_rhos = np.array(all_rhos)
     corr_in_lab[label] = all_rhos
     
-nrows, ncols = 7, 10
-    
-ensure_dir(res_dir / "correlations")
-ensure_dir(res_dir / "rsa_plots")
+nrows, ncols = 3, 6
+ensure_dir(figures_dir / "correlations")
+ensure_dir(figures_dir / "rsa")
 # plot per subject
-for isub, sub in enumerate(subjects):
-    
-    fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='constrained', figsize=(40, 13))
-    fig.suptitle(sub)
+for isub, subject in enumerate(subjects):
+    print(subject)
+    fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(20,7))
+    fig.suptitle(subject)
     for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
         corr = corr_in_lab[label][isub, :, 0]
         ax.plot(times, corr)
         ax.axvspan(0, 0.2, color='grey', alpha=.2)
         ax.axhline(0, color='black', ls='dashed', alpha=.5)
         ax.set_title(label)
-    plt.savefig(res_dir / "correlations" / f"{subject}.png")
+    plt.savefig(figures_dir / "correlations" / f"{subject}.png", transparent=False)
     plt.close()
     
-    fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='constrained', figsize=(40, 13))
+    fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(20, 7))
     for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
-        practice = rsa_in_lab[label][isub, 0, :]
-        learning = rsa_in_lab[label][isub, 1:5, :]
+        practice = rsa_in_lab[label][isub, 0, :] * (-1)
+        learning = rsa_in_lab[label][isub, 1:5, :] * (-1)
         
         ax.plot(times, practice, label='practice')
         ax.plot(times, learning.mean(0).flatten(), label='learning')
@@ -122,61 +125,123 @@ for isub, sub in enumerate(subjects):
             legend = ax.legend()
             plt.setp(legend.get_texts(), fontsize=8)  # Adjust legend size
         
-        for tick in ax.xaxis.get_major_ticks():  # Adjust x-axis label size
-            tick.label.set_fontsize(8)
-        for tick in ax.yaxis.get_major_ticks():  # Adjust y-axis label size
-            tick.label.set_fontsize(8)
-    plt.savefig(res_dir / "rsa_plots" / f"{subject}.png")
+        # for tick in ax.xaxis.get_major_ticks():  # Adjust x-axis label size
+        #     tick.label.set_fontsize(8)
+        # for tick in ax.yaxis.get_major_ticks():  # Adjust y-axis label size
+        #     tick.label.set_fontsize(8)
+    plt.savefig(figures_dir / "rsa" / f"{subject}.png", transparent=False)
     plt.close()
     
 # plot average rho across subjects
-fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='constrained', figsize=(40, 13))
-fig.suptitle("correlations")
+fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(20, 7))
+# fig.suptitle("correlations")
 for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
+    if lock == 'stim':
+        ax.axvspan(0, 0.2, color='grey', alpha=.2)
+    else:
+        ax.axvline(0, color='black', alpha=.7)
     corr = corr_in_lab[label][:, :, 0].mean(0)
     ax.plot(times, corr)
-
-    p_values = decod_stats(corr_in_lab[label][:, :, 0])
+    p_values = decod_stats(corr_in_lab[label][:, :, 0], jobs)
     p_values_unc = ttest_1samp(corr_in_lab[label][:, :, 0], axis=0, popmean=0)[1]
     sig = p_values < 0.05
     sig_unc = p_values_unc < 0.05
-    
     ax.fill_between(times, 0, corr, where=sig_unc, color='C2', alpha=1)
     ax.fill_between(times, 0, corr, where=sig, alpha=0.3)
-    ax.axvspan(0, 0.2, color='grey', alpha=.2)
     ax.axhline(0, color='black', ls='dashed', alpha=.5)
-    ax.set_title(label)
-plt.savefig(res_dir / "correlations" / "mean.png")
+    ax.set_title(f"${label}$", fontsize=8)   
+plt.savefig(figures_dir / "correlations" / "mean.pdf", transparent=True)
 plt.close()
 
 # plot rsa
-fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='constrained', figsize=(40, 13))
-fig.suptitle("RSA average across subjects")
+fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(20, 7))
+# fig.suptitle("RSA average across subjects")
 for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
-    practice = rsa_in_lab[label][:, 0, :].mean(0)
-    learning = rsa_in_lab[label][:, 1:5, :].mean((0, 1))
-    
+    practice = rsa_in_lab[label][:, 0, :].mean(0).astype(np.float64) * (-1)
+    learning = rsa_in_lab[label][:, 1:5, :].mean((0, 1)).astype(np.float64) * (-1)
+    if lock == 'stim':
+        ax.axvspan(0, 0.2, color='grey', alpha=.2)
+    else:
+        ax.axvline(0, color='black', alpha=.7)
     ax.plot(times, practice, label='practice')
     ax.plot(times, learning, label='learning')
-    ax.set_title(label)
-    ax.axvspan(0, 0.2, color='grey', alpha=.2)
+    ax.set_title(f"${label}$", fontsize=8)     
     ax.axhline(0, color='black', ls='dashed', alpha=.5)
     if i == 0:
         legend = ax.legend()
         plt.setp(legend.get_texts(), fontsize=8)  # Adjust legend size
-    
-    for tick in ax.xaxis.get_major_ticks():  # Adjust x-axis label size
-        tick.label.set_fontsize(8)
-    for tick in ax.yaxis.get_major_ticks():  # Adjust y-axis label size
-        tick.label.set_fontsize(8)
-        
-    # diff = rsa_in_lab[label][:, 1:5, :].mean((1)) - rsa_in_lab[label][:, 0, :]
-    # # p_values_unc = ttest_1samp(diff, axis=0, popmean=0)[1]
-    # # sig_unc = p_values_unc < 0.05
-    # p_values = decod_stats(diff)
-    # sig = p_values < 0.05
-    # # ax.fill_between(times, 0, learning, where=sig_unc, color='C2', alpha=0.2)
-    # ax.fill_between(times, 0, learning, where=sig, color='C3', alpha=0.3)
-    
-plt.savefig(res_dir / "rsa_plots" / "mean-rsa.png")
+    # for tick in ax.xaxis.get_major_ticks():  # Adjust x-axis label size
+    #     tick.label.set_fontsize(8)
+    # for tick in ax.yaxis.get_major_ticks():  # Adjust y-axis label size
+    #     tick.label.set_fontsize(8)
+    diff = rsa_in_lab[label][:, 1:5, :].mean((1)) - rsa_in_lab[label][:, 0, :]
+    p_values_unc = ttest_1samp(diff.astype(np.float64), axis=0, popmean=0)[1]
+    sig_unc = p_values_unc < 0.05
+    ax.fill_between(times, 0, learning, where=sig_unc, color='C2', alpha=0.2)
+    p_values = decod_stats(diff, jobs)
+    sig = p_values < 0.05
+    ax.fill_between(times, 0, learning, where=sig, color='C3', alpha=0.3)
+plt.savefig(figures_dir / "rsa" / "mean.pdf", transparent=True)
+plt.close()
+
+# plot rsa practice vs b4
+fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(26, 7))
+# fig.suptitle("RSA average across subjects")
+for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
+    practice = rsa_in_lab[label][:, 0, :].mean(0).astype(np.float64) * (-1)
+    learning = rsa_in_lab[label][:, -1, :].mean(0).astype(np.float64) * (-1)
+    if lock == 'stim':
+        ax.axvspan(0, 0.2, color='grey', alpha=.2)
+    else:
+        ax.axvline(0, color='black', alpha=.7)
+    ax.plot(times, practice, label='Practice')
+    ax.plot(times, learning, label='Block_4')
+    ax.set_title(f"${label}$", fontsize=8)     
+    ax.axhline(0, color='black', ls='dashed', alpha=.5)
+    if i == 0:
+        legend = ax.legend()
+        plt.setp(legend.get_texts(), fontsize=8)  # Adjust legend size
+    # for tick in ax.xaxis.get_major_ticks():  # Adjust x-axis label size
+    #     tick.label.set_fontsize(8)
+    # for tick in ax.yaxis.get_major_ticks():  # Adjust y-axis label size
+    #     tick.label.set_fontsize(8)
+    diff = rsa_in_lab[label][:, -1, :] - rsa_in_lab[label][:, 0, :]
+    p_values_unc = ttest_1samp(diff.astype(np.float64), axis=0, popmean=0)[1]
+    sig_unc = p_values_unc < 0.05
+    ax.fill_between(times, 0, learning, where=sig_unc, color='C2', alpha=1)
+    p_values = decod_stats(diff, jobs)
+    sig = p_values < 0.05
+    ax.fill_between(times, 0, learning, where=sig, color='black', alpha=1)
+plt.savefig(figures_dir / "rsa" / "mean_prac_vs_b4.pdf", transparent=True)
+plt.close()
+
+# plot rsa b1 vs b4
+fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(26, 7))
+# fig.suptitle("RSA average across subjects")
+for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
+    practice = rsa_in_lab[label][:, 1, :].mean(0).astype(np.float64) * (-1)
+    learning = rsa_in_lab[label][:, -1, :].mean(0).astype(np.float64) * (-1)
+    if lock == 'stim':
+        ax.axvspan(0, 0.2, color='grey', alpha=.2)
+    else:
+        ax.axvline(0, color='black', alpha=.7)
+    ax.plot(times, practice, label='Block_1')
+    ax.plot(times, learning, label='Block_4')
+    ax.set_title(f"${label}$", fontsize=8)     
+    ax.axhline(0, color='black', ls='dashed', alpha=.5)
+    if i == 0:
+        legend = ax.legend()
+        plt.setp(legend.get_texts(), fontsize=8)  # Adjust legend size
+    # for tick in ax.xaxis.get_major_ticks():  # Adjust x-axis label size
+    #     tick.label.set_fontsize(8)
+    # for tick in ax.yaxis.get_major_ticks():  # Adjust y-axis label size
+    #     tick.label.set_fontsize(8)
+    diff = rsa_in_lab[label][:, -1, :] - rsa_in_lab[label][:, 1, :]
+    p_values_unc = ttest_1samp(diff.astype(np.float64), axis=0, popmean=0)[1]
+    sig_unc = p_values_unc < 0.05
+    ax.fill_between(times, 0, learning, where=sig_unc, color='C2', alpha=1)
+    p_values = decod_stats(diff, jobs)
+    sig = p_values < 0.05
+    ax.fill_between(times, 0, learning, where=sig, color='black', alpha=1)
+plt.savefig(figures_dir / "rsa" / "mean_b1_vs_b4.pdf", transparent=True)
 plt.close()

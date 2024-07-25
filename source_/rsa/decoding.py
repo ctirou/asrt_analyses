@@ -1,71 +1,73 @@
 import numpy as np
 import pandas as pd
 import mne
-from mne.decoding import SlidingEstimator
+from mne.decoding import SlidingEstimator, cross_val_multiscore
 from sklearn.pipeline import make_pipeline
 from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import confusion_matrix, roc_auc_score
-from base import ensure_dir
+from base import ensure_dir, get_volume_estimate_time_course
 from config import *
 from mne.beamformer import make_lcmv, apply_lcmv_epochs
 import gc
+import os
+from tqdm.auto import tqdm
 
 # params
-subject = SUBJS[0]
+subjects = SUBJS
 
-analysis = "decoding_cvm"
+analysis = "concatenated"
 lock = "stim" # "stim", "button"
 trial_type = 'pattern' # "all", "pattern", or "random"
 data_path = DATA_DIR
 subjects_dir = FREESURFER_DIR
 res_path = RESULTS_DIR
+ensure_dir(res_path)
 sessions = ['Practice', 'Block_1', 'Block_2', 'Block_3', 'Block_4']
 folds = 10
 solver = 'lbfgs'
-scoring = "roc_auc"
+scoring = "accuracy"
 parc='aparc'
+# parc='aseg'
 hemi = 'both'
 verbose = True
-jobs = 10
+jobs = -1
 
 # get times
 epoch_fname = DATA_DIR / lock / 'sub01-0-epo.fif'
 epochs = mne.read_epochs(epoch_fname, verbose=verbose)
 times = epochs.times
-
-# get label index    
-ilabel = 0
-# get labels
-labels = mne.read_labels_from_annot(subject=subject, parc=parc, hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
-label = labels[ilabel]
-
-del epochs, epoch_fname, labels
+del epochs, epoch_fname
 gc.collect()
 
-for session_id, session in enumerate(sessions):
-        
-    # results dir
-    res_dir = res_path / analysis / 'source' / lock / trial_type / label.name / subject / session
-    ensure_dir(res_dir)    
-    # read stim epoch
-    epoch_fname = data_path / lock / f"{subject}-{session_id}-epo.fif"
-    epoch = mne.read_epochs(epoch_fname, preload=True, verbose=verbose)
-    # read behav
-    behav_fname = data_path / "behav" / f"{subject}-{session_id}.pkl"
-    behav = pd.read_pickle(behav_fname).reset_index()
-    # get session behav and epoch
-    if session_id == 0:
-        session = 'prac'
-    else:
-        session = 'sess-%s' % (str(session_id).zfill(2))
+for subject in subjects:
+            
+    epo_dir = data_path / lock
+    epo_fnames = [epo_dir / f'{f}' for f in sorted(os.listdir(epo_dir)) if '.fif' in f and subject in f]
+    all_epo = [mne.read_epochs(fname, preload=True, verbose="error") for fname in epo_fnames]
+    for epoch in all_epo: # see mne.preprocessing.maxwell_filter to realign the runs to a common head position. On raw data.
+        epoch.info['dev_head_t'] = all_epo[0].info['dev_head_t']
+    epoch = mne.concatenate_epochs(all_epo)
+
+    beh_dir = data_path / 'behav'
+    beh_fnames = [beh_dir / f'{f}' for f in sorted(os.listdir(beh_dir)) if '.pkl' in f and subject in f]
+    all_beh = [pd.read_pickle(fname) for fname in beh_fnames]
+    behav = pd.concat(all_beh)
+
     if lock == 'button': 
-        epoch_bsl_fname = data_path / "bsl" / f"{subject}-{session_id}-epo.fif"
-        epoch_bsl = mne.read_epochs(epoch_bsl_fname, verbose=verbose)
+        bsl_data = data_path / "bsl"
+        epoch_bsl_fnames = [bsl_data / f"{f}" for f in sorted(os.listdir(bsl_data)) if ".fif" in f and subject in f]
+        all_bsl = [mne.read_epochs(fname, preload=True, verbose="error") for fname in epoch_bsl_fnames]
+        for epoch in all_bsl:
+            epoch.info['dev_head_t'] = all_epo[0].info['dev_head_t']
+        epoch_bsl = mne.concatenate_epochs(all_bsl)
+
     # read forward solution    
-    fwd_fname = res_path / "fwd" / lock / f"{subject}-{session_id}-fwd.fif"
-    fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
+    fwd_fname = res_path / analysis / "fwd" / lock / f"{subject}-mixed-lh-fwd.fif"
+    fwd = mne.read_forward_solution(fwd_fname, ordered=False, verbose=verbose)
+    # labels = mne.get_volume_labels_from_src(fwd['src'], subject, subjects_dir)
+    
     # compute data covariance matrix on evoked data
     data_cov = mne.compute_covariance(epoch, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
     # compute noise covariance
@@ -80,70 +82,81 @@ for session_id, session in enumerate(sessions):
     filters = make_lcmv(info, fwd, data_cov=data_cov, noise_cov=noise_cov,
                     pick_ori=None, rank=rank, reduce_rank=True, verbose=verbose)
     stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
-        
-    # get stcs in label
-    stcs_data = [stc.in_label(label).data for stc in stcs]
-    stcs_data = np.array(stcs_data)
-    assert len(stcs_data) == len(behav)
-
-    if trial_type == 'pattern':
-        pattern = behav.trialtypes == 1
-        X = stcs_data[pattern]
-        y = behav.positions[pattern]
-    elif trial_type == 'random':
-        random = behav.trialtypes == 2
-        X = stcs_data[random]
-        y = behav.positions[random]
-    else:
-        X = stcs_data
-        y = behav.positions
-    y = y.reset_index(drop=True)            
-    assert X.shape[0] == y.shape[0]
-    
-    del epoch, epoch_fname, behav_fname, fwd, fwd_fname, data_cov, noise_cov, rank, info, filters, stcs, stcs_data
-    gc.collect()
     
     # set-up the classifier and cv structure
-    clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, multi_class="ovr", max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
+    clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
     clf = SlidingEstimator(clf, scoring=scoring, n_jobs=jobs, verbose=verbose)
     cv = StratifiedKFold(folds, shuffle=True)
+
+    labels = mne.read_labels_from_annot(subject=subject, parc=parc, hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
     
-    pred = np.zeros((len(y), X.shape[-1]))
-    pred_rock = np.zeros((len(y), X.shape[-1], len(set(y))))
-    for train, test in cv.split(X, y):
-        clf.fit(X[train], y[train])
-        pred[test] = np.array(clf.predict(X[test]))
-        pred_rock[test] = np.array(clf.predict_proba(X[test]))
-                    
-    cms, scores = list(), list()
-    for itime in range(len(times)):
-        cms.append(confusion_matrix(y[:], pred[:, itime], normalize='true', labels=[1, 2, 3, 4]))
-        scores.append(roc_auc_score(y[:], pred_rock[:, itime, :], multi_class='ovr'))
-    
-    cms_arr = np.array(cms)
-    np.save(res_dir / "cms.npy", cms_arr)
-    scores = np.array(scores)
-    np.save(res_dir / "scores.npy", scores)
-    
-    one_two_similarity = list()
-    one_three_similarity = list()
-    one_four_similarity = list() 
-    two_three_similarity = list()
-    two_four_similarity = list()
-    three_four_similarity = list()
-    for itime in range(len(times)):
-        one_two_similarity.append(cms_arr[itime, 0, 1])
-        one_three_similarity.append(cms_arr[itime, 0, 2])
-        one_four_similarity.append(cms_arr[itime, 0, 3])
-        two_three_similarity.append(cms_arr[itime, 1, 2])
-        two_four_similarity.append(cms_arr[itime, 1, 3])
-        three_four_similarity.append(cms_arr[itime, 2, 3])
-                                    
-    similarities = [one_two_similarity, one_three_similarity, one_four_similarity, 
-                    two_three_similarity, two_four_similarity, three_four_similarity]
-    similarities = np.array(similarities)
-    np.save(res_dir / 'rsa.npy', similarities)
-    
-    del X, y, clf, cv, train, test, pred, pred_rock, cms, cms_arr, scores, similarities
-    del one_two_similarity, one_three_similarity, one_four_similarity, two_three_similarity, two_four_similarity, three_four_similarity
+    del epoch, fwd, fwd_fname, data_cov, noise_cov, rank, info, filters
     gc.collect()
+    
+    for ilabel, label in enumerate(labels):
+        
+        print(subject, f"{str(ilabel+1).zfill(2)}/{len(labels)}", label.name)
+        # results dir
+        res_dir = res_path / analysis / 'source' / lock / trial_type / label.name / subject
+        ensure_dir(res_dir)
+        
+        # get stcs in label
+        stcs_data = [stc.in_label(label).data for stc in stcs] # stc.in_label() doesn't work anymore for volume source space            
+        stcs_data = np.array(stcs_data)
+        assert len(stcs_data) == len(behav)
+
+        if trial_type == 'pattern':
+            pattern = behav.trialtypes == 1
+            X = stcs_data[pattern]
+            y = behav.positions[pattern]
+        elif trial_type == 'random':
+            random = behav.trialtypes == 2
+            X = stcs_data[random]
+            y = behav.positions[random]
+        else:
+            X = stcs_data
+            y = behav.positions
+        y = y.reset_index(drop=True)            
+        assert X.shape[0] == y.shape[0]
+
+        del stcs_data
+        gc.collect()
+
+        scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=verbose)
+        np.save(res_dir / "scores.npy", scores.mean(0))
+            
+        del X, y, scores
+        gc.collect()
+    
+labels = mne.get_volume_labels_from_src(fwd['src'], subject, subjects_dir)
+label_tc = get_volume_estimate_time_course(stcs, fwd, subject, subjects_dir)
+
+labels_list = list(label_tc.keys())
+scores_df = dict()
+for label in labels_list: 
+    print(label)
+    pattern = behav.trialtypes == 1
+    X = label_tc[label][pattern]
+    y = behav.positions[pattern]
+    scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=verbose)
+    scores_df[label] = scores.mean(0).T
+
+import matplotlib.pyplot as plt
+nrows, ncols = 4, 4
+fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(40, 13))
+for i, (ax, label) in enumerate(zip(axs.flat, labels_list)):
+    ax.plot(times, scores_df[label])
+    ax.axhline(.25, color='black', ls='dashed', alpha=.5)
+    ax.set_title(f"${label}$", fontsize=8)    
+    ax.axvspan(0, 0.2, color='grey', alpha=.2)
+plt.show()
+fig.savefig(f"/Users/coum/Desktop/test_sub_decoding-lh.pdf")
+plt.close()
+
+plt.plot(times, scores.mean(0).T)
+plt.title(label.name)
+plt.axvline(x=0, color='black', linestyle='--')
+plt.axhline(y=0.25, color='black', linestyle='--')
+plt.show()
+# plt.save(f"/Users/coum/Desktop/test_sub_decoding/{label.name}.pdf")
+# plt.close()

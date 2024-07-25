@@ -16,6 +16,25 @@ PRED_PATH = Path('/Users/coum/Desktop/pred_asrt')
 PRED_PATH_SSD = Path('/Volumes/Ultra_Touch/pred_asrt')
 PRED_PATH_MB = Path('/Users/coum/Desktop/pred_asrt')
 
+SURFACE_LABELS = ['cuneus-lh',
+                'cuneus-rh',
+                'fusiform-lh',
+                'fusiform-rh',
+                'inferiorparietal-lh',
+                'inferiorparietal-rh',
+                'isthmuscingulate-lh',
+                'isthmuscingulate-rh',
+                'lateraloccipital-lh',
+                'lateraloccipital-rh',
+                'lingual-lh',
+                'lingual-rh',
+                'pericalcarine-lh',
+                'pericalcarine-rh',
+                'precuneus-lh',
+                'precuneus-rh',
+                'superiorparietal-lh',
+                'superiorparietal-rh']
+
 VOLUME_LABELS = ['Amygdala-lh',
                   'Amygdala-rh',
                   'Brain-Stem',
