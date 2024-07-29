@@ -44,6 +44,8 @@ def spearman_rank_correlation(x, y):
 labels_annot = read_labels_from_annot(subject='sub01', parc='aparc', hemi='both', subjects_dir=FREESURFER_DIR, verbose=False)
 label_names = [label.name for label in labels_annot]
 
+diag_dict = dict()
+
 for ilabel, label in enumerate(label_names):
     print(f"{str(ilabel+1).zfill(2)}/{len(label_names)}", label)
     ensure_dir(figure_dir / label)
@@ -66,8 +68,8 @@ for ilabel, label in enumerate(label_names):
         cmap="RdBu_r",
         extent=times[[0, -1, 0, -1]],
         aspect=0.5,
-        vmin=0.23,
-        vmax=.27)
+        vmin=.20,
+        vmax=.30)
     ax.set_xlabel("Testing Time (s)")
     ax.set_ylabel("Training Time (s)")
     ax.set_title("Temporal generalization")
@@ -76,6 +78,7 @@ for ilabel, label in enumerate(label_names):
     cbar = plt.colorbar(im, ax=ax)
     cbar.set_label("accuracy")
     fig.savefig(figure_dir / label / "mean_pattern.pdf")
+    plt.close()
 
     # plot random
     fig, ax = plt.subplots(1, 1, figsize=(16, 7))
@@ -86,7 +89,7 @@ for ilabel, label in enumerate(label_names):
         cmap="RdBu_r",
         extent=times[[0, -1, 0, -1]],
         aspect=0.5,
-        vmin=-.30,
+        vmin=.20,
         vmax=.30)
     ax.set_xlabel("Testing Time (s)")
     ax.set_ylabel("Training Time (s)")
@@ -96,17 +99,28 @@ for ilabel, label in enumerate(label_names):
     cbar = plt.colorbar(im, ax=ax)
     cbar.set_label("accuracy")
     fig.savefig(figure_dir / label / "mean_random.pdf")
+    plt.close()
 
     # plot contrast with significance
     contrasts = patterns - randoms
-    
+    color1 = "#1f77b4"
+    color2 = "#F79256"
     coco = np.array([np.diag(cock) for cock in contrasts])
-    fig, ax = plt.subplots(1, 1, figsize=(35, 5), layout='tight')
+    fig, ax = plt.subplots(1, 1, figsize=(40, 5), layout='tight')
     pval = decod_stats(coco, -1)
     sig = pval < 0.05
-    ax.plot(times, np.diag(contrasts.mean(0)), label='contrasts')
-    ax.fill_between(times, 0, np.diag(contrasts.mean(0)), color="grey", alpha=.3, where=sig)
+    ax.plot(times, np.diag(contrasts.mean(0)), color=color1, label='contrasts')
+    ax.fill_between(times, 0, np.diag(contrasts.mean(0)), color=color2, alpha=.7, where=sig)
+    ax.axhline(0, alpha=.7, color='black')
+    ax.axvline(-3, ls="dashed", alpha=.7, color='black')
+    ax.axvline(-1.5, ls="dashed", alpha=.7, color='black')
+    ax.axvline(0, ls="dashed", alpha=.7, color='black')
+    ax.axvline(1.5, ls="dashed", alpha=.7, color='black')
+    ax.axvline(3, ls="dashed", alpha=.7, color='black')
     fig.savefig(figure_dir / label / "contrast_diag.pdf")
+    plt.close()
+    if label not in diag_dict:
+        diag_dict[label] = contrasts.mean(0)
 
     # pval = gat_stats(contrasts, jobs)
     # pval = np.load(res_path / "pval" / label / "contrast-pval.npy")
@@ -132,7 +146,8 @@ for ilabel, label in enumerate(label_names):
     #                     linestyles='solid', linewidths=1)
     ax.axvline(0, color="k")
     ax.axhline(0, color="k")
-    fig.savefig(figure_dir / label / "mean_contrast.png")
+    fig.savefig(figure_dir / label / "mean_contrast.pdf")
+    plt.close()
 
     # # look at the correlations
     # all_patterns, all_randoms = [], []
@@ -186,3 +201,14 @@ for ilabel, label in enumerate(label_names):
     #     ax.axhline(0, color="k")
     #     fig.savefig(op.join(figure_dir, lock, f"mean_rho_{trial_type}.png"))
 
+# plot diag plots
+fig, axs = plt.subplots(nrows=7, ncols=10, layout="tight", figsize=(40, 10), sharex=True, sharey=True)
+for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
+    print(f"plotting {label}...")
+    ax.plot(times, diag_dict[label], color=color1)
+    ax.axhline(0, alpha=.7, color='black')
+    ax.axvline(-3, ls="dashed", alpha=.7, color='black')
+    ax.axvline(-1.5, ls="dashed", alpha=.7, color='black')
+    ax.axvline(0, ls="dashed", alpha=.7, color='black')
+    ax.axvline(1.5, ls="dashed", alpha=.7, color='black')
+    ax.axvline(3, ls="dashed", alpha=.7, color='black')
