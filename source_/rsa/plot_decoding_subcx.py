@@ -45,7 +45,7 @@ for lock in ['stim', 'button']:
                 for label in labels_list:
                     if label not in label_dict:
                         label_dict[label] = []
-                    res_dir = res_path / 'source' / lock / trial_type / label
+                    res_dir = res_path / label
                     try:        
                         score = np.load(res_dir / f"{subject}-scores.npy")
                         label_dict[label].append(score)
@@ -81,7 +81,7 @@ for lock in ['stim', 'button']:
         for label in tqdm(labels):
             if label not in score_dict:
                 score_dict[label] = []
-            res_dir = res_path / 'source' / lock / trial_type / label
+            res_dir = res_path / label
             for subject in subjects:
                 score = np.load(res_dir / f"{subject}-scores.npy")
                 score_dict[label].append(score)
@@ -111,3 +111,39 @@ for lock in ['stim', 'button']:
                 plt.setp(legend.get_texts(), fontsize=7)  # Adjust legend size
         plt.savefig(FIGURE_PATH / analysis / 'source' / f'{lock}-{trial_type}-ave.pdf', transparent=True)
         plt.close()
+
+
+# plot thalamus vs cuneus
+for lock in ['stim', 'button']:
+    for trial_type in ['pattern', 'random']:
+        res_path = RESULTS_DIR / analysis / 'source' / lock / trial_type
+        figures = FIGURE_PATH / analysis / 'source' / lock / trial_type
+        ensure_dir(figures)
+        score_dict = {}
+        for label in tqdm(labels):
+            if label not in score_dict:
+                score_dict[label] = []
+            res_dir = res_path / label
+            for subject in subjects:
+                score = np.load(res_dir / f"{subject}-scores.npy")
+                score_dict[label].append(score)
+            score_dict[label] = np.array(score_dict[label])
+
+        fig, (ax1, ax2) = plt.subplots(1, 2, sharey=True, layout='tight', figsize=(14,5))
+        # left
+        ax1.axhline(.25, color='black', ls="dashed")
+        ax1.plot(times, score_dict['Thalamus-Proper-lh'].mean(0), color=color1, label='Thalamus')
+        ax1.plot(times, score_dict['cuneus-lh'].mean(0), color=color2, label='Cuneus')
+        ax1.axvspan(0, 0.2, color='grey', alpha=.2)
+        ax1.set_title("$Left$")
+        ax1.axvline(times[np.argmax(score_dict['Thalamus-Proper-lh'].mean(0))], color='black', ls=':')
+        ax1.legend()
+        # right
+        ax2.axhline(.25, color='black', ls="dashed")
+        ax2.plot(times, score_dict['Thalamus-Proper-rh'].mean(0), color=color1, label='Thalamus')
+        ax2.plot(times, score_dict['cuneus-rh'].mean(0), color=color2, label='Cuneus')
+        ax2.axvspan(0, 0.2, color='grey', alpha=.2)
+        ax2.set_title("$Right$")
+        ax2.axvline(times[np.argmax(score_dict['Thalamus-Proper-rh'].mean(0))], color='black', ls=':')
+        ax2.legend()
+        plt.savefig(figures / "thal_vs_cun.pdf")
