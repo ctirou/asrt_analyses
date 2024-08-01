@@ -11,7 +11,7 @@ from tqdm.auto import tqdm
 loca = "subcx"
 trial_type = "pattern"
 subjects = SUBJS
-lock = "button"
+lock = "stim"
 analysis = "rsa"
 sessions = EPOCHS
 res_path = RESULTS_DIR
@@ -98,6 +98,9 @@ for ilabel, label in enumerate(label_names):
     corr_in_lab[label] = all_rhos
     
 nrows, ncols = 3, 7
+color1 = "#1f77b4"
+color2 = "#F08700"
+color3 = "#00A6A6"
 ensure_dir(figures_dir / "correlations")
 ensure_dir(figures_dir / "rsa")
 # plot per subject
@@ -139,19 +142,28 @@ for isub, subject in enumerate(subjects):
 fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(20, 7))
 # fig.suptitle("correlations")
 for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
+    print(label)
     if lock == 'stim':
         ax.axvspan(0, 0.2, color='grey', alpha=.2)
     else:
         ax.axvline(0, color='black', alpha=.7)
     corr = corr_in_lab[label][:, :, 0].mean(0)
-    ax.plot(times, corr)
-    p_values = decod_stats(corr_in_lab[label][:, :, 0], jobs)
+    ax.plot(times, corr, color=color2, label='rho')
+    if i == 0:
+        legend = ax.legend()
+        plt.setp(legend.get_texts(), fontsize=8)
+        yticks = ax.get_yticks()
+    ax.axhline(0, color='black', alpha=.7, linewidth=.5)
     p_values_unc = ttest_1samp(corr_in_lab[label][:, :, 0], axis=0, popmean=0)[1]
-    sig = p_values < 0.05
     sig_unc = p_values_unc < 0.05
-    ax.fill_between(times, 0, corr, where=sig_unc, color='C2', alpha=1)
-    ax.fill_between(times, 0, corr, where=sig, alpha=0.3)
-    ax.axhline(0, color='black', ls='dashed', alpha=.5)
+    # ax.fill_between(times, 0, corr, where=sig_unc, color='C2', alpha=1)
+    for idx, sig in enumerate(sig_unc):
+        if sig:
+            # ax.plot(times[idx], yticks[0], 'o', color=color3, markersize=4)
+            ax.plot(times[idx], 0.45, 'o', color=color3, markersize=4)
+    p_values = decod_stats(corr_in_lab[label][:, :, 0], jobs)
+    sig = p_values < 0.05
+    ax.fill_between(times, 0, corr, where=sig, color='black', alpha=1)
     ax.set_title(f"${label}$", fontsize=8)   
 plt.savefig(figures_dir / "correlations" / "mean.pdf", transparent=True)
 plt.close()
@@ -160,30 +172,42 @@ plt.close()
 fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(20, 7))
 # fig.suptitle("RSA average across subjects")
 for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
-    practice = rsa_in_lab[label][:, 0, :].mean(0).astype(np.float64) * (-1)
-    learning = rsa_in_lab[label][:, 1:5, :].mean((0, 1)).astype(np.float64) * (-1)
+    print(label)
     if lock == 'stim':
         ax.axvspan(0, 0.2, color='grey', alpha=.2)
     else:
         ax.axvline(0, color='black', alpha=.7)
-    ax.plot(times, practice, label='practice')
-    ax.plot(times, learning, label='learning')
+    practice = np.array(rsa_in_lab[label][:, 0, :], dtype=float) * (-1)
+    prac_sem = np.std(practice, axis=0) / np.sqrt(len(subjects))
+    prac_m1 = np.array(practice.mean(0) + np.array(prac_sem))
+    prac_m2 = np.array(practice.mean(0) - np.array(prac_sem))
+    learning = np.array(rsa_in_lab[label][:, 1:, :], dtype=float) * (-1)
+    diff_sem = np.std(learning, axis = (0, 1)) / np.sqrt(len(subjects))
+    diff_m1 = np.array(learning.mean((0, 1)) + np.array(diff_sem))
+    diff_m2 = np.array(learning.mean((0, 1)) - np.array(diff_sem))
+    ax.fill_between(times, prac_m1, prac_m2, facecolor="grey", alpha=.7, label='Practice')
+    ax.fill_between(times, diff_m1, diff_m2, facecolor=color2, alpha=.8, label='Learning')
     ax.set_title(f"${label}$", fontsize=8)     
-    ax.axhline(0, color='black', ls='dashed', alpha=.5)
     if i == 0:
         legend = ax.legend()
-        plt.setp(legend.get_texts(), fontsize=8)  # Adjust legend size
+        plt.setp(legend.get_texts(), fontsize=8)
+        yticks = ax.get_yticks()
+    # Adjust legend size
     # for tick in ax.xaxis.get_major_ticks():  # Adjust x-axis label size
     #     tick.label.set_fontsize(8)
     # for tick in ax.yaxis.get_major_ticks():  # Adjust y-axis label size
     #     tick.label.set_fontsize(8)
-    diff = rsa_in_lab[label][:, 1:5, :].mean((1)) - rsa_in_lab[label][:, 0, :]
+    ax.axhline(0, color='black', alpha=.7, linewidth=.5)
+    diff = learning.mean(1) - practice
     p_values_unc = ttest_1samp(diff.astype(np.float64), axis=0, popmean=0)[1]
     sig_unc = p_values_unc < 0.05
-    ax.fill_between(times, 0, learning, where=sig_unc, color='C2', alpha=0.2)
+    for idx, sig in enumerate(sig_unc):
+        if sig:
+            ax.plot(times[idx], 0.2, 'o', color=color3, markersize=4)
+    # ax.fill_between(times, 0, learning, where=sig_unc, color='C2', alpha=0.2)
     p_values = decod_stats(diff, jobs)
     sig = p_values < 0.05
-    ax.fill_between(times, 0, learning, where=sig, color='C3', alpha=0.3)
+    ax.fill_between(times, diff_m1, diff_m2, where=sig, color='black', alpha=1)
 plt.savefig(figures_dir / "rsa" / "mean.pdf", transparent=True)
 plt.close()
 
@@ -197,21 +221,19 @@ for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
         ax.axvspan(0, 0.2, color='grey', alpha=.2)
     else:
         ax.axvline(0, color='black', alpha=.7)
-    ax.plot(times, practice, label='Practice')
-    ax.plot(times, learning, label='Block_4')
+    ax.plot(times, practice, label='Practice', color='grey', alpha=.7)
+    ax.plot(times, learning, label='Block_4', color=color2, alpha=.8)
     ax.set_title(f"${label}$", fontsize=8)     
-    ax.axhline(0, color='black', ls='dashed', alpha=.5)
+    ax.axhline(0, color='black', alpha=.7, linewidth=.5)
     if i == 0:
         legend = ax.legend()
         plt.setp(legend.get_texts(), fontsize=8)  # Adjust legend size
-    # for tick in ax.xaxis.get_major_ticks():  # Adjust x-axis label size
-    #     tick.label.set_fontsize(8)
-    # for tick in ax.yaxis.get_major_ticks():  # Adjust y-axis label size
-    #     tick.label.set_fontsize(8)
     diff = rsa_in_lab[label][:, -1, :] - rsa_in_lab[label][:, 0, :]
     p_values_unc = ttest_1samp(diff.astype(np.float64), axis=0, popmean=0)[1]
     sig_unc = p_values_unc < 0.05
-    ax.fill_between(times, 0, learning, where=sig_unc, color='C2', alpha=1)
+    for idx, sig in enumerate(sig_unc):
+        if sig:
+            ax.plot(times[idx], 0.15, 'o', color=color3, markersize=4)
     p_values = decod_stats(diff, jobs)
     sig = p_values < 0.05
     ax.fill_between(times, 0, learning, where=sig, color='black', alpha=1)
@@ -228,10 +250,10 @@ for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
         ax.axvspan(0, 0.2, color='grey', alpha=.2)
     else:
         ax.axvline(0, color='black', alpha=.7)
-    ax.plot(times, practice, label='Block_1')
-    ax.plot(times, learning, label='Block_4')
+    ax.plot(times, practice, label='Block_1', color='grey', alpha=.7)
+    ax.plot(times, learning, label='Block_4', color=color2, alpha=.8)
     ax.set_title(f"${label}$", fontsize=8)     
-    ax.axhline(0, color='black', ls='dashed', alpha=.5)
+    ax.axhline(0, color='black', alpha=.7, linewidth=.5)
     if i == 0:
         legend = ax.legend()
         plt.setp(legend.get_texts(), fontsize=8)  # Adjust legend size
@@ -242,7 +264,9 @@ for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
     diff = rsa_in_lab[label][:, -1, :] - rsa_in_lab[label][:, 1, :]
     p_values_unc = ttest_1samp(diff.astype(np.float64), axis=0, popmean=0)[1]
     sig_unc = p_values_unc < 0.05
-    ax.fill_between(times, 0, learning, where=sig_unc, color='C2', alpha=1)
+    for idx, sig in enumerate(sig_unc):
+        if sig:
+            ax.plot(times[idx], 0.10, 'o', color=color3, markersize=4)
     p_values = decod_stats(diff, jobs)
     sig = p_values < 0.05
     ax.fill_between(times, 0, learning, where=sig, color='black', alpha=1)
