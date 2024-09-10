@@ -6,7 +6,6 @@ from sklearn.pipeline import make_pipeline
 from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import confusion_matrix, roc_auc_score
 from base import ensure_dir, get_volume_estimate_time_course
 from config import *
 from mne.beamformer import make_lcmv, apply_lcmv_epochs
@@ -17,8 +16,8 @@ from tqdm.auto import tqdm
 # params
 subjects = SUBJS
 
-analysis = "concatenated"
-lock = "stim" # "stim", "button"
+analysis = "decoding"
+lock = "button" # "stim", "button"
 trial_type = 'pattern' # "all", "pattern", or "random"
 data_path = DATA_DIR
 subjects_dir = FREESURFER_DIR
@@ -31,7 +30,7 @@ scoring = "accuracy"
 parc='aparc'
 # parc='aseg'
 hemi = 'both'
-verbose = True
+verbose = 'error'
 jobs = -1
 
 # get times
@@ -40,6 +39,11 @@ epochs = mne.read_epochs(epoch_fname, verbose=verbose)
 times = epochs.times
 del epochs, epoch_fname
 gc.collect()
+
+# set-up the classifier and cv structure
+clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
+clf = SlidingEstimator(clf, scoring=scoring, n_jobs=jobs, verbose=verbose)
+cv = StratifiedKFold(folds, shuffle=True)
 
 for subject in subjects:
             
@@ -59,13 +63,13 @@ for subject in subjects:
         bsl_data = data_path / "bsl"
         epoch_bsl_fnames = [bsl_data / f"{f}" for f in sorted(os.listdir(bsl_data)) if ".fif" in f and subject in f]
         all_bsl = [mne.read_epochs(fname, preload=True, verbose="error") for fname in epoch_bsl_fnames]
-        for epoch in all_bsl:
-            epoch.info['dev_head_t'] = all_epo[0].info['dev_head_t']
+        for epo in all_bsl:
+            epo.info['dev_head_t'] = all_epo[0].info['dev_head_t']
         epoch_bsl = mne.concatenate_epochs(all_bsl)
 
     # read forward solution    
-    fwd_fname = res_path / analysis / "fwd" / lock / f"{subject}-mixed-lh-fwd.fif"
-    fwd = mne.read_forward_solution(fwd_fname, ordered=False, verbose=verbose)
+    # fwd_fname = res_path / analysis / "fwd" / lock / f"{subject}-mixed-lh-fwd.fif"
+    # fwd = mne.read_forward_solution(fwd_fname, ordered=False, verbose=verbose)
     # labels = mne.get_volume_labels_from_src(fwd['src'], subject, subjects_dir)
     
     # compute data covariance matrix on evoked data
@@ -78,26 +82,36 @@ for subject in subjects:
     info = epoch.info
     # conpute rank
     rank = mne.compute_rank(noise_cov, info=info, rank=None, tol_kind='relative', verbose=verbose)
+    trans_fname = os.path.join(res_path, "trans", lock, "%s-all-trans.fif" % (subject))
+
+    src_fname = res_path / "src" / f"{subject}-src.fif"
+    src = mne.read_source_spaces(src_fname, verbose=verbose)
+    bem_fname = res_path / "bem" / f"{subject}-bem-sol.fif"    
+
+    # compute forward solution
+    fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,
+                                src=src, bem=bem_fname,
+                                meg=True, eeg=False,
+                                mindist=5.0,
+                                n_jobs=jobs,
+                                verbose=verbose)
+
     # compute source estimates
     filters = make_lcmv(info, fwd, data_cov=data_cov, noise_cov=noise_cov,
                     pick_ori=None, rank=rank, reduce_rank=True, verbose=verbose)
     stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
     
-    # set-up the classifier and cv structure
-    clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
-    clf = SlidingEstimator(clf, scoring=scoring, n_jobs=jobs, verbose=verbose)
-    cv = StratifiedKFold(folds, shuffle=True)
-
-    labels = mne.read_labels_from_annot(subject=subject, parc=parc, hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
+    all_labels = mne.read_labels_from_annot(subject=subject, parc=parc, hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
+    labels = [label for label in all_labels if label.name in SURFACE_LABELS_RT]
     
-    del epoch, fwd, fwd_fname, data_cov, noise_cov, rank, info, filters
+    del epoch, fwd, src, data_cov, noise_cov, rank, info, filters
     gc.collect()
     
     for ilabel, label in enumerate(labels):
         
         print(subject, f"{str(ilabel+1).zfill(2)}/{len(labels)}", label.name)
         # results dir
-        res_dir = res_path / analysis / 'source' / lock / trial_type / label.name / subject
+        res_dir = res_path / analysis / 'source' / lock / trial_type / label.name
         ensure_dir(res_dir)
         
         # get stcs in label
@@ -123,7 +137,7 @@ for subject in subjects:
         gc.collect()
 
         scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=verbose)
-        np.save(res_dir / "scores.npy", scores.mean(0))
+        np.save(res_dir / f"{subject}-scores.npy", scores.mean(0))
             
         del X, y, scores
         gc.collect()

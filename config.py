@@ -35,6 +35,23 @@ SURFACE_LABELS = ['cuneus-lh',
                 'superiorparietal-lh',
                 'superiorparietal-rh']
 
+SURFACE_LABELS_RT = ['lateraloccipital-lh',
+                     'lateraloccipital-rh',
+                     'lingual-lh',
+                     'lingual-rh',
+                     'paracentral-lh',
+                     'paracentral-rh',
+                     'pericalcarine-lh',
+                     'pericalcarine-rh',
+                     'postcentral-lh',
+                     'postcentral-rh',
+                     'precentral-lh',
+                     'precentral-rh',
+                     'superiorparietal-lh',
+                     'superiorparietal-rh',
+                     'supramarginal-lh',
+                     'supramarginal-rh']
+
 VOLUME_LABELS = ['Amygdala-lh',
                   'Amygdala-rh',
                   'Brain-Stem',
