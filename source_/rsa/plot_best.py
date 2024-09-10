@@ -19,6 +19,7 @@ subjects_dir = FREESURFER_DIR
 verbose = "error"
 hemi = 'both'
 chance = 25
+jobs = -1
 
 # get times
 epoch_fname = DATA_DIR / lock / 'sub01-0-epo.fif'
@@ -162,7 +163,7 @@ for ilabel in tqdm(range(len(label_names))):
         sem = np.std(score, axis=0) / np.sqrt(len(subjects))
         m1 = np.array(score.mean(0) + np.array(sem))
         m2 = np.array(score.mean(0) - np.array(sem))
-        p_values = decod_stats(score - chance)
+        p_values = decod_stats(score - chance, jobs)
         sig = p_values < 0.05
         axs[0].fill_between(times, m1, m2, facecolor='0.6')
         axs[0].fill_between(times, m1, m2, facecolor=color1, where=sig, alpha=1)
@@ -175,7 +176,7 @@ for ilabel in tqdm(range(len(label_names))):
         sem = np.std(score2, axis=0) / np.sqrt(len(subjects))
         m1 = np.array(score2.mean(0) + np.array(sem))
         m2 = np.array(score2.mean(0) - np.array(sem))
-        p_values = decod_stats(score2 - chance)
+        p_values = decod_stats(score2 - chance, jobs)
         sig = p_values < 0.05
         axs[1].fill_between(times, m1, m2, facecolor='0.6')
         axs[1].fill_between(times, m1, m2, facecolor=color2, where=sig, alpha=1)
