@@ -72,6 +72,10 @@ for subject in subjects:
     # fwd = mne.read_forward_solution(fwd_fname, ordered=False, verbose=verbose)
     # labels = mne.get_volume_labels_from_src(fwd['src'], subject, subjects_dir)
     
+    src_fname = res_path / "src" / f"{subject}-src.fif"
+    src = mne.read_source_spaces(src_fname, verbose=verbose)
+    bem_fname = res_path / "bem" / f"{subject}-bem-sol.fif"    
+
     # compute data covariance matrix on evoked data
     data_cov = mne.compute_covariance(epoch, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
     # compute noise covariance
@@ -83,10 +87,6 @@ for subject in subjects:
     # conpute rank
     rank = mne.compute_rank(noise_cov, info=info, rank=None, tol_kind='relative', verbose=verbose)
     trans_fname = os.path.join(res_path, "trans", lock, "%s-all-trans.fif" % (subject))
-
-    src_fname = res_path / "src" / f"{subject}-src.fif"
-    src = mne.read_source_spaces(src_fname, verbose=verbose)
-    bem_fname = res_path / "bem" / f"{subject}-bem-sol.fif"    
 
     # compute forward solution
     fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,

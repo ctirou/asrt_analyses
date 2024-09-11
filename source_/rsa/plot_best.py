@@ -41,6 +41,8 @@ labels = read_labels_from_annot(subject='sub01', parc='aparc', hemi=hemi, subjec
 label_names = [label.name for ilabel, label in enumerate(labels) if ilabel in best_regions]
 del labels
 
+label_names = sorted(SURFACE_LABELS + VOLUME_LABELS) if lock == 'button' else sorted(SURFACE_LABELS_RT + VOLUME_LABELS)
+
 figures = res_path / "figures" / analysis / 'source' / lock / trial_type
 ensure_dir(figures)
 gc.collect()

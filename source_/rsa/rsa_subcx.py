@@ -39,7 +39,7 @@ times = epochs.times
 
 # get label names
 # best_regions = [6, 7, 12, 13, 14, 15, 20, 21, 22, 23, 26, 27, 42, 43, 50, 51, 58, 59]
-labels = VOLUME_LABELS
+labels = VOLUME_LABELS if lock == 'stim' else VOLUME_LABELS_RT
 
 del epochs
 gc.collect()

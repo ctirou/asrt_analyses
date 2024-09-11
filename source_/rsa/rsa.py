@@ -22,7 +22,7 @@ import gc
 subjects = SUBJS
 
 analysis = 'RSA'
-lock = "stim"
+lock = "button"
 trial_type = "pattern"
 data_path = DATA_DIR
 subjects_dir = FREESURFER_DIR
@@ -32,6 +32,7 @@ res_path = RESULTS_DIR
 parc = 'aparc'
 hemi = 'both'
 verbose = "error"
+jobs = 10
 
 # figures dir
 res_dir = res_path / analysis / 'source' / lock / trial_type
@@ -42,9 +43,10 @@ epochs = mne.read_epochs(epoch_fname, verbose=verbose)
 times = epochs.times
 
 # get label names
-best_regions = [6, 7, 12, 13, 14, 15, 20, 21, 22, 23, 26, 27, 42, 43, 50, 51, 58, 59]
+# best_regions = [6, 7, 12, 13, 14, 15, 20, 21, 22, 23, 26, 27, 42, 43, 50, 51, 58, 59]
+best = SURFACE_LABELS if lock == 'stim' else SURFACE_LABELS_RT
 labels = mne.read_labels_from_annot(subject='sub01', parc=parc, hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
-label_names = [label.name for ilabel, label in enumerate(labels) if ilabel in best_regions]
+label_names = [label.name for label in labels if label.name in best]
 
 del epochs, labels
 gc.collect()
@@ -53,14 +55,19 @@ combinations = ['one_two', 'one_three', 'one_four', 'two_three', 'two_four', 'th
 for subject in subjects:
     
     # get labels
-    label = mne.read_labels_from_annot(subject=subject, parc=parc, hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
-    labels = [label for ilabel, label in enumerate(label) if ilabel in best_regions]
+    all_labels = mne.read_labels_from_annot(subject=subject, parc=parc, hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
+    labels = [label for label in all_labels if label.name in best]
+    # labels = [label.name for label in labels if label.name in best_regions]
     # to store dissimilarity distances
     rsa_dict = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
     
-    del label
+    del all_labels
     gc.collect()
-                
+    
+    src_fname = res_path / "src" / f"{subject}-src.fif"
+    src = mne.read_source_spaces(src_fname, verbose=verbose)
+    bem_fname = res_path / "bem" / f"{subject}-bem-sol.fif"    
+    
     for session_id, session in enumerate(sessions):
         
         # read stim epoch
@@ -78,8 +85,8 @@ for subject in subjects:
             epoch_bsl_fname = data_path / "bsl" / f"{subject}-{session_id}-epo.fif"
             epoch_bsl = mne.read_epochs(epoch_bsl_fname, verbose=verbose)
         # read forward solution    
-        fwd_fname = res_path / "fwd" / lock / f"{subject}-{session_id}-fwd.fif"
-        fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
+        # fwd_fname = res_path / "fwd" / lock / f"{subject}-{session_id}-fwd.fif"
+        # fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
         # compute data covariance matrix on evoked data
         data_cov = mne.compute_covariance(epoch, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
         # compute noise covariance
@@ -90,12 +97,19 @@ for subject in subjects:
         info = epoch.info
         # conpute rank
         rank = mne.compute_rank(noise_cov, info=info, rank=None, tol_kind='relative', verbose=verbose)
+        trans_fname = os.path.join(res_path, "trans", lock, "%s-all-trans.fif" % (subject))
+        fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,
+                                    src=src, bem=bem_fname,
+                                    meg=True, eeg=False,
+                                    mindist=5.0,
+                                    n_jobs=jobs,
+                                    verbose=verbose)
         # compute source estimates
         filters = make_lcmv(info, fwd, data_cov=data_cov, noise_cov=noise_cov,
                         pick_ori=None, rank=rank, reduce_rank=True, verbose=verbose)
         stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
         
-        del epoch, epoch_fname, behav_fname, fwd, fwd_fname, data_cov, noise_cov, rank, info, filters
+        del epoch, epoch_fname, behav_fname, fwd, data_cov, noise_cov, rank, info, filters
         gc.collect()
 
         # loop across labels

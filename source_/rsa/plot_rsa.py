@@ -38,7 +38,7 @@ corr_in_lab = {}
 
 # get labels
 # labels = read_labels_from_annot(subject='sub01', parc=parc, hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
-label_names = sorted(SURFACE_LABELS + VOLUME_LABELS) if lock == 'button' else sorted(SURFACE_LABELS_RT + VOLUME_LABELS)
+label_names = sorted(SURFACE_LABELS + VOLUME_LABELS) if lock == 'stim' else sorted(SURFACE_LABELS_RT + VOLUME_LABELS_RT)
 # del labels
 
 print("processing surface labels...")
@@ -150,6 +150,8 @@ for ilabel, label in enumerate(VOLUME_LABELS):
     corr_in_lab[label] = all_rhos
 
 nrows, ncols = 8, 5
+# color1 = "#1f77b4"
+# color2 = "#F79256"
 ensure_dir(figures_dir / "correlations")
 ensure_dir(figures_dir / "rsa")
 # plot per subject
