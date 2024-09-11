@@ -37,13 +37,14 @@ rsa_in_lab = {}
 corr_in_lab = {}
 
 # get labels
-labels = read_labels_from_annot(subject='sub01', parc=parc, hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
-label_names = [label.name for label in labels if label.name in SURFACE_LABELS]
-del labels
+# labels = read_labels_from_annot(subject='sub01', parc=parc, hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
+label_names = sorted(SURFACE_LABELS + VOLUME_LABELS) if lock == 'button' else sorted(SURFACE_LABELS_RT + VOLUME_LABELS)
+# del labels
 
-for ilabel, label in enumerate(label_names):
+print("processing surface labels...")
+for ilabel, label in enumerate(SURFACE_LABELS):
         
-    print(f"{str(ilabel+1).zfill(2)}/{len(label_names)}", label)
+    print(f"{str(ilabel+1).zfill(2)}/{len(SURFACE_LABELS)}", label)
 
     all_in_seqs, all_out_seqs = [], []
     
@@ -93,8 +94,62 @@ for ilabel, label in enumerate(label_names):
         all_rhos.append(rhos)
     all_rhos = np.array(all_rhos)
     corr_in_lab[label] = all_rhos
+
+print("processing volume labels...")
+for ilabel, label in enumerate(VOLUME_LABELS):
+        
+    print(f"{str(ilabel+1).zfill(2)}/{len(VOLUME_LABELS)}", label)
+
+    all_in_seqs, all_out_seqs = [], []
     
-nrows, ncols = 3, 6
+    for subject in subjects:
+                
+        one_two_similarities = list()
+        one_three_similarities = list()
+        one_four_similarities = list() 
+        two_three_similarities = list()
+        two_four_similarities = list() 
+        three_four_similarities = list()
+
+        behav_dir = HOME / "raw_behavs" / subject
+        sequence = get_sequence(behav_dir)
+                
+        rsa_df = pd.read_hdf(res_dir / f"{subject}_rsa-subcx.h5", key='rsa')
+        
+        for session_id, session in enumerate(sessions):
+            
+            one_two, one_three, one_four, two_three, two_four, three_four = [], [], [], [], [], []
+            for sim, sim_list in zip(similarity_names, [one_four, one_three, one_two, three_four, two_four, two_three]):
+                sim_list.append(rsa_df.loc[(label, session_id, sim), :])
+            for all_sims, sim_list in zip([one_two_similarities, one_three_similarities, one_four_similarities, two_three_similarities, two_four_similarities, three_four_similarities], 
+                                          [one_two, one_three, one_four, two_three, two_four, three_four]):
+                    all_sims.append(np.array(sim_list))
+                
+        for all_sims in [one_two_similarities, one_three_similarities, one_four_similarities, two_three_similarities, two_four_similarities, three_four_similarities]:
+            all_sims = np.array(all_sims)
+            
+        similarities = [one_two_similarities, one_three_similarities, one_four_similarities, two_three_similarities, two_four_similarities, three_four_similarities]
+        
+        in_seq, out_seq = get_inout_seq(sequence, similarities)
+        
+        all_in_seqs.append(in_seq)
+        all_out_seqs.append(out_seq)
+                
+    all_in_seq = np.array(all_in_seqs)
+    all_out_seq = np.array(all_out_seqs)
+    diff_inout = np.squeeze(all_in_seq.mean(axis=1) - all_out_seq.mean(axis=1))
+    rsa_in_lab[label] = diff_inout
+    
+    all_rhos = []
+    for sub in range(len(subjects)):
+        rhos = []
+        for itime in range(len(times)):
+            rhos.append(spearmanr([0, 1, 2, 3, 4], diff_inout[sub, :, itime]))
+        all_rhos.append(rhos)
+    all_rhos = np.array(all_rhos)
+    corr_in_lab[label] = all_rhos
+
+nrows, ncols = 8, 5
 ensure_dir(figures_dir / "correlations")
 ensure_dir(figures_dir / "rsa")
 # plot per subject
@@ -154,7 +209,7 @@ plt.savefig(figures_dir / "correlations" / "mean.pdf", transparent=True)
 plt.close()
 
 # plot rsa
-fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(20, 7))
+fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(10, 15))
 # fig.suptitle("RSA average across subjects")
 for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
     practice = rsa_in_lab[label][:, 0, :].mean(0).astype(np.float64) * (-1)
