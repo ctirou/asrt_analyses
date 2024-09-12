@@ -161,6 +161,7 @@ for ilabel in tqdm(range(len(label_names))):
                 axs[i].axvspan(0, 0.2, facecolor='grey', alpha=.2, lw=0, zorder=1)
             if ilabel == 0:
                 axs[i].set_ylabel("Accuracy (%)")
+        
         score = decoding[label] * 100
         sem = np.std(score, axis=0) / np.sqrt(len(subjects))
         m1 = np.array(score.mean(0) + np.array(sem))
