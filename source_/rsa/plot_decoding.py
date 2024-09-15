@@ -5,6 +5,14 @@ from base import *
 from config import *
 import gc
 from tqdm.auto import tqdm
+from PyPDF2 import PdfMerger
+import os
+from pptx import Presentation
+from pptx.util import Inches
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+from pdfrw import PdfReader, PdfWriter, PageMerge
 
 lock = 'stim'
 trial_type = 'pattern'
@@ -29,6 +37,48 @@ gc.collect()
 # color1, color2 = "#1982C4", "#74B3CE"
 # color1, color2 = "#73A580", "#C5C392"
 
+# Function to add PDFs into a grid layout on a new PDF page
+def create_pdf_grid_with_pdfs(pdf_paths, nrows, ncols, output_pdf):
+    # Define the page size (letter size in this case)
+    page_width, page_height = letter
+    margin = 50
+
+    # Calculate the grid size for each PDF cell
+    grid_width = (page_width - 2 * margin) / ncols
+    grid_height = (page_height - 2 * margin) / nrows
+
+    # Initialize the PDF writer
+    writer = PdfWriter()
+
+    # Create a new page
+    new_page = PageMerge()
+
+    for i, pdf_path in enumerate(pdf_paths):
+        # Read the PDF file
+        pdf_reader = PdfReader(pdf_path)
+        pdf_page = pdf_reader.pages[0]  # Assuming single-page PDFs
+
+        # Get the position of the PDF in the grid
+        row = i // ncols
+        col = i % ncols
+
+        # Position on the new page
+        x = margin + col * grid_width
+        y = margin + row * grid_height
+
+        # Add the PDF page to the grid
+        PageMerge(new_page).add(pdf_page, viewrect=(0, 0, 1, 1)).scale_to(grid_width, grid_height).x = x
+        PageMerge(new_page).y = page_height - (y + grid_height)
+
+        # If the grid is full, finish the page and start a new one
+        if (i + 1) % (nrows * ncols) == 0 or (i + 1) == len(pdf_paths):
+            writer.addpage(new_page.render())
+            new_page = PageMerge()  # Start a new page
+
+    # Write the output PDF
+    writer.write(output_pdf)
+    print(f"Grid layout PDF saved as: {output_pdf}")
+
 for lock in ["stim", "button"]:
     label_names = sorted(SURFACE_LABELS + VOLUME_LABELS, key=str.casefold) if lock == 'stim' else sorted(SURFACE_LABELS_RT + VOLUME_LABELS_RT, key=str.casefold)
     trial_type = 'pattern'
@@ -44,33 +94,24 @@ for lock in ["stim", "button"]:
             score = np.load(RESULTS_DIR / analysis / 'source' / lock / trial_type / label / f"{subject}-scores.npy")
             decoding[label].append(score)
         decoding[label] = np.array(decoding[label])
-        
+    # define parameters    
     chance = 25
     ncols = 4
     nrows = 10 if lock == 'stim' else 9
     far_left = [0] + [i for i in range(0, len(label_names), ncols*2)]
-    color1, color2 = ("#1982C4", "#74B3CE") if lock == 'stim' else ("#73A580", "#C5C392")    
-    
+    color1, color2 = ("#1982C4", "#74B3CE") if lock == 'stim' else ("#73A580", "#C5C392")
     for ilabel in tqdm(range(0, len(label_names), 2)):
         fig, axs = plt.subplots(2, 1, figsize=(6, 4), sharex=True)
         fig.subplots_adjust(hspace=0)
         label = label_names[ilabel]
-        
-        # axs[0].text(1.05, 0, f"{label[:-3].capitalize()}",
-        #             weight='normal', style='italic', ha='left', va='center', rotation=270,
-        #             transform=axs[0].transAxes,
-        #             bbox=dict(facecolor='none', edgecolor='black', boxstyle='round,pad=1'))
-
         axs[0].text(0.25, 40, f"{label.capitalize()[:-3]}",
                     fontsize=11, weight='normal', style='italic', ha='left',
                     bbox=dict(facecolor='none', edgecolor='black', boxstyle='round,pad=1'))
-
         if ilabel in range(8):
             if lock == 'stim':
                 axs[0].text(0.1, 46, "$Stimulus$", fontsize=9, zorder=10, ha='center')
             else:
                 axs[0].text(0.05, 46, "Button press", style='italic', fontsize=9, zorder=10, ha='center')
-        
         for i in range(2):
             axs[i].set_ylim(20, 45)
             yticks = axs[i].get_yticks()
@@ -89,18 +130,15 @@ for lock in ["stim", "button"]:
                 axs[i].set_ylabel("Accuracy (%)")
             else:
                 axs[i].set_yticklabels([])  # Remove y-axis labels for non-left plots
-        
         if ilabel in far_left:
             axs[0].text(-0.19, 38, "Left\nhemisphere", fontsize=10, color=color1, ha='left', weight='normal', style='italic')
             axs[1].text(-0.19, 38, "Right\nhemisphere", fontsize=10, color=color2, ha='left', weight='normal', style='italic')
-    
         # Show the x-axis label only on the bottom row
         if ilabel in range(len(label_names))[-8:]:
             axs[1].get_xaxis().set_visible(True)
             axs[1].set_xlabel("Time (s)")
         else:
             axs[1].set_xticklabels([])
-        
         # First curve
         score = decoding[label] * 100
         sem = np.std(score, axis=0) / np.sqrt(len(subjects))
@@ -114,7 +152,6 @@ for lock in ["stim", "button"]:
         axs[0].spines["bottom"].set_visible(False)
         axs[0].xaxis.set_ticks_position('none')  # Remove x-ticks on the upper plot
         axs[0].xaxis.set_tick_params(labelbottom=False)  # Remove x-tick labels on the upper plot
-        
         # Second curve
         label = label_names[ilabel+1]
         score2 = decoding[label] * 100
@@ -126,106 +163,118 @@ for lock in ["stim", "button"]:
         axs[1].fill_between(times, m1, m2, facecolor='0.6')
         axs[1].fill_between(times, m1, m2, facecolor=color2, where=sig, alpha=1)
         axs[1].fill_between(times, chance, m2, facecolor=color2, where=sig, alpha=0.7)
-        
+        # save figure
         plt.savefig(FIGURE_PATH / analysis / 'source' / lock / trial_type / f'{ilabel}_{label}.pdf', transparent=True)
+        plt.savefig(FIGURE_PATH / analysis / 'source' / lock / trial_type / f'{ilabel}_{label}.png', transparent=True)
         plt.close()
-
-# plot basic average plot
-nrows, ncols = 10, 4
-chance = 25
-color1, color2 = "#1fb45c", "#00B2CA"
-for lock in ['stim', 'button']:
-    label_names = sorted(SURFACE_LABELS + VOLUME_LABELS, key=str.casefold) if lock == 'stim' else sorted(SURFACE_LABELS_RT + VOLUME_LABELS_RT, key=str.casefold)
-    trial_type = 'pattern'
-    # for trial_type in ['pattern', 'random']:
-    print(lock, trial_type)
-    figures = FIGURE_PATH / analysis / 'source' / lock / trial_type
-    decoding = {}
-    for label in tqdm(label_names):
-        if label not in decoding:
-            decoding[label] = []
-        res_dir = res_path / label
-        for subject in subjects:
-            score = np.load(RESULTS_DIR / analysis / 'source' / lock / trial_type / label / f"{subject}-scores.npy")
-            decoding[label].append(score)
-        decoding[label] = np.array(decoding[label])
-    fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(10, 15))
-    for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
-        if lock == 'stim':
-            ax.axvspan(0, 0.2, color='grey', alpha=.2, label="Stimulus")
-            color = color1
-        else:
-            ax.axvline(0, color='black', alpha=.2)
-            color=color2
-        score = decoding[label] * 100
-        sem = np.std(score, axis=0) / np.sqrt(len(subjects))
-        m1 = np.array(score.mean(0) + np.array(sem))
-        m2 = np.array(score.mean(0) - np.array(sem))
-        ax.axhline(chance, color='black', ls='dashed', alpha=.5, label='Chance')
-        if label.endswith('lh'):
-            title = 'L. ' + label[:-3].capitalize()
-        elif label.endswith('rh'):
-            title = 'R. ' + label[:-3].capitalize()
-        else:
-            title = label.capitalize()
-        # ax.set_title(f"${title}$", fontsize=10)    
-        ax.text(-0.19, 40, f"{title}",
-        weight='semibold', style='italic', ha='left',
-        bbox=dict(facecolor='none', edgecolor='black', boxstyle='round,pad=1'))
-        p_values = decod_stats(score - chance, jobs)
-        sig = p_values < 0.05
-        ax.fill_between(times, m1, m2, color='0.6')
-        ax.fill_between(times, m1, m2, color=color, where=sig, alpha=1)
-        ax.fill_between(times, chance, m2, where=sig, color=color, alpha=0.7, label='Significant')
-        ax.spines["top"].set_visible(False)
-        ax.spines["right"].set_visible(False)
-        # ax.text(0.6, 22.5, "$Chance$", fontsize=9, zorder=10, ha='center')
-        if i % ncols == 0:
-            ax.set_ylabel("Accuracy (%)", fontsize=8)
-        if i == 0:
-            legend = ax.legend()
-            plt.setp(legend.get_texts(), fontsize=6)  # Adjust legend size
-        if i >= (nrows-1) * ncols:
-            ax.set_xlabel("Time (s)", fontsize=8)
-    # plt.savefig(FIGURE_PATH / analysis / 'source' / f'new-{lock}-{trial_type}-ave.pdf', transparent=True)
-    plt.savefig(FIGURE_PATH / analysis / 'source' / f'new-{lock}-{trial_type}-ave.png', transparent=True)
-    plt.close()
     
+    pdf_folder = op.join(FIGURE_PATH, analysis, 'source', lock, trial_type)
+    output_pdf = 'grid_output.pdf'  # Output file name
+    
+    # Get all PDF file paths from the folder
+    pdf_paths = sorted([os.path.join(pdf_folder, f) for f in os.listdir(pdf_folder) if f.endswith('.png')])
+    
+    # Arrange PDFs in a grid layout and save as a single PDF
+    
+    create_pdf_grid_with_pdfs(pdf_paths, nrows, ncols, output_pdf)
+    
+    print(f"Grid layout PDF saved as: {output_pdf}")
 
-# plot per subject
-vol_labels_lh = [l for l in label_names if l.endswith('lh')]
-vol_labels_rh = [l for l in label_names if l.endswith('rh')]
-vol_labels_others = [l for l in label_names if not l.endswith(('lh', 'rh'))]
-lh_scores, rh_scores, other_scores = {}, {}, {}
-for lock in ['stim', 'button']:
-    for trial_type in ['pattern', 'random']:
-        print(lock, trial_type)
-        for subject in tqdm(subjects):
-            sub_dict = dict()
-            for hemi, labels_list, label_dict in zip(['lh', 'rh', 'others'], [vol_labels_lh, vol_labels_rh, vol_labels_others], [lh_scores, rh_scores, other_scores]):
-            # for ilabel, label in enumerate(label_names):    
-                for label in labels_list:
-                    if label not in label_dict:
-                        label_dict[label] = []
-                    res_dir = res_path / label
-                    try:        
-                        score = np.load(res_dir / f"{subject}-scores.npy")
-                        label_dict[label].append(score)
-                        if label not in sub_dict:
-                            sub_dict[label] = score
-                    except:
-                        continue
-            all_labels = sorted(vol_labels_lh + vol_labels_rh + vol_labels_others)
-            nrows, ncols = 9, 5
-            fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(15, 13))
-            for i, (ax, label) in enumerate(zip(axs.flat, all_labels)):
-                try:
-                    ax.plot(times, sub_dict[label])
-                    ax.axhline(.25, color='black', ls='dashed', alpha=.5)
-                    ax.set_title(f"${label}$")    
-                    ax.axvspan(0, 0.2, color='grey', alpha=.2)
-                except:
-                    continue
-            fig.savefig(figures / f"{subject}.pdf", transparent=True)
-            plt.close()
+# # plot basic average plot
+# nrows, ncols = 10, 4
+# chance = 25
+# color1, color2 = "#1fb45c", "#00B2CA"
+# for lock in ['stim', 'button']:
+#     label_names = sorted(SURFACE_LABELS + VOLUME_LABELS, key=str.casefold) if lock == 'stim' else sorted(SURFACE_LABELS_RT + VOLUME_LABELS_RT, key=str.casefold)
+#     trial_type = 'pattern'
+#     # for trial_type in ['pattern', 'random']:
+#     print(lock, trial_type)
+#     figures = FIGURE_PATH / analysis / 'source' / lock / trial_type
+#     decoding = {}
+#     for label in tqdm(label_names):
+#         if label not in decoding:
+#             decoding[label] = []
+#         res_dir = res_path / label
+#         for subject in subjects:
+#             score = np.load(RESULTS_DIR / analysis / 'source' / lock / trial_type / label / f"{subject}-scores.npy")
+#             decoding[label].append(score)
+#         decoding[label] = np.array(decoding[label])
+#     fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(10, 15))
+#     for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
+#         if lock == 'stim':
+#             ax.axvspan(0, 0.2, color='grey', alpha=.2, label="Stimulus")
+#             color = color1
+#         else:
+#             ax.axvline(0, color='black', alpha=.2)
+#             color=color2
+#         score = decoding[label] * 100
+#         sem = np.std(score, axis=0) / np.sqrt(len(subjects))
+#         m1 = np.array(score.mean(0) + np.array(sem))
+#         m2 = np.array(score.mean(0) - np.array(sem))
+#         ax.axhline(chance, color='black', ls='dashed', alpha=.5, label='Chance')
+#         if label.endswith('lh'):
+#             title = 'L. ' + label[:-3].capitalize()
+#         elif label.endswith('rh'):
+#             title = 'R. ' + label[:-3].capitalize()
+#         else:
+#             title = label.capitalize()
+#         # ax.set_title(f"${title}$", fontsize=10)    
+#         ax.text(-0.19, 40, f"{title}",
+#         weight='semibold', style='italic', ha='left',
+#         bbox=dict(facecolor='none', edgecolor='black', boxstyle='round,pad=1'))
+#         p_values = decod_stats(score - chance, jobs)
+#         sig = p_values < 0.05
+#         ax.fill_between(times, m1, m2, color='0.6')
+#         ax.fill_between(times, m1, m2, color=color, where=sig, alpha=1)
+#         ax.fill_between(times, chance, m2, where=sig, color=color, alpha=0.7, label='Significant')
+#         ax.spines["top"].set_visible(False)
+#         ax.spines["right"].set_visible(False)
+#         # ax.text(0.6, 22.5, "$Chance$", fontsize=9, zorder=10, ha='center')
+#         if i % ncols == 0:
+#             ax.set_ylabel("Accuracy (%)", fontsize=8)
+#         if i == 0:
+#             legend = ax.legend()
+#             plt.setp(legend.get_texts(), fontsize=6)  # Adjust legend size
+#         if i >= (nrows-1) * ncols:
+#             ax.set_xlabel("Time (s)", fontsize=8)
+#     # plt.savefig(FIGURE_PATH / analysis / 'source' / f'new-{lock}-{trial_type}-ave.pdf', transparent=True)
+#     plt.savefig(FIGURE_PATH / analysis / 'source' / f'new-{lock}-{trial_type}-ave.png', transparent=True)
+#     plt.close()
+    
+# # plot per subject
+# vol_labels_lh = [l for l in label_names if l.endswith('lh')]
+# vol_labels_rh = [l for l in label_names if l.endswith('rh')]
+# vol_labels_others = [l for l in label_names if not l.endswith(('lh', 'rh'))]
+# lh_scores, rh_scores, other_scores = {}, {}, {}
+# for lock in ['stim', 'button']:
+#     for trial_type in ['pattern', 'random']:
+#         print(lock, trial_type)
+#         for subject in tqdm(subjects):
+#             sub_dict = dict()
+#             for hemi, labels_list, label_dict in zip(['lh', 'rh', 'others'], [vol_labels_lh, vol_labels_rh, vol_labels_others], [lh_scores, rh_scores, other_scores]):
+#             # for ilabel, label in enumerate(label_names):    
+#                 for label in labels_list:
+#                     if label not in label_dict:
+#                         label_dict[label] = []
+#                     res_dir = res_path / label
+#                     try:        
+#                         score = np.load(res_dir / f"{subject}-scores.npy")
+#                         label_dict[label].append(score)
+#                         if label not in sub_dict:
+#                             sub_dict[label] = score
+#                     except:
+#                         continue
+#             all_labels = sorted(vol_labels_lh + vol_labels_rh + vol_labels_others)
+#             nrows, ncols = 9, 5
+#             fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(15, 13))
+#             for i, (ax, label) in enumerate(zip(axs.flat, all_labels)):
+#                 try:
+#                     ax.plot(times, sub_dict[label])
+#                     ax.axhline(.25, color='black', ls='dashed', alpha=.5)
+#                     ax.set_title(f"${label}$")    
+#                     ax.axvspan(0, 0.2, color='grey', alpha=.2)
+#                 except:
+#                     continue
+#             fig.savefig(figures / f"{subject}.pdf", transparent=True)
+#             plt.close()
 

@@ -7,7 +7,7 @@ from mne import read_labels_from_annot, read_epochs
 from scipy.stats import ttest_1samp, spearmanr
 import gc
 from pathlib import Path
-import numba
+from numba import jit
 
 lock = "stim"
 trial_type = "pattern"
@@ -36,20 +36,26 @@ corr_in_lab = {}
 decoding = dict()
 
 # get label names
-label_names = SURFACE_LABELS + VOLUME_LABELS
+label_names = SURFACE_LABELS + VOLUME_LABELS if lock == 'stim' else SURFACE_LABELS_RT + VOLUME_LABELS_RT
 
 figures = res_path / "figures" / analysis / 'source' / lock / trial_type
 ensure_dir(figures)
 gc.collect()
 
-@numba.jit
+@jit(nopython=True)
 def spearman_rank_correlation(x, y):
+    # Convert input lists to NumPy arrays
+    x = np.array(x)
+    y = np.array(y)
+    
     n = len(x)
-    rank_x = np.argsort(np.argsort(x))
-    rank_y = np.argsort(np.argsort(y))
-    d = rank_x - rank_y
-    d_squared = np.sum(d * d)
-    rho = 1 - (6 * d_squared) / (n * (n * n - 1))
+    # Get the ranks (add 1 to correct for zero-indexing)
+    rank_x = np.argsort(np.argsort(x)) + 1
+    rank_y = np.argsort(np.argsort(y)) + 1
+    # Calculate the difference in ranks
+    d_squared = np.sum((rank_x - rank_y) ** 2)
+    # Spearman's rho formula
+    rho = 1 - (6 * d_squared) / (n * (n**2 - 1))
     return rho
 
 for ilabel, label in enumerate(label_names):
@@ -138,7 +144,8 @@ for ilabel, label in enumerate(label_names):
         for sub in range(len(subjects)):
             rhos = []
             for t in range(len(times)):
-                rho = spearman_rank_correlation([0, 1, 2, 3, 4], diff_inout[sub, :, t])
+                # rho = spearman_rank_correlation([0, 1, 2, 3, 4], diff_inout[sub, :, t])
+                rho = spearmanr([0, 1, 2, 3, 4], diff_inout[sub, :, t])
                 rhos.append(rho)
             corr.append(rhos)
         corr = np.array(corr)
@@ -184,23 +191,6 @@ for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
     if lock == 'stim':
         ax.axvspan(0, 0.2, color='grey', alpha=.2)        
 plt.savefig(figures / f"diff_in_out.pdf")
-plt.close()
-
-# plot in vs out
-fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(40, 13))
-fig.suptitle(f"${lock}$ / ${trial_type}$ / in_vs_out_decoding")
-for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
-    ins = decod_in_lab2[label][0].mean(axis=(0, 1))
-    outs = decod_in_lab2[label][1].mean(axis=(0, 1))
-    ax.plot(times, ins, label='in') 
-    ax.plot(times, outs, label='out')
-    ax.set_title(f"${label}$", fontsize=8)
-    if i == 0:
-        legend = ax.legend()
-        plt.setp(legend.get_texts(), fontsize=7)  # Adjust legend size
-    if lock == 'stim':
-        ax.axvspan(0, 0.2, color='grey', alpha=.2)
-plt.savefig(figures / f"in_vs_out.pdf")
 plt.close()
 
 # correlations

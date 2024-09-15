@@ -48,7 +48,7 @@ clf = SlidingEstimator(clf, scoring=scoring, n_jobs=jobs, verbose=verbose)
 cv = StratifiedKFold(folds, shuffle=True)
 
 
-for subject in subjects[2:]:
+for subject in subjects:
     # read source space file
     src_fname = op.join(res_path, "src", "%s-src.fif" % (subject))
     src = mne.read_source_spaces(src_fname, verbose=verbose)
@@ -99,7 +99,7 @@ for subject in subjects[2:]:
                         pick_ori=None, rank=rank, reduce_rank=True, verbose=verbose)
         stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
             
-        label_tc, _ = get_volume_estimate_tc(stcs, fwd, offsets, subject, subjects_dir)
+        label_tc = get_volume_estimate_tc(stcs, fwd, offsets, subject, subjects_dir)
         
         for ilabel, label in enumerate(labels):
             print(f"{str(ilabel+1).zfill(2)}/{len(labels)}", subject, lock, session, label.name)

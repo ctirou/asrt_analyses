@@ -32,7 +32,7 @@ res_path = RESULTS_DIR
 parc = 'aparc'
 hemi = 'both'
 verbose = "error"
-jobs = 10
+jobs = -1
 
 # figures dir
 res_dir = res_path / analysis / 'source' / lock / trial_type
