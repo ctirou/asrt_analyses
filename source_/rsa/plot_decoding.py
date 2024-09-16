@@ -5,14 +5,7 @@ from base import *
 from config import *
 import gc
 from tqdm.auto import tqdm
-from PyPDF2 import PdfMerger
 import os
-from pptx import Presentation
-from pptx.util import Inches
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import letter
-from pdfrw import PdfReader, PdfWriter, PageMerge
 
 lock = 'stim'
 trial_type = 'pattern'
@@ -36,48 +29,6 @@ gc.collect()
 # color1, color2 = "#DD614A", "#F48668"
 # color1, color2 = "#1982C4", "#74B3CE"
 # color1, color2 = "#73A580", "#C5C392"
-
-# Function to add PDFs into a grid layout on a new PDF page
-def create_pdf_grid_with_pdfs(pdf_paths, nrows, ncols, output_pdf):
-    # Define the page size (letter size in this case)
-    page_width, page_height = letter
-    margin = 50
-
-    # Calculate the grid size for each PDF cell
-    grid_width = (page_width - 2 * margin) / ncols
-    grid_height = (page_height - 2 * margin) / nrows
-
-    # Initialize the PDF writer
-    writer = PdfWriter()
-
-    # Create a new page
-    new_page = PageMerge()
-
-    for i, pdf_path in enumerate(pdf_paths):
-        # Read the PDF file
-        pdf_reader = PdfReader(pdf_path)
-        pdf_page = pdf_reader.pages[0]  # Assuming single-page PDFs
-
-        # Get the position of the PDF in the grid
-        row = i // ncols
-        col = i % ncols
-
-        # Position on the new page
-        x = margin + col * grid_width
-        y = margin + row * grid_height
-
-        # Add the PDF page to the grid
-        PageMerge(new_page).add(pdf_page, viewrect=(0, 0, 1, 1)).scale_to(grid_width, grid_height).x = x
-        PageMerge(new_page).y = page_height - (y + grid_height)
-
-        # If the grid is full, finish the page and start a new one
-        if (i + 1) % (nrows * ncols) == 0 or (i + 1) == len(pdf_paths):
-            writer.addpage(new_page.render())
-            new_page = PageMerge()  # Start a new page
-
-    # Write the output PDF
-    writer.write(output_pdf)
-    print(f"Grid layout PDF saved as: {output_pdf}")
 
 for lock in ["stim", "button"]:
     label_names = sorted(SURFACE_LABELS + VOLUME_LABELS, key=str.casefold) if lock == 'stim' else sorted(SURFACE_LABELS_RT + VOLUME_LABELS_RT, key=str.casefold)
@@ -168,18 +119,6 @@ for lock in ["stim", "button"]:
         plt.savefig(FIGURE_PATH / analysis / 'source' / lock / trial_type / f'{ilabel}_{label}.png', transparent=True)
         plt.close()
     
-    pdf_folder = op.join(FIGURE_PATH, analysis, 'source', lock, trial_type)
-    output_pdf = 'grid_output.pdf'  # Output file name
-    
-    # Get all PDF file paths from the folder
-    pdf_paths = sorted([os.path.join(pdf_folder, f) for f in os.listdir(pdf_folder) if f.endswith('.png')])
-    
-    # Arrange PDFs in a grid layout and save as a single PDF
-    
-    create_pdf_grid_with_pdfs(pdf_paths, nrows, ncols, output_pdf)
-    
-    print(f"Grid layout PDF saved as: {output_pdf}")
-
 # # plot basic average plot
 # nrows, ncols = 10, 4
 # chance = 25

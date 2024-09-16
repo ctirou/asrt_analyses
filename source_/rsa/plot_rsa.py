@@ -78,16 +78,17 @@ for ilabel in tqdm(range(0, len(label_names), 2)):
     fig, axs = plt.subplots(2, 1, figsize=(6, 4), sharex=True)
     fig.subplots_adjust(hspace=0)
     label = label_names[ilabel]
-    axs[0].text(0.25, 0.16, f"{label.capitalize()[:-3]}",
+    ytitle = 0.16 if lock == 'stim' else 0.25 
+    axs[0].text(0.25, ytitle, f"{label.capitalize()[:-3]}",
                 fontsize=9, weight='normal', style='italic', ha='left',
                 bbox=dict(facecolor='none', edgecolor='black', boxstyle='round,pad=1'))
     if ilabel in range(8):
         if lock == 'stim':
             axs[0].text(0.1, 0.22, "$Stimulus$", fontsize=9, zorder=10, ha='center')
         else:
-            axs[0].text(0.05, 0.22, "Button press", style='italic', fontsize=9, zorder=10, ha='center')
+            axs[0].text(0.05, 0.32, "Button press", style='italic', fontsize=9, zorder=10, ha='center')
     for i in range(2):
-        axs[i].set_ylim(-0.3, 0.2)
+        axs[i].set_ylim(-0.3, 0.2) if lock == 'stim' else axs[i].set_ylim(-0.5, 0.3)
         yticks = axs[i].get_yticks()
         yticks = yticks[1:-1]  # Remove first and last element
         axs[i].set_yticks(yticks)
@@ -104,8 +105,12 @@ for ilabel in tqdm(range(0, len(label_names), 2)):
         else:
             axs[i].set_yticklabels([])  # Remove y-axis labels for non-left plots
     if ilabel in far_left:
-        axs[0].text(-0.19, -0.2, "Left\nhemisphere", fontsize=9, color=color1, ha='left', weight='normal', style='italic')
-        axs[1].text(-0.19, -0.2, "Right\nhemisphere", fontsize=9, color=color2, ha='left', weight='normal', style='italic')
+        if lock == 'stim':
+            axs[0].text(-0.19, -0.2, "Left\nhemisphere", fontsize=9, color=color1, ha='left', weight='normal', style='italic')
+            axs[1].text(-0.19, -0.2, "Right\nhemisphere", fontsize=9, color=color2, ha='left', weight='normal', style='italic')
+        else:    
+            axs[0].text(-0.19, -0.4, "Left\nhemisphere", fontsize=9, color=color1, ha='left', weight='normal', style='italic')
+            axs[1].text(-0.19, -0.4, "Right\nhemisphere", fontsize=9, color=color2, ha='left', weight='normal', style='italic')
     # Show the x-axis label only on the bottom row
     if ilabel in range(len(label_names))[-8:]:
         axs[1].get_xaxis().set_visible(True)
@@ -211,9 +216,6 @@ for ilabel in tqdm(range(0, len(label_names), 2)):
     sig = p_values < 0.05
     axs[1].fill_between(times, corr_m1, corr_m2, facecolor=color2, alpha=.8, label='Learning')
     axs[1].fill_between(times, corr_m1, corr_m2, where=sig, color='black', alpha=1)
-    axs[1].spines["bottom"].set_visible(False)
-    axs[1].xaxis.set_ticks_position('none')  # Remove x-ticks on the upper plot
-    axs[1].xaxis.set_tick_params(labelbottom=False)  # Remove x-tick labels on the upper plot
     # save figure
     plt.savefig(figures_dir / f'{ilabel}_{label}_corr.pdf', transparent=True)
     plt.close()

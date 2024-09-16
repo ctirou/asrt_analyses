@@ -9,7 +9,7 @@ import gc
 from pathlib import Path
 from numba import jit
 
-lock = "stim"
+lock = "button"
 trial_type = "pattern"
 subjects = SUBJS
 analysis = "pred_decoding"
@@ -18,7 +18,8 @@ subjects_dir = FREESURFER_DIR
 verbose = True
 hemi = 'both'
 chance = .5
-overwrite = True
+overwrite = False
+jobs = -1
 
 summary = False
 
@@ -28,7 +29,7 @@ epochs = read_epochs(epoch_fname, verbose=verbose)
 times = epochs.times
 del epochs
 
-sessions = ['Practice', 'Block_1', 'Block_2', 'Block_3', 'Block_4']
+sessions = ['Practice', 'Block_1', 'Block_2', 'Block_3', 'Block_4'] if lock == 'stim' else ['prac', 'sess-01', 'sess-02', 'sess-03', 'sess-04']
 
 decod_in_lab = {}
 decod_in_lab2 = {}
@@ -153,36 +154,35 @@ for ilabel, label in enumerate(label_names):
     corr = np.load(res_path / analysis / 'source' / lock / trial_type / label / "corr.npy")
     corr_in_lab[label] = corr
         
-nrows, ncols = 5, 8
-
-# decoding
-chance = 0.25
-fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(40, 13))
-fig.suptitle(f"${lock}$ / ${trial_type}$ / decoding")
-for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
-    # score = decoding[label][:, 1:5, :]
-    score = decoding[label][:, :, :]
-    # ax.plot(times, score.mean((0, 1)), label='roc_auc')
-    ax.plot(times, score.mean((0, 1)), label='acc')
-    ax.axhline(chance, color='black', ls='dashed', alpha=.5)
-    ax.set_title(f"${label}$", fontsize=8)    
-    p_values = decod_stats(score.mean(1) - chance)
-    p_values_unc = ttest_1samp(score, axis=0, popmean=0)[1]
-    sig = p_values < 0.05
-    ax.fill_between(times, chance, score.mean((0, 1)), where=sig, alpha=.4)
-    if lock == 'stim':
-        ax.axvspan(0, 0.2, color='grey', alpha=.2)
-plt.savefig(figures / f"decoding_{lock}_{trial_type}.pdf")
-plt.close()
+label_names = sorted(SURFACE_LABELS + VOLUME_LABELS, key=str.casefold) if lock == 'stim' else sorted(SURFACE_LABELS_RT + VOLUME_LABELS_RT, key=str.casefold)
+figures = FIGURE_PATH / analysis / 'source' / lock / trial_type
+ensure_dir(figures)
+# define parameters    
+chance = 25
+ncols = 4
+nrows = 10 if lock == 'stim' else 9
+far_left = [0] + [i for i in range(0, len(label_names), ncols*2)]
+color1, color2 = ("#1982C4", "#74B3CE") if lock == 'stim' else ("#73A580", "#C5C392")
+color3 = "C7"
 
 # plot diff in/out
 fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(40, 13))
 fig.suptitle(f"${lock}$ / ${trial_type}$ / diff_in_out")
 for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
-    practice = decod_in_lab[label][:, 0, :].mean(0)
-    learning = decod_in_lab[label][:, 1:, :].mean((0, 1))
-    ax.plot(times, practice, label='practice')
-    ax.plot(times, learning, label='learning')
+    practice = np.array(decod_in_lab[label][:, 0, :], dtype=float) * (-1)
+    prac_sem = np.std(practice, axis=0) / np.sqrt(len(subjects))
+    prac_m1 = np.array(practice.mean(0) + np.array(prac_sem))
+    prac_m2 = np.array(practice.mean(0) - np.array(prac_sem))
+    learning = np.array(decod_in_lab[label][:, 1:, :], dtype=float) * (-1)
+    diff_sem = np.std(learning, axis = (0, 1)) / np.sqrt(len(subjects))
+    diff_m1 = np.array(learning.mean((0, 1)) + np.array(diff_sem))
+    diff_m2 = np.array(learning.mean((0, 1)) - np.array(diff_sem))
+    diff = learning.mean(1) - practice
+    p_values = decod_stats(diff, jobs)
+    sig = p_values < 0.05
+    ax.fill_between(times, prac_m1, prac_m2, facecolor=color3, alpha=.5, label='Pre-learning')
+    ax.fill_between(times, diff_m1, diff_m2, facecolor=color1, alpha=.8, label='Learning')
+    ax.fill_between(times, diff_m1, diff_m2, where=sig, color='black', alpha=1)
     ax.set_title(f"${label}$", fontsize=8)
     ax.axhline(0, color='black', ls='dashed', alpha=.5)
     if i == 0:
@@ -214,3 +214,24 @@ for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
         ax.axvspan(0, 0.2, color='grey', alpha=.2)
 plt.savefig(figures / "correlations.pdf")
 plt.close()
+
+
+# # decoding
+# chance = 0.25
+# fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(40, 13))
+# fig.suptitle(f"${lock}$ / ${trial_type}$ / decoding")
+# for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
+#     # score = decoding[label][:, 1:5, :]
+#     score = decoding[label][:, :, :]
+#     # ax.plot(times, score.mean((0, 1)), label='roc_auc')
+#     ax.plot(times, score.mean((0, 1)), label='acc')
+#     ax.axhline(chance, color='black', ls='dashed', alpha=.5)
+#     ax.set_title(f"${label}$", fontsize=8)    
+#     p_values = decod_stats(score.mean(1) - chance)
+#     p_values_unc = ttest_1samp(score, axis=0, popmean=0)[1]
+#     sig = p_values < 0.05
+#     ax.fill_between(times, chance, score.mean((0, 1)), where=sig, alpha=.4)
+#     if lock == 'stim':
+#         ax.axvspan(0, 0.2, color='grey', alpha=.2)
+# plt.savefig(figures / f"decoding_{lock}_{trial_type}.pdf")
+# plt.close()
