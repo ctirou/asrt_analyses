@@ -8,8 +8,9 @@ from scipy.stats import ttest_1samp, spearmanr
 import gc
 from pathlib import Path
 from numba import jit
+from tqdm.auto import tqdm
 
-lock = "button"
+lock = "stim"
 trial_type = "pattern"
 subjects = SUBJS
 analysis = "pred_decoding"
@@ -39,8 +40,8 @@ decoding = dict()
 # get label names
 label_names = SURFACE_LABELS + VOLUME_LABELS if lock == 'stim' else SURFACE_LABELS_RT + VOLUME_LABELS_RT
 
-figures = res_path / "figures" / analysis / 'source' / lock / trial_type
-ensure_dir(figures)
+figures_dir = res_path / "figures" / analysis / 'source' / lock / trial_type
+ensure_dir(figures_dir)
 gc.collect()
 
 @jit(nopython=True)
@@ -166,9 +167,50 @@ color1, color2 = ("#1982C4", "#74B3CE") if lock == 'stim' else ("#73A580", "#C5C
 color3 = "C7"
 
 # plot diff in/out
-fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(40, 13))
-fig.suptitle(f"${lock}$ / ${trial_type}$ / diff_in_out")
-for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
+for ilabel in tqdm(range(0, len(label_names), 2)):
+    fig, axs = plt.subplots(2, 1, figsize=(6, 4), sharex=True)
+    fig.subplots_adjust(hspace=0)
+    label = label_names[ilabel]
+    ytitle = 0.16 if lock == 'stim' else 0.25 
+    axs[0].text(0.25, ytitle, f"{label.capitalize()[:-3]}",
+                fontsize=9, weight='normal', style='italic', ha='left',
+                bbox=dict(facecolor='none', edgecolor='black', boxstyle='round,pad=1'))
+    if ilabel in range(8):
+        if lock == 'stim':
+            axs[0].text(0.1, 0.22, "$Stimulus$", fontsize=9, zorder=10, ha='center')
+        else:
+            axs[0].text(0.05, 0.32, "Button press", style='italic', fontsize=9, zorder=10, ha='center')
+    for i in range(2):
+        axs[i].set_ylim(-0.3, 0.2) if lock == 'stim' else axs[i].set_ylim(-0.5, 0.3)
+        yticks = axs[i].get_yticks()
+        yticks = yticks[1:-1]  # Remove first and last element
+        axs[i].set_yticks(yticks)
+        axs[i].spines["top"].set_visible(False)
+        axs[i].spines["right"].set_visible(False)
+        axs[i].axhline(0, color='black', ls='dashed', alpha=.7, zorder=-1)
+        # Add the stimulus span or vertical line
+        if lock == 'stim':
+            axs[i].axvspan(0, 0.2, color='grey', lw=0, alpha=.2, label="Stimulus")
+        else:
+            axs[i].axvline(0, color='black', alpha=.5)
+        if ilabel in far_left:
+            axs[i].set_ylabel("Similarity index")
+        else:
+            axs[i].set_yticklabels([])  # Remove y-axis labels for non-left plots
+    if ilabel in far_left:
+        if lock == 'stim':
+            axs[0].text(-0.19, -0.2, "Left\nhemisphere", fontsize=9, color=color1, ha='left', weight='normal', style='italic')
+            axs[1].text(-0.19, -0.2, "Right\nhemisphere", fontsize=9, color=color2, ha='left', weight='normal', style='italic')
+        else:    
+            axs[0].text(-0.19, -0.4, "Left\nhemisphere", fontsize=9, color=color1, ha='left', weight='normal', style='italic')
+            axs[1].text(-0.19, -0.4, "Right\nhemisphere", fontsize=9, color=color2, ha='left', weight='normal', style='italic')
+    # Show the x-axis label only on the bottom row
+    if ilabel in range(len(label_names))[-8:]:
+        axs[1].get_xaxis().set_visible(True)
+        axs[1].set_xlabel("Time (s)")
+    else:
+        axs[1].set_xticklabels([])
+    # First curve
     practice = np.array(decod_in_lab[label][:, 0, :], dtype=float) * (-1)
     prac_sem = np.std(practice, axis=0) / np.sqrt(len(subjects))
     prac_m1 = np.array(practice.mean(0) + np.array(prac_sem))
@@ -180,18 +222,31 @@ for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
     diff = learning.mean(1) - practice
     p_values = decod_stats(diff, jobs)
     sig = p_values < 0.05
-    ax.fill_between(times, prac_m1, prac_m2, facecolor=color3, alpha=.5, label='Pre-learning')
-    ax.fill_between(times, diff_m1, diff_m2, facecolor=color1, alpha=.8, label='Learning')
-    ax.fill_between(times, diff_m1, diff_m2, where=sig, color='black', alpha=1)
-    ax.set_title(f"${label}$", fontsize=8)
-    ax.axhline(0, color='black', ls='dashed', alpha=.5)
-    if i == 0:
-        legend = ax.legend()
-        plt.setp(legend.get_texts(), fontsize=7)  # Adjust legend size
-    if lock == 'stim':
-        ax.axvspan(0, 0.2, color='grey', alpha=.2)        
-plt.savefig(figures / f"diff_in_out.pdf")
-plt.close()
+    axs[0].fill_between(times, prac_m1, prac_m2, facecolor=color3, alpha=.5, label='Pre-learning')
+    axs[0].fill_between(times, diff_m1, diff_m2, facecolor=color1, alpha=.8, label='Learning')
+    axs[0].fill_between(times, diff_m1, diff_m2, where=sig, color='black', alpha=1)
+    axs[0].spines["bottom"].set_visible(False)
+    axs[0].xaxis.set_ticks_position('none')  # Remove x-ticks on the upper plot
+    axs[0].xaxis.set_tick_params(labelbottom=False)  # Remove x-tick labels on the upper plot
+    # Second curve
+    label = label_names[ilabel+1]
+    practice = np.array(decod_in_lab[label][:, 0, :], dtype=float) * (-1)
+    prac_sem = np.std(practice, axis=0) / np.sqrt(len(subjects))
+    prac_m1 = np.array(practice.mean(0) + np.array(prac_sem))
+    prac_m2 = np.array(practice.mean(0) - np.array(prac_sem))
+    learning = np.array(decod_in_lab[label][:, 1:, :], dtype=float) * (-1)
+    diff_sem = np.std(learning, axis = (0, 1)) / np.sqrt(len(subjects))
+    diff_m1 = np.array(learning.mean((0, 1)) + np.array(diff_sem))
+    diff_m2 = np.array(learning.mean((0, 1)) - np.array(diff_sem))
+    axs[1].fill_between(times, prac_m1, prac_m2, facecolor=color3, alpha=.5, label='Pre-learning')
+    axs[1].fill_between(times, diff_m1, diff_m2, facecolor=color2, alpha=.8, label='Learning')
+    axs[1].fill_between(times, diff_m1, diff_m2, where=sig, color='black', alpha=1)
+    diff = learning.mean(1) - practice
+    p_values = decod_stats(diff, jobs)
+    sig = p_values < 0.05
+    # save figure
+    plt.savefig(figures_dir / f'{ilabel}_{label}.pdf', transparent=True)
+    plt.close()
 
 # correlations
 fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(40, 13))
@@ -215,6 +270,69 @@ for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
 plt.savefig(figures / "correlations.pdf")
 plt.close()
 
+for ilabel in tqdm(range(0, len(label_names), 2)):
+    fig, axs = plt.subplots(2, 1, figsize=(6, 4), sharex=True)
+    fig.subplots_adjust(hspace=0)
+    label = label_names[ilabel]
+    axs[0].text(0.25, 0.75, f"{label.capitalize()[:-3]}",
+                fontsize=9, weight='normal', style='italic', ha='left',
+                bbox=dict(facecolor='none', edgecolor='black', boxstyle='round,pad=1'))
+    if ilabel in range(8):
+        if lock == 'stim':
+            axs[0].text(0.1, 1.1, "$Stimulus$", fontsize=9, zorder=10, ha='center')
+        else:
+            axs[0].text(0.05, 1.1, "Button press", style='italic', fontsize=9, zorder=10, ha='center')
+    for i in range(2):
+        axs[i].set_ylim(-1, 1)
+        yticks = axs[i].get_yticks()
+        yticks = yticks[1:-1]  # Remove first and last element
+        axs[i].set_yticks(yticks)
+        axs[i].spines["top"].set_visible(False)
+        axs[i].spines["right"].set_visible(False)
+        axs[i].axhline(0, color='black', ls='dashed', alpha=.7, zorder=-1)
+        # Add the stimulus span or vertical line
+        if lock == 'stim':
+            axs[i].axvspan(0, 0.2, color='grey', lw=0, alpha=.2, label="Stimulus")
+        else:
+            axs[i].axvline(0, color='black', alpha=.5)
+        if ilabel in far_left:
+            axs[i].set_ylabel("Spearman's rho")
+        else:
+            axs[i].set_yticklabels([])  # Remove y-axis labels for non-left plots
+    if ilabel in far_left:
+        axs[0].text(-0.19, 0.5, "Left\nhemisphere", fontsize=9, color=color1, ha='left', weight='normal', style='italic')
+        axs[1].text(-0.19, 0.5, "Right\nhemisphere", fontsize=9, color=color2, ha='left', weight='normal', style='italic')
+    # Show the x-axis label only on the bottom row
+    if ilabel in range(len(label_names))[-8:]:
+        axs[1].get_xaxis().set_visible(True)
+        axs[1].set_xlabel("Time (s)")
+    else:
+        axs[1].set_xticklabels([])
+    # First curve
+    correlations = corr[label][:, :].mean(0)
+    corr_sem = np.std(corr[label][:, :], axis = (0)) / np.sqrt(len(subjects))
+    corr_m1 = np.array(correlations + np.array(corr_sem))
+    corr_m2 = np.array(correlations - np.array(corr_sem))
+    p_values = decod_stats(corr[label][:, :], jobs)
+    sig = p_values < 0.05
+    axs[0].fill_between(times, corr_m1, corr_m2, facecolor=color1, alpha=.8, label='Learning')
+    axs[0].fill_between(times, corr_m1, corr_m2, where=sig, color='black', alpha=1)
+    axs[0].spines["bottom"].set_visible(False)
+    axs[0].xaxis.set_ticks_position('none')  # Remove x-ticks on the upper plot
+    axs[0].xaxis.set_tick_params(labelbottom=False)  # Remove x-tick labels on the upper plot
+    # Second curve
+    label = label_names[ilabel+1]
+    correlations = corr[label][:, :].mean(0)
+    corr_sem = np.std(corr[label][:, :], axis = (0)) / np.sqrt(len(subjects))
+    corr_m1 = np.array(correlations + np.array(corr_sem))
+    corr_m2 = np.array(correlations - np.array(corr_sem))
+    p_values = decod_stats(corr[label][:, :], jobs)
+    sig = p_values < 0.05
+    axs[1].fill_between(times, corr_m1, corr_m2, facecolor=color2, alpha=.8, label='Learning')
+    axs[1].fill_between(times, corr_m1, corr_m2, where=sig, color='black', alpha=1)
+    # save figure
+    plt.savefig(figures_dir / f'{ilabel}_{label}_corr.pdf', transparent=True)
+    plt.close()
 
 # # decoding
 # chance = 0.25
