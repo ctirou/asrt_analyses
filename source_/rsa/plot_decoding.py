@@ -116,7 +116,7 @@ for lock in ["stim", "button"]:
         axs[1].fill_between(times, chance, m2, facecolor=color2, where=sig, alpha=0.7)
         # save figure
         plt.savefig(FIGURE_PATH / analysis / 'source' / lock / trial_type / f'{ilabel}_{label}.pdf', transparent=True)
-        plt.savefig(FIGURE_PATH / analysis / 'source' / lock / trial_type / f'{ilabel}_{label}.png', transparent=True)
+        plt.savefig(FIGURE_PATH / analysis / 'source' / lock / trial_type / f'{ilabel}_{label}.png', transparent=True) # use dpi
         plt.close()
     
 # # plot basic average plot

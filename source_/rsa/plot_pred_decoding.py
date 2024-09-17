@@ -30,17 +30,17 @@ epochs = read_epochs(epoch_fname, verbose=verbose)
 times = epochs.times
 del epochs
 
-sessions = ['Practice', 'Block_1', 'Block_2', 'Block_3', 'Block_4'] if lock == 'stim' else ['prac', 'sess-01', 'sess-02', 'sess-03', 'sess-04']
+sessions = ['Practice', 'Block_1', 'Block_2', 'Block_3', 'Block_4']
 
 decod_in_lab = {}
 decod_in_lab2 = {}
-corr_in_lab = {}
+corr = {}
 decoding = dict()
 
 # get label names
 label_names = SURFACE_LABELS + VOLUME_LABELS if lock == 'stim' else SURFACE_LABELS_RT + VOLUME_LABELS_RT
 
-figures_dir = res_path / "figures" / analysis / 'source' / lock / trial_type
+figures_dir = res_path / "figures_dir" / analysis / 'source' / lock / trial_type
 ensure_dir(figures_dir)
 gc.collect()
 
@@ -111,7 +111,7 @@ for ilabel, label in enumerate(label_names):
         
         if summary:
             from sklearn.metrics import ConfusionMatrixDisplay
-            ensure_dir(figures / "summary" / label)
+            ensure_dir(figures_dir / "summary" / label)
             fig, axs = plt.subplots(2, 5, layout='tight', figsize=(23, 7), sharey=False)
             fig.suptitle(f'{subject} / ${label}$')
             times_win = np.where((times >= 0) & (times <= 0.2))[0]
@@ -129,7 +129,7 @@ for ilabel, label in enumerate(label_names):
                 disp = ConfusionMatrixDisplay(sub_cms[i, max_score, :, :], display_labels=[1, 2, 3, 4])
                 disp.plot(ax=ax2)
                 disp.im_.set_clim(0, 1)  # Set colorbar limits
-            plt.savefig(figures / "summary" / label / f"{subject}.png")
+            plt.savefig(figures_dir / "summary" / label / f"{subject}.png")
             plt.close()
             
         decoding[label].append(sub_scores)
@@ -142,22 +142,22 @@ for ilabel, label in enumerate(label_names):
     decod_in_lab2[label] = [np.squeeze(all_in_seq).mean(axis=1), np.squeeze(all_out_seq).mean(axis=1)]
     
     if not op.exists(res_path / analysis / 'source' / lock / trial_type / label / "corr.npy") or overwrite:
-        corr = []
+        corr_npy = []
         for sub in range(len(subjects)):
             rhos = []
             for t in range(len(times)):
                 # rho = spearman_rank_correlation([0, 1, 2, 3, 4], diff_inout[sub, :, t])
                 rho = spearmanr([0, 1, 2, 3, 4], diff_inout[sub, :, t])
                 rhos.append(rho)
-            corr.append(rhos)
-        corr = np.array(corr)
+            corr_npy.append(rhos)
+        corr_npy = np.array(corr_npy)
         np.save(res_path / analysis / 'source' / lock / trial_type / label / "corr.npy", corr)
-    corr = np.load(res_path / analysis / 'source' / lock / trial_type / label / "corr.npy")
-    corr_in_lab[label] = corr
+    corr_npy = np.load(res_path / analysis / 'source' / lock / trial_type / label / "corr.npy")
+    corr[label] = corr_npy
         
 label_names = sorted(SURFACE_LABELS + VOLUME_LABELS, key=str.casefold) if lock == 'stim' else sorted(SURFACE_LABELS_RT + VOLUME_LABELS_RT, key=str.casefold)
-figures = FIGURE_PATH / analysis / 'source' / lock / trial_type
-ensure_dir(figures)
+figures_dir = FIGURE_PATH / analysis / 'source' / lock / trial_type
+ensure_dir(figures_dir)
 # define parameters    
 chance = 25
 ncols = 4
@@ -166,22 +166,22 @@ far_left = [0] + [i for i in range(0, len(label_names), ncols*2)]
 color1, color2 = ("#1982C4", "#74B3CE") if lock == 'stim' else ("#73A580", "#C5C392")
 color3 = "C7"
 
-# plot diff in/out
+# Diff in/out 
 for ilabel in tqdm(range(0, len(label_names), 2)):
     fig, axs = plt.subplots(2, 1, figsize=(6, 4), sharex=True)
     fig.subplots_adjust(hspace=0)
     label = label_names[ilabel]
-    ytitle = 0.16 if lock == 'stim' else 0.25 
-    axs[0].text(0.25, ytitle, f"{label.capitalize()[:-3]}",
+    ytitle = 0.21 if lock == 'stim' else 0.11
+    axs[1].text(0.25, ytitle, f"{label.capitalize()[:-3]}",
                 fontsize=9, weight='normal', style='italic', ha='left',
                 bbox=dict(facecolor='none', edgecolor='black', boxstyle='round,pad=1'))
     if ilabel in range(8):
         if lock == 'stim':
             axs[0].text(0.1, 0.22, "$Stimulus$", fontsize=9, zorder=10, ha='center')
         else:
-            axs[0].text(0.05, 0.32, "Button press", style='italic', fontsize=9, zorder=10, ha='center')
+            axs[0].text(0.05, 0.11, "Button press", style='italic', fontsize=9, zorder=10, ha='center')
     for i in range(2):
-        axs[i].set_ylim(-0.3, 0.2) if lock == 'stim' else axs[i].set_ylim(-0.5, 0.3)
+        axs[i].set_ylim(-0.2, 0.2) if lock == 'stim' else axs[i].set_ylim(-0.1, 0.1)
         yticks = axs[i].get_yticks()
         yticks = yticks[1:-1]  # Remove first and last element
         axs[i].set_yticks(yticks)
@@ -197,13 +197,19 @@ for ilabel in tqdm(range(0, len(label_names), 2)):
             axs[i].set_ylabel("Similarity index")
         else:
             axs[i].set_yticklabels([])  # Remove y-axis labels for non-left plots
+            axs[i].spines["left"].set_visible(False)
+        if ilabel not in range(len(label_names))[-8:]:
+            axs[i].spines["bottom"].set_visible(False)
+            axs[i].get_xaxis().set_visible(False)
+        if ilabel not in far_left:
+            axs[i].get_yaxis().set_visible(False)
     if ilabel in far_left:
         if lock == 'stim':
-            axs[0].text(-0.19, -0.2, "Left\nhemisphere", fontsize=9, color=color1, ha='left', weight='normal', style='italic')
-            axs[1].text(-0.19, -0.2, "Right\nhemisphere", fontsize=9, color=color2, ha='left', weight='normal', style='italic')
+            axs[0].text(-0.19, 0.12, "Left\nhemisphere", fontsize=9, color=color1, ha='left', weight='normal', style='italic')
+            axs[1].text(-0.19, 0.12, "Right\nhemisphere", fontsize=9, color=color2, ha='left', weight='normal', style='italic')
         else:    
-            axs[0].text(-0.19, -0.4, "Left\nhemisphere", fontsize=9, color=color1, ha='left', weight='normal', style='italic')
-            axs[1].text(-0.19, -0.4, "Right\nhemisphere", fontsize=9, color=color2, ha='left', weight='normal', style='italic')
+            axs[0].text(-0.19, 0.075, "Left\nhemisphere", fontsize=9, color=color1, ha='left', weight='normal', style='italic')
+            axs[1].text(-0.19, 0.075, "Right\nhemisphere", fontsize=9, color=color2, ha='left', weight='normal', style='italic')
     # Show the x-axis label only on the bottom row
     if ilabel in range(len(label_names))[-8:]:
         axs[1].get_xaxis().set_visible(True)
@@ -248,33 +254,12 @@ for ilabel in tqdm(range(0, len(label_names), 2)):
     plt.savefig(figures_dir / f'{ilabel}_{label}.pdf', transparent=True)
     plt.close()
 
-# correlations
-fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(40, 13))
-fig.suptitle(f"${lock}$ / ${trial_type}$ / correlations")
-for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
-    rho = corr_in_lab[label][:, :, 0]
-    ax.plot(times, rho.mean(0), label='rho')
-    ax.axhline(0, color='black', ls='dashed', alpha=.5)
-    ax.set_title(f"${label}$", fontsize=8)
-    if i == 0:
-        legend = ax.legend()
-        plt.setp(legend.get_texts(), fontsize=7)  # Adjust legend size
-    p_values = decod_stats(rho)
-    p_values_unc = ttest_1samp(rho, axis=0, popmean=0)[1]
-    sig = p_values < 0.05
-    sig_unc = p_values_unc < 0.05
-    ax.fill_between(times, 0, rho.mean(0), where=sig_unc, color='C2', alpha=1)
-    ax.fill_between(times, 0, rho.mean(0), where=sig, alpha=0.3)
-    if lock == 'stim':
-        ax.axvspan(0, 0.2, color='grey', alpha=.2)
-plt.savefig(figures / "correlations.pdf")
-plt.close()
-
+# Correlations
 for ilabel in tqdm(range(0, len(label_names), 2)):
     fig, axs = plt.subplots(2, 1, figsize=(6, 4), sharex=True)
     fig.subplots_adjust(hspace=0)
     label = label_names[ilabel]
-    axs[0].text(0.25, 0.75, f"{label.capitalize()[:-3]}",
+    axs[1].text(0.25, 1, f"{label.capitalize()[:-3]}",
                 fontsize=9, weight='normal', style='italic', ha='left',
                 bbox=dict(facecolor='none', edgecolor='black', boxstyle='round,pad=1'))
     if ilabel in range(8):
@@ -299,9 +284,15 @@ for ilabel in tqdm(range(0, len(label_names), 2)):
             axs[i].set_ylabel("Spearman's rho")
         else:
             axs[i].set_yticklabels([])  # Remove y-axis labels for non-left plots
+            axs[i].spines["left"].set_visible(False)
+        if ilabel not in range(len(label_names))[-8:]:
+            axs[i].spines["bottom"].set_visible(False)
+            axs[i].get_xaxis().set_visible(False)
+        if ilabel not in far_left:
+            axs[i].get_yaxis().set_visible(False)            
     if ilabel in far_left:
-        axs[0].text(-0.19, 0.5, "Left\nhemisphere", fontsize=9, color=color1, ha='left', weight='normal', style='italic')
-        axs[1].text(-0.19, 0.5, "Right\nhemisphere", fontsize=9, color=color2, ha='left', weight='normal', style='italic')
+        axs[0].text(-0.19, 0.52, "Left\nhemisphere", fontsize=9, color=color1, ha='left', weight='normal', style='italic')
+        axs[1].text(-0.19, 0.52, "Right\nhemisphere", fontsize=9, color=color2, ha='left', weight='normal', style='italic')
     # Show the x-axis label only on the bottom row
     if ilabel in range(len(label_names))[-8:]:
         axs[1].get_xaxis().set_visible(True)
@@ -309,11 +300,11 @@ for ilabel in tqdm(range(0, len(label_names), 2)):
     else:
         axs[1].set_xticklabels([])
     # First curve
-    correlations = corr[label][:, :].mean(0)
-    corr_sem = np.std(corr[label][:, :], axis = (0)) / np.sqrt(len(subjects))
-    corr_m1 = np.array(correlations + np.array(corr_sem))
-    corr_m2 = np.array(correlations - np.array(corr_sem))
-    p_values = decod_stats(corr[label][:, :], jobs)
+    correlations = corr[label][:, :, 0]
+    corr_sem = np.std(correlations, axis = (0)) / np.sqrt(len(subjects))
+    corr_m1 = np.array(correlations.mean(0) + np.array(corr_sem))
+    corr_m2 = np.array(correlations.mean(0) - np.array(corr_sem))
+    p_values = decod_stats(correlations, jobs)
     sig = p_values < 0.05
     axs[0].fill_between(times, corr_m1, corr_m2, facecolor=color1, alpha=.8, label='Learning')
     axs[0].fill_between(times, corr_m1, corr_m2, where=sig, color='black', alpha=1)
@@ -322,11 +313,11 @@ for ilabel in tqdm(range(0, len(label_names), 2)):
     axs[0].xaxis.set_tick_params(labelbottom=False)  # Remove x-tick labels on the upper plot
     # Second curve
     label = label_names[ilabel+1]
-    correlations = corr[label][:, :].mean(0)
-    corr_sem = np.std(corr[label][:, :], axis = (0)) / np.sqrt(len(subjects))
-    corr_m1 = np.array(correlations + np.array(corr_sem))
-    corr_m2 = np.array(correlations - np.array(corr_sem))
-    p_values = decod_stats(corr[label][:, :], jobs)
+    correlations = corr[label][:, :, 0]
+    corr_sem = np.std(correlations, axis = (0)) / np.sqrt(len(subjects))
+    corr_m1 = np.array(correlations.mean(0) + np.array(corr_sem))
+    corr_m2 = np.array(correlations.mean(0) - np.array(corr_sem))
+    p_values = decod_stats(correlations, jobs)
     sig = p_values < 0.05
     axs[1].fill_between(times, corr_m1, corr_m2, facecolor=color2, alpha=.8, label='Learning')
     axs[1].fill_between(times, corr_m1, corr_m2, where=sig, color='black', alpha=1)
@@ -351,5 +342,5 @@ for ilabel in tqdm(range(0, len(label_names), 2)):
 #     ax.fill_between(times, chance, score.mean((0, 1)), where=sig, alpha=.4)
 #     if lock == 'stim':
 #         ax.axvspan(0, 0.2, color='grey', alpha=.2)
-# plt.savefig(figures / f"decoding_{lock}_{trial_type}.pdf")
+# plt.savefig(figures_dir / f"decoding_{lock}_{trial_type}.pdf")
 # plt.close()
