@@ -89,3 +89,18 @@ VOLUME_LABELS_RT = ['Caudate-lh',
                   'Thalamus-Proper-rh',
                   'VentralDC-lh',
                   'VentralDC-rh']
+
+BAD_VOLUME_LABELS = ['3rd-Ventricle',
+                     '5th-Ventricle',
+                     'Cerebral-Cortex-lh',
+                     'Cerebral-Cortex-rh',
+                     'Cerebral-White-Matter-lh',
+                     'Cerebral-White-Matter-lh',
+                     'Inf-Lat-Vent-lh', 
+                     'Inf-Lat-Vent-rh',
+                     'Optic-Chiasm',
+                     'choroid-plexus-lh',
+                     'choroid-plexus-rh',
+                     'Unknown',
+                     'vessel-lh',
+                     'vessel-rh']

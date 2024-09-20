@@ -97,9 +97,9 @@ ax.set_ylabel("Training Time (s)")
 ax.set_title("Temporal generalization")
 cbar = plt.colorbar(im, ax=ax)
 cbar.set_label("accuracy")
-xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
-ax.contour(xx, yy, sig, colors='Gray', levels=[0],
-                    linestyles='solid', linewidths=1)
+# xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
+# ax.contour(xx, yy, sig, colors='Gray', levels=[0],
+#                     linestyles='solid', linewidths=1)
 ax.axvline(0, color="k")
 ax.axhline(0, color="k")
 fig.savefig(op.join(figure_dir, "mean_contrast_1024.pdf"))
