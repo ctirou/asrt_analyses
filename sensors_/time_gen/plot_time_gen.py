@@ -1,11 +1,11 @@
 import os
-from base import ensure_dir, gat_stats
+from base import ensure_dir, gat_stats, decod_stats
 from config import *
 import os.path as op
 import matplotlib.pyplot as plt
 import numpy as np
 from mne import read_epochs
-from scipy.stats import spearmanr
+from scipy.stats import spearmanr, ttest_1samp
 from tqdm.auto import tqdm
 
 analysis = "time_generalization_1024"
@@ -13,6 +13,7 @@ data_path = PRED_PATH
 subjects, epochs_list = SUBJS, EPOCHS
 lock = 'stim'
 jobs = -1
+analysis = "csp"
 
 # get times
 epoch_fname = data_path / lock / 'sub01-0-epo.fif'
@@ -78,8 +79,8 @@ fig.savefig(op.join(figure_dir, "mean_random_1024.pdf"))
 # plot contrast with significance
 contrasts = patterns - randoms
 
-pval = gat_stats(contrasts, jobs)
-sig = np.array(pval < 0.05)
+# pval = gat_stats(contrasts, jobs)
+# sig = np.array(pval < 0.05)
 
 fig, ax = plt.subplots(1, 1, figsize=(16, 7))
 im = ax.imshow(
@@ -154,4 +155,28 @@ for trial_type, time_gen in zip(['pattern', 'random'], [all_patterns, all_random
     ax.axvline(0, color="k")
     ax.axhline(0, color="k")
     fig.savefig(op.join(figure_dir, f"mean_rho_{trial_type}_1024.pdf"))
-
+    
+# plot contrast with significance
+contrasts = patterns - randoms
+color1 = "#1982C4"
+color2 = "#00BFB3"
+coco = np.array([np.diag(cock) for cock in contrasts])
+fig, ax = plt.subplots(1, 1, figsize=(40, 5), layout='tight')
+pval = decod_stats(coco, -1)
+sig = pval < 0.05
+pval_unc = ttest_1samp(coco, popmean=0, axis=0)[1]
+sig_unc = pval_unc < 0.05
+# List to store x-coordinates where sig_unc is true
+x_points = [x for x, sig in zip(times, sig_unc) if sig]
+ax.plot(times, np.diag(contrasts.mean(0)), color=color1, label='contrasts')
+ax.set_title(f"$diag$", fontsize=15)
+ax.fill_between(times, 0, np.diag(contrasts.mean(0)), color=color2, alpha=.7, where=sig)
+ax.axhline(0, alpha=.7, color='black')
+ax.axvline(-3, ls="dashed", alpha=.7, color='black')
+ax.axvline(-1.5, ls="dashed", alpha=.7, color='black')
+ax.axvline(0, ls="dashed", alpha=.7, color='black')
+ax.axvline(1.5, ls="dashed", alpha=.7, color='black')
+ax.axvline(3, ls="dashed", alpha=.7, color='black')
+ax.scatter(x_points, [0] * len(x_points), color='#DD614A')
+fig.savefig(figure_dir / "contrast_diag.pdf")
+plt.close()

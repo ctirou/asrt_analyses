@@ -5,14 +5,14 @@ import os.path as op
 import matplotlib.pyplot as plt
 import numpy as np
 from mne import read_epochs, read_labels_from_annot
-from scipy.stats import spearmanr
+from scipy.stats import ttest_1samp, spearmanr
 from tqdm.auto import tqdm
 import numba
 
 analysis = "time_generalization"
 data_path = PRED_PATH
 subjects, epochs_list = SUBJS, EPOCHS
-lock = 'stim'
+lock = 'button'
 jobs = -1
 verbose = True
 
@@ -28,6 +28,8 @@ res_dir = res_path / analysis / 'source' / lock
 # figures output directory
 figure_dir = HOME / 'figures' / analysis / 'source' / lock
 ensure_dir(figure_dir)
+ensure_dir(figure_dir / "contrast_diags")
+ensure_dir(figure_dir / "contrasts")
 
 @numba.jit
 def spearman_rank_correlation(x, y):
@@ -51,7 +53,7 @@ for ilabel, label in enumerate(label_names):
     ensure_dir(figure_dir / label)
     # load patterns and randoms time-generalization on all epochs
     patterns, randoms = [], []
-    for subject in subjects[:-3]:
+    for subject in subjects:
         pattern = np.load(res_dir / label / 'pattern' / f"{subject}-all-scores.npy")
         patterns.append(pattern)
         random = np.load(res_dir / label / 'random' / f"{subject}-all-scores.npy")
@@ -103,13 +105,18 @@ for ilabel, label in enumerate(label_names):
 
     # plot contrast with significance
     contrasts = patterns - randoms
-    color1 = "#1f77b4"
-    color2 = "#F79256"
+    color1 = "#1982C4"
+    color2 = "#00BFB3"
     coco = np.array([np.diag(cock) for cock in contrasts])
     fig, ax = plt.subplots(1, 1, figsize=(40, 5), layout='tight')
     pval = decod_stats(coco, -1)
     sig = pval < 0.05
+    pval_unc = ttest_1samp(coco, popmean=0, axis=0)[1]
+    sig_unc = pval_unc < 0.05
+    # List to store x-coordinates where sig_unc is true
+    x_points = [x for x, sig in zip(times, sig_unc) if sig]
     ax.plot(times, np.diag(contrasts.mean(0)), color=color1, label='contrasts')
+    ax.set_title(f"${label}$", fontsize=10)
     ax.fill_between(times, 0, np.diag(contrasts.mean(0)), color=color2, alpha=.7, where=sig)
     ax.axhline(0, alpha=.7, color='black')
     ax.axvline(-3, ls="dashed", alpha=.7, color='black')
@@ -117,7 +124,9 @@ for ilabel, label in enumerate(label_names):
     ax.axvline(0, ls="dashed", alpha=.7, color='black')
     ax.axvline(1.5, ls="dashed", alpha=.7, color='black')
     ax.axvline(3, ls="dashed", alpha=.7, color='black')
+    ax.scatter(x_points, [0] * len(x_points), color='#DD614A')
     fig.savefig(figure_dir / label / "contrast_diag.pdf")
+    fig.savefig(figure_dir / "contrast_diags" / f"{label}.pdf")
     plt.close()
     if label not in diag_dict:
         diag_dict[label] = contrasts.mean(0)
@@ -137,6 +146,7 @@ for ilabel, label in enumerate(label_names):
         vmin=-0.05,
         vmax=0.05)
     ax.set_xlabel("Testing Time (s)")
+    ax.set_title(f"${label}$", fontsize=10)
     ax.set_ylabel("Training Time (s)")
     ax.set_title("Temporal generalization")
     cbar = plt.colorbar(im, ax=ax)
@@ -147,6 +157,7 @@ for ilabel, label in enumerate(label_names):
     ax.axvline(0, color="k")
     ax.axhline(0, color="k")
     fig.savefig(figure_dir / label / "mean_contrast.pdf")
+    fig.savefig(figure_dir / "contrasts" / f"{label}.pdf")
     plt.close()
 
     # # look at the correlations
@@ -200,15 +211,3 @@ for ilabel, label in enumerate(label_names):
     #     ax.axvline(0, color="k")
     #     ax.axhline(0, color="k")
     #     fig.savefig(op.join(figure_dir, lock, f"mean_rho_{trial_type}.png"))
-
-# plot diag plots
-fig, axs = plt.subplots(nrows=7, ncols=10, layout="tight", figsize=(40, 10), sharex=True, sharey=True)
-for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
-    print(f"plotting {label}...")
-    ax.plot(times, diag_dict[label], color=color1)
-    ax.axhline(0, alpha=.7, color='black')
-    ax.axvline(-3, ls="dashed", alpha=.7, color='black')
-    ax.axvline(-1.5, ls="dashed", alpha=.7, color='black')
-    ax.axvline(0, ls="dashed", alpha=.7, color='black')
-    ax.axvline(1.5, ls="dashed", alpha=.7, color='black')
-    ax.axvline(3, ls="dashed", alpha=.7, color='black')

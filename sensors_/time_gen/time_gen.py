@@ -2,7 +2,7 @@ import mne
 import os
 import os.path as op
 import numpy as np
-from mne.decoding import cross_val_multiscore, GeneralizingEstimator
+from mne.decoding import cross_val_multiscore, GeneralizingEstimator, CSP
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import make_pipeline
@@ -16,15 +16,18 @@ import gc
 data_path = PRED_PATH
 analysis = 'time_generalization'
 subjects, epochs_list = SUBJS, EPOCHS
-lock = 'button'
+lock = 'stim'
 folds = 10
 solver = 'lbfgs'
 scoring = "accuracy"
 jobs = -1
-ensure_dir(PRED_PATH / 'results')
+analysis = "csp"
+ensure_dir(PRED_PATH / 'results' / analysis)
 
+csp = CSP(n_components=30)
 # define classifier
-clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
+# clf = make_pipeline(StandardScaler(), csp, LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
+clf = make_pipeline(csp, LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
 clf = GeneralizingEstimator(clf, scoring=scoring, n_jobs=jobs)
 cv = StratifiedKFold(folds, shuffle=True)
 
@@ -53,7 +56,7 @@ for subject in subjects:
             assert X.shape[0] == y.shape[0]
             gc.collect()
             scores = cross_val_multiscore(clf, X, y, cv=cv)
-            np.save(op.join(data_path, 'results', f"{subject}-epoch{epoch_num}-{trial_type}-scores.npy"), scores.mean(0))
+            np.save(op.join(data_path, 'results', analysis, f"{subject}-epoch{epoch_num}-{trial_type}-scores.npy"), scores.mean(0))
             # append epochs
             all_epochs.append(epoch_gen)
             all_behavs.append(behav)
@@ -80,6 +83,6 @@ for subject in subjects:
         del all_epochs, all_behavs, behav, epoch_fname, epoch_gen, epochs, behav_df, meg_data, behav_data
         gc.collect()
         scores = cross_val_multiscore(clf, X, y, cv=cv)
-        np.save(op.join(data_path, 'results', f"{subject}-epochall-{trial_type}-scores.npy"), scores.mean(0))
+        np.save(op.join(data_path, 'results', analysis, f"{subject}-epochall-{trial_type}-scores.npy"), scores.mean(0))
         del X, y, scores
         gc.collect()
