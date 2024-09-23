@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from base import *
 from config import *
 from mne import read_epochs
-from scipy.stats import spearmanr
+from scipy.stats import spearmanr, ttest_1samp
 from tqdm.auto import tqdm
 
 # Configuration

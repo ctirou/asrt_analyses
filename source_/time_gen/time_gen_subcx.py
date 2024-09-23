@@ -9,7 +9,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import make_pipeline
 from sklearn.model_selection import StratifiedKFold
 import pandas as pd
-from base import ensure_dir, get_volume_estimate_tc
+from base import ensure_dir, get_volume_estimate_tc, rsync_files
 from config import *
 import gc
 import sys
@@ -50,8 +50,6 @@ for lock in ['stim', 'button']:
         src = mne.read_source_spaces(src_fname, verbose=verbose)
         # path to bem file
         bem_fname = op.join(data_path, "bem", "%s-bem-sol.fif" % (subject))
-        # get labels
-        # labels = mne.read_labels_from_annot(subject=subject, parc=parc, hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
         
         for hemi in ['lh', 'rh', 'others']:
             # create mixed source space
@@ -98,16 +96,14 @@ for lock in ['stim', 'button']:
                     label_tc, _ = get_volume_estimate_tc(stcs, fwd, offsets, subject, subjects_dir)
                     # subcortex labels
                     labels = [label for label in label_tc.keys() if label not in BAD_VOLUME_LABELS]
-                    
                     del noise_cov, data_cov, filters
                     gc.collect()
-
                     for ilabel, label in enumerate(labels):
                         print(subject, lock, trial_type, hemi, f"{str(ilabel+1).zfill(2)}/{len(labels)}", label) 
                         # results dir
-                        res_dir = res_path / 'source' / lock / trial_type / label
+                        res_dir = res_path / 'source' / lock / label / trial_type
                         ensure_dir(res_dir)
-                        if not os.path.exists(res_dir / f"{subject}-scores.npy"):
+                        if not os.path.exists(res_dir / f"{subject}-{epoch_num}-scores.npy"):
                             if trial_type == 'pattern':    
                                 pattern = behav.trialtypes == 1
                                 X = label_tc[label][pattern]
@@ -124,60 +120,52 @@ for lock in ['stim', 'button']:
                             # if X.shape[1] < 1:
                             #     continue            
                             scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=verbose)
-                            np.save(res_dir / f"{subject}-scores.npy", scores.mean(0))
+                            np.save(res_dir / f"{subject}-{epoch_num}-scores.npy", scores.mean(0))
                             del X, y, scores
                             gc.collect()
-                    
                     # append epochs
                     all_behavs.append(behav)
                     all_stcs.extend(stcs)
-                    
                     del epoch, behav, stcs
                     if trial_type == 'button':
                         del epoch_bsl
                     gc.collect()
-                
                 behav_df = pd.concat(all_behavs)
                 all_stcs = np.array(all_stcs)
                 del all_behavs
                 gc.collect()
-                
-                # offsets = np.cumsum([0] + [len(s["vertno"]) for s in vol_src])
                 label_tc, _ = get_volume_estimate_tc(all_stcs, fwd, offsets, subject, subjects_dir)
                 # subcortex labels
                 labels = [label for label in label_tc.keys() if label not in BAD_VOLUME_LABELS]
-
                 for ilabel, label in enumerate(labels):
-                    print(subject, lock, trial_type, "all", f"{str(ilabel+1).zfill(2)}/{len(labels)}", label.name)
                     # results dir
-                    res_dir = res_path / lock / label.name / trial_type
+                    res_dir = res_path / 'source' / lock / label / trial_type
                     ensure_dir(res_dir)
-
                     if not os.path.exists(res_dir / f"{subject}-all-scores.npy"):
                         print(subject, lock, trial_type, hemi, f"{str(ilabel+1).zfill(2)}/{len(labels)}", label) 
-                        # results dir
-                        res_dir = res_path / 'source' / lock / trial_type / label
-                        ensure_dir(res_dir)
-                        if not os.path.exists(res_dir / f"{subject}-scores.npy") or overwrite:
-                            if trial_type == 'pattern':    
-                                pattern = behav_df.trialtypes == 1
-                                X = label_tc[label][pattern]
-                                y = behav_df.positions[pattern]
-                            elif trial_type == 'random':
-                                random = behav_df.trialtypes == 2
-                                X = label_tc[label][random]
-                                y = behav_df.positions[random]
-                            else:
-                                X = label_tc[label]
-                                y = behav_df.positions
-                            y = y.reset_index(drop=True)            
-                            assert X.shape[0] == y.shape[0]
-                            if X.shape[1] < 1:
-                                continue            
-                            scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=verbose)
-                            np.save(res_dir / f"{subject}-scores.npy", scores.mean(0))
-                            del X, y, scores
-                            gc.collect()
-                
+                        if trial_type == 'pattern':    
+                            pattern = behav_df.trialtypes == 1
+                            X = label_tc[label][pattern]
+                            y = behav_df.positions[pattern]
+                        elif trial_type == 'random':
+                            random = behav_df.trialtypes == 2
+                            X = label_tc[label][random]
+                            y = behav_df.positions[random]
+                        else:
+                            X = label_tc[label]
+                            y = behav_df.positions
+                        y = y.reset_index(drop=True)            
+                        assert X.shape[0] == y.shape[0]
+                        if X.shape[1] < 1:
+                            continue            
+                        scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=verbose)
+                        np.save(res_dir / f"{subject}-all-scores.npy", scores.mean(0))
+                        del X, y, scores
+                        gc.collect()
                 del behav_df, all_stcs
                 gc.collect()
+                
+                source = "/Users/coum/Desktop/pred_asrt/results/source"
+                destination = "/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt/results/time_generalization"
+                options = "-av" 
+                rsync_files(source, destination, options)

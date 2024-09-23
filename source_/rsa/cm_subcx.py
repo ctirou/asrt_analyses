@@ -72,9 +72,6 @@ for subject in subjects:
         if lock == 'button': 
             epoch_bsl_fname = data_path / "bsl" / f"{subject}-{session_id}-epo.fif"
             epoch_bsl = mne.read_epochs(epoch_bsl_fname, verbose=verbose)
-        # read forward solution
-        # fwd_fname = res_path / "fwd" / lock / f"{subject}-{session_id}-fwd.fif"
-        # fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
         # path to trans file
         trans_fname = op.join(res_path, "trans", lock, "%s-%i-trans.fif" % (subject, session_id))
         # compute forward solution
