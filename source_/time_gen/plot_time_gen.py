@@ -12,7 +12,7 @@ import numba
 analysis = "time_generalization"
 data_path = PRED_PATH
 subjects, epochs_list = SUBJS, EPOCHS
-lock = 'button'
+lock = 'stim'
 jobs = -1
 verbose = True
 
@@ -23,7 +23,7 @@ times = epoch.times
 del epoch
 
 res_path = RESULTS_DIR
-res_dir = res_path / analysis / 'source' / lock 
+res_dir = res_path / analysis / 'source' / 'source' / lock 
 
 # figures output directory
 figure_dir = HOME / 'figures' / analysis / 'source' / lock
@@ -42,7 +42,7 @@ def spearman_rank_correlation(x, y):
     return rho
 
 # get labels
-# labels = SURFACE_LABELS
+label_names = SURFACE_LABELS + VOLUME_LABELS if lock == 'stim' else SURFACE_LABELS_RT + VOLUME_LABELS_RT # need to include all labels except volume bad
 labels_annot = read_labels_from_annot(subject='sub01', parc='aparc', hemi='both', subjects_dir=FREESURFER_DIR, verbose=False)
 label_names = [label.name for label in labels_annot]
 
@@ -53,7 +53,7 @@ for ilabel, label in enumerate(label_names):
     ensure_dir(figure_dir / label)
     # load patterns and randoms time-generalization on all epochs
     patterns, randoms = [], []
-    for subject in subjects:
+    for subject in subjects[:1]:
         pattern = np.load(res_dir / label / 'pattern' / f"{subject}-all-scores.npy")
         patterns.append(pattern)
         random = np.load(res_dir / label / 'random' / f"{subject}-all-scores.npy")
