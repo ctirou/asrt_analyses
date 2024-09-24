@@ -169,7 +169,7 @@ sig_unc = pval_unc < 0.05
 # List to store x-coordinates where sig_unc is true
 x_points = [x for x, sig in zip(times, sig_unc) if sig]
 ax.plot(times, np.diag(contrasts.mean(0)), color=color1, label='contrasts')
-ax.set_title(f"$diag$", fontsize=15)
+ax.set_title(f"$contrast$", fontsize=15)
 ax.fill_between(times, 0, np.diag(contrasts.mean(0)), color=color2, alpha=.7, where=sig)
 ax.axhline(0, alpha=.7, color='black')
 ax.axvline(-3, ls="dashed", alpha=.7, color='black')
@@ -178,5 +178,54 @@ ax.axvline(0, ls="dashed", alpha=.7, color='black')
 ax.axvline(1.5, ls="dashed", alpha=.7, color='black')
 ax.axvline(3, ls="dashed", alpha=.7, color='black')
 ax.scatter(x_points, [0] * len(x_points), color='#DD614A')
-fig.savefig(figure_dir / "contrast_diag.pdf")
+fig.savefig(figure_dir / "contrasts_diag.pdf")
+plt.close()
+
+chance = .25
+# plot pattern
+color1 = "#1982C4"
+color2 = "#00BFB3"
+fig, ax = plt.subplots(1, 1, figsize=(40, 5), layout='tight')
+coco = np.array([np.diag(cock) for cock in patterns])
+pval = decod_stats(coco - chance, -1)
+sig = pval < 0.05
+pval_unc = ttest_1samp(coco, popmean=0, axis=0)[1]
+sig_unc = pval_unc < 0.05
+# List to store x-coordinates where sig_unc is true
+x_points = [x for x, sig in zip(times, sig_unc) if sig]
+ax.set_ylim(-0.225, 0.450)
+ax.plot(times, np.diag(patterns.mean(0)), color=color1, label='contrasts')
+ax.set_title(f"$pattern$", fontsize=15)
+ax.fill_between(times, chance, np.diag(patterns.mean(0)), color=color2, alpha=.7, where=sig)
+ax.axhline(chance, alpha=.7, color='black')
+ax.axvline(-3, ls="dashed", alpha=.7, color='black')
+ax.axvline(-1.5, ls="dashed", alpha=.7, color='black')
+ax.axvline(0, ls="dashed", alpha=.7, color='black')
+ax.axvline(1.5, ls="dashed", alpha=.7, color='black')
+ax.axvline(3, ls="dashed", alpha=.7, color='black')
+fig.savefig(figure_dir / "patterns_diag.pdf")
+plt.close()
+
+# plot random
+color1 = "#1982C4"
+color2 = "#00BFB3"
+fig, ax = plt.subplots(1, 1, figsize=(40, 5), layout='tight')
+coco = np.array([np.diag(cock) for cock in randoms])
+pval = decod_stats(coco - chance, -1)
+sig = pval < 0.05
+pval_unc = ttest_1samp(coco, popmean=0, axis=0)[1]
+sig_unc = pval_unc < 0.05
+# List to store x-coordinates where sig_unc is true
+x_points = [x for x, sig in zip(times, sig_unc) if sig]
+ax.set_ylim(-0.225, 0.450)
+ax.plot(times, np.diag(randoms.mean(0)), color=color1, label='contrasts')
+ax.set_title(f"$random$", fontsize=15)
+ax.fill_between(times, chance, np.diag(randoms.mean(0)), color=color2, alpha=.7, where=sig)
+ax.axhline(chance, alpha=.7, color='black')
+ax.axvline(-3, ls="dashed", alpha=.7, color='black')
+ax.axvline(-1.5, ls="dashed", alpha=.7, color='black')
+ax.axvline(0, ls="dashed", alpha=.7, color='black')
+ax.axvline(1.5, ls="dashed", alpha=.7, color='black')
+ax.axvline(3, ls="dashed", alpha=.7, color='black')
+fig.savefig(figure_dir / "randoms_diag.pdf")
 plt.close()
