@@ -293,15 +293,21 @@ def rsync_files(source, destination, options=""):
     import subprocess
     try:
         # Construct the rsync command
-        command = f"rsync {options} --ignore-existing {source} {destination}"
+        command = f"rsync {options} --progress --ignore-existing {source} {destination}"
         
         # Execute the command
         result = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         
-        # Print the output and errors (if any)
-        print(result.stdout.decode())
-        print(result.stderr.decode())
-        
+        # Decode and print the output and errors (if any)
+        stdout = result.stdout.decode()
+        stderr = result.stderr.decode()
+
+        print(stdout)
+        if stderr:
+            print(f"Errors during rsync: {stderr}")
+
         print("Rsync operation completed successfully.")
+        return stdout
     except subprocess.CalledProcessError as e:
         print(f"An error occurred: {e.stderr.decode()}")
+        return None

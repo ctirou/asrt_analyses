@@ -37,6 +37,9 @@ ensure_dir(res_path)
 # subject_num = int(sys.argv[2])
 # subject = subjects[subject_num]
 
+source = "/Users/coum/Desktop/pred_asrt/results/source"
+destination = "/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt/results/time_generalization"
+
 # define classifier
 clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
 clf = GeneralizingEstimator(clf, scoring=scoring, n_jobs=jobs)
@@ -123,6 +126,7 @@ for lock in ['stim', 'button']:
                             np.save(res_dir / f"{subject}-{epoch_num}-scores.npy", scores.mean(0))
                             del X, y, scores
                             gc.collect()
+                            rsync_files(source, destination, options='-av')
                     # append epochs
                     all_behavs.append(behav)
                     all_stcs.extend(stcs)
@@ -162,10 +166,6 @@ for lock in ['stim', 'button']:
                         np.save(res_dir / f"{subject}-all-scores.npy", scores.mean(0))
                         del X, y, scores
                         gc.collect()
+                        rsync_files(source, destination, options='-av')
                 del behav_df, all_stcs
                 gc.collect()
-                
-                source = "/Users/coum/Desktop/pred_asrt/results/source"
-                destination = "/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt/results/time_generalization"
-                options = "-av" 
-                rsync_files(source, destination, options)
