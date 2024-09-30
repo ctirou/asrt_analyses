@@ -14,7 +14,7 @@ import gc
 # stim disp = 500 ms
 # RSI = 750 ms in task
 data_path = PRED_PATH
-analysis = 'time_generalization'
+analysis = 'train_on_practice'
 subjects, epochs_list, subjects_dir = SUBJS, EPOCHS, FREESURFER_DIR
 lock = 'stim'
 folds = 10
@@ -24,7 +24,7 @@ hemi = 'both'
 parc = 'aparc'
 jobs = -1
 verbose = True
-res_path = data_path / 'results' / 'sensors' / 'train_rdm_test_pat'
+res_path = data_path / 'results' / 'sensors' / analysis
 ensure_dir(res_path)
 
 # define classifier
@@ -32,13 +32,7 @@ clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000,
 clf = GeneralizingEstimator(clf, scoring=scoring, n_jobs=jobs)
 cv = StratifiedKFold(folds, shuffle=True)
 
-def reset_all():
-    for name in dir():
-        if not name.startswith('__'):
-            del globals()[name]
-    
-# for lock in ['stim', 'button']: 
-for lock in ['stim']: 
+for lock in ['stim', 'button']: 
     
     ensure_dir(res_path / lock / 'cv_scores')
     ensure_dir(res_path / lock / 'scores')
@@ -46,6 +40,17 @@ for lock in ['stim']:
     for subject in subjects:
 
         all_epochs, all_behavs = [], []
+        
+        behav_prac = pd.read_pickle(op.join(data_path, 'behav', f'{subject}-0.pkl'))
+        epoch_fname = op.join(data_path, lock, f"{subject}-0-epo.fif")
+        epoch_prac = mne.read_epochs(epoch_fname, verbose=verbose, preload=False)
+        
+        pat_prac = behav_prac.trialtypes == 1
+        Xprac = epoch_prac.get_data()[pat_prac]
+        yprac = np.array(behav_prac.positions[pat_prac])
+        assert Xprac.shape[0] == yprac.shape[0]
+         
+        clf.fit(Xprac, yprac)
 
         # for epoch_num, epo, score_list, scoring_list in zip([1, 2, 3, 4], epochs_list[1:], [scores_1, scores_2, scores_3, scores_4], [scoring_1, scoring_2, scoring_3, scoring_4]):
         for epoch_num, epo in zip([1, 2, 3, 4], epochs_list[1:]):
@@ -72,10 +77,9 @@ for lock in ['stim']:
             gc.collect()
             
             # method 1
-            clf.fit(Xrand, yrand)
             scores = clf.score(Xpat, ypat)
             np.save(res_path / lock / 'scores' / f"{subject}-{epoch_num}.npy", scores)
-            
+                        
             del scores
             gc.collect()
             
