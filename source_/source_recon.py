@@ -46,11 +46,11 @@ for subject in subjects:
     # cortex source space
     # src_fname = op.join(res_path, "src", "%s-src.fif" % (subject))
     # if not op.exists(src_fname) or overwrite:
-    #     src = mne.setup_source_space(subject, spacing='oct6',
-    #                                     subjects_dir=subjects_dir,
-    #                                     add_dist=True,
-    #                                     n_jobs=jobs,
-    #                                     verbose=verbose)
+        src = mne.setup_source_space(subject, spacing='oct6',
+                                        subjects_dir=subjects_dir,
+                                        add_dist=True,
+                                        n_jobs=jobs,
+                                        verbose=verbose)
     #     mne.write_source_spaces(src_fname, src, overwrite=True)
                                 
     # volume source space

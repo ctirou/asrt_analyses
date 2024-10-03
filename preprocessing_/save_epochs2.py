@@ -27,11 +27,12 @@ subjects = SUBJS
 def int_to_unicode(array):
         return ''.join([str(chr(int(ii))) for ii in array]) # permet de convertir int en unicode (pour editops)
 
-mode_ICA = False
+mode_ICA = True
 jobs = -1
 verbose = True
 overwrite = True
 generalizing = True
+baselining = True
 
 # Set path
 if generalizing:
@@ -92,7 +93,7 @@ for subject in subjects:
                         ica.exclude = np.unique(np.concatenate([veog_indices, heog_indices, hbeat_indices]))
                         # Filter raw
                         ica.apply(raw)
-                # raw.filter(0.1, 30, n_jobs=jobs)     
+                raw.filter(0.1, 30, n_jobs=jobs)
                 # Select events of interest (only photodiode for good triplets and correct answers)
                 if subject == 'sub06' and meg_session == '6_EPOCH_4':
                         events = mne.find_events(raw, shortest_event=1, verbose=verbose)
@@ -193,8 +194,8 @@ for subject in subjects:
                         epochs_stim = mne.Epochs(raw, events_stim, tmin=-0.2, tmax=0.6, baseline=(-.2, 0), preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)                   
                         epochs_button = mne.Epochs(raw, events_button, tmin=-0.2, tmax=0.6, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)                        
                 # Free memory
-                del raw
-                gc.collect()
+                # del raw
+                # gc.collect()
                 for df, df_column, epochs in zip([stim_df, button_df], ['triplets', 'expec_triggers'], [epochs_stim, epochs_button]):
                         changes = editops(int_to_unicode(df[df_column]), int_to_unicode(epochs.events[:, 2]))
                         # Make modification
@@ -251,6 +252,52 @@ for subject in subjects:
                         bsl_data = np.mean(bsl_data, axis=2)
                         epochs_button._data[:, bsl_channels, :] -= bsl_data[:, :, np.newaxis]
                         epochs_baseline.save(op.join(path, 'bsl', f'{subject}-{session_num+1}-epo.fif'), overwrite=overwrite)
+                
+                if baselining:
+                        for behav, epochs in zip([stim_df, button_df], [epochs_stim, epochs_button]):
+                                # make sure equal number of randoms and patterns
+                                # make sure always a random before a pattern
+                                behav.reset_index(drop=True, inplace=True)
+                                cleaned = False
+                                while not cleaned:                
+                                        drop_indices = set()
+                                        cleaned = True
+                                        for i, trialtype in enumerate(behav.trialtypes):
+                                                if i == len(behav) - 1:
+                                                        break        
+                                                if trialtype == 2:
+                                                        if i+1 < len(behav) and behav.trialtypes.iloc[i+1] == 1:
+                                                                pass
+                                                        else:
+                                                                if i+1 < len(behav) and behav.trialtypes.iloc[i+1] == 2:
+                                                                        drop_indices.add(i)
+                                                                else:
+                                                                        drop_indices.add(i + 1)
+                                                                        cleaned = False
+                                                if trialtype == 1:
+                                                        if i+1 < len(behav) and behav.trialtypes.iloc[i+1] == 1:
+                                                                drop_indices.add(i+1)
+                                                                cleaned = False
+                                        if behav.trialtypes.iloc[-1] == 2:
+                                                drop_indices.add(len(behav) - 1)
+                                                cleaned = False
+                                        if behav.trialtypes.iloc[0] == 1:
+                                                drop_indices.add(0)
+                                                cleaned = False
+                                        drop_indices = sorted(drop_indices, reverse=True)
+                                        for idx in drop_indices:
+                                                if idx < len(behav):
+                                                        behav.drop(idx, inplace=True)
+                                                        epochs.drop(idx)
+                                        behav.reset_index(drop=True, inplace=True)
+                                assert behav.shape[0] == epochs._data.shape[0]
+                                # baselining using randoms' baseline
+                                rdm_bsl = epochs[behav.trialtypes == 2].copy().crop(-0.2, 0)
+                                bsl_channels = mne.pick_types(epochs.info, meg=True)
+                                bsl_data = rdm_bsl.get_data()[:, bsl_channels, :]
+                                bsl_data = np.mean(bsl_data, axis=2)
+                                epochs._data[behav.trialtypes == 1][:, bsl_channels, :] -= bsl_data[:, :, np.newaxis]
+                        
                 # Save epochs 
                 epochs_stim.save(op.join(path, 'stim', f'{subject}-{session_num+1}-epo.fif'), overwrite=overwrite)
                 epochs_button.save(op.join(path, 'button', f'{subject}-{session_num+1}-epo.fif'), overwrite=overwrite)
