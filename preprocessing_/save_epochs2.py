@@ -27,12 +27,12 @@ subjects = SUBJS
 def int_to_unicode(array):
         return ''.join([str(chr(int(ii))) for ii in array]) # permet de convertir int en unicode (pour editops)
 
-mode_ICA = True
+mode_ICA = False
 jobs = -1
 verbose = True
 overwrite = True
 generalizing = True
-baselining = True
+baselining = False
 
 # Set path
 if generalizing:
@@ -93,7 +93,7 @@ for subject in subjects:
                         ica.exclude = np.unique(np.concatenate([veog_indices, heog_indices, hbeat_indices]))
                         # Filter raw
                         ica.apply(raw)
-                raw.filter(0.1, 30, n_jobs=jobs)
+                # raw.filter(0.1, 30, n_jobs=jobs)
                 # Select events of interest (only photodiode for good triplets and correct answers)
                 if subject == 'sub06' and meg_session == '6_EPOCH_4':
                         events = mne.find_events(raw, shortest_event=1, verbose=verbose)
