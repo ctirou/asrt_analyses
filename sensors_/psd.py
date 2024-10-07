@@ -1,18 +1,10 @@
 import mne
-import os
 import os.path as op
 import numpy as np
-from mne.decoding import cross_val_multiscore, GeneralizingEstimator
-from mne.beamformer import make_lcmv, apply_lcmv_epochs
-from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import LogisticRegression
-from sklearn.pipeline import make_pipeline
-from sklearn.model_selection import StratifiedKFold
 import pandas as pd
 from base import ensure_dir
 from config import *
-import gc
-import sys
+import matplotlib.pyplot as plt
 
 # stim disp = 500 ms
 # RSI = 750 ms in task
@@ -53,20 +45,55 @@ for epoch_num, epo in zip([1, 2, 3, 4], epochs_list[1:]):
     
     epo_ps = epoch_no_filt.compute_psd(method='multitaper', tmin=0, tmax=0.6, picks='meg')
     epo_ps.plot()
+
+#####
+    epoch = epoch_filt.copy()
+    events = epoch.events
+    event_samples = events[:, 0]
+    sample_intervals = np.diff(event_samples)
+
+    sfreq = epoch.info['sfreq']
+    time_intervals_ms = (sample_intervals / sfreq) * 1000
+    # std_interval = np.std(time_intervals_ms)
+
+    # Plot the time intervals
+    plt.figure(figsize=(10, 6))
+    plt.plot(time_intervals_ms, marker='o', linestyle='-', color='b')
+    plt.title('Time Intervals Between Events')
+    plt.xlabel('Event Index')
+    plt.ylabel('Interval (s)')
+    plt.grid(True)
+    plt.show()
+####
+    data_path = Path('/Users/coum/Desktop/rawz/raws/')
+    raw_fname = op.join(data_path, subject, 'meg_data', epo, 'results', 'c,rfDC_EEG')
+    hs_fname = op.join(data_path, subject, "meg_data", epo, "hs_file")
+    config_fname = op.join(data_path, subject, "meg_data", epo, "config")
+    raw = mne.io.read_raw_bti(raw_fname, preload=True, config_fname=config_fname, head_shape_fname=hs_fname, verbose=verbose)
+
+    all_events = mne.find_events(raw, verbose=verbose)
+    sfreq = raw.info['sfreq']
     
-events_stim = None    
+    # events = [event for event in all_events if event[1] in [30, 32, 34]]
+    events = np.array(events)
 
-interval = list()
-for i, j in enumerate(events_stim[:, 0]):
-    if i == len(events_stim) - 1:
-        break
-    interval.append(events_stim[i+1, 0] - j)
+    mne.viz.plot_events(events, sfreq)
+    
+    event_samples = events[:, 0]
+    sample_intervals = np.diff(event_samples)
+    time_intervals_ms = (sample_intervals / sfreq) * 1000
+    std_interval = np.std(time_intervals_ms)
+    time_interval = [ti for ti in time_intervals_ms if ti < std_interval]
 
-interval = np.array(interval)
-filt = interval < 6000
-interval = interval[filt]
+    # Plot the time intervals
+    plt.figure(figsize=(10, 6))
+    plt.plot(time_interval, marker='o')
+    plt.title('Time Intervals Between Events')
+    plt.xlabel('Event Index')
+    plt.ylabel('Interval (ms)')
+    plt.grid(True)
+    plt.show()
+    
+    break
 
-import matplotlib.pyplot as plt
-plt.plot(interval)
-# plt.scatter(np.newaxis, interval)
-plt.show()
+

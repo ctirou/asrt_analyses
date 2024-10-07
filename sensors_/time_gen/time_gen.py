@@ -20,7 +20,7 @@ lock = 'stim'
 folds = 10
 solver = 'lbfgs'
 scoring = "accuracy"
-jobs = -1
+jobs = 10
 
 # define classifier
 clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
@@ -53,8 +53,8 @@ for subject in subjects:
             y = y.reset_index(drop=True)            
             assert X.shape[0] == y.shape[0]
             gc.collect()
-            scores = cross_val_multiscore(clf, X, y, cv=cv)
-            np.save(res_dir / f"{subject}-epoch{epoch_num}-{trial_type}-scores.npy", scores.mean(0))
+            # scores = cross_val_multiscore(clf, X, y, cv=cv)
+            # np.save(res_dir / f"{subject}-epoch{epoch_num}-{trial_type}-scores.npy", scores.mean(0))
             # append epochs
             all_epochs.append(epoch_gen)
             all_behavs.append(behav)

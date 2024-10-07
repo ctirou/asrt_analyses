@@ -14,8 +14,7 @@ from Levenshtein import editops
 import pandas as pd
 import warnings
 from base import ensure_dir
-from config import RAW_DATA_DIR, DATA_DIR, PRED_PATH, SUBJS
-import gc
+from config import DATA_DIR, PRED_PATH, SUBJS
 from pathlib import Path
 
 subjects = SUBJS
@@ -27,16 +26,18 @@ subjects = SUBJS
 def int_to_unicode(array):
         return ''.join([str(chr(int(ii))) for ii in array]) # permet de convertir int en unicode (pour editops)
 
-mode_ICA = False
-jobs = -1
+mode_ICA = True
+jobs = 10
 verbose = True
 overwrite = True
 generalizing = True
 baselining = False
 
+analysis = 'filtered_baselined'
+
 # Set path
 if generalizing:
-        path = PRED_PATH / 'no_filter'
+        path = PRED_PATH / analysis
         ensure_dir(path)
 else:
         path = DATA_DIR
@@ -297,7 +298,6 @@ for subject in subjects:
                                 bsl_data = rdm_bsl.get_data()[:, bsl_channels, :]
                                 bsl_data = np.mean(bsl_data, axis=2)
                                 epochs._data[behav.trialtypes == 1][:, bsl_channels, :] -= bsl_data[:, :, np.newaxis]
-                        
                 # Save epochs 
                 epochs_stim.save(op.join(path, 'stim', f'{subject}-{session_num+1}-epo.fif'), overwrite=overwrite)
                 epochs_button.save(op.join(path, 'button', f'{subject}-{session_num+1}-epo.fif'), overwrite=overwrite)
