@@ -12,11 +12,6 @@ data_path = PRED_PATH
 analysis = 'time_generalization'
 subjects, epochs_list, subjects_dir = SUBJS, EPOCHS, FREESURFER_DIR
 lock = 'stim'
-folds = 10
-solver = 'lbfgs'
-scoring = "accuracy"
-hemi = 'both'
-parc = 'aparc'
 jobs = 10
 verbose = True
 res_path = data_path / 'results' / 'source'
@@ -65,7 +60,8 @@ for epoch_num, epo in zip([1, 2, 3, 4], epochs_list[1:]):
     plt.grid(True)
     plt.show()
 ####
-    data_path = Path('/Users/coum/Desktop/rawz/raws/')
+    # data_path = Path('/Users/coum/Desktop/rawz/raws/')
+    data_path = RAW_DATA_DIR_SSD
     raw_fname = op.join(data_path, subject, 'meg_data', epo, 'results', 'c,rfDC_EEG')
     hs_fname = op.join(data_path, subject, "meg_data", epo, "hs_file")
     config_fname = op.join(data_path, subject, "meg_data", epo, "config")
@@ -74,16 +70,16 @@ for epoch_num, epo in zip([1, 2, 3, 4], epochs_list[1:]):
     all_events = mne.find_events(raw, verbose=verbose)
     sfreq = raw.info['sfreq']
     
-    # events = [event for event in all_events if event[1] in [30, 32, 34]]
+    events = [event for event in all_events if event[1] in [30, 32, 34]]
     events = np.array(events)
 
-    mne.viz.plot_events(events, sfreq)
+    # mne.viz.plot_events(events, sfreq)
     
     event_samples = events[:, 0]
     sample_intervals = np.diff(event_samples)
     time_intervals_ms = (sample_intervals / sfreq) * 1000
     std_interval = np.std(time_intervals_ms)
-    time_interval = [ti for ti in time_intervals_ms if ti < std_interval]
+    time_interval = [ti for ti in time_intervals_ms if ti < std_interval and ti < 1700]
 
     # Plot the time intervals
     plt.figure(figsize=(10, 6))
