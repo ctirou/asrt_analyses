@@ -13,6 +13,8 @@ FREESURFER_DIR = Path('/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.
 FIGURE_PATH = Path('/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt/figures')
 HOME = Path('/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt')
 
+NEW_FIG_DIR = Path("/Users/coum/MEGAsync/figures")
+
 PRED_PATH = Path('/Users/coum/Desktop/pred_asrt')
 PRED_PATH_SSD = Path('/Volumes/Ultra_Touch/pred_asrt')
 PRED_PATH_MB = Path('/Users/coum/Desktop/pred_asrt')
