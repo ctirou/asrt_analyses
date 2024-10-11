@@ -8,12 +8,11 @@ from mne import read_epochs
 from scipy.stats import spearmanr, ttest_1samp
 from tqdm.auto import tqdm
 
-analysis = "time_generalization_1024"
-data_path = PRED_PATH / "no_filter"
+analysis = "rdm_bsl_filtered"
+data_path = PRED_PATH / analysis
 subjects, epochs_list = SUBJS, EPOCHS
 lock = 'stim'
 jobs = -1
-analysis = "csp"
 
 # get times
 epoch_fname = PRED_PATH / lock / 'sub01-0-epo.fif'
@@ -21,7 +20,8 @@ epoch = read_epochs(epoch_fname, verbose=False)
 times = epoch.times
 del epoch
 
-figure_dir = data_path / 'figures' / 'sensors' / lock
+# figure_dir = data_path / 'figures' / 'sensors' / lock
+figure_dir = NEW_FIG_DIR / "time_gen" / "sensors" / lock / analysis
 ensure_dir(figure_dir)
 
 res_dir = data_path / 'results' / 'sensors' / lock
@@ -79,8 +79,8 @@ fig.savefig(op.join(figure_dir, "mean_random.pdf"))
 # plot contrast with significance
 contrasts = patterns - randoms
 
-# pval = gat_stats(contrasts, jobs)
-# sig = np.array(pval < 0.05)
+pval = gat_stats(contrasts, jobs)
+sig = np.array(pval < 0.05)
 
 fig, ax = plt.subplots(1, 1, figsize=(16, 7))
 im = ax.imshow(
@@ -97,9 +97,9 @@ ax.set_ylabel("Training Time (s)")
 ax.set_title("contrast = pattern - random", style='italic')
 cbar = plt.colorbar(im, ax=ax)
 cbar.set_label("difference in accuracy")
-# xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
-# ax.contour(xx, yy, sig, colors='Gray', levels=[0],
-#                     linestyles='solid', linewidths=1)
+xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
+ax.contour(xx, yy, sig, colors='Gray', levels=[0],
+                    linestyles='solid', linewidths=1)
 ax.axvline(0, color="k")
 ax.axhline(0, color="k")
 fig.savefig(op.join(figure_dir, "mean_contrast.pdf"))

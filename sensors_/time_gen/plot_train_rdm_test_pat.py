@@ -9,8 +9,7 @@ from scipy.stats import spearmanr, ttest_1samp
 from tqdm.auto import tqdm
 import numba
 
-# analysis = "train_rdm_test_pat"
-analysis = "train_on_practice"
+analysis = "pat_bsl_filtered"
 data_path = PRED_PATH
 subjects, epochs_list = SUBJS, EPOCHS
 lock = 'stim'
@@ -32,7 +31,7 @@ def spearman_rank_correlation(x, y):
     rho = 1 - (6 * d_squared) / (n * (n * n - 1))
     return rho
 
-figure_dir = data_path / 'figures' / 'sensors' / analysis / lock
+figure_dir = NEW_FIG_DIR / 'sensors' / lock / analysis
 ensure_dir(figure_dir)
 
 res_dir = data_path / 'results' / 'sensors' / analysis / lock
@@ -167,4 +166,3 @@ xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
 ax.contour(xx, yy, sig_unc, colors='Gray', levels=[0],
                     linestyles='solid', linewidths=1)
 fig.savefig(op.join(figure_dir, f"mean_rho_unc.pdf"))
-    

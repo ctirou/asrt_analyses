@@ -13,9 +13,9 @@ import gc
 
 # stim disp = 500 ms
 # RSI = 750 ms in task
-data_path = PRED_PATH
-analysis = 'time_generalization'
-subjects, epochs_list, subjects_dir = SUBJS, EPOCHS, FREESURFER_DIR
+analysis = 'pat_bsl_filtered'
+data_path = PRED_PATH / analysis
+subjects, epochs_list = SUBJS, EPOCHS
 lock = 'stim'
 folds = 10
 solver = 'lbfgs'
@@ -73,20 +73,23 @@ for lock in ['stim']:
             
             # method 1
             clf.fit(Xrand, yrand)
-            scores = clf.score(Xpat, ypat)
-            np.save(res_path / lock / 'scores' / f"{subject}-{epoch_num}.npy", scores)
-            
-            del scores
-            gc.collect()
+            if not op.exists(res_path / lock / 'scores' / f"{subject}-{epoch_num}.npy"):
+                scores = clf.score(Xpat, ypat)
+                np.save(res_path / lock / 'scores' / f"{subject}-{epoch_num}.npy", scores)            
+                del scores
+                gc.collect()
             
             # method 2
-            cv_scores = list()
-            for train, test in cv.split(Xpat, ypat):
-                cv_scores.append(np.array(clf.score(Xpat[test], ypat[test])))
-            cv_scores = np.array(cv_scores)
-            np.save(res_path / lock / 'cv_scores' / f"{subject}-{epoch_num}.npy", cv_scores.mean(0))
+            if not op.exists(res_path / lock / 'cv_scores' / f"{subject}-{epoch_num}.npy"):
+                cv_scores = list()
+                for train, test in cv.split(Xpat, ypat):
+                    cv_scores.append(np.array(clf.score(Xpat[test], ypat[test])))
+                cv_scores = np.array(cv_scores)
+                np.save(res_path / lock / 'cv_scores' / f"{subject}-{epoch_num}.npy", cv_scores.mean(0))
+                del cv_scores
+                gc.collect()
             
-            del Xrand, yrand, Xpat, ypat, cv_scores
+            del Xrand, yrand, Xpat, ypat
             gc.collect()
 
         behavs = pd.concat(all_behavs)
@@ -112,17 +115,24 @@ for lock in ['stim']:
         del behavs, epochs
         gc.collect()
         
-        # method 1
         clf.fit(Xrand, yrand)
-        scores = clf.score(Xpat, ypat)
-        np.save(res_path / lock / 'scores' / f"{subject}-all.npy", scores)
+        
+        # method 1
+        if not op.exists(res_path / lock / 'scores' / f"{subject}-all.npy"):
+            scores = clf.score(Xpat, ypat)
+            np.save(res_path / lock / 'scores' / f"{subject}-all.npy", scores)
+            del scores
+            gc.collect()
         
         # method 2
-        cv_scores = list()
-        for train, test in cv.split(Xpat, ypat):
-            cv_scores.append(np.array(clf.score(Xpat[test], ypat[test])))
-        cv_scores = np.array(cv_scores)
-        np.save(res_path / lock / 'cv_scores' / f"{subject}-all.npy", cv_scores.mean(0))
+        if not op.exists(res_path / lock / 'cv_scores' / f"{subject}-all.npy"):
+            cv_scores = list()
+            for train, test in cv.split(Xpat, ypat):
+                cv_scores.append(np.array(clf.score(Xpat[test], ypat[test])))
+            cv_scores = np.array(cv_scores)
+            np.save(res_path / lock / 'cv_scores' / f"{subject}-all.npy", cv_scores.mean(0))
+            del cv_scores
+            gc.collect()
         
         del Xrand, yrand, Xpat, ypat
         gc.collect()
