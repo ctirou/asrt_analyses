@@ -6,19 +6,21 @@ SUBJS = ['sub01', 'sub02', 'sub04', 'sub07', 'sub08', 'sub09',
 EPOCHS = ['2_PRACTICE', '3_EPOCH_1', '4_EPOCH_2', '5_EPOCH_3', '6_EPOCH_4']
 
 RAW_DATA_DIR = Path('/Users/coum/Desktop/asrt/raws')
-RAW_DATA_DIR_SSD = Path('/Volumes/Ultra_Touch/asrt/raws')
 DATA_DIR = Path('/Users/coum/Desktop/asrt/preprocessed')
 RESULTS_DIR = Path('/Users/coum/Desktop/asrt/results')
 FREESURFER_DIR = Path('/Users/coum/Desktop/asrt/freesurfer')
+TIMEG_DATA_DIR = Path('/Users/coum/Desktop/pred_asrt')
 
 HOME = Path("/Users/coum/Desktop/asrt")
+HOME_SSD = Path("/Volumes/Ultra_Touch/asrt/")
 FIGURES_DIR = Path("/Users/coum/MEGAsync/figures")
 
-PRED_PATH = Path('/Users/coum/Desktop/pred_asrt')
-PRED_PATH_SSD = Path('/Volumes/Ultra_Touch/pred_asrt')
-PRED_PATH_MB = Path('/Users/coum/Desktop/pred_asrt')
+DATA_DIR_SSD = Path('/Volumes/Ultra_Touch/asrt/preprocessed')
+RAW_DATA_DIR_SSD = Path('/Volumes/Ultra_Touch/asrt/raws')
+RESULTS_DIR_SSD = Path('/Volumes/Ultra_Touch/asrt/results')
+FREESURFER_DIR_SSD = Path('/Users/coum/Desktop/asrt/freesurfer')
 
-DATA_DIR_SSD = Path('/Volumes/Ultra_Touch/asrt')
+TIMEG_DATA_DIR = Path('/Volumes/Ultra_Touch/pred_asrt')
 
 SURFACE_LABELS = ['cuneus-lh',
                 'cuneus-rh',
