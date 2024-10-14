@@ -18,6 +18,8 @@ PRED_PATH = Path('/Users/coum/Desktop/pred_asrt')
 PRED_PATH_SSD = Path('/Volumes/Ultra_Touch/pred_asrt')
 PRED_PATH_MB = Path('/Users/coum/Desktop/pred_asrt')
 
+DATA_DIR_SSD = Path('/Volumes/Ultra_Touch/asrt')
+
 SURFACE_LABELS = ['cuneus-lh',
                 'cuneus-rh',
                 'fusiform-lh',

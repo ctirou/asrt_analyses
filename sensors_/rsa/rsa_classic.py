@@ -191,7 +191,7 @@ for trial_type in ['pattern']:
     diff = diff_inout[:, 1:5, :].mean((1)) - diff_inout[:, 0, :]
     p_values_unc = ttest_1samp(diff, axis=0, popmean=0)[1]
     sig_unc = p_values_unc < 0.05
-    p_values = decod_stats(diff)
+    p_values = decod_stats(diff, -1)
     sig = p_values < 0.05
     plt.fill_between(times, 0, diff_inout[:, 1:5, :].mean((0, 1)), where=sig_unc, color='C1', alpha=0.2)
     plt.fill_between(times, 0, diff_inout[:, 1:5, :].mean((0, 1)), where=sig, color='C1', alpha=0.3)
@@ -201,12 +201,12 @@ for trial_type in ['pattern']:
 
     # plot the difference in vs. out sequence for each epoch
     for i in range(1, 5):
-        plt.plot(times, diff_inout[:, 0, :].mean(0), label='practice', color='C7', alpha=0.6)
-        plt.plot(times, diff_inout[:, i, :].mean(0), label='learning', color='C1', alpha=0.6)
+        plt.plot(times, diff_inout[:, 0, :].mean(0), label=f'practice_{i}', color='C7', alpha=0.6)
+        plt.plot(times, diff_inout[:, i, :].mean(0), label=f'learning{i}', color='C1', alpha=0.6)
         diff = diff_inout[:, i, :] - diff_inout[:, 0, :]
         p_values_unc = ttest_1samp(diff, axis=0, popmean=0)[1]
         sig_unc = p_values < 0.05
-        p_values = decod_stats(diff)
+        p_values = decod_stats(diff, -1)
         sig = p_values < 0.05
         plt.fill_between(times, 0, diff_inout[:, i, :].mean(0), where=sig_unc, color='C1', alpha=0.2)
         plt.fill_between(times, 0, diff_inout[:, i, :].mean(0), where=sig, color='C1', alpha=0.4, hatch='+')

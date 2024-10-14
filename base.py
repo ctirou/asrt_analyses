@@ -311,3 +311,39 @@ def rsync_files(source, destination, options=""):
     except subprocess.CalledProcessError as e:
         print(f"An error occurred: {e.stderr.decode()}")
         return None
+    
+# Cross-Validated Mahalanobis Distance Calculation
+def cv_distance(response, residuals, metric, n_splits=10):
+    """
+    Compute cross-validated Mahalanobis distance.
+    """
+    
+    import statsmodels.api as sm
+    from sklearn.covariance import LedoitWolf
+    from scipy.spatial.distance import pdist, squareform
+    from sklearn.model_selection import KFold
+    
+    nconditions, nchs = response.shape
+    rdm = np.zeros((nconditions, nconditions))
+    
+    # Prepare cross-validation
+    kf = KFold(n_splits=n_splits)
+    
+    for train_index, test_index in kf.split(residuals):
+        train_residuals = residuals[train_index]
+        
+        # Estimate covariance matrix using LedoitWolf shrinkage
+        lw_shrinkage = LedoitWolf(assume_centered=True)
+        cov = lw_shrinkage.fit(train_residuals)
+        
+        if metric == 'mahalonobis':
+            # Compute Mahalanobis distance using the cross-validated covariance matrix
+            VI = np.linalg.inv(cov.covariance_)  # Inverse covariance matrix
+            rdm_fold = squareform(pdist(response, metric=metric, VI=VI))
+        elif metric == 'cosine':
+            rdm_fold = squareform(pdist(response, metric=metric))
+        
+        rdm += rdm_fold  # Sum the distances for each fold
+    
+    rdm /= n_splits  # Average over the folds
+    return rdm

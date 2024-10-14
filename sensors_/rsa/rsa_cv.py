@@ -1,39 +1,37 @@
 import os.path as op
-import os
 import numpy as np
 import mne
 import pandas as pd
 import matplotlib.pyplot as plt
-from scipy.spatial.distance import pdist, squareform
-from mne.decoding import UnsupervisedSpatialFilter
-import scipy.stats
+from scipy.stats import ttest_1samp, zscore, spearmanr
 import statsmodels.api as sm
 from tqdm.auto import tqdm
-from sklearn.covariance import LedoitWolf
 from base import *
-from config import RAW_DATA_DIR, DATA_DIR, RESULTS_DIR, FREESURFER_DIR, SUBJS, EPOCHS
+from config import DATA_DIR_SSD, RESULTS_DIR, NEW_FIG_DIR, SUBJS, EPOCHS
+from scipy.spatial.distance import pdist, squareform
+import statsmodels.api as sm
+from sklearn.covariance import LedoitWolf
 
 lock = 'stim'
 trial_type = 'pattern'
+metric = 'mahalanobis'
 
-data_path = DATA_DIR
+data_path = DATA_DIR_SSD
 res_path = RESULTS_DIR
-subjects_dir = FREESURFER_DIR
 subjects, epochs_list = SUBJS, EPOCHS
 
-figures = op.join(res_path, 'figures', lock, 'similarity')
-ensure_dir(figures)
+combinations = ['one_two', 'one_three', 'one_four', 'two_three', 'two_four', 'three_four']
+
+figures_dir = NEW_FIG_DIR / "RSA" / "sensors" / lock
+ensure_dir(figures_dir)
 
 all_in_seqs, all_out_seqs = [], []
 
-for subject in subjects[:2]:
-    
-    # all_in_seqs, all_out_seqs = [], []
-    
+for subject in subjects:
+        
     # Read the behav file to get the sequence 
-    behav_dir = op.join(RAW_DATA_DIR, "%s/behav_data/" % (subject)) 
+    behav_dir = DATA_DIR_SSD / "raw_behavs" / f"{subject}"
     sequence = get_sequence(behav_dir)
-    # random.shuffle(sequence)
         
     # create lists of possible combinations between stimuli
     one_two_similarities = list()
@@ -45,22 +43,21 @@ for subject in subjects[:2]:
     
     # loop across sessions
     for epoch_num, epo in enumerate(epochs_list):
-    # for epoch_num, epo in zip([2], epochs_list):
                     
         if epo == '2_PRACTICE':
             epo_fname = 'prac'
         else:
             epo_fname = 'sess-%s' % (str(epoch_num).zfill(2))
     
-        behav_fname = op.join(data_path, "behav/%s_%s.pkl" % (subject, epoch_num))
+        behav_fname = op.join(data_path, "preprocessed/behav/%s-%s.pkl" % (subject, epoch_num))
         behav = pd.read_pickle(behav_fname)
         # read epochs
         if lock == 'button': 
-            epoch_bsl_fname = op.join(data_path, "bsl/%s_%s_bl-epo.fif" % (subject, epoch_num))
+            epoch_bsl_fname = op.join(data_path, "bsl/%s-%s_bl-epo.fif" % (subject, epoch_num))
             epoch_bsl = mne.read_epochs(epoch_bsl_fname)
-            epoch_fname = op.join(data_path, "%s/%s_%s_b-epo.fif" % (lock, subject, epoch_num))
+            epoch_fname = op.join(data_path, "%s/%s-%s-b-epo.fif" % (lock, subject, epoch_num))
         else:
-            epoch_fname = op.join(data_path, "%s/%s_%s_s-epo.fif" % (lock, subject, epoch_num))
+            epoch_fname = op.join(data_path, "preprocessed/%s/%s-%s-epo.fif" % (lock, subject, epoch_num))
         epoch = mne.read_epochs(epoch_fname)
         times = epoch.times              
         
@@ -83,9 +80,9 @@ for subject in subjects[:2]:
         # Run OLS
         # z-score the data
         # meg_data_V = epoch.get_data()
-        meg_data_V = epoch
+        meg_data_V = epoch.copy()
         _, nchs, ntimes = meg_data_V.shape
-        meg_data_V = scipy.stats.zscore(meg_data_V, axis=0)
+        meg_data_V = zscore(meg_data_V, axis=0)
 
         coefs = np.zeros((nconditions, nchs, ntimes))
         resids = np.zeros_like(meg_data_V)
@@ -104,7 +101,11 @@ for subject in subjects[:2]:
         for itime in tqdm(range(ntimes)):
             response = coefs[:, :, itime] # (4, 248)
             residuals = resids[:, :, itime] # (51, 248)
-            
+                    
+            # rdm = cv_distance(response, residuals, metric)
+            # assert ~np.isnan(rdm).all()
+            # rdm_times[:, :, itime] = rdm  # rdm_times (4, 4, 163)                
+
             # Estimate covariance from residuals
             lw_shrinkage = LedoitWolf(assume_centered=True)
             cov = lw_shrinkage.fit(residuals)
@@ -114,28 +115,9 @@ for subject in subjects[:2]:
             # rdm = squareform(pdist(response, metric="mahalanobis", VI=VI))
             rdm = squareform(pdist(response, metric="cosine"))
             assert ~np.isnan(rdm).all()
-            rdm_times[:, :, itime] = rdm # rdm_times (4, 4, 163), rdm (4, 4)
+            rdm_times[:, :, itime] = rdm # rdm_times (4, 4, 163), rdm (4, 4)                                
         
-        rdm_dir = op.join(RESULTS_DIR, "rdms", "sensors", "shuffled", subject)
-        # ensure_dir(rdm_dir)
-        # rdm_fname = "rdm_%s.npy" % str(epoch_num)
-        # np.save(op.join(rdm_dir, rdm_fname), np.random.shuffle(rdm_times))
-        
-        # coefs_dir = op.join(RESULTS_DIR, "coefs", "sensors", subject)
-        # ensure_dir(coefs_dir)
-        # coefs_fname = "coefs_%s.npy" % str(epoch_num)
-        # np.save(op.join(coefs_dir, coefs_fname), coefs)
-        # response_fname = "response_%s.npy" % str(epoch_num)
-        # np.save(op.join(coefs_dir, response_fname), response)
-        
-        # resids_dir = op.join(RESULTS_DIR, "resids", "sensors", subject)
-        # ensure_dir(resids_dir)
-        # resids_fname = "resids_%s.npy" % str(epoch_num)
-        # np.save(op.join(resids_dir, resids_fname), resids)
-        # residuals_fname = "residuals_%s.npy" % str(epoch_num)
-        # np.save(op.join(resids_dir, residuals_fname), residuals)
-                
-        rdmx = rdm_times
+        rdmx = rdm_times.copy()
         
         one_two_similarity = list()
         one_three_similarity = list()
@@ -198,3 +180,55 @@ all_in_seqs = np.array(all_in_seqs)
 all_out_seqs = np.array(all_out_seqs)
 
 diff_inout = all_in_seqs.mean(axis=1) - all_out_seqs.mean(axis=1)
+
+rhos = [[spearmanr([1, 2, 3, 4], diff_inout[sub, 1:, itime])[0] for itime in range(len(times))] for sub in range(len(subjects))]
+rhos = np.array(rhos)
+
+# plot correlations
+plt.subplots(1, 1, figsize=(14, 5))
+plt.plot(times, rhos.mean(0))
+p_values = decod_stats(rhos, -1)
+sig = p_values < 0.05
+plt.fill_between(times, rhos.mean(0), 0, where=sig, color='green', alpha=.7)
+plt.axhline(0, color="black", linestyle="dashed")
+plt.title(f'{metric} {trial_type} correlations', style='italic')
+plt.axvspan(0, 0.2, color='grey', alpha=.2)
+plt.axhline(0, color='black', linestyle='dashed')
+plt.savefig(op.join(figures_dir, '%s_correlations_%s.pdf' % (metric, trial_type)))
+plt.close()
+
+# plot the difference in vs. out sequence averaging all epochs
+plt.subplots(1, 1, figsize=(14, 5))
+plt.plot(times, diff_inout[:, 0, :].mean(0), label='practice', color='C7', alpha=0.6)
+plt.plot(times, diff_inout[:, 1:5, :].mean((0, 1)), label='learning', color='C1', alpha=0.6)
+diff = diff_inout[:, 1:5, :].mean((1)) - diff_inout[:, 0, :]
+p_values_unc = ttest_1samp(diff, axis=0, popmean=0)[1]
+sig_unc = p_values_unc < 0.05
+p_values = decod_stats(diff, -1)
+sig = p_values < 0.05
+plt.fill_between(times, 0, diff_inout[:, 1:5, :].mean((0, 1)), where=sig_unc, color='C1', alpha=0.2)
+plt.fill_between(times, 0, diff_inout[:, 1:5, :].mean((0, 1)), where=sig, color='C1', alpha=0.3)
+plt.axhline(0, color='black', linestyle='dashed')
+plt.legend()
+plt.title(f'{metric} diff in/out {trial_type} average', style='italic')
+plt.savefig(op.join(figures_dir, '%s_diff_inout_ave_%s.pdf' % (metric, trial_type)))
+plt.close()
+
+# plot the difference in vs. out sequence for each epoch
+for i in range(1, 5):
+    plt.subplots(1, 1, figsize=(14, 5))
+    plt.plot(times, diff_inout[:, 0, :].mean(0), label='practice', color='C7', alpha=0.6)
+    plt.plot(times, diff_inout[:, i, :].mean(0), label='learning', color='C1', alpha=0.6)
+    diff = diff_inout[:, i, :] - diff_inout[:, 0, :]
+    p_values_unc = ttest_1samp(diff, axis=0, popmean=0)[1]
+    sig_unc = p_values < 0.05
+    p_values = decod_stats(diff, -1)
+    sig = p_values < 0.05
+    plt.fill_between(times, 0, diff_inout[:, i, :].mean(0), where=sig_unc, alpha=0.2)
+    plt.fill_between(times, 0, diff_inout[:, i, :].mean(0), where=sig, alpha=0.4, hatch='+')
+    plt.axhline(0, color='black', linestyle='dashed')
+    plt.axvspan(0, 0.2, color='grey', alpha=.2)
+    plt.legend()
+    plt.title(f'{metric} diff in/out {trial_type} epoch {i}', style='italic')
+    plt.savefig(op.join(figures_dir, '%s_diff_inout_%s_%s.pdf' % (metric, trial_type, str(i))))
+    plt.close()
