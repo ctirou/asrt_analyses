@@ -12,7 +12,7 @@ RESULTS_DIR = Path('/Users/coum/Desktop/asrt/results')
 FREESURFER_DIR = Path('/Users/coum/Desktop/asrt/freesurfer')
 
 HOME = Path("/Users/coum/Desktop/asrt")
-NEW_FIG_DIR = Path("/Users/coum/MEGAsync/figures")
+FIGURES_DIR = Path("/Users/coum/MEGAsync/figures")
 
 PRED_PATH = Path('/Users/coum/Desktop/pred_asrt')
 PRED_PATH_SSD = Path('/Volumes/Ultra_Touch/pred_asrt')

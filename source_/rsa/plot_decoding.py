@@ -15,7 +15,7 @@ jobs = -1
 subjects = SUBJS
 subjects_dir = FREESURFER_DIR
 res_path = RESULTS_DIR / analysis / 'source' / lock / trial_type
-figures = FIGURE_PATH / analysis / 'source' / lock / trial_type
+figures = FIGURES_DIR / analysis / 'source' / lock / trial_type
 ensure_dir(figures)
 
 # get times
@@ -35,7 +35,7 @@ for lock in ["stim", "button"]:
     trial_type = 'pattern'
     # for trial_type in ['pattern', 'random']:
     print(lock, trial_type)
-    figures = FIGURE_PATH / analysis / 'source' / lock / trial_type
+    figures = FIGURES_DIR / analysis / 'source' / lock / trial_type
     decoding = {}
     for label in tqdm(label_names):
         if label not in decoding:
@@ -115,8 +115,8 @@ for lock in ["stim", "button"]:
         axs[1].fill_between(times, m1, m2, facecolor=color2, where=sig, alpha=1)
         axs[1].fill_between(times, chance, m2, facecolor=color2, where=sig, alpha=0.7)
         # save figure
-        plt.savefig(FIGURE_PATH / analysis / 'source' / lock / trial_type / f'{ilabel}_{label}.pdf', transparent=True)
-        plt.savefig(FIGURE_PATH / analysis / 'source' / lock / trial_type / f'{ilabel}_{label}.png', transparent=True) # use dpi
+        plt.savefig(FIGURES_DIR / analysis / 'source' / lock / trial_type / f'{ilabel}_{label}.pdf', transparent=True)
+        plt.savefig(FIGURES_DIR / analysis / 'source' / lock / trial_type / f'{ilabel}_{label}.png', transparent=True) # use dpi
         plt.close()
     
 # # plot basic average plot

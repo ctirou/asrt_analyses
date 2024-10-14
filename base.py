@@ -336,7 +336,7 @@ def cv_distance(response, residuals, metric, n_splits=10):
         lw_shrinkage = LedoitWolf(assume_centered=True)
         cov = lw_shrinkage.fit(train_residuals)
         
-        if metric == 'mahalonobis':
+        if metric == 'mahalanobis':
             # Compute Mahalanobis distance using the cross-validated covariance matrix
             VI = np.linalg.inv(cov.covariance_)  # Inverse covariance matrix
             rdm_fold = squareform(pdist(response, metric=metric, VI=VI))

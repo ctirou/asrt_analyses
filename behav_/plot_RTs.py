@@ -73,11 +73,11 @@ ax.plot(sessions, mean_random, '-o', color=color2, label="Unpaired elements", ma
 # Scatter plot individual subject values
 for subject in subjects:
     for i in range(1, 5):
-        ax.scatter(str(i), subdict[subject][i]["pattern"], color=color1, alpha=0.3)
-        ax.scatter(str(i), subdict[subject][i]["random"], color=color2, alpha=0.2)
+        ax.scatter(str(i), subdict[subject][i]["pattern"], color=color1, marker=".", alpha=0.3)
+        ax.scatter(str(i), subdict[subject][i]["random"], color=color2, marker=".", alpha=0.2)
 # Add asterisks above all mean random values
 for i, mean_r in enumerate(mean_random):
-    ax.annotate('*', (sessions[i], mean_r + 15), ha='center', color='black', fontsize=14)
+    ax.annotate('*', (sessions[i], mean_r + 20), ha='center', color='black', fontsize=14)
 ax.legend(loc='lower left', frameon=False)
 ax.set_xlabel("Session")
 ax.set_ylabel("Reaction Time (ms)")

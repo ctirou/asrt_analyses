@@ -31,10 +31,10 @@ def spearman_rank_correlation(x, y):
     rho = 1 - (6 * d_squared) / (n * (n * n - 1))
     return rho
 
-figure_dir = NEW_FIG_DIR / 'sensors' / lock / analysis
+figure_dir = NEW_FIG_DIR / "time_gen" / 'sensors' / lock / analysis / 'train_rdm_test_pat'
 ensure_dir(figure_dir)
 
-res_dir = data_path / 'results' / 'sensors' / analysis / lock
+res_dir = data_path / analysis / 'results' / 'sensors' / 'train_rdm_test_pat' / lock
 
 # load patterns and randoms time-generalization on all epochs
 all_scores, sessions = [], []
@@ -68,11 +68,11 @@ if not op.exists(op.join(figure_dir, "mean_all.pdf")):
     ax.axhline(0, color="k")
     cbar = plt.colorbar(im, ax=ax)
     cbar.set_label("accuracy")
-    # pval = gat_stats(all_scores - 0.25, jobs)
-    # sig = np.array(pval < 0.05)
-    # xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
-    # ax.contour(xx, yy, sig, colors='Gray', levels=[0],
-    #                     linestyles='solid', linewidths=1)
+    pval = gat_stats(all_scores - 0.25, jobs)
+    sig = np.array(pval < 0.05)
+    xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
+    ax.contour(xx, yy, sig, colors='Gray', levels=[0],
+                        linestyles='solid', linewidths=1)
     fig.savefig(op.join(figure_dir, "mean_all.pdf"))    
 # plot per session
 for session in range(4):

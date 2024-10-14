@@ -7,7 +7,7 @@ from scipy.stats import ttest_1samp, zscore, spearmanr
 import statsmodels.api as sm
 from tqdm.auto import tqdm
 from base import *
-from config import DATA_DIR_SSD, RESULTS_DIR, NEW_FIG_DIR, SUBJS, EPOCHS
+from config import DATA_DIR_SSD, RESULTS_DIR, NEW_FIG_DIR, SUBJS, EPOCHS, RAW_DATA_DIR, DATA_DIR
 from scipy.spatial.distance import pdist, squareform
 import statsmodels.api as sm
 from sklearn.covariance import LedoitWolf
@@ -16,7 +16,7 @@ lock = 'stim'
 trial_type = 'pattern'
 metric = 'mahalanobis'
 
-data_path = DATA_DIR_SSD
+data_path = DATA_DIR
 res_path = RESULTS_DIR
 subjects, epochs_list = SUBJS, EPOCHS
 
@@ -30,7 +30,8 @@ all_in_seqs, all_out_seqs = [], []
 for subject in subjects:
         
     # Read the behav file to get the sequence 
-    behav_dir = DATA_DIR_SSD / "raw_behavs" / f"{subject}"
+    # behav_dir = DATA_DIR_SSD / "raw_behavs" / f"{subject}"
+    behav_dir = RAW_DATA_DIR / f"{subject}" / 'behav_data'
     sequence = get_sequence(behav_dir)
         
     # create lists of possible combinations between stimuli
@@ -49,7 +50,7 @@ for subject in subjects:
         else:
             epo_fname = 'sess-%s' % (str(epoch_num).zfill(2))
     
-        behav_fname = op.join(data_path, "preprocessed/behav/%s-%s.pkl" % (subject, epoch_num))
+        behav_fname = data_path / "behav" / f"{subject}-{epoch_num}.pkl"
         behav = pd.read_pickle(behav_fname)
         # read epochs
         if lock == 'button': 
@@ -57,7 +58,7 @@ for subject in subjects:
             epoch_bsl = mne.read_epochs(epoch_bsl_fname)
             epoch_fname = op.join(data_path, "%s/%s-%s-b-epo.fif" % (lock, subject, epoch_num))
         else:
-            epoch_fname = op.join(data_path, "preprocessed/%s/%s-%s-epo.fif" % (lock, subject, epoch_num))
+            epoch_fname = data_path / lock / f"{subject}-{epoch_num}-epo.fif"
         epoch = mne.read_epochs(epoch_fname)
         times = epoch.times              
         
@@ -108,12 +109,10 @@ for subject in subjects:
 
             # Estimate covariance from residuals
             lw_shrinkage = LedoitWolf(assume_centered=True)
-            cov = lw_shrinkage.fit(residuals)
-            
+            cov = lw_shrinkage.fit(residuals)            
             # Compute pairwise mahalanobis distances
             VI = np.linalg.inv(cov.covariance_) # covariance matrix needed for mahalonobis
-            # rdm = squareform(pdist(response, metric="mahalanobis", VI=VI))
-            rdm = squareform(pdist(response, metric="cosine"))
+            rdm = squareform(pdist(response, metric="mahalanobis", VI=VI))
             assert ~np.isnan(rdm).all()
             rdm_times[:, :, itime] = rdm # rdm_times (4, 4, 163), rdm (4, 4)                                
         
@@ -191,10 +190,10 @@ p_values = decod_stats(rhos, -1)
 sig = p_values < 0.05
 plt.fill_between(times, rhos.mean(0), 0, where=sig, color='green', alpha=.7)
 plt.axhline(0, color="black", linestyle="dashed")
-plt.title(f'{metric} {trial_type} correlations', style='italic')
+plt.title(f'cross val {metric} {trial_type} correlations', style='italic')
 plt.axvspan(0, 0.2, color='grey', alpha=.2)
 plt.axhline(0, color='black', linestyle='dashed')
-plt.savefig(op.join(figures_dir, '%s_correlations_%s.pdf' % (metric, trial_type)))
+plt.savefig(op.join(figures_dir, '%s_cv_correlations_%s.pdf' % (metric, trial_type)))
 plt.close()
 
 # plot the difference in vs. out sequence averaging all epochs
@@ -210,8 +209,8 @@ plt.fill_between(times, 0, diff_inout[:, 1:5, :].mean((0, 1)), where=sig_unc, co
 plt.fill_between(times, 0, diff_inout[:, 1:5, :].mean((0, 1)), where=sig, color='C1', alpha=0.3)
 plt.axhline(0, color='black', linestyle='dashed')
 plt.legend()
-plt.title(f'{metric} diff in/out {trial_type} average', style='italic')
-plt.savefig(op.join(figures_dir, '%s_diff_inout_ave_%s.pdf' % (metric, trial_type)))
+plt.title(f'cross val {metric} diff in/out {trial_type} average', style='italic')
+plt.savefig(op.join(figures_dir, '%s_cv_diff_inout_ave_%s.pdf' % (metric, trial_type)))
 plt.close()
 
 # plot the difference in vs. out sequence for each epoch
@@ -229,6 +228,6 @@ for i in range(1, 5):
     plt.axhline(0, color='black', linestyle='dashed')
     plt.axvspan(0, 0.2, color='grey', alpha=.2)
     plt.legend()
-    plt.title(f'{metric} diff in/out {trial_type} epoch {i}', style='italic')
-    plt.savefig(op.join(figures_dir, '%s_diff_inout_%s_%s.pdf' % (metric, trial_type, str(i))))
+    plt.title(f'cross val {metric} diff in/out {trial_type} epoch {i}', style='italic')
+    plt.savefig(op.join(figures_dir, '%s_cv_diff_inout_%s_%s.pdf' % (metric, trial_type, str(i))))
     plt.close()
