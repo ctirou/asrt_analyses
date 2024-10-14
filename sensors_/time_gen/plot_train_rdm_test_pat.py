@@ -31,7 +31,7 @@ def spearman_rank_correlation(x, y):
     rho = 1 - (6 * d_squared) / (n * (n * n - 1))
     return rho
 
-figure_dir = NEW_FIG_DIR / "time_gen" / 'sensors' / lock / analysis / 'train_rdm_test_pat'
+figure_dir = FIGURES_DIR / "time_gen" / 'sensors' / lock / analysis / 'train_rdm_test_pat'
 ensure_dir(figure_dir)
 
 res_dir = data_path / analysis / 'results' / 'sensors' / 'train_rdm_test_pat' / lock

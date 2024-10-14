@@ -36,6 +36,7 @@ for lock in ["stim", "button"]:
     # for trial_type in ['pattern', 'random']:
     print(lock, trial_type)
     figures = FIGURES_DIR / analysis / 'source' / lock / trial_type
+    ensure_dir(figures)
     decoding = {}
     for label in tqdm(label_names):
         if label not in decoding:
@@ -50,24 +51,25 @@ for lock in ["stim", "button"]:
     ncols = 4
     nrows = 10 if lock == 'stim' else 9
     far_left = [0] + [i for i in range(0, len(label_names), ncols*2)]
-    color1, color2 = ("#1982C4", "#74B3CE") if lock == 'stim' else ("#73A580", "#C5C392")
+    color1, color2 = ("#1982C4", "#74B3CE") if lock == 'stim' else ("#DD614A", "#F48668")
     for ilabel in tqdm(range(0, len(label_names), 2)):
         fig, axs = plt.subplots(2, 1, figsize=(6, 4), sharex=True)
         fig.subplots_adjust(hspace=0)
         label = label_names[ilabel]
         axs[0].text(0.25, 40, f"{label.capitalize()[:-3]}",
-                    fontsize=11, weight='normal', style='italic', ha='left',
+                    fontsize=13, weight='normal', style='italic', ha='left',
                     bbox=dict(facecolor='none', edgecolor='black', boxstyle='round,pad=1'))
         if ilabel in range(8):
             if lock == 'stim':
-                axs[0].text(0.1, 46, "$Stimulus$", fontsize=9, zorder=10, ha='center')
+                axs[0].text(0.1, 46, "Stimulus", style='italic', fontsize=11, zorder=10, ha='center')
             else:
-                axs[0].text(0.05, 46, "Button press", style='italic', fontsize=9, zorder=10, ha='center')
+                axs[0].text(0.05, 46, "Button press", style='italic', fontsize=11, zorder=10, ha='center')
         for i in range(2):
             axs[i].set_ylim(20, 45)
             yticks = axs[i].get_yticks()
-            yticks = yticks[1:-1]  # Remove first and last element
+            yticks = [int(ytick) for ytick in yticks[1:-1]]  # Remove first and last element
             axs[i].set_yticks(yticks)
+            axs[i].set_yticklabels(yticks, fontsize=11)
             axs[i].spines["top"].set_visible(False)
             axs[i].spines["right"].set_visible(False)
             axs[i].axhline(chance, color='black', ls='dashed', alpha=.7, zorder=-1)
@@ -77,17 +79,17 @@ for lock in ["stim", "button"]:
             else:
                 axs[i].axvline(0, color='black', alpha=.5)
             if ilabel in far_left:
-                axs[i].text(0.6, 22.5, "$Chance$", fontsize=9, zorder=10, ha='center')
-                axs[i].set_ylabel("Accuracy (%)")
+                axs[i].text(0.6, 22, "$Chance$", fontsize=11, zorder=10, ha='center')
+                axs[i].set_ylabel("Accuracy (%)", fontsize=11)
             else:
                 axs[i].set_yticklabels([])  # Remove y-axis labels for non-left plots
         if ilabel in far_left:
-            axs[0].text(-0.19, 38, "Left\nhemisphere", fontsize=10, color=color1, ha='left', weight='normal', style='italic')
-            axs[1].text(-0.19, 38, "Right\nhemisphere", fontsize=10, color=color2, ha='left', weight='normal', style='italic')
+            axs[0].text(-0.2, 38, "Left\nhemisphere", fontsize=12, color=color1, ha='left', weight='normal', style='italic')
+            axs[1].text(-0.2, 38, "Right\nhemisphere", fontsize=12, color=color2, ha='left', weight='normal', style='italic')
         # Show the x-axis label only on the bottom row
         if ilabel in range(len(label_names))[-8:]:
             axs[1].get_xaxis().set_visible(True)
-            axs[1].set_xlabel("Time (s)")
+            axs[1].set_xlabel("Time (s)", fontsize=11)
         else:
             axs[1].set_xticklabels([])
         # First curve
@@ -115,8 +117,8 @@ for lock in ["stim", "button"]:
         axs[1].fill_between(times, m1, m2, facecolor=color2, where=sig, alpha=1)
         axs[1].fill_between(times, chance, m2, facecolor=color2, where=sig, alpha=0.7)
         # save figure
-        plt.savefig(FIGURES_DIR / analysis / 'source' / lock / trial_type / f'{ilabel}_{label}.pdf', transparent=True)
-        plt.savefig(FIGURES_DIR / analysis / 'source' / lock / trial_type / f'{ilabel}_{label}.png', transparent=True) # use dpi
+        plt.savefig(figures / f'{ilabel}_{label}.pdf', transparent=True)
+        plt.savefig(figures / f'{ilabel}_{label}.png', dpi='figure', transparent=True) # use dpi
         plt.close()
     
 # # plot basic average plot
