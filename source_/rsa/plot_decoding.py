@@ -7,7 +7,7 @@ import gc
 from tqdm.auto import tqdm
 import os
 
-lock = 'stim'
+lock = 'button'
 trial_type = 'pattern'
 analysis = 'decoding'
 jobs = -1
@@ -29,6 +29,7 @@ gc.collect()
 # color1, color2 = "#DD614A", "#F48668"
 # color1, color2 = "#1982C4", "#74B3CE"
 # color1, color2 = "#73A580", "#C5C392"
+# color1, color2 = "#D76A03", "#EC9F05"
 
 for lock in ["stim", "button"]:
     label_names = sorted(SURFACE_LABELS + VOLUME_LABELS, key=str.casefold) if lock == 'stim' else sorted(SURFACE_LABELS_RT + VOLUME_LABELS_RT, key=str.casefold)
@@ -51,13 +52,19 @@ for lock in ["stim", "button"]:
     ncols = 4
     nrows = 10 if lock == 'stim' else 9
     far_left = [0] + [i for i in range(0, len(label_names), ncols*2)]
-    color1, color2 = ("#1982C4", "#74B3CE") if lock == 'stim' else ("#DD614A", "#F48668")
+    color1, color2 = ("#1982C4", "#74B3CE") if lock == 'stim' else ("#D76A03", "#EC9F05")
     for ilabel in tqdm(range(0, len(label_names), 2)):
         fig, axs = plt.subplots(2, 1, figsize=(6, 4), sharex=True)
         fig.subplots_adjust(hspace=0)
         label = label_names[ilabel]
-        axs[0].text(0.25, 40, f"{label.capitalize()[:-3]}",
-                    fontsize=13, weight='normal', style='italic', ha='left',
+        if label == "Cerebellum-White-Matter-lh":
+            xtitle=0.6
+            ha='right'
+        else:
+            xtitle=0.25
+            ha='left'
+        axs[0].text(xtitle, 40, f"{label.capitalize()[:-3]}",
+                    fontsize=13, weight='normal', style='italic', ha=ha,
                     bbox=dict(facecolor='none', edgecolor='black', boxstyle='round,pad=1'))
         if ilabel in range(8):
             if lock == 'stim':
@@ -80,7 +87,7 @@ for lock in ["stim", "button"]:
                 axs[i].axvline(0, color='black', alpha=.5)
             if ilabel in far_left:
                 axs[i].text(0.6, 22, "$Chance$", fontsize=11, zorder=10, ha='center')
-                axs[i].set_ylabel("Accuracy (%)", fontsize=11)
+                axs[i].set_ylabel("Accuracy (%)", fontsize=12)
             else:
                 axs[i].set_yticklabels([])  # Remove y-axis labels for non-left plots
         if ilabel in far_left:
@@ -89,7 +96,7 @@ for lock in ["stim", "button"]:
         # Show the x-axis label only on the bottom row
         if ilabel in range(len(label_names))[-8:]:
             axs[1].get_xaxis().set_visible(True)
-            axs[1].set_xlabel("Time (s)", fontsize=11)
+            axs[1].set_xlabel("Time (s)", fontsize=12)
         else:
             axs[1].set_xticklabels([])
         # First curve
@@ -121,7 +128,7 @@ for lock in ["stim", "button"]:
         plt.savefig(figures / f'{ilabel}_{label}.png', dpi='figure', transparent=True) # use dpi
         plt.close()
     
-# # plot basic average plot
+# # plot basic average plots
 # nrows, ncols = 10, 4
 # chance = 25
 # color1, color2 = "#1fb45c", "#00B2CA"

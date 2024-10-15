@@ -9,6 +9,7 @@ import gc
 from pathlib import Path
 from numba import jit
 from tqdm.auto import tqdm
+from matplotlib.ticker import FuncFormatter
 
 lock = "stim"
 trial_type = "pattern"
@@ -59,6 +60,9 @@ def spearman_rank_correlation(x, y):
     # Spearman's rho formula
     rho = 1 - (6 * d_squared) / (n * (n**2 - 1))
     return rho
+
+def format_func(value, tick_number):
+    return f'{value:.1f}'
 
 for ilabel, label in enumerate(label_names):
     
@@ -156,14 +160,14 @@ for ilabel, label in enumerate(label_names):
     corr[label] = corr_npy
         
 label_names = sorted(SURFACE_LABELS + VOLUME_LABELS, key=str.casefold) if lock == 'stim' else sorted(SURFACE_LABELS_RT + VOLUME_LABELS_RT, key=str.casefold)
-figures_dir = FIGURE_PATH / analysis / 'source' / lock / trial_type
+figures_dir = FIGURES_DIR / analysis / 'source' / lock / trial_type
 ensure_dir(figures_dir)
 # define parameters    
 chance = 25
 ncols = 4
 nrows = 10 if lock == 'stim' else 9
 far_left = [0] + [i for i in range(0, len(label_names), ncols*2)]
-color1, color2 = ("#1982C4", "#74B3CE") if lock == 'stim' else ("#73A580", "#C5C392")
+color1, color2 = ("#1982C4", "#74B3CE") if lock == 'stim' else ("#D76A03", "#EC9F05")
 color3 = "C7"
 
 # Diff in/out 
@@ -172,48 +176,56 @@ for ilabel in tqdm(range(0, len(label_names), 2)):
     fig.subplots_adjust(hspace=0)
     label = label_names[ilabel]
     ytitle = 0.21 if lock == 'stim' else 0.11
-    axs[1].text(0.25, ytitle, f"{label.capitalize()[:-3]}",
-                fontsize=9, weight='normal', style='italic', ha='left',
+    if label == "Cerebellum-White-Matter-lh":
+        xtitle=0.6
+        ha='right'
+    else:
+        xtitle=0.25
+        ha='left' 
+    axs[1].text(xtitle, ytitle, f"{label.capitalize()[:-3]}",
+                fontsize=13, weight='normal', style='italic', ha=ha,
                 bbox=dict(facecolor='none', edgecolor='black', boxstyle='round,pad=1'))
     if ilabel in range(8):
         if lock == 'stim':
-            axs[0].text(0.1, 0.22, "$Stimulus$", fontsize=9, zorder=10, ha='center')
+            axs[0].text(0.1, 0.22, "$Stimulus$", fontsize=11, zorder=10, ha='center')
         else:
-            axs[0].text(0.05, 0.11, "Button press", style='italic', fontsize=9, zorder=10, ha='center')
+            axs[0].text(0.05, 0.11, "Button press", style='italic', fontsize=11, zorder=10, ha='center')
     for i in range(2):
         axs[i].set_ylim(-0.2, 0.2) if lock == 'stim' else axs[i].set_ylim(-0.1, 0.1)
         yticks = axs[i].get_yticks()
         yticks = yticks[1:-1]  # Remove first and last element
         axs[i].set_yticks(yticks)
+        axs[i].set_yticklabels(yticks, fontsize=11)
         axs[i].spines["top"].set_visible(False)
         axs[i].spines["right"].set_visible(False)
         axs[i].axhline(0, color='black', ls='dashed', alpha=.7, zorder=-1)
+        axs[i].yaxis.set_major_formatter(FuncFormatter(format_func))  # Set the formatter for y-ticks
         # Add the stimulus span or vertical line
         if lock == 'stim':
             axs[i].axvspan(0, 0.2, color='grey', lw=0, alpha=.2, label="Stimulus")
         else:
             axs[i].axvline(0, color='black', alpha=.5)
         if ilabel in far_left:
-            axs[i].set_ylabel("Similarity index")
+            axs[i].set_ylabel("Similarity index", fontsize=11)
         else:
             axs[i].set_yticklabels([])  # Remove y-axis labels for non-left plots
-            axs[i].spines["left"].set_visible(False)
-        if ilabel not in range(len(label_names))[-8:]:
-            axs[i].spines["bottom"].set_visible(False)
-            axs[i].get_xaxis().set_visible(False)
-        if ilabel not in far_left:
-            axs[i].get_yaxis().set_visible(False)
+            # axs[i].spines["left"].set_visible(False)
+        # if ilabel not in range(len(label_names))[-8:]:
+        #     axs[i].spines["bottom"].set_visible(False)
+        #     axs[i].get_xaxis().set_visible(False)
+        # if ilabel not in far_left:
+        #     axs[i].get_yaxis().set_visible(False)
     if ilabel in far_left:
         if lock == 'stim':
-            axs[0].text(-0.19, 0.12, "Left\nhemisphere", fontsize=9, color=color1, ha='left', weight='normal', style='italic')
-            axs[1].text(-0.19, 0.12, "Right\nhemisphere", fontsize=9, color=color2, ha='left', weight='normal', style='italic')
+            axs[0].text(-0.20, 0.12, "Left\nhemisphere", fontsize=12, color=color1, ha='left', weight='normal', style='italic')
+            axs[1].text(-0.20, 0.12, "Right\nhemisphere", fontsize=12, color=color2, ha='left', weight='normal', style='italic')
         else:    
-            axs[0].text(-0.19, 0.075, "Left\nhemisphere", fontsize=9, color=color1, ha='left', weight='normal', style='italic')
-            axs[1].text(-0.19, 0.075, "Right\nhemisphere", fontsize=9, color=color2, ha='left', weight='normal', style='italic')
+            axs[0].text(-0.20, 0.075, "Left\nhemisphere", fontsize=12, color=color1, ha='left', weight='normal', style='italic')
+            axs[1].text(-0.20, 0.075, "Right\nhemisphere", fontsize=12, color=color2, ha='left', weight='normal', style='italic')
     # Show the x-axis label only on the bottom row
     if ilabel in range(len(label_names))[-8:]:
         axs[1].get_xaxis().set_visible(True)
-        axs[1].set_xlabel("Time (s)")
+        axs[1].set_xlabel("Time (s)", fontsize=11)
     else:
         axs[1].set_xticklabels([])
     # First curve
@@ -252,6 +264,7 @@ for ilabel in tqdm(range(0, len(label_names), 2)):
     sig = p_values < 0.05
     # save figure
     plt.savefig(figures_dir / f'{ilabel}_{label}.pdf', transparent=True)
+    plt.savefig(figures_dir / f'{ilabel}_{label}.png', dpi='figure', transparent=True)
     plt.close()
 
 # Correlations

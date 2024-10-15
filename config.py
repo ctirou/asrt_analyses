@@ -19,8 +19,7 @@ DATA_DIR_SSD = Path('/Volumes/Ultra_Touch/asrt/preprocessed')
 RAW_DATA_DIR_SSD = Path('/Volumes/Ultra_Touch/asrt/raws')
 RESULTS_DIR_SSD = Path('/Volumes/Ultra_Touch/asrt/results')
 FREESURFER_DIR_SSD = Path('/Users/coum/Desktop/asrt/freesurfer')
-
-TIMEG_DATA_DIR = Path('/Volumes/Ultra_Touch/pred_asrt')
+TIMEG_DATA_DIR_SSD = Path('/Volumes/Ultra_Touch/pred_asrt')
 
 SURFACE_LABELS = ['cuneus-lh',
                 'cuneus-rh',
