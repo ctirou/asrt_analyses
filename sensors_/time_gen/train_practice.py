@@ -13,7 +13,7 @@ import gc
 
 # stim disp = 500 ms
 # RSI = 750 ms in task
-data_path = PRED_PATH
+data_path = TIMEG_DATA_DIR
 analysis = 'train_on_practice'
 subjects, epochs_list, subjects_dir = SUBJS, EPOCHS, FREESURFER_DIR
 lock = 'stim'

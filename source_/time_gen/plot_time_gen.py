@@ -10,7 +10,7 @@ from tqdm.auto import tqdm
 import numba
 
 analysis = "time_generalization"
-data_path = PRED_PATH
+data_path = TIMEG_DATA_DIR
 subjects, epochs_list = SUBJS, EPOCHS
 lock = 'stim'
 jobs = -1

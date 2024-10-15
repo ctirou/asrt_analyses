@@ -14,7 +14,7 @@ import gc
 # stim disp = 500 ms
 # RSI = 750 ms in task
 analysis = 'no_filter'
-data_path = PRED_PATH / analysis
+data_path = TIMEG_DATA_DIR / analysis
 subjects, epochs_list = SUBJS, EPOCHS
 lock = 'stim'
 folds = 10

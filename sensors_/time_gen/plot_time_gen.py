@@ -9,19 +9,19 @@ from scipy.stats import spearmanr, ttest_1samp
 from tqdm.auto import tqdm
 
 analysis = "rdm_bsl_filtered"
-data_path = PRED_PATH / analysis
+data_path = TIMEG_DATA_DIR / analysis
 subjects, epochs_list = SUBJS, EPOCHS
 lock = 'stim'
 jobs = -1
 
 # get times
-epoch_fname = PRED_PATH / lock / 'sub01-0-epo.fif'
+epoch_fname = TIMEG_DATA_DIR / lock / 'sub01-0-epo.fif'
 epoch = read_epochs(epoch_fname, verbose=False)
 times = epoch.times
 del epoch
 
 # figure_dir = data_path / 'figures' / 'sensors' / lock
-figure_dir = NEW_FIG_DIR / "time_gen" / "sensors" / lock / analysis
+figure_dir = FIGURES_DIR / "time_gen" / "sensors" / lock / analysis
 ensure_dir(figure_dir)
 
 res_dir = data_path / 'results' / 'sensors' / lock

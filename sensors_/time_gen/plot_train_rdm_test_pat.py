@@ -10,7 +10,7 @@ from tqdm.auto import tqdm
 import numba
 
 analysis = "pat_bsl_filtered"
-data_path = PRED_PATH
+data_path = TIMEG_DATA_DIR
 subjects, epochs_list = SUBJS, EPOCHS
 lock = 'stim'
 jobs = -1
