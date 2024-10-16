@@ -192,3 +192,14 @@ right_hemisphere = ['bankssts-rh', 'caudalanteriorcingulate-rh', 'caudalmiddlefr
                     'Right-Cerebellum-Cortex', 'Right-Thalamus-Proper', 'Right-Caudate', 'Right-Putamen', 'Right-Pallidum',
                     'Right-Hippocampus', 'Right-Amygdala', 'Right-Accumbens-area', 'Right-VentralDC', 'Right-vessel',
                     'Right-choroid-plexus']
+
+NEW_LABELS = ['corpus_callosum',
+              'cortex_regions', 
+              'frontal_lobe',
+              'left_hemisphere',
+              'occipital_lobe',
+              'parietal_lobe',
+              'right_hemisphere',
+              'subcortex_regions',
+              'temporal_lobe',
+              'ventricular_and_brainstem']

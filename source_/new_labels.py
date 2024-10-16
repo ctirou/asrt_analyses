@@ -15,6 +15,7 @@ subjects_dir = FREESURFER_DIR
 res_path = data_path / 'results' / "new_labels"
 ensure_dir(res_path)
 
+# Define your region groupings here
 new_labels = [cortex_regions, subcortex_regions, 
               frontal_lobe, parietal_lobe, occipital_lobe, temporal_lobe, cerebellum, 
               ventricular_and_brainstem, 
@@ -22,37 +23,41 @@ new_labels = [cortex_regions, subcortex_regions,
               left_hemisphere, right_hemisphere]
 
 new_labels_names = ['cortex_regions', 'subcortex_regions', 
-              'frontal_lobe', 'parietal_lobe', 'occipital_lobe', 'temporal_lobe', 'cerebellum', 
-              'ventricular_and_brainstem', 
-              'corpus_callosum', 
-              'left_hemisphere', 'right_hemisphere']
+                    'frontal_lobe', 'parietal_lobe', 'occipital_lobe', 'temporal_lobe', 'cerebellum', 
+                    'ventricular_and_brainstem', 
+                    'corpus_callosum', 
+                    'left_hemisphere', 'right_hemisphere']
 
 for subject in subjects:
-
     ensure_dir(res_path / subject)
     
-    # get all cortical labels
+    # Get all cortical labels
     cx_labels = mne.read_labels_from_annot(subject=subject, parc="aparc", hemi="both", subjects_dir=subjects_dir, verbose=verbose)
-    # get all subcortical labels
+    
+    # Get all subcortical labels
     aseg_labels = list()
     for hemi in ['lh', 'rh', 'others']:
-        # create mixed source space
-        vol_src_fname = op.join(RESULTS_DIR, "src", "%s-%s-vol-src.fif" % (subject, hemi))
+        # Create mixed source space
+        vol_src_fname = op.join(RESULTS_DIR, "src", f"{subject}-{hemi}-vol-src.fif")
         vol_src = mne.read_source_spaces(vol_src_fname, verbose=verbose)    
         aseg_labels.extend(mne.get_volume_labels_from_src(vol_src, subject, subjects_dir))
 
+    # Combine cortical and subcortical labels
     labels = cx_labels + aseg_labels
     
+    # Iterate over region groups
     for i, (label_list, label_list_name) in enumerate(zip(new_labels, new_labels_names)):
         
+        # Filter the labels based on the current list
         filtered_labels = [label for label in labels if label.name in label_list and label.name not in BAD_VOLUME_LABELS]
         
         if filtered_labels:
+            # Start with the first label and sum the remaining to create a combined label
             big_label = filtered_labels[0]
             for label in filtered_labels[1:]:
                 big_label += label
             
-            # Handle if big_label is a BiHemiLabel
+            # If it's a BiHemiLabel (both hemispheres), save left and right separately
             if isinstance(big_label, mne.BiHemiLabel):
                 # Save left hemisphere
                 if big_label.lh is not None:
@@ -62,5 +67,5 @@ for subject in subjects:
                 if big_label.rh is not None:
                     big_label.rh.save(res_path / subject / f'{label_list_name}-rh.label')
             else:
-                # Save as a single label if it's not BiHemiLabel
+                # If it's a single hemisphere label, save it directly
                 big_label.save(res_path / subject / f'{label_list_name}.label')
