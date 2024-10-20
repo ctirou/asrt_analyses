@@ -16,9 +16,9 @@ import sys
 
 # stim disp = 500 ms
 # RSI = 750 ms in task
-data_path = TIMEG_DATA_DIR
+data_path = TIMEG_DATA_DIR_SSD
 analysis = 'time_generalization'
-subjects, epochs_list, subjects_dir = SUBJS, EPOCHS, FREESURFER_DIR
+subjects, epochs_list, subjects_dir = SUBJS, EPOCHS, FREESURFER_DIR_SSD
 lock = 'stim'
 folds = 10
 solver = 'lbfgs'
@@ -50,59 +50,58 @@ NEW_LABELS = ['corpus_callosum',
               'temporal_lobe',
               'ventricular_and_brainstem']
 
+subject = SUBJS[0]
+label_fname = 'subcortex_regions'
+labels_dir = res_path / 'new_labels' / subject
+
 def process_label(labels_dir, label_fname):
     from os import listdir
     from mne import read_label, Label
-    label_fnames = [label for label in listdir(labels_dir) if label_fname in label]
+    import numpy as np
+    label_fnames = [label for label in listdir(labels_dir) if label.startswith(label_fname)]
     if len(label_fnames) > 1:
         label1 = read_label(labels_dir / label_fnames[0], subject=subject)
         label2 = read_label(labels_dir / label_fnames[1], subject=subject)
         label = label1 + label2
     else:
-        label = Label.from_file(labels_dir / label_fnames[0])
-    return label
+        label_path = labels_dir / f"{label_fname}-both.label"
+        with open(label_path, 'r') as file:
+            lines = file.readlines()
 
-def read_custom_label(label_path, subject, subjects_dir):
-    """
-    Manually load a label that doesn't follow the -lh.label or -rh.label convention,
-    and skip lines with incomplete data (e.g., only vertex number).
-    """
-    with open(label_path, 'r') as file:
-        lines = file.readlines()
-
-    # Initialize containers for label data
-    label_data = []
-    pos = []
-    values = []
-    
-    for line in lines:
-        if line.startswith('#'):  # Skip comment lines
-            continue
+        # Initialize containers for label data
+        label_data = []
+        pos = []
+        values = []
         
-        # Split the line and check if it has the required number of elements
-        parts = line.strip().split()
-        
-        # Ensure that the line has 5 elements (vertex, x, y, z, stat value)
-        if len(parts) == 5:
-            vertex = int(parts[0])
-            x, y, z = map(float, parts[1:4])
-            stat = float(parts[4])
+        for line in lines:
+            if line.startswith('#'):  # Skip comment lines
+                continue
             
-            # Append parsed values
-            label_data.append(vertex)
-            pos.append([x, y, z])
-            values.append(stat)
-        else:
-            # Skip the line if it doesn't have the required number of parts (like just a vertex number)
-            print(f"Skipping incomplete line: {line.strip()}")
+            # Split the line and check if it has the required number of elements
+            parts = line.strip().split()
+            
+            # Ensure that the line has 5 elements (vertex, x, y, z, stat value)
+            if len(parts) == 5:
+                vertex = int(parts[0])
+                x, y, z = map(float, parts[1:4])
+                stat = float(parts[4])
+                
+                # Append parsed values
+                label_data.append(vertex)
+                pos.append([x, y, z])
+                values.append(stat)
+            else:
+                # Skip the line if it doesn't have the required number of parts (like just a vertex number)
+                print(f"Skipping incomplete line: {line.strip()}")
 
-    # Convert to numpy arrays
-    label_data = np.array(label_data)
-    pos = np.array(pos)
-    values = np.array(values)
+        # Convert to numpy arrays
+        name = label_fname
+        label_data = np.array(label_data)
+        pos = np.array(pos)
+        values = np.array(values)
 
-    # Create the label object
-    label = mne.Label(vertices=label_data, pos=pos, values=values, hemi='both', subject=subject)
+        # Create the label object
+        label = Label(vertices=label_data, pos=pos, values=values, hemi='both', subject=subject, name=name)
 
     return label
 
@@ -117,8 +116,8 @@ for subject in subjects:
     
     this_label = 'subcortex_regions'
     labels_dir = res_path / 'new_labels' / subject / f"{this_label}-both.label"
-    # label = process_label(labels_dir, this_label)
-    label = read_custom_label(labels_dir, subject, subjects_dir)
+    label = process_label(labels_dir, this_label)
+    # label = read_custom_label(labels_dir, subject, subjects_dir)
         
 
     for trial_type in ['pattern', 'random']:

@@ -2,11 +2,11 @@ import os.path as op
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from config import DATA_DIR, SUBJS, NEW_FIG_DIR
+from config import *
 from tqdm.auto import tqdm
 
-path_data = DATA_DIR
-figures_dir = NEW_FIG_DIR
+path_data = DATA_DIR_SSD
+figures_dir = FIGURES_DIR
 
 subjects = SUBJS
 
@@ -83,4 +83,4 @@ ax.set_xlabel("Session")
 ax.set_ylabel("Reaction Time (ms)")
 ax.spines['top'].set_visible(False)
 ax.spines['right'].set_visible(False)
-fig.savefig(figures_dir / 'behav' / 'mean_RT2.pdf')
+fig.savefig(figures_dir / 'behav' / 'mean_RT2.pdf', transparent=True)
