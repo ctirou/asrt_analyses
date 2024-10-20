@@ -7,9 +7,10 @@ import numpy as np
 from mne import read_epochs
 from scipy.stats import spearmanr, ttest_1samp
 from tqdm.auto import tqdm
+from matplotlib.ticker import FormatStrFormatter
 
-analysis = "pat_bsl_filtered_3300_3160"
-data_path = TIMEG_DATA_DIR / analysis
+# analysis = "pat_bsl_filtered_3300_3160"
+data_path = TIMEG_DATA_DIR
 subjects, epochs_list = SUBJS, EPOCHS
 lock = 'stim'
 jobs = -1
@@ -21,7 +22,7 @@ times = epoch.times
 del epoch
 
 # figure_dir = data_path / 'figures' / 'sensors' / lock
-figure_dir = FIGURES_DIR / "time_gen" / "sensors" / lock / analysis
+figure_dir = FIGURES_DIR / "time_gen" / "sensors" / lock
 ensure_dir(figure_dir)
 
 res_dir = data_path / 'results' / 'sensors' / lock
@@ -82,27 +83,39 @@ contrasts = patterns - randoms
 # pval = gat_stats(contrasts, jobs)
 # sig = np.array(pval < 0.05)
 
-fig, ax = plt.subplots(1, 1, figsize=(16, 7))
+# Define the new time range
+time_mask = (times >= -2)
+new_times = times[time_mask]
+new_contrasts = contrasts[:, time_mask, :][:, :, time_mask]
+
+fig, ax = plt.subplots(1, 1, figsize=(11, 5))
 im = ax.imshow(
-    contrasts.mean(0),
+    new_contrasts.mean(0),
     interpolation="lanczos",
     origin="lower",
     cmap="RdBu_r",
-    extent=times[[0, -1, 0, -1]],
+    extent=[new_times[0], new_times[-1], new_times[0], new_times[-1]],
     aspect=0.5,
     vmin=-0.1,
     vmax=0.1)
+if not op.exists(figure_dir / "contrast-pval.npy"):
+    pval = gat_stats(new_contrasts, jobs)
+    np.save(figure_dir / "contrast-pval.npy", pval)
+else:
+    pval = np.load(figure_dir / "contrast-pval.npy")
+sig = np.array(pval < 0.05)
+xx, yy = np.meshgrid(new_times, new_times, copy=False, indexing='xy')
+ax.contour(xx, yy, sig, colors='Gray', levels=[0],
+                    linestyles='solid', linewidths=1)
 ax.set_xlabel("Testing Time (s)")
 ax.set_ylabel("Training Time (s)")
-ax.set_title("contrast = pattern - random", style='italic')
+# ax.set_title("Paired – Unpaired elements", style='italic')
 cbar = plt.colorbar(im, ax=ax)
-cbar.set_label("difference in accuracy")
-# xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
-# ax.contour(xx, yy, sig, colors='Gray', levels=[0],
-#                     linestyles='solid', linewidths=1)
+cbar.set_label("Difference in accuracy")
+cbar.ax.yaxis.set_major_formatter(FormatStrFormatter('%.1f'))
+ax.axhline(0, color="k") 
 ax.axvline(0, color="k")
-ax.axhline(0, color="k")
-fig.savefig(op.join(figure_dir, "mean_contrast.pdf"))
+fig.savefig(figure_dir / "mean_contrast_focused.pdf", transparent=True)
 
 # # look at the correlations
 # all_patterns, all_randoms = [], []
@@ -220,3 +233,4 @@ ax3.axvline(3, ls="dashed", alpha=.7, color='black')
 ax3.scatter(x_points, [0] * len(x_points), color='#DD614A')
 fig.savefig(figure_dir / "diags.pdf")
 plt.close()
+
