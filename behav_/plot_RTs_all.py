@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from config import *
 from tqdm.auto import tqdm
 
-path_data = DATA_DIR_SSD
+path_data = DATA_DIR
 figures_dir = FIGURES_DIR
 
 subjects = SUBJS
@@ -35,6 +35,7 @@ sessions = ['1', '2', '3', '4']
 n = len(subjects)
 
 subdict = {}
+learn_index_dict = {}
 
 for subject in tqdm(subjects):
 
@@ -43,6 +44,7 @@ for subject in tqdm(subjects):
     rand_RT = list()
     
     subdict[subject] = {}
+    learn_index_dict[subject] = {}
     
     for i in range(1, 5):
 
@@ -53,6 +55,8 @@ for subject in tqdm(subjects):
         fname_behav = op.join(path_data, 'behav', f'{subject}-{i}.pkl')
         behav_df = pd.read_pickle(fname_behav)
         behav_df.reset_index(inplace=True)
+        
+        highs, lows = [], []
         
         for j, k in enumerate(behav_df['RTs']):
             all_RT.append(k)
@@ -69,6 +73,18 @@ for subject in tqdm(subjects):
         subdict[subject][i]["pattern"] = np.mean(subdict[subject][i]["pattern"]) 
         subdict[subject][i]["random_high"] = np.mean(subdict[subject][i]["random_high"])
         subdict[subject][i]["random_low"] = np.mean(subdict[subject][i]["random_low"])
+
+        highs.append(np.mean(subdict[subject][i]["pattern"]))
+        highs.append(np.mean(subdict[subject][i]["random_high"]))
+        lows.append(np.mean(subdict[subject][i]["random_low"]))
+        
+        learning_index = (np.mean(lows) - np.mean(highs)) / np.mean(lows)
+        learn_index_dict[subject][i] = learning_index
+
+# Save learning indices to CSV
+learn_index_df = pd.DataFrame.from_dict(learn_index_dict, orient='index')
+if not op.exists(figures_dir / 'behav' / 'learning_indices.csv'):
+    learn_index_df.to_csv(figures_dir / 'behav' / 'learning_indices.csv')
 
 # Calculate means and standard errors
 mean_pattern = [np.mean(pattern_RT[f'Epoch_{i}']) for i in range(1, 5)]
@@ -103,3 +119,16 @@ ax.spines['top'].set_visible(False)
 ax.spines['right'].set_visible(False)
 plt.tight_layout()
 fig.savefig(figures_dir / 'behav' / 'mean_RT3.pdf', transparent=True)
+
+# Plot learning index as a histogram
+fig, ax = plt.subplots(1, 1, figsize=(8, 5))
+ax.autoscale()
+learning_indices_mean = learn_index_df.mean(axis=0)
+learning_indices_stderr = learn_index_df.sem(axis=0)
+ax.bar(sessions, learning_indices_mean, yerr=learning_indices_stderr, color=color3, alpha=0.7, capsize=5)
+ax.set_xlabel("Session")
+ax.set_ylabel("Learning Index")
+ax.spines['top'].set_visible(False)
+ax.spines['right'].set_visible(False)
+plt.tight_layout()
+fig.savefig(figures_dir / 'behav' / 'learning_index_all.pdf', transparent=True)

@@ -59,6 +59,76 @@ def get_sequence(behav_dir):
                 break
     return sequence
 
+def get_random_low(behav_dir):
+    behav_files = [f for f in os.listdir(behav_dir) if (not f.startswith('.') and ('_eASRT_Epoch_' in f))]
+    behav = open(op.join(behav_dir, behav_files[0]), 'r')
+    lines = behav.readlines()
+    column_names = lines[0].split()
+    rdm_low = list()
+    for iline, line in enumerate(lines[1:]):
+            triplet = int(line.split()[column_names.index('triplet')])
+            if triplet == 34:
+                first = line.split()[column_names.index('position')]
+                second = lines[iline-2].split()[column_names.index('position')]
+                pair = first + second
+                if pair not in rdm_low:
+                    # print(pair)
+                    rdm_low.append(pair)
+            # if len(rdm_low) == 3:
+            #     break
+    return rdm_low
+
+def get_rdm(epoch, behav):
+    from scipy.spatial.distance import pdist, squareform
+    import scipy.stats
+    import statsmodels.api as sm
+    from tqdm.auto import tqdm
+    from sklearn.covariance import LedoitWolf
+    # Prepare the design matrix                        
+    ntrials = len(epoch)
+    nconditions = 4
+    design_matrix = np.zeros((ntrials, nconditions))
+    
+    for icondi, condi in enumerate(behav["positions"]):            
+        # assert isinstance(condi, np.int64) 
+        design_matrix[icondi, condi-1] = 1
+    assert np.sum(design_matrix.sum(axis=1) == 1) == len(epoch)  
+    
+    meg_data_V = epoch
+    _, nchs, ntimes = meg_data_V.shape
+    meg_data_V = scipy.stats.zscore(meg_data_V, axis=0)
+
+    coefs = np.zeros((nconditions, nchs, ntimes))
+    resids = np.zeros_like(meg_data_V)
+    for ich in tqdm(range(nchs)):
+        for itime in range(ntimes):
+            y = meg_data_V[:, ich, itime]
+            
+            model = sm.OLS(endog=y, exog=design_matrix, missing="raise")
+            results = model.fit()
+            
+            coefs[:, ich, itime] = results.params # (4, 248, 163)
+            resids[:, ich, itime] = results.resid # (ntrials, 248, 163)
+    
+    # Calculate pairwise mahalanobis distance between regression coefficients        
+    rdm_times = np.zeros((nconditions, nconditions, ntimes))
+    for itime in tqdm(range(ntimes)):
+        response = coefs[:, :, itime] # (4, 248)
+        residuals = resids[:, :, itime] # (51, 248)
+        
+        # Estimate covariance from residuals
+        lw_shrinkage = LedoitWolf(assume_centered=True)
+        cov = lw_shrinkage.fit(residuals)
+        
+        # Compute pairwise mahalanobis distances
+        VI = np.linalg.inv(cov.covariance_) # covariance matrix needed for mahalonobis
+        rdm = squareform(pdist(response, metric="mahalanobis", VI=VI))
+        # rdm = squareform(pdist(response, metric="cosine"))
+        assert ~np.isnan(rdm).all()
+        rdm_times[:, :, itime] = rdm # rdm_times (4, 4, 163), rdm (4, 4)
+    
+    return rdm_times
+    
 def get_inout_seq(sequence, similarities):
     import numpy as np
     # create list of possible pairs

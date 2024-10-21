@@ -7,7 +7,7 @@ from scipy.stats import ttest_1samp, zscore, spearmanr
 import statsmodels.api as sm
 from tqdm.auto import tqdm
 from base import *
-from config import DATA_DIR_SSD, RESULTS_DIR, NEW_FIG_DIR, SUBJS, EPOCHS, RAW_DATA_DIR, DATA_DIR
+from config import *
 from scipy.spatial.distance import pdist, squareform
 import statsmodels.api as sm
 from sklearn.covariance import LedoitWolf
@@ -22,7 +22,7 @@ subjects, epochs_list = SUBJS, EPOCHS
 
 combinations = ['one_two', 'one_three', 'one_four', 'two_three', 'two_four', 'three_four']
 
-figures_dir = NEW_FIG_DIR / "RSA" / "sensors" / lock
+figures_dir = FIGURES_DIR / "RSA" / "sensors" / lock
 ensure_dir(figures_dir)
 
 all_in_seqs, all_out_seqs = [], []
