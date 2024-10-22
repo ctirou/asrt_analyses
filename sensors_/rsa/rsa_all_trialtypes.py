@@ -5,6 +5,7 @@ import mne
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.stats import ttest_1samp, zscore, spearmanr
+from tqdm.auto import tqdm
 from base import *
 from config import *
 
@@ -19,8 +20,6 @@ ensure_dir(figures_dir)
 metric = 'mahalanobis'
 
 all_in_seqs, all_out_seqs = [], []
-
-
 
 for subject in subjects:
     
@@ -184,10 +183,9 @@ all_out_seqs = np.array(all_out_seqs)
 
 diff_inout = all_in_seqs.mean(axis=1) - all_out_seqs.mean(axis=1)
 
+# plot correlations
 rhos = [[spearmanr([1, 2, 3, 4], diff_inout[sub, :, itime])[0] for itime in range(len(times))] for sub in range(len(subjects))]
 rhos = np.array(rhos)
-
-# plot correlations
 plt.subplots(1, 1, figsize=(14, 5))
 plt.plot(times, rhos.mean(0))
 p_values = decod_stats(rhos, -1)
@@ -197,7 +195,42 @@ plt.axhline(0, color="black", linestyle="dashed")
 plt.title(f'{metric} correlations', style='italic')
 plt.axvspan(0, 0.2, color='grey', alpha=.2)
 plt.axhline(0, color='black', linestyle='dashed')
-plt.savefig(op.join(figures_dir, '%s_high_low_correlations_%s.pdf' % (metric, trial_type)))
+plt.savefig(op.join(figures_dir, '%s_high_low_correlations_%s.pdf' % (metric, trial_type)), transparent=True)
+plt.close()
+
+learning_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices.csv', sep="\t")
+
+# plot across subjects
+all_pvalues = []
+for t in range(len(times)):
+    all_pvalues.append(spearmanr(learning_index_df["4"], diff_inout[:, -1, t])[1])
+plt.subplots(1, 1, figsize=(14, 5))
+plt.plot(times, all_pvalues)
+sig = (np.asarray(all_pvalues) < 0.05)
+plt.fill_between(times, -0.1, -0.11, where=sig, color='red', alpha=1.0)  # Solid line at the bottom when sig is true
+plt.title(f'{metric} across subjects correlations', style='italic')
+plt.axvspan(0, 0.2, color='grey', alpha=.2)
+plt.savefig(op.join(figures_dir, '%s_high_low_across_sub_correlations_%s.pdf' % (metric, trial_type)), transparent=True)
+plt.close()
+
+# plot within subjects
+all_rhos = []
+for sub in tqdm(range(len(subjects))):
+    rhos = []
+    for t in range(len(times)):
+        rhos.append(spearmanr(learning_index_df.iloc[sub, 1:], diff_inout[sub, :, t])[0])
+    all_rhos.append(rhos)
+all_rhos = np.array(all_rhos)
+plt.subplots(1, 1, figsize=(14, 5))
+plt.plot(times, all_rhos.mean(0))
+p_values = decod_stats(all_rhos, -1)
+sig = p_values < 0.05
+plt.fill_between(times, all_rhos.mean(0), 0, where=sig, color='green', alpha=.7)
+plt.axhline(0, color="black", linestyle="dashed")
+plt.title(f'{metric} within subjects correlations', style='italic')
+plt.axvspan(0, 0.2, color='grey', alpha=.2)
+plt.axhline(0, color='black', linestyle='dashed')
+plt.savefig(op.join(figures_dir, '%s_high_low_within_sub_correlations_%s.pdf' % (metric, trial_type)), transparent=True)
 plt.close()
 
 # plot the difference in vs. out sequence averaging all epochs
