@@ -130,7 +130,6 @@ for subject in subjects:
                         print(ii)
                         if events[ii, 2] in triggs and events[ii+1, 2] in [12, 14, 16, 18]:
                                 event_stim = events[ii]
-                                print(event_stim)
                                 if subject == 'sub11':
                                         event_stim[0] = event_stim[0] + 97 # To re-synchronize with photodiode time-samples
                                 event_button = events[ii+1] # events[ii+2] for sub11
@@ -219,6 +218,7 @@ for subject in subjects:
                                                 del_from_behav.append(change[1])
                                 epochs_stim.drop(del_from_epoch)
                                 epochs_button.drop(del_from_epoch)
+                                epochs_bsl.drop(del_from_epoch)
                                 df.drop(df.index[del_from_behav], inplace=True)
                 # Equalize number of trials in epochs
                 changes = editops(int_to_unicode(stim_df['positions']), int_to_unicode(button_df['positions']))
@@ -239,6 +239,7 @@ for subject in subjects:
                         stim_df.drop(stim_df.index[del_from_stimdf], inplace=True)
                         button_df.drop(button_df.index[del_from_buttondf], inplace=True)
                         epochs_stim.drop(del_from_stimepo)
+                        epochs_bsl.drop(del_from_stimepo)
                         epochs_button.drop(del_from_buttonepo)
                 # Last check if behav and epochs have same shapes
                 changes = editops(int_to_unicode(stim_df['triplets']), int_to_unicode(epochs_stim.events[:, 2]))
