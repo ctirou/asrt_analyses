@@ -11,11 +11,12 @@ from config import *
 
 lock = 'stim'
 trial_type = 'pattern'
+analysis = 'pat_high_rdm_high'
 
 data_path = DATA_DIR
 subjects_dir = FREESURFER_DIR
 subjects, epochs_list = SUBJS, EPOCHS
-figures_dir = FIGURES_DIR / "RSA" / "sensors" / lock
+figures_dir = FIGURES_DIR / "RSA" / "sensors" / lock / analysis
 ensure_dir(figures_dir)
 metric = 'mahalanobis'
 
@@ -172,8 +173,8 @@ for subject in subjects:
     for pair, rev_pair, pat_sim, rand_sim in zip(pairs, rev_pairs, similarities, random_lows):
         if ((pair in pairs_in_sequence) or (rev_pair in pairs_in_sequence)):
             in_seq.append(pat_sim)
-        else:
-            out_seq.append(rand_sim)
+            out_seq.append(pat_sim)
+        # else:
     all_in_seqs.append(np.array(in_seq))    
     # for l in random_lows:
     #     out_seq.append(l)
@@ -199,44 +200,44 @@ plt.axhline(0, color='black', linestyle='dashed')
 plt.savefig(op.join(figures_dir, '%s_high_low_correlations_%s.pdf' % (metric, trial_type)), transparent=True)
 plt.close()
 
-learning_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices.csv', sep="\t")
+# learning_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices.csv', sep="\t")
 
-# plot across subjects
-all_pvalues = []
-for t in range(len(times)):
-    all_pvalues.append(spearmanr(learning_index_df["4"], diff_inout[:, -1, t])[1])
-plt.subplots(1, 1, figsize=(14, 5))
-plt.plot(times, all_pvalues)
-sig = (np.asarray(all_pvalues) < 0.05)
-plt.fill_between(times, -0.1, -0.11, where=sig, color='red', alpha=1.0)  # Solid line at the bottom when sig is true
-plt.title(f'{metric} across subjects correlations', style='italic')
-plt.axvspan(0, 0.2, color='grey', alpha=.2)
-plt.savefig(op.join(figures_dir, '%s_high_low_across_sub_correlations_%s.pdf' % (metric, trial_type)), transparent=True)
-plt.close()
+# # plot across subjects
+# all_pvalues = []
+# for t in range(len(times)):
+#     all_pvalues.append(spearmanr(learning_index_df["4"], diff_inout[:, -1, t])[1])
+# plt.subplots(1, 1, figsize=(14, 5))
+# plt.plot(times, all_pvalues)
+# sig = (np.asarray(all_pvalues) < 0.05)
+# plt.fill_between(times, -0.1, -0.11, where=sig, color='red', alpha=1.0)  # Solid line at the bottom when sig is true
+# plt.title(f'{metric} across subjects correlations', style='italic')
+# plt.axvspan(0, 0.2, color='grey', alpha=.2)
+# plt.savefig(op.join(figures_dir, '%s_high_low_across_sub_correlations_%s.pdf' % (metric, trial_type)), transparent=True)
+# plt.close()
 
-# plot within subjects
-all_rhos = []
-for sub in tqdm(range(len(subjects))):
-    rhos = []
-    for t in range(len(times)):
-        rhos.append(spearmanr(learning_index_df.iloc[sub, 1:], diff_inout[sub, :, t])[0])
-    all_rhos.append(rhos)
-all_rhos = np.array(all_rhos)
-plt.subplots(1, 1, figsize=(14, 5))
-plt.plot(times, all_rhos.mean(0))
-p_values = decod_stats(all_rhos, -1)
-sig = p_values < 0.05
-plt.fill_between(times, all_rhos.mean(0), 0, where=sig, color='green', alpha=.7)
-plt.axhline(0, color="black", linestyle="dashed")
-plt.title(f'{metric} within subjects correlations', style='italic')
-plt.axvspan(0, 0.2, color='grey', alpha=.2)
-plt.axhline(0, color='black', linestyle='dashed')
-plt.savefig(op.join(figures_dir, '%s_high_low_within_sub_correlations_%s.pdf' % (metric, trial_type)), transparent=True)
-plt.close()
+# # plot within subjects
+# all_rhos = []
+# for sub in tqdm(range(len(subjects))):
+#     rhos = []
+#     for t in range(len(times)):
+#         rhos.append(spearmanr(learning_index_df.iloc[sub, 1:], diff_inout[sub, :, t])[0])
+#     all_rhos.append(rhos)
+# all_rhos = np.array(all_rhos)
+# plt.subplots(1, 1, figsize=(14, 5))
+# plt.plot(times, all_rhos.mean(0))
+# p_values = decod_stats(all_rhos, -1)
+# sig = p_values < 0.05
+# plt.fill_between(times, all_rhos.mean(0), 0, where=sig, color='green', alpha=.7)
+# plt.axhline(0, color="black", linestyle="dashed")
+# plt.title(f'{metric} within subjects correlations', style='italic')
+# plt.axvspan(0, 0.2, color='grey', alpha=.2)
+# plt.axhline(0, color='black', linestyle='dashed')
+# plt.savefig(op.join(figures_dir, '%s_high_low_within_sub_correlations_%s.pdf' % (metric, trial_type)), transparent=True)
+# plt.close()
 
 # plot the difference in vs. out sequence averaging all epochs
 plt.subplots(1, 1, figsize=(14, 5))
-diff = diff_inout[:, 1:, :].mean((0, 1)) - diff_inout[:, 0, :]
+diff = diff_inout[:, 1:, :].mean(1) - diff_inout[:, 0, :]
 plt.plot(times, diff.mean(0), label='high - low', color='C1', alpha=0.6)
 p_values_unc = ttest_1samp(diff, axis=0, popmean=0)[1]
 sig_unc = p_values_unc < 0.05
@@ -245,6 +246,7 @@ sig = p_values < 0.05
 # plt.fill_between(times, 0, diff_inout.mean((0, 1)), where=sig_unc, color='C1', alpha=0.2)
 plt.fill_between(times, 0, diff.mean(0), where=sig, color='black', alpha=0.3)
 plt.axhline(0, color='black', linestyle='dashed')
+plt.axvspan(0, 0.2, color='grey', alpha=.2)
 plt.legend()
 plt.title(f'{metric} high – low average', style='italic')
 plt.savefig(op.join(figures_dir, '%s_high_low_ave_%s.pdf' % (metric, trial_type)))
