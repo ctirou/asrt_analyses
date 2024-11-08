@@ -14,7 +14,7 @@ from Levenshtein import editops
 import pandas as pd
 import warnings
 from base import ensure_dir
-from config import RAW_DATA_DIR, DATA_DIR, PRED_PATH, SUBJS
+from config import *
 import gc
 from pathlib import Path
 
@@ -28,18 +28,19 @@ def int_to_unicode(array):
         return ''.join([str(chr(int(ii))) for ii in array]) # permet de convertir int en unicode (pour editops)
 
 mode_ICA = False
-jobs = -1
-verbose = True
+generalizing = False
+filtering = True
 overwrite = True
-generalizing = True
+verbose = True
+jobs = -1
 
 # Set path
 if generalizing:
-        path = PRED_PATH / 'no_filter'
+        path = TIMEG_DATA_DIR 
         ensure_dir(path)
 else:
         path = DATA_DIR
-path_data = Path('/Users/coum/Desktop/rawz/raws/')
+path_data = Path('/Users/coum/Desktop/asrt/raws/')
 
 all_epochs_stim = list()
 all_epochs_button = list()
@@ -92,7 +93,8 @@ for subject in subjects:
                         ica.exclude = np.unique(np.concatenate([veog_indices, heog_indices, hbeat_indices]))
                         # Filter raw
                         ica.apply(raw)
-                # raw.filter(0.1, 30, n_jobs=jobs)     
+                if filtering:
+                        raw.filter(0.1, 30, n_jobs=jobs)
                 # Select events of interest (only photodiode for good triplets and correct answers)
                 if subject == 'sub06' and meg_session == '6_EPOCH_4':
                         events = mne.find_events(raw, shortest_event=1, verbose=verbose)
@@ -121,11 +123,14 @@ for subject in subjects:
                         triggs = [30, 32, 34]
                         ranger = range(len(events)-1)
                 else:
-                        triggs = [542, 544, 546]
+                        triggs = [542, 544, 546, 548, 550, 552]
+                        # triggs = [542, 544, 546]
                         ranger = range(len(events))
                 for ii in ranger:
+                        print(ii)
                         if events[ii, 2] in triggs and events[ii+1, 2] in [12, 14, 16, 18]:
                                 event_stim = events[ii]
+                                print(event_stim)
                                 if subject == 'sub11':
                                         event_stim[0] = event_stim[0] + 97 # To re-synchronize with photodiode time-samples
                                 event_button = events[ii+1] # events[ii+2] for sub11
@@ -137,6 +142,12 @@ for subject in subjects:
                                                 event_stim[2] = 32
                                         if event_stim[2] == 546:
                                                 event_stim[2] = 34
+                                        if event_stim[2] == 548:
+                                                event_stim[2] = 36
+                                        if event_stim[2] == 550:
+                                                event_stim[2] = 38
+                                        if event_stim[2] == 552:
+                                                event_stim[2] = 40
                                 events_stim.append(event_stim)
                                 events_button.append(event_button)
                 events_stim = np.array(events_stim)
@@ -176,11 +187,6 @@ for subject in subjects:
                                 'trialtypes': np.array(trialtypes), 'RTs': np.array(RTs),
                                 'expec_triggers': np.array(expec_triggers), 'blocks': np.array(blocks)}
                 behav_df = pd.DataFrame(behav_dict)
-                # Indices of good triplets 
-                good_triplets = np.where((behav_dict['triplets']==30) |
-                                        (behav_dict['triplets']==32) |
-                                        (behav_dict['triplets']==34))[0]
-                behav_df = behav_df.reindex(index = good_triplets)
                 stim_df = behav_df.copy()
                 button_df = behav_df.copy()
                 # Create epochs time locked on stimulus onset and button response, and baseline epochs
@@ -190,7 +196,9 @@ for subject in subjects:
                         epochs_stim = mne.Epochs(raw, events_stim, tmin=-4, tmax=4, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)                   
                         epochs_button = mne.Epochs(raw, events_button, tmin=-4, tmax=4, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)                        
                 else:
-                        epochs_stim = mne.Epochs(raw, events_stim, tmin=-0.2, tmax=0.6, baseline=(-.2, 0), preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)                   
+                        epochs_stim = mne.Epochs(raw, events_stim, tmin=-0.2, tmax=0.6, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)                   
+                        epochs_bsl = epochs_stim.copy().crop(-.2, 0)           
+                        epochs_stim.apply_baseline((-0.2, 0))                
                         epochs_button = mne.Epochs(raw, events_button, tmin=-0.2, tmax=0.6, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)                        
                 # Free memory
                 del raw
@@ -244,15 +252,13 @@ for subject in subjects:
                 else:
                         print("Behav file and button epochs have same shapes!")
                 # Apply baseline from before the stimulus in the epochs_button
-                if not generalizing:
-                        epochs_baseline = epochs_stim.copy().crop(None, 0)         
-                        bsl_channels = mne.pick_types(epochs_button.info, meg=True)
-                        bsl_data = epochs_baseline.get_data()[:, bsl_channels, :]
-                        bsl_data = np.mean(bsl_data, axis=2)
-                        epochs_button._data[:, bsl_channels, :] -= bsl_data[:, :, np.newaxis]
-                        epochs_baseline.save(op.join(path, 'bsl', f'{subject}-{session_num+1}-epo.fif'), overwrite=overwrite)
+                bsl_channels = mne.pick_types(epochs_button.info, meg=True)
+                bsl_data = epochs_bsl.get_data()[:, bsl_channels, :]
+                bsl_data = np.mean(bsl_data, axis=2)
+                epochs_button._data[:, bsl_channels, :] -= bsl_data[:, :, np.newaxis]
                 # Save epochs 
                 epochs_stim.save(op.join(path, 'stim', f'{subject}-{session_num+1}-epo.fif'), overwrite=overwrite)
+                epochs_bsl.save(op.join(path, 'bsl', f'{subject}-{session_num+1}-epo.fif'), overwrite=overwrite)
                 epochs_button.save(op.join(path, 'button', f'{subject}-{session_num+1}-epo.fif'), overwrite=overwrite)
                 # Save behavioral data
                 behav_df = stim_df

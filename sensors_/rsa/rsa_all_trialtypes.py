@@ -48,7 +48,7 @@ for subject in subjects:
     three_fours_rand = list()
     
     # loop across sessions
-    for epoch_num in [1, 2, 3, 4]:
+    for epoch_num in [0, 1, 2, 3, 4]:
                     
         if epoch_num == 0:
             epo_fname = 'prac'
@@ -106,12 +106,12 @@ for subject in subjects:
             two_four_pat.append(rdm_pat[1, 3, itime])
             three_four_pat.append(rdm_pat[2, 3, itime])
 
-            one_two_rand.append(rdm_pat[0, 1, itime])
-            one_three_rand.append(rdm_pat[0, 2, itime])
-            one_four_rand.append(rdm_pat[0, 3, itime])
-            two_three_rand.append(rdm_pat[1, 2, itime])
-            two_four_rand.append(rdm_pat[1, 3, itime])
-            three_four_rand.append(rdm_pat[2, 3, itime])
+            one_two_rand.append(rdm_rand[0, 1, itime])
+            one_three_rand.append(rdm_rand[0, 2, itime])
+            one_four_rand.append(rdm_rand[0, 3, itime])
+            two_three_rand.append(rdm_rand[1, 2, itime])
+            two_four_rand.append(rdm_rand[1, 3, itime])
+            three_four_rand.append(rdm_rand[2, 3, itime])
                         
         one_two_pat = np.array(one_two_pat)
         one_three_pat = np.array(one_three_pat)
@@ -164,18 +164,19 @@ for subject in subjects:
     in_seq, out_seq = [], []
     similarities = [one_twos_pat, one_threes_pat, one_fours_pat,
                     two_threes_pat, two_fours_pat, three_fours_pat]
+    random_lows = [one_twos_rand, one_threes_rand, one_fours_rand,
+                    two_threes_rand, two_fours_rand, three_fours_rand]
         
     pairs = ['12', '13', '14', '23', '24', '34']
     rev_pairs = ['21', '31', '41', '32', '42', '43']                        
-    for pair, rev_pair, similarity in zip(pairs, rev_pairs, similarities):
+    for pair, rev_pair, pat_sim, rand_sim in zip(pairs, rev_pairs, similarities, random_lows):
         if ((pair in pairs_in_sequence) or (rev_pair in pairs_in_sequence)):
-            in_seq.append(similarity)
-    all_in_seqs.append(np.array(in_seq))
-    
-    random_lows = [one_twos_rand, one_threes_rand, one_fours_rand,
-                    two_threes_rand, two_fours_rand, three_fours_rand]
-    for l in random_lows:
-        out_seq.append(l)
+            in_seq.append(pat_sim)
+        else:
+            out_seq.append(rand_sim)
+    all_in_seqs.append(np.array(in_seq))    
+    # for l in random_lows:
+    #     out_seq.append(l)
     all_out_seqs.append(np.array(out_seq))
     
 all_in_seqs = np.array(all_in_seqs)
@@ -184,7 +185,7 @@ all_out_seqs = np.array(all_out_seqs)
 diff_inout = all_in_seqs.mean(axis=1) - all_out_seqs.mean(axis=1)
 
 # plot correlations
-rhos = [[spearmanr([1, 2, 3, 4], diff_inout[sub, :, itime])[0] for itime in range(len(times))] for sub in range(len(subjects))]
+rhos = [[spearmanr([0, 1, 2, 3, 4], diff_inout[sub, :, itime])[0] for itime in range(len(times))] for sub in range(len(subjects))]
 rhos = np.array(rhos)
 plt.subplots(1, 1, figsize=(14, 5))
 plt.plot(times, rhos.mean(0))
@@ -235,15 +236,14 @@ plt.close()
 
 # plot the difference in vs. out sequence averaging all epochs
 plt.subplots(1, 1, figsize=(14, 5))
-# plt.plot(times, all_out_seqs.mean((0, 1, 2)), label='random low', color='C7', alpha=0.6)
-plt.plot(times, diff_inout.mean((0, 1)), label='high - low', color='C1', alpha=0.6)
-diff = diff_inout.mean(1)
+diff = diff_inout[:, 1:, :].mean((0, 1)) - diff_inout[:, 0, :]
+plt.plot(times, diff.mean(0), label='high - low', color='C1', alpha=0.6)
 p_values_unc = ttest_1samp(diff, axis=0, popmean=0)[1]
 sig_unc = p_values_unc < 0.05
 p_values = decod_stats(diff, -1)
 sig = p_values < 0.05
-plt.fill_between(times, 0, diff_inout.mean((0, 1)), where=sig_unc, color='C1', alpha=0.2)
-plt.fill_between(times, 0, diff_inout.mean((0, 1)), where=sig, color='black', alpha=0.3)
+# plt.fill_between(times, 0, diff_inout.mean((0, 1)), where=sig_unc, color='C1', alpha=0.2)
+plt.fill_between(times, 0, diff.mean(0), where=sig, color='black', alpha=0.3)
 plt.axhline(0, color='black', linestyle='dashed')
 plt.legend()
 plt.title(f'{metric} high – low average', style='italic')
@@ -251,21 +251,21 @@ plt.savefig(op.join(figures_dir, '%s_high_low_ave_%s.pdf' % (metric, trial_type)
 plt.close()
 
 # plot the difference in vs. out sequence for each epoch
-for i in range(4):
+for i in range(1, 5):
     plt.subplots(1, 1, figsize=(14, 5))
     # plt.plot(times, diff_inout[:, 0, :].mean(0), label='practice', color='C7', alpha=0.6)
     plt.plot(times, diff_inout[:, i, :].mean(0), label='learning', color='C1', alpha=0.6)
-    diff = diff_inout[:, i, :]
+    diff = diff_inout[:, i, :] - diff_inout[:, 0, :]
     p_values_unc = ttest_1samp(diff, axis=0, popmean=0)[1]
     sig_unc = p_values < 0.05
     p_values = decod_stats(diff, -1)
     sig = p_values < 0.05
-    plt.fill_between(times, 0, diff_inout[:, i, :].mean(0), where=sig_unc, alpha=0.2)
-    plt.fill_between(times, 0, diff_inout[:, i, :].mean(0), where=sig, alpha=0.4, color='black')
-    plt.axhline(0, color='black', linestyle='dashed')
+    # plt.fill_between(times, 0, diff_inout[:, i, :].mean(0), where=sig_unc, alpha=0.2)
+    # plt.fill_between(times, 0, diff_inout[:, i, :].mean(0), where=sig, alpha=0.4, color='black')
+    # plt.axhline(0, color='black', linestyle='dashed')
     plt.axvspan(0, 0.2, color='grey', alpha=.2)
     plt.legend()
-    plt.gca().set_ylim(-0.04, 0.12)
+    # plt.gca().set_ylim(-0.04, 0.12)
     plt.title(f'{metric} high – low epoch {i+1}', style='italic')
     plt.savefig(op.join(figures_dir, '%s_high_low_%s_%s.pdf' % (metric, trial_type, str(i+1))))
     plt.close()
