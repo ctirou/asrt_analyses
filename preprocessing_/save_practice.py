@@ -21,7 +21,7 @@ def int_to_unicode(array):
         return ''.join([str(chr(int(ii))) for ii in array]) #permet de convertir int en unicode (pour editops)
 
 generalizing = False
-mode_ICA = False
+mode_ICA = True
 filtering = True
 overwrite = True
 verbose = True
@@ -168,6 +168,7 @@ for subject in subjects:
         picks = mne.pick_types(raw.info, meg=True, eeg=False, eog=True, stim=False)
         if generalizing:
                 epochs_stim = mne.Epochs(raw, events_stim, tmin=-4, tmax=4, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)                   
+                epochs_bsl = epochs_stim.copy().crop(-.2, 0)
                 epochs_button = mne.Epochs(raw, events_button, tmin=-4, tmax=4, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)                        
         else:
                 epochs_stim = mne.Epochs(raw, events_stim, tmin=-0.2, tmax=0.6, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)                   
@@ -239,3 +240,5 @@ for subject in subjects:
         # Save behavioral data
         behav_df = stim_df.copy()
         behav_df.to_pickle(op.join(path, 'behav', f'{subject}-0.pkl'))
+        print("Final number of epochs: ", len(epochs_stim), "our of 255...")
+        

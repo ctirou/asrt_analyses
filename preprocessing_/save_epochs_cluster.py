@@ -1,10 +1,3 @@
-#!/usr/bin/env python
-
-# DO NOT USE TO CREATE EPOCHS FOR PRACTICE SESSION
-
-# reject flat or noisy channels, search automatically or manually
-# add rejection threshold in mne.Epochs
-
 import os
 import os.path as op
 import numpy as np
@@ -17,43 +10,42 @@ from base import ensure_dir
 from config import *
 import gc
 from pathlib import Path
+import sys
+
+is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
 subjects = SUBJS
-
-# # To run on cluster
-# subject_num = int(os.environ["SLURM_ARRAY_TASK_ID"])
-# subject = subjects[subject_num]
 
 def int_to_unicode(array):
         return ''.join([str(chr(int(ii))) for ii in array]) # permet de convertir int en unicode (pour editops)
 
-mode_ICA = False
-generalizing = False
-filtering = True
-overwrite = True
-verbose = True
-jobs = -1
+def process_subject(subject):        
+        mode_ICA = False
+        generalizing = False
+        filtering = True
+        overwrite = True
+        verbose = True
+        jobs = -1
 
-# Set path
-if generalizing:
-        path = TIMEG_DATA_DIR 
-        ensure_dir(path)
-else:
-        path = DATA_DIR
-path_data = Path('/Users/coum/Desktop/asrt/raws/')
+        # Set path
+        if generalizing:
+                path = TIMEG_DATA_DIR 
+                ensure_dir(path)
+        else:
+                path = DATA_DIR
+        path_data = Path('/Users/coum/Desktop/asrt/raws/')
 
-all_epochs_stim = list()
-all_epochs_button = list()
-all_behav_df = pd.DataFrame({'position': [], 'triplet': [], 'trialtype': [], 'RT': [], 'block':[]})
+        all_epochs_stim = list()
+        all_epochs_button = list()
+        all_behav_df = pd.DataFrame({'position': [], 'triplet': [], 'trialtype': [], 'RT': [], 'block':[]})
 
-meg_sessions = ['3_EPOCH_1', '4_EPOCH_2', '5_EPOCH_3', '6_EPOCH_4']
+        meg_sessions = ['3_EPOCH_1', '4_EPOCH_2', '5_EPOCH_3', '6_EPOCH_4']
 
-# Create preprocessed sub-folders
-folders = ['stim', 'button', 'behav', 'bsl']
-for fold in folders:
-        ensure_dir(path / fold)
-
-for subject in subjects:
+        # Create preprocessed sub-folders
+        folders = ['stim', 'button', 'behav', 'bsl']
+        for fold in folders:
+                ensure_dir(path / fold)
+        
         # Sort behav files
         path_to_behav_dir = f'{path_data}/{subject}/behav_data'
         behav_dir = os.listdir(path_to_behav_dir)
@@ -265,4 +257,16 @@ for subject in subjects:
                 behav_df = stim_df
                 behav_df.to_pickle(op.join(path, 'behav', f'{subject}-{session_num+1}.pkl'))
                 print("Final number of epochs: ", len(epochs_stim), "our of 425...")
-                
+
+if is_cluster:
+    # Check that SLURM_ARRAY_TASK_ID is available and use it to get the subject
+    try:
+        subject_num = int(os.getenv("SLURM_ARRAY_TASK_ID"))
+        subject = subjects[subject_num]
+        process_subject(subject)
+    except (IndexError, ValueError) as e:
+        print("Error: SLURM_ARRAY_TASK_ID is not set correctly or is out of bounds.")
+        sys.exit(1)
+else:
+    for subject in subjects:
+        process_subject(subject)
