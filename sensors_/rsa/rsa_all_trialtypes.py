@@ -11,11 +11,10 @@ from config import *
 
 lock = 'stim'
 trial_type = 'pattern'
-analysis = 'pat_high_rdm_high'
-overwrite = True
+analysis = 'usual'
+overwrite = False
 
 data_path = DATA_DIR
-subjects_dir = FREESURFER_DIR
 subjects, epochs_list = SUBJS, EPOCHS
 figures_dir = FIGURES_DIR / "RSA" / "sensors" / lock / analysis
 ensure_dir(figures_dir)
@@ -23,7 +22,13 @@ metric = 'mahalanobis'
 
 all_in_seqs, all_out_seqs = [], []
 
-for subject in subjects:
+# get times
+epoch_fname = op.join(data_path, lock, 'sub01-0-epo.fif')
+epochs = mne.read_epochs(epoch_fname)
+times = epochs.times
+del epochs
+
+for subject in tqdm(subjects):
     
     res_path = RESULTS_DIR / 'RSA' / 'sensors' / lock / "rdm" / subject
     ensure_dir(res_path)
@@ -51,33 +56,21 @@ for subject in subjects:
     
     # loop across sessions
     for epoch_num in [0, 1, 2, 3, 4]:
-                    
-        if epoch_num == 0:
-            epo_fname = 'prac'
-        else:
-            epo_fname = 'sess-%s' % (str(epoch_num).zfill(2))
-        behav_fname = op.join(data_path, "behav/%s-%s.pkl" % (subject, epoch_num))
-        behav = pd.read_pickle(behav_fname)
-        # read epochs
-        if lock == 'button': 
-            epoch_bsl_fname = op.join(data_path, "bsl/%s_%s_bl-epo.fif" % (subject, epoch_num))
-            epoch_bsl = mne.read_epochs(epoch_bsl_fname)
-            epoch_fname = op.join(data_path, "%s/%s_%s_b-epo.fif" % (lock, subject, epoch_num))
-        else:
-            epoch_fname = op.join(data_path, "%s/%s-%s-epo.fif" % (lock, subject, epoch_num))
-        epoch = mne.read_epochs(epoch_fname)
-        times = epoch.times
         
-        if not op.exists(res_path / f"pat-{epoch_num}.npy") or overwrite:
+        if not op.exists(res_path / f"pat-{epoch_num}.npy") or not op.exists(res_path / f"rand-{epoch_num}.npy"):
+            # read behav
+            behav_fname = op.join(data_path, "behav/%s-%s.pkl" % (subject, epoch_num))
+            behav = pd.read_pickle(behav_fname)
+            # read epochs
+            epoch_fname = op.join(data_path, "%s/%s-%s-epo.fif" % (lock, subject, epoch_num))
+            epoch = mne.read_epochs(epoch_fname)
+        
             epoch_pat = epoch[np.where(behav["trialtypes"]==1)].get_data(copy=False).mean(axis=0)
             behav_pat = behav[behav["trialtypes"]==1]
             assert len(epoch_pat) == len(behav_pat)
             rdm_pat = get_rdm(epoch_pat, behav_pat)
             np.save(res_path / f"pat-{epoch_num}.npy", rdm_pat)
-        else:
-            rdm_pat = np.load(res_path / f"pat-{epoch_num}.npy")
         
-        if not op.exists(res_path / f"rand-{epoch_num}.npy") or overwrite:
             epoch_rand = epoch[np.where(behav["triplets"]==34)].get_data(copy=False).mean(axis=0)
             behav_rand = behav[behav["triplets"]==34]
             assert len(epoch_rand) == len(behav_rand)
@@ -85,6 +78,7 @@ for subject in subjects:
             np.save(res_path / f"rand-{epoch_num}.npy", rdm_rand)
         else:
             rdm_rand = np.load(res_path / f"rand-{epoch_num}.npy")
+            rdm_pat = np.load(res_path / f"pat-{epoch_num}.npy")
         
         one_two_pat = list()
         one_three_pat = list()
@@ -147,7 +141,7 @@ for subject in subjects:
     one_threes_pat = np.array(one_threes_pat)  
     one_fours_pat = np.array(one_fours_pat)   
     two_threes_pat = np.array(two_threes_pat)  
-    two_fours_pat = np.array(two_fours_pat)   
+    two_fours_pat = np.array(two_fours_pat)
     three_fours_pat = np.array(three_fours_pat)
 
     one_twos_rand = np.array(one_twos_rand)
@@ -174,17 +168,28 @@ for subject in subjects:
     for pair, rev_pair, pat_sim, rand_sim in zip(pairs, rev_pairs, similarities, random_lows):
         if ((pair in pairs_in_sequence) or (rev_pair in pairs_in_sequence)):
             in_seq.append(pat_sim)
+        else:
             out_seq.append(pat_sim)
-        # else:
-    all_in_seqs.append(np.array(in_seq))    
     # for l in random_lows:
     #     out_seq.append(l)
+    
+    all_in_seqs.append(np.array(in_seq))    
     all_out_seqs.append(np.array(out_seq))
     
 all_in_seqs = np.array(all_in_seqs)
 all_out_seqs = np.array(all_out_seqs)
 
 diff_inout = all_in_seqs.mean(axis=1) - all_out_seqs.mean(axis=1)
+
+# plot in out and diff
+plt.subplots(1, 1, figsize=(14, 5))
+plt.plot(times, all_in_seqs.mean((0, 1, 2)), label='in', color='C0', alpha=0.6)
+plt.plot(times, all_out_seqs.mean((0, 1, 2)), label='out', color='C1', alpha=0.6)
+plt.plot(times, diff_inout.mean((0, 1)), label='in - out', color='C2', alpha=0.6)
+plt.axvspan(0, 0.2, color='grey', alpha=.2)
+plt.legend()
+plt.savefig(op.join(figures_dir, '%s_all_%s.pdf' % (metric, trial_type)), transparent=True)
+plt.close()
 
 # plot correlations
 rhos = [[spearmanr([0, 1, 2, 3, 4], diff_inout[sub, :, itime])[0] for itime in range(len(times))] for sub in range(len(subjects))]
@@ -239,13 +244,15 @@ plt.close()
 # plot the difference in vs. out sequence averaging all epochs
 plt.subplots(1, 1, figsize=(14, 5))
 diff = diff_inout[:, 1:, :].mean(1) - diff_inout[:, 0, :]
-plt.plot(times, diff.mean(0), label='high - low', color='C1', alpha=0.6)
+plt.plot(times, diff_inout[:, 0, :].mean(0), label='practice', color='C7', alpha=0.6)
+plt.plot(times, diff_inout[:, 1:, :].mean(1).mean(0), label='high - low', color='C0', alpha=0.6)
+plt.plot(times, diff.mean(0), label='high - low - practice', color='C1', alpha=0.6)
 p_values_unc = ttest_1samp(diff, axis=0, popmean=0)[1]
 sig_unc = p_values_unc < 0.05
 p_values = decod_stats(diff, -1)
 sig = p_values < 0.05
 # plt.fill_between(times, 0, diff_inout.mean((0, 1)), where=sig_unc, color='C1', alpha=0.2)
-plt.fill_between(times, 0, diff.mean(0), where=sig, color='black', alpha=0.3)
+# plt.fill_between(times, 0, diff.mean(0), where=sig, color='black', alpha=0.3)
 plt.axhline(0, color='black', linestyle='dashed')
 plt.axvspan(0, 0.2, color='grey', alpha=.2)
 plt.legend()
@@ -269,6 +276,6 @@ for i in range(1, 5):
     plt.axvspan(0, 0.2, color='grey', alpha=.2)
     plt.legend()
     # plt.gca().set_ylim(-0.04, 0.12)
-    plt.title(f'{metric} high – low epoch {i+1}', style='italic')
-    plt.savefig(op.join(figures_dir, '%s_high_low_%s_%s.pdf' % (metric, trial_type, str(i+1))))
+    plt.title(f'{metric} high – low epoch {i}', style='italic')
+    plt.savefig(op.join(figures_dir, '%s_high_low_%s_%s.pdf' % (metric, trial_type, str(i))))
     plt.close()

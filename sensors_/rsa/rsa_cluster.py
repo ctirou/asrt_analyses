@@ -8,12 +8,9 @@ from config import *
 import sys
 
 lock = 'stim'
-trial_type = 'pattern'
-analysis = 'pat_high_rdm_high'
 overwrite = True
 
 data_path = DATA_DIR
-subjects_dir = FREESURFER_DIR
 subjects, epochs_list = SUBJS, EPOCHS
 metric = 'mahalanobis'
 
@@ -29,21 +26,11 @@ def process_subject(subject):
     # loop across sessions
     for epoch_num in [0, 1, 2, 3, 4]:
                     
-        if epoch_num == 0:
-            epo_fname = 'prac'
-        else:
-            epo_fname = 'sess-%s' % (str(epoch_num).zfill(2))
         behav_fname = op.join(data_path, "behav/%s-%s.pkl" % (subject, epoch_num))
         behav = pd.read_pickle(behav_fname)
         # read epochs
-        if lock == 'button': 
-            epoch_bsl_fname = op.join(data_path, "bsl/%s_%s_bl-epo.fif" % (subject, epoch_num))
-            epoch_bsl = mne.read_epochs(epoch_bsl_fname)
-            epoch_fname = op.join(data_path, "%s/%s_%s_b-epo.fif" % (lock, subject, epoch_num))
-        else:
-            epoch_fname = op.join(data_path, "%s/%s-%s-epo.fif" % (lock, subject, epoch_num))
+        epoch_fname = op.join(data_path, "%s/%s-%s-epo.fif" % (lock, subject, epoch_num))
         epoch = mne.read_epochs(epoch_fname)
-        times = epoch.times
         
         if not op.exists(res_path / f"pat-{epoch_num}.npy") or overwrite:
             epoch_pat = epoch[np.where(behav["trialtypes"]==1)].get_data(copy=False).mean(axis=0)
