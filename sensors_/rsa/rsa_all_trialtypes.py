@@ -12,6 +12,7 @@ from config import *
 lock = 'stim'
 trial_type = 'pattern'
 analysis = 'pat_high_rdm_high'
+overwrite = True
 
 data_path = DATA_DIR
 subjects_dir = FREESURFER_DIR
@@ -67,7 +68,7 @@ for subject in subjects:
         epoch = mne.read_epochs(epoch_fname)
         times = epoch.times
         
-        if not op.exists(res_path / f"pat-{epoch_num}.npy"):
+        if not op.exists(res_path / f"pat-{epoch_num}.npy") or overwrite:
             epoch_pat = epoch[np.where(behav["trialtypes"]==1)].get_data(copy=False).mean(axis=0)
             behav_pat = behav[behav["trialtypes"]==1]
             assert len(epoch_pat) == len(behav_pat)
@@ -76,7 +77,7 @@ for subject in subjects:
         else:
             rdm_pat = np.load(res_path / f"pat-{epoch_num}.npy")
         
-        if not op.exists(res_path / f"rand-{epoch_num}.npy"):
+        if not op.exists(res_path / f"rand-{epoch_num}.npy") or overwrite:
             epoch_rand = epoch[np.where(behav["triplets"]==34)].get_data(copy=False).mean(axis=0)
             behav_rand = behav[behav["triplets"]==34]
             assert len(epoch_rand) == len(behav_rand)
