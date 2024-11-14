@@ -17,7 +17,7 @@ subjects_dir = FREESURFER_DIR
 parc = 'aparc'
 hemi = 'both'
 verbose = True
-overwrite = True
+overwrite = False
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
 def process_subject(subject, lock, jobs, rsync):
@@ -101,11 +101,11 @@ def process_subject(subject, lock, jobs, rsync):
                 rdm_rand = get_rdm(X_rand, y_rand)
                 np.save(res_path / f"rand-{epoch_num}.npy", rdm_rand)
             
-            del stcs_data, X_pat, y_pat, X_rand, y_rand
-            gc.collect()
+                del stcs_data, X_pat, y_pat, X_rand, y_rand
+                gc.collect()
     
-    del labels, stcs
-    gc.collect()
+        del stcs
+        gc.collect()
     
     if rsync:
         source = RESULTS_DIR / analysis / 'source'

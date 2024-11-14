@@ -82,12 +82,12 @@ for subject in tqdm(subjects):
         lows.append(np.mean(subdict[subject][i]["random_low"]))
         
         learning_index = (np.mean(lows) - np.mean(highs)) / np.mean(lows)
-        learn_index_dict[subject][i] = learning_index if not np.isnan(learning_index) else 0
+        learn_index_dict[subject][i] = learning_index if i != 0 else 0
 
 # Save learning indices to CSV
 learn_index_df = pd.DataFrame.from_dict(learn_index_dict, orient='index')
 if not op.exists(figures_dir / 'behav' / 'learning_indices.csv'):
-    learn_index_df.to_csv(figures_dir / 'behav' / 'learning_indices.csv')
+    learn_index_df.to_csv(figures_dir / 'behav' / 'learning_indices.csv', sep='\t')
 
 # Calculate means and standard errors
 mean_pattern = [np.mean(pattern_RT[f'Epoch_{i}']) for i in range(1, 5)]
