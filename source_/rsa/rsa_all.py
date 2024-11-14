@@ -14,7 +14,6 @@ subjects = SUBJS
 analysis = 'RSA'
 data_path = DATA_DIR
 subjects_dir = FREESURFER_DIR
-res_path = RESULTS_DIR
 parc = 'aparc'
 hemi = 'both'
 verbose = True

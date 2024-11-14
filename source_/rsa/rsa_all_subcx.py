@@ -14,7 +14,6 @@ subjects = SUBJS
 analysis = 'RSA'
 data_path = DATA_DIR
 subjects_dir = FREESURFER_DIR
-res_path = RESULTS_DIR
 parc = 'aparc'
 hemi = 'both'
 verbose = True
@@ -22,20 +21,16 @@ overwrite = True
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
 def process_subject(subject, lock, jobs, rsync):
-    # get label names
-    best_labels = SURFACE_LABELS if lock == 'stim' else SURFACE_LABELS_RT
-
-    # get labels
-    all_labels = mne.read_labels_from_annot(subject=subject, parc=parc, hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
-    labels = [label for label in all_labels if label.name in best_labels]
     
-    del all_labels
-    gc.collect()
-    
-    src_fname = RESULTS_DIR / "src" / f"{subject}-src.fif"
-    src = mne.read_source_spaces(src_fname, verbose=verbose)
-    bem_fname = RESULTS_DIR / "bem" / f"{subject}-bem-sol.fif"    
-    
+    # path to bem file
+    bem_fname = op.join(RESULTS_DIR, "bem", "%s-bem-sol.fif" % (subject))
+    # read volume and surface source space
+    src_fname = op.join(RESULTS_DIR, "src", "%s-src.fif" % (subject))
+    src = mne.read_source_spaces(src_fname, verbose=verbose)        
+    vol_src_fname = op.join(RESULTS_DIR, "src", "%s-vol-src.fif" % (subject))
+    vol_src = mne.read_source_spaces(vol_src_fname, verbose=verbose)
+    mixed_src = src + vol_src
+            
     for epoch_num in [0, 1, 2, 3, 4]:
         
         # read stim epoch
@@ -53,9 +48,6 @@ def process_subject(subject, lock, jobs, rsync):
         else:
             noise_cov = mne.compute_covariance(epoch, tmin=-.2, tmax=0, method="empirical", rank="info", verbose=verbose)
             
-        # read forward solution    
-        # fwd_fname = RESULTS_DIR / "fwd" / lock / f"{subject}-{epoch_num}-fwd.fif"
-        # fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
         # compute data covariance matrix on evoked data
         data_cov = mne.compute_covariance(epoch, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
 
@@ -64,7 +56,7 @@ def process_subject(subject, lock, jobs, rsync):
         rank = mne.compute_rank(noise_cov, info=info, rank=None, tol_kind='relative', verbose=verbose)
         trans_fname = os.path.join(RESULTS_DIR, "trans", lock, "%s-%i-trans.fif" % (subject, epoch_num))
         fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,
-                                    src=src, bem=bem_fname,
+                                    src=mixed_src, bem=bem_fname,
                                     meg=True, eeg=False,
                                     mindist=5.0,
                                     n_jobs=jobs,
@@ -74,21 +66,25 @@ def process_subject(subject, lock, jobs, rsync):
                         pick_ori=None, rank=rank, reduce_rank=True, verbose=verbose)
         stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
         
+        offsets = np.cumsum([0] + [len(s["vertno"]) for s in vol_src])
+        label_tc, _ = get_volume_estimate_tc(stcs, fwd, offsets, subject, subjects_dir)
+        # subcortex labels
+        labels_subcx = list(label_tc.keys())
+        
         del epoch, epoch_fname, behav_fname, fwd, data_cov, noise_cov, rank, info, filters
         gc.collect()
 
         # loop across labels
-        for ilabel, label in enumerate(labels):
-            print(f"{str(ilabel+1).zfill(2)}/{len(labels)}", subject, epoch_num, label.name)
+        for ilabel, label in enumerate(labels_subcx):
+            print(f"{str(ilabel+1).zfill(2)}/{len(labels_subcx)}", subject, epoch_num, label)
             
-            res_path = RESULTS_DIR / analysis / 'source' / label.name / lock / 'rdm'
+            res_path = RESULTS_DIR / analysis / 'source' / label / lock / 'rdm'
 
             if not op.exists(res_path / f"pat-{epoch_num}.npy") or not op.exists(res_path / f"rand-{epoch_num}.npy") or overwrite:
                 ensure_dir(res_path)
 
                 # get stcs in label
-                stcs_data = [stc.in_label(label).data for stc in stcs]
-                stcs_data = np.array(stcs_data)
+                stcs_data = label_tc[label]
                 assert len(stcs_data) == len(behav)
 
                 pattern = behav.trialtypes == 1

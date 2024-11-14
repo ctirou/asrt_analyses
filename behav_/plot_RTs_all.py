@@ -11,6 +11,7 @@ figures_dir = FIGURES_DIR
 subjects = SUBJS
 
 pattern_RT = {
+    'Epoch_0': list(),
     'Epoch_1': list(),
     'Epoch_2': list(),
     'Epoch_3': list(),
@@ -18,6 +19,7 @@ pattern_RT = {
 }
 
 random_high_RT = {
+    'Epoch_0': list(),
     'Epoch_1': list(),
     'Epoch_2': list(),
     'Epoch_3': list(),
@@ -25,13 +27,14 @@ random_high_RT = {
 }
 
 random_low_RT = {
+    'Epoch_0': list(),
     'Epoch_1': list(),
     'Epoch_2': list(),
     'Epoch_3': list(),
     'Epoch_4': list(),
 }
 
-sessions = ['1', '2', '3', '4']
+sessions = ['0', '1', '2', '3', '4']
 n = len(subjects)
 
 subdict = {}
@@ -46,7 +49,7 @@ for subject in tqdm(subjects):
     subdict[subject] = {}
     learn_index_dict[subject] = {}
     
-    for i in range(1, 5):
+    for i in range(5):
 
         subdict[subject][i] = {"pattern": [], 
                                "random_high": [],
@@ -79,7 +82,7 @@ for subject in tqdm(subjects):
         lows.append(np.mean(subdict[subject][i]["random_low"]))
         
         learning_index = (np.mean(lows) - np.mean(highs)) / np.mean(lows)
-        learn_index_dict[subject][i] = learning_index
+        learn_index_dict[subject][i] = learning_index if not np.isnan(learning_index) else 0
 
 # Save learning indices to CSV
 learn_index_df = pd.DataFrame.from_dict(learn_index_dict, orient='index')
@@ -99,9 +102,9 @@ color2 = "#DD614A"
 color3 = "#1982C4"
 fig, ax = plt.subplots(1, 1, figsize=(8, 5))
 ax.autoscale()
-ax.plot(sessions, mean_pattern, '-o', color=color1, label="pattern", markersize=7, alpha=1)
-ax.plot(sessions, mean_random_high, '-o', color=color2, label="random high", markersize=7, alpha=.9)
-ax.plot(sessions, mean_random_low, '-o', color=color3, label="random low", markersize=7, alpha=.9)
+ax.plot(sessions[1:], mean_pattern, '-o', color=color1, label="pattern", markersize=7, alpha=1)
+ax.plot(sessions[1:], mean_random_high, '-o', color=color2, label="random high", markersize=7, alpha=.9)
+ax.plot(sessions[1:], mean_random_low, '-o', color=color3, label="random low", markersize=7, alpha=.9)
 # Scatter plot individual subject values
 for subject in subjects:
     for i in range(1, 5):
@@ -125,7 +128,7 @@ fig, ax = plt.subplots(1, 1, figsize=(8, 5))
 ax.autoscale()
 learning_indices_mean = learn_index_df.mean(axis=0)
 learning_indices_stderr = learn_index_df.sem(axis=0)
-ax.bar(sessions, learning_indices_mean, yerr=learning_indices_stderr, color=color3, alpha=0.7, capsize=5)
+ax.bar(sessions, learning_indices_mean, yerr=learning_indices_stderr, color=color1, alpha=0.7, capsize=5)
 ax.set_xlabel("Session")
 ax.set_ylabel("Learning Index")
 ax.spines['top'].set_visible(False)
