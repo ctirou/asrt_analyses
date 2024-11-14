@@ -48,7 +48,7 @@ for subject in tqdm(subjects):
 
     one_twos_rand = list()
     one_threes_rand = list()
-    one_fours_rand = list() 
+    one_fours_rand = list()
     two_threes_rand = list()
     two_fours_rand = list() 
     three_fours_rand = list()

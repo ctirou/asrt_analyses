@@ -84,12 +84,18 @@ def get_rdm(epoch, behav):
     import statsmodels.api as sm
     from tqdm.auto import tqdm
     from sklearn.covariance import LedoitWolf
+    import pandas as pd
     # Prepare the design matrix                        
     ntrials = len(epoch)
     nconditions = 4
     design_matrix = np.zeros((ntrials, nconditions))
     
-    for icondi, condi in enumerate(behav["positions"]):            
+    if type(behav) == pd.core.frame.DataFrame:
+        y = behav["positions"]
+    else:
+        y = behav
+    
+    for icondi, condi in enumerate(y):            
         # assert isinstance(condi, np.int64) 
         design_matrix[icondi, condi-1] = 1
     assert np.sum(design_matrix.sum(axis=1) == 1) == len(epoch)  
