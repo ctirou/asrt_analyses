@@ -1,5 +1,5 @@
 from pathlib import Path
-macbook = False
+macbook = True
 
 SUBJS = ['sub01', 'sub02', 'sub04', 'sub07', 'sub08', 'sub09',
         'sub10', 'sub12', 'sub13', 'sub14', 'sub15']

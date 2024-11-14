@@ -10,7 +10,7 @@ from base import *
 from config import *
 
 lock = 'stim'
-analysis = 'usual'
+analysis = 'pat_high_rdm_high'
 overwrite = False
 
 data_path = DATA_DIR
@@ -168,10 +168,10 @@ for subject in tqdm(subjects):
         if ((pair in pairs_in_sequence) or (rev_pair in pairs_in_sequence)):
             in_seq.append(pat_sim)
             # pat high rdm high
-            # out_seq.append(rand_sim)
-        else:
+            out_seq.append(rand_sim)
+        # else:
             # usual: paired - unapaired
-            out_seq.append(pat_sim)
+            # out_seq.append(pat_sim)
             # pat high rdm low
             # out_seq.append(rand_sim)
     all_in_seqs.append(np.array(in_seq))    
