@@ -134,52 +134,7 @@ def get_rdm(epoch, behav):
         rdm_times[:, :, itime] = rdm # rdm_times (4, 4, 163), rdm (4, 4)
     
     return rdm_times
-    
-def get_inout_seq(sequence, similarities):
-    import numpy as np
-    # create list of possible pairs
-    pairs_in_sequence = list()
-    pairs_in_sequence.append(str(sequence[0]) + str(sequence[1]))
-    pairs_in_sequence.append(str(sequence[1]) + str(sequence[2]))
-    pairs_in_sequence.append(str(sequence[2]) + str(sequence[3]))
-    pairs_in_sequence.append(str(sequence[3]) + str(sequence[0]))
-    in_seq, out_seq = [], []
-    pairs = ['12', '13', '14', '23', '24', '34']
-    rev_pairs = ['21', '31', '41', '32', '42', '43']
-    # look which are in, which are out
-    for pair, rev_pair, similarity in zip(pairs, rev_pairs, similarities):
-        if ((pair in pairs_in_sequence) or (rev_pair in pairs_in_sequence)):
-            in_seq.append(similarity)
-        else: 
-            out_seq.append(similarity)
-    return np.array(in_seq), np.array(out_seq)
 
-
-def get_best_pairs(sequence, similarities):
-    # create list of possible pairs
-    pairs_in_sequence, pairs_out_sequence = [], []
-    pairs_in_sequence.append(str(sequence[0]) + str(sequence[1]))
-    pairs_in_sequence.append(str(sequence[1]) + str(sequence[2]))
-    pairs_in_sequence.append(str(sequence[2]) + str(sequence[3]))
-    pairs_in_sequence.append(str(sequence[3]) + str(sequence[0]))
-    
-    pairs_out_sequence.append(str(sequence[0]) + str(sequence[2]))
-    pairs_out_sequence.append(str(sequence[1]) + str(sequence[3]))
-
-    in_seq, out_seq = [], []
-    pairs = ['12', '13', '14', '23', '24', '34']
-    rev_pairs = ['21', '31', '41', '32', '42', '43']
-    
-    index = [0, 2]
-    best_pairs = [val for idx, val in enumerate(pairs_in_sequence) if idx in index]
-    
-    # look which are in, which are out
-    for pair, rev_pair, similarity in zip(pairs, rev_pairs, similarities):
-        if ((pair in best_pairs) or (rev_pair in best_pairs)):
-            in_seq.append(similarity)
-        elif ((pair in pairs_out_sequence) or (rev_pair in pairs_out_sequence)):
-            out_seq.append(similarity)
-    return np.array(in_seq), np.array(out_seq)
     
 def get_inseq(sequence):
     # create list of possible pairs
@@ -423,3 +378,162 @@ def cv_distance(response, residuals, metric, n_splits=10):
     
     rdm /= n_splits  # Average over the folds
     return rdm
+
+def get_in_out_seq(sequence, similarities, random_lows, analysis):
+    import numpy as np
+    # create list of possible pairs
+    pairs_in_sequence = list()
+    pairs_in_sequence.append(str(sequence[0]) + str(sequence[1]))
+    pairs_in_sequence.append(str(sequence[1]) + str(sequence[2]))
+    pairs_in_sequence.append(str(sequence[2]) + str(sequence[3]))
+    pairs_in_sequence.append(str(sequence[3]) + str(sequence[0]))
+    in_seq, out_seq = [], []
+    pairs = ['12', '13', '14', '23', '24', '34']
+    rev_pairs = ['21', '31', '41', '32', '42', '43']
+    if analysis == 'pat_high_rdm_high':
+        for pair, rev_pair, pat_sim, rand_sim in zip(pairs, rev_pairs, similarities, random_lows):
+            if ((pair in pairs_in_sequence) or (rev_pair in pairs_in_sequence)):
+                in_seq.append(pat_sim)
+                out_seq.append(rand_sim)
+    elif analysis == 'pat_high_rdm_low':
+        for pair, rev_pair, pat_sim, rand_sim in zip(pairs, rev_pairs, similarities, random_lows):
+            if ((pair in pairs_in_sequence) or (rev_pair in pairs_in_sequence)):
+                in_seq.append(pat_sim)
+            else:
+                out_seq.append(rand_sim)
+    else:
+        for pair, rev_pair, pat_sim, rand_sim in zip(pairs, rev_pairs, similarities, random_lows):
+            if ((pair in pairs_in_sequence) or (rev_pair in pairs_in_sequence)):
+                in_seq.append(pat_sim)
+            else:
+                out_seq.append(pat_sim)
+    return np.array(in_seq), np.array(out_seq)
+
+def get_all_high_low(res_path, sequence, analysis):
+    import numpy as np
+    # create lists of possible combinations between stimuli
+    one_twos_pat = list()
+    one_threes_pat = list()
+    one_fours_pat = list() 
+    two_threes_pat = list()
+    two_fours_pat = list() 
+    three_fours_pat = list()
+
+    one_twos_rand = list()
+    one_threes_rand = list()
+    one_fours_rand = list()
+    two_threes_rand = list()
+    two_fours_rand = list() 
+    three_fours_rand = list()
+    
+    # loop across sessions
+    for epoch_num in [0, 1, 2, 3, 4]:
+        
+        print(f"Processing session {epoch_num}...")
+        
+        rdm_rand = np.load(res_path / f"rand-{epoch_num}.npy")
+        rdm_pat = np.load(res_path / f"pat-{epoch_num}.npy")
+        
+        one_two_pat = list()
+        one_three_pat = list()
+        one_four_pat = list() 
+        two_three_pat = list()
+        two_four_pat = list()
+        three_four_pat = list()
+
+        one_two_rand = list()
+        one_three_rand = list()
+        one_four_rand = list() 
+        two_three_rand = list()
+        two_four_rand = list()
+        three_four_rand = list()
+
+        for itime in range(rdm_pat.shape[2]):
+            one_two_pat.append(rdm_pat[0, 1, itime])
+            one_three_pat.append(rdm_pat[0, 2, itime])
+            one_four_pat.append(rdm_pat[0, 3, itime])
+            two_three_pat.append(rdm_pat[1, 2, itime])
+            two_four_pat.append(rdm_pat[1, 3, itime])
+            three_four_pat.append(rdm_pat[2, 3, itime])
+
+            one_two_rand.append(rdm_rand[0, 1, itime])
+            one_three_rand.append(rdm_rand[0, 2, itime])
+            one_four_rand.append(rdm_rand[0, 3, itime])
+            two_three_rand.append(rdm_rand[1, 2, itime])
+            two_four_rand.append(rdm_rand[1, 3, itime])
+            three_four_rand.append(rdm_rand[2, 3, itime])
+                        
+        one_two_pat = np.array(one_two_pat)
+        one_three_pat = np.array(one_three_pat)
+        one_four_pat = np.array(one_four_pat) 
+        two_three_pat = np.array(two_three_pat)
+        two_four_pat = np.array(two_four_pat) 
+        three_four_pat = np.array(three_four_pat)
+
+        one_two_rand = np.array(one_two_rand)
+        one_three_rand = np.array(one_three_rand)
+        one_four_rand = np.array(one_four_rand) 
+        two_three_rand = np.array(two_three_rand)
+        two_four_rand = np.array(two_four_rand) 
+        three_four_rand = np.array(three_four_rand)
+
+        one_twos_pat.append(one_two_pat)
+        one_threes_pat.append(one_three_pat)
+        one_fours_pat.append(one_four_pat) 
+        two_threes_pat.append(two_three_pat)
+        two_fours_pat.append(two_four_pat) 
+        three_fours_pat.append(three_four_pat)
+
+        one_twos_rand.append(one_two_rand)
+        one_threes_rand.append(one_three_rand)
+        one_fours_rand.append(one_four_rand) 
+        two_threes_rand.append(two_three_rand)
+        two_fours_rand.append(two_four_rand) 
+        three_fours_rand.append(three_four_rand)
+                            
+    one_twos_pat = np.array(one_twos_pat)
+    one_threes_pat = np.array(one_threes_pat)  
+    one_fours_pat = np.array(one_fours_pat)   
+    two_threes_pat = np.array(two_threes_pat)  
+    two_fours_pat = np.array(two_fours_pat)
+    three_fours_pat = np.array(three_fours_pat)
+
+    one_twos_rand = np.array(one_twos_rand)
+    one_threes_rand = np.array(one_threes_rand)  
+    one_fours_rand = np.array(one_fours_rand)   
+    two_threes_rand = np.array(two_threes_rand)  
+    two_fours_rand = np.array(two_fours_rand)   
+    three_fours_rand = np.array(three_fours_rand)
+    
+    similarities = [one_twos_pat, one_threes_pat, one_fours_pat,
+                    two_threes_pat, two_fours_pat, three_fours_pat]
+    random_lows = [one_twos_rand, one_threes_rand, one_fours_rand,
+                    two_threes_rand, two_fours_rand, three_fours_rand]
+        
+    # create list of possible pairs
+    pairs_in_sequence = list()
+    pairs_in_sequence.append(str(sequence[0]) + str(sequence[1]))
+    pairs_in_sequence.append(str(sequence[1]) + str(sequence[2]))
+    pairs_in_sequence.append(str(sequence[2]) + str(sequence[3]))
+    pairs_in_sequence.append(str(sequence[3]) + str(sequence[0]))
+    high, low = [], []
+    pairs = ['12', '13', '14', '23', '24', '34']
+    rev_pairs = ['21', '31', '41', '32', '42', '43']
+    if analysis == 'pat_high_rdm_high':
+        for pair, rev_pair, pat_sim, rand_sim in zip(pairs, rev_pairs, similarities, random_lows):
+            if ((pair in pairs_in_sequence) or (rev_pair in pairs_in_sequence)):
+                high.append(pat_sim)
+                low.append(rand_sim)
+    elif analysis == 'pat_high_rdm_low':
+        for pair, rev_pair, pat_sim, rand_sim in zip(pairs, rev_pairs, similarities, random_lows):
+            if ((pair in pairs_in_sequence) or (rev_pair in pairs_in_sequence)):
+                high.append(pat_sim)
+            else:
+                low.append(rand_sim)
+    else:
+        for pair, rev_pair, pat_sim, rand_sim in zip(pairs, rev_pairs, similarities, random_lows):
+            if ((pair in pairs_in_sequence) or (rev_pair in pairs_in_sequence)):
+                high.append(pat_sim)
+            else:
+                low.append(pat_sim)
+    return np.array(high), np.array(low)

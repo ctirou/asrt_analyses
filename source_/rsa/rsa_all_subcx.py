@@ -78,7 +78,7 @@ def process_subject(subject, lock, jobs, rsync):
         for ilabel, label in enumerate(labels_subcx):
             print(f"{str(ilabel+1).zfill(2)}/{len(labels_subcx)}", subject, epoch_num, label)
             
-            res_path = RESULTS_DIR / analysis / 'source' / label / lock / 'rdm'
+            res_path = RESULTS_DIR / analysis / 'source' / label / lock / 'rdm' / subject
 
             if not op.exists(res_path / f"pat-{epoch_num}.npy") or not op.exists(res_path / f"rand-{epoch_num}.npy") or overwrite:
                 ensure_dir(res_path)

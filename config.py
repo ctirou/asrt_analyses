@@ -1,5 +1,5 @@
+import os
 from pathlib import Path
-macbook = False
 
 SUBJS = ['sub01', 'sub02', 'sub04', 'sub07', 'sub08', 'sub09',
         'sub10', 'sub12', 'sub13', 'sub14', 'sub15']
@@ -8,13 +8,19 @@ EPOCHS = ['2_PRACTICE', '3_EPOCH_1', '4_EPOCH_2', '5_EPOCH_3', '6_EPOCH_4']
 
 FIGURES_DIR = Path("/Users/coum/MEGAsync/figures")
 
-if macbook:
+if os.getenv("MB_ENV") is not None:
     HOME = Path("/Volumes/Ultra_Touch/asrt/")
     DATA_DIR = Path('/Volumes/Ultra_Touch/asrt/preprocessed')
     RAW_DATA_DIR = Path('/Volumes/Ultra_Touch/asrt/raws')
     RESULTS_DIR = Path('/Volumes/Ultra_Touch/asrt/results')
     FREESURFER_DIR = Path('/Users/coum/Desktop/asrt/freesurfer')
     TIMEG_DATA_DIR = Path('/Volumes/Ultra_Touch/pred_asrt')
+elif os.getenv("CLUSTER_ENV") is not None:
+    RAW_DATA_DIR = Path('/sps/crnl/Romain/ASRT_MEG/data/raws')
+    DATA_DIR = Path('/sps/crnl/Romain/ASRT_MEG/data/preprocessed')
+    RESULTS_DIR = Path('/sps/crnl/Romain/ASRT_MEG/data/preprocessed/results')
+    FREESURFER_DIR = Path('/sps/crnl/Romain/ASRT_MEG/data/freesurfer')
+    TIMEG_DATA_DIR = Path('/sps/crnl/Romain/ASRT_MEG/data/pred_asrt')
 else:
     RAW_DATA_DIR = Path('/Users/coum/Desktop/asrt/raws')
     DATA_DIR = Path('/Users/coum/Desktop/asrt/preprocessed')
