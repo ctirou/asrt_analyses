@@ -537,3 +537,21 @@ def get_all_high_low(res_path, sequence, analysis):
             else:
                 low.append(pat_sim)
     return np.array(high), np.array(low)
+
+def get_cm(clf, cv, X, y, times):
+    import numpy as np
+    from sklearn.metrics import confusion_matrix, roc_auc_score
+    
+    pred = np.zeros((len(y), X.shape[-1]))
+    pred_rock = np.zeros((len(y), X.shape[-1], len(set(y))))
+    for train, test in cv.split(X, y):
+        clf.fit(X[train], y[train])
+        pred[test] = np.array(clf.predict(X[test]))
+        pred_rock[test] = np.array(clf.predict_proba(X[test]))
+                    
+    cms, scores = list(), list()
+    for itime in range(len(times)):
+        cms.append(confusion_matrix(y[:], pred[:, itime], normalize='true', labels=[1, 2, 3, 4]))
+        scores.append(roc_auc_score(y[:], pred_rock[:, itime, :], multi_class='ovr'))
+    
+    return np.array(cms), np.array(scores)
