@@ -429,7 +429,7 @@ def get_all_high_low(res_path, sequence, analysis):
     # loop across sessions
     for epoch_num in [0, 1, 2, 3, 4]:
         
-        print(f"Processing session {epoch_num}...")
+        # print(f"Processing session {epoch_num}...")
         
         rdm_rand = np.load(res_path / f"rand-{epoch_num}.npy")
         rdm_pat = np.load(res_path / f"pat-{epoch_num}.npy")
