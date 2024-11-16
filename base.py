@@ -530,6 +530,12 @@ def get_all_high_low(res_path, sequence, analysis):
                 high.append(pat_sim)
             else:
                 low.append(rand_sim)
+    elif analysis == 'rdm_high_rdm_low':
+        for pair, rev_pair, pat_sim, rand_sim in zip(pairs, rev_pairs, similarities, random_lows):
+            if ((pair in pairs_in_sequence) or (rev_pair in pairs_in_sequence)):
+                low.append(pat_sim)
+            else:
+                high.append(rand_sim)
     else:
         for pair, rev_pair, pat_sim, rand_sim in zip(pairs, rev_pairs, similarities, random_lows):
             if ((pair in pairs_in_sequence) or (rev_pair in pairs_in_sequence)):

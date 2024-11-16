@@ -13,6 +13,7 @@ lock = 'stim'
 analysis = 'usual'
 # analysis = 'pat_high_rdm_high'
 # analysis = 'pat_high_rdm_low'
+analysis = 'rdm_high_rdm_low'
 overwrite = False
 
 data_path = DATA_DIR
@@ -24,10 +25,7 @@ metric = 'mahalanobis'
 all_in_seqs, all_out_seqs = [], []
 
 # get times
-epoch_fname = op.join(data_path, lock, 'sub01-0-epo.fif')
-epochs = mne.read_epochs(epoch_fname)
-times = epochs.times
-del epochs
+times = np.load(data_path / "times.npy")
 
 for subject in tqdm(subjects):
     
