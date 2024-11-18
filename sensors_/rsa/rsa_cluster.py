@@ -14,8 +14,6 @@ data_path = DATA_DIR
 subjects, epochs_list = SUBJS, EPOCHS
 metric = 'mahalanobis'
 
-all_in_seqs, all_out_seqs = [], []
-
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
 def process_subject(subject):

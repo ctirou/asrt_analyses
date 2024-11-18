@@ -24,7 +24,6 @@ def process_subject(subject, lock, scoring, solver, folds, jobs, verbose):
     from sklearn.model_selection import StratifiedKFold
     from sklearn.preprocessing import StandardScaler
     from sklearn.linear_model import LogisticRegression
-
     from base import get_cm
     
     # get times
