@@ -56,28 +56,8 @@ for subject in tqdm(subjects):
     # loop across sessions
     for epoch_num in [0, 1, 2, 3, 4]:
         
-        if not op.exists(res_path / f"pat-{epoch_num}.npy") or not op.exists(res_path / f"rand-{epoch_num}.npy") or overwrite:
-            # read behav
-            behav_fname = op.join(data_path, "behav/%s-%s.pkl" % (subject, epoch_num))
-            behav = pd.read_pickle(behav_fname)
-            # read epochs
-            epoch_fname = op.join(data_path, "%s/%s-%s-epo.fif" % (lock, subject, epoch_num))
-            epoch = mne.read_epochs(epoch_fname)
-        
-            epoch_pat = epoch[np.where(behav["trialtypes"]==1)].get_data(copy=False).mean(axis=0)
-            behav_pat = behav[behav["trialtypes"]==1]
-            assert len(epoch_pat) == len(behav_pat)
-            rdm_pat = get_rdm(epoch_pat, behav_pat)
-            np.save(res_path / f"pat-{epoch_num}.npy", rdm_pat)
-        
-            epoch_rand = epoch[np.where(behav["trialtypes"]==2)].get_data(copy=False).mean(axis=0)
-            behav_rand = behav[behav["trialtypes"]==2]
-            assert len(epoch_rand) == len(behav_rand)
-            rdm_rand = get_rdm(epoch_rand, behav_rand)
-            np.save(res_path / f"rand-{epoch_num}.npy", rdm_rand)
-        else:
-            rdm_rand = np.load(res_path / f"rand-{epoch_num}.npy")
-            rdm_pat = np.load(res_path / f"pat-{epoch_num}.npy")
+        rdm_rand = np.load(res_path / f"rand-{epoch_num}.npy")
+        rdm_pat = np.load(res_path / f"pat-{epoch_num}.npy")
         
         one_two_pat = list()
         one_three_pat = list()
