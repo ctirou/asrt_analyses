@@ -40,8 +40,8 @@ def process_subject(subject):
             rdm_pat = np.load(res_path / f"pat-{epoch_num}.npy")
         
         if not op.exists(res_path / f"rand-{epoch_num}.npy") or overwrite:
-            epoch_rand = epoch[np.where(behav["triplets"]==34)].get_data(copy=False).mean(axis=0)
-            behav_rand = behav[behav["triplets"]==34]
+            epoch_rand = epoch[np.where(behav["trialtypes"]==2)].get_data(copy=False).mean(axis=0)
+            behav_rand = behav[behav["trialtypes"]==2]
             assert len(epoch_rand) == len(behav_rand)
             rdm_rand = get_rdm(epoch_rand, behav_rand)
             np.save(res_path / f"rand-{epoch_num}.npy", rdm_rand)

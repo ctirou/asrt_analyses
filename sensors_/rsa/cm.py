@@ -30,6 +30,7 @@ def process_subject(subject, lock, scoring, solver, folds, jobs, verbose):
     epoch_fname = DATA_DIR / lock / 'sub01-0-epo.fif'
     epochs = mne.read_epochs(epoch_fname, verbose=verbose)
     times = epochs.times
+    del epochs
     
     # set-up the classifier and cv structure
     clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, multi_class="ovr", max_iter=100000, solver=solver, class_weight="balanced", random_state=42))

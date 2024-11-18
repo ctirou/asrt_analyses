@@ -33,10 +33,9 @@ def process_subject(subject, lock, jobs):
     clf = GeneralizingEstimator(clf, scoring=scoring, n_jobs=jobs)
     cv = StratifiedKFold(folds, shuffle=True)
 
-    all_behavs = list()
-    all_epochs = list()
-        
     for trial_type in ['pattern', 'random']:
+        all_behavs = list()
+        all_epochs = list()
         for epoch_num in [0, 1, 2, 3, 4]:
             res_path = data_path / 'results' / 'sensors' / lock
             ensure_dir(res_path)
@@ -45,7 +44,7 @@ def process_subject(subject, lock, jobs):
             epoch_gen = read_epochs(epoch_fname, verbose="error", preload=False)
             
             if not op.exists(res_path / f"{subject}-epoch0-{trial_type}-scores.npy") or overwrite:
-                print(f"Processing {subject} - {trial_type}...")
+                print(f"Processing {subject} - session {epoch_num} - {trial_type}...")
                 # run time generalization decoding on unique epoch
                 if trial_type == 'pattern':
                     pattern = behav.trialtypes == 1
@@ -61,7 +60,7 @@ def process_subject(subject, lock, jobs):
                 y = y.reset_index(drop=True)            
                 assert X.shape[0] == y.shape[0]
                 gc.collect()
-                scores = cross_val_multiscore(clf, X, y, cv=cv)
+                scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=verbose)
                 np.save(res_path / f"{subject}-epoch0-{trial_type}-scores.npy", scores.mean(0))
             
             if epoch_num != 0:
@@ -91,7 +90,7 @@ def process_subject(subject, lock, jobs):
         del all_epochs, all_behavs, behav, epoch_fname, epoch_gen, epochs, behav_df, meg_data, behav_data
         gc.collect()
         if not op.exists(res_path / f"{subject}-epochall-{trial_type}-scores.npy") or overwrite:
-            scores = cross_val_multiscore(clf, X, y, cv=cv)
+            scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=verbose)
             np.save(res_path / f"{subject}-epochall-{trial_type}-scores.npy", scores.mean(0))
             del X, y, scores
             gc.collect()
