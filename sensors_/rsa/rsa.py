@@ -29,9 +29,10 @@ def process_subject(subject):
         # read epochs
         epoch_fname = op.join(data_path, "%s/%s-%s-epo.fif" % (lock, subject, epoch_num))
         epoch = mne.read_epochs(epoch_fname)
+        data = epoch.get_data(picks='mag', copy=True)
         
         if not op.exists(res_path / f"pat-{epoch_num}.npy") or overwrite:
-            epoch_pat = epoch[np.where(behav["trialtypes"]==1)].get_data(copy=False).mean(axis=0)
+            epoch_pat = data[np.where(behav["trialtypes"]==1)]
             behav_pat = behav[behav["trialtypes"]==1]
             assert len(epoch_pat) == len(behav_pat)
             rdm_pat = get_rdm(epoch_pat, behav_pat)
@@ -40,7 +41,7 @@ def process_subject(subject):
             rdm_pat = np.load(res_path / f"pat-{epoch_num}.npy")
         
         if not op.exists(res_path / f"rand-{epoch_num}.npy") or overwrite:
-            epoch_rand = epoch[np.where(behav["trialtypes"]==2)].get_data(copy=False).mean(axis=0)
+            epoch_rand = data[np.where(behav["trialtypes"]==2)]
             behav_rand = behav[behav["trialtypes"]==2]
             assert len(epoch_rand) == len(behav_rand)
             rdm_rand = get_rdm(epoch_rand, behav_rand)
