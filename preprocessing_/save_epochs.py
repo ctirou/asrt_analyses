@@ -15,7 +15,7 @@ is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
 subjects = SUBJS
 mode_ICA = True
-generalizing = True
+generalizing = False
 filtering = True
 overwrite = True
 verbose = True
@@ -31,7 +31,7 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
         else:
                 res_path = DATA_DIR
 
-        meg_sessions = ['3_EPOCH_1', '4_EPOCH_2', '5_EPOCH_3', '6_EPOCH_4']
+        meg_sessions = ['2_PRACTICE', '3_EPOCH_1', '4_EPOCH_2', '5_EPOCH_3', '6_EPOCH_4']
 
         # Create preprocessed sub-folders
         folders = ['stim', 'button', 'behav', 'bsl']
@@ -42,7 +42,8 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
         path_to_behav_dir = f'{data_path}/{subject}/behav_data'
         behav_dir = os.listdir(path_to_behav_dir)
         behav_files_filter = [f for f in behav_dir if not f.startswith('.')]
-        behav_sessions = sorted([f for f in behav_files_filter if '_eASRT_Epoch' in f])
+        behav_files = sorted([f for f in behav_files_filter if '_eASRT_Practice' in f or '_eASRT_Epoch' in f])
+        behav_sessions = [behav_files[-1]] + behav_files[:-1]
         # Loop across sessions
         for session_num, (meg_session, behav_session) in enumerate(zip(meg_sessions, behav_sessions)):
                 # Read the raw data
@@ -140,6 +141,9 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                 behav = open(fname_behav, 'r')
                 lines = behav.readlines()
                 column_names = lines[0].split()
+                if session_num == 0:
+                        del column_names[7] # there are extra columns in the behav file that mess up the reading
+                        del column_names[7] # there are extra columns in the behav file that mess up the reading
                 positions = list()
                 triplets = list()
                 trialtypes = list()
@@ -174,9 +178,10 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                 button_df = behav_df.copy()
                 # Create epochs time locked on stimulus onset and button response, and baseline epochs
                 reject = dict(mag=5e-12)
-                picks = mne.pick_types(raw.info, meg=True, eeg=False, eog=True, stim=False)
+                picks = mne.pick_types(raw.info, meg=True, eeg=False, eog=False, stim=False) # by default eog is True
                 if generalizing:
-                        epochs_stim = mne.Epochs(raw, events_stim, tmin=-4, tmax=4, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)                   
+                        epochs_stim = mne.Epochs(raw, events_stim, tmin=-4, tmax=4, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)
+                        epochs_bsl = epochs_stim.copy().crop(-.2, 0)                   
                         epochs_button = mne.Epochs(raw, events_button, tmin=-4, tmax=4, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)                        
                 else:
                         epochs_stim = mne.Epochs(raw, events_stim, tmin=-0.2, tmax=0.6, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)                   
@@ -242,12 +247,12 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                 bsl_data = np.mean(bsl_data, axis=2)
                 epochs_button._data[:, bsl_channels, :] -= bsl_data[:, :, np.newaxis]
                 # Save epochs 
-                epochs_stim.save(op.join(res_path, 'stim', f'{subject}-{session_num+1}-epo.fif'), overwrite=overwrite)
-                epochs_bsl.save(op.join(res_path, 'bsl', f'{subject}-{session_num+1}-epo.fif'), overwrite=overwrite)
-                epochs_button.save(op.join(res_path, 'button', f'{subject}-{session_num+1}-epo.fif'), overwrite=overwrite)
+                epochs_stim.save(op.join(res_path, 'stim', f'{subject}-{session_num}-epo.fif'), overwrite=overwrite)
+                epochs_bsl.save(op.join(res_path, 'bsl', f'{subject}-{session_num}-epo.fif'), overwrite=overwrite)
+                epochs_button.save(op.join(res_path, 'button', f'{subject}-{session_num}-epo.fif'), overwrite=overwrite)
                 # Save behavioral data
                 behav_df = stim_df
-                behav_df.to_pickle(op.join(res_path, 'behav', f'{subject}-{session_num+1}.pkl'))
+                behav_df.to_pickle(op.join(res_path, 'behav', f'{subject}-{session_num}.pkl'))
                 print("Final number of epochs: ", len(epochs_stim), "our of 425...")
 
 if is_cluster:

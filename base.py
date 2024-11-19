@@ -409,7 +409,7 @@ def get_in_out_seq(sequence, similarities, random_lows, analysis):
                 out_seq.append(pat_sim)
     return np.array(in_seq), np.array(out_seq)
 
-def get_all_high_low(res_path, sequence, analysis):
+def get_all_high_low(res_path, sequence, analysis, cv):
     import numpy as np
     # create lists of possible combinations between stimuli
     one_twos_pat = list()
@@ -428,9 +428,7 @@ def get_all_high_low(res_path, sequence, analysis):
     
     # loop across sessions
     for epoch_num in [0, 1, 2, 3, 4]:
-        
-        # print(f"Processing session {epoch_num}...")
-        
+                
         rdm_rand = np.load(res_path / f"rand-{epoch_num}.npy")
         rdm_pat = np.load(res_path / f"pat-{epoch_num}.npy")
         
@@ -448,21 +446,37 @@ def get_all_high_low(res_path, sequence, analysis):
         two_four_rand = list()
         three_four_rand = list()
 
-        for itime in range(rdm_pat.shape[2]):
-            one_two_pat.append(rdm_pat[0, 1, itime])
-            one_three_pat.append(rdm_pat[0, 2, itime])
-            one_four_pat.append(rdm_pat[0, 3, itime])
-            two_three_pat.append(rdm_pat[1, 2, itime])
-            two_four_pat.append(rdm_pat[1, 3, itime])
-            three_four_pat.append(rdm_pat[2, 3, itime])
+        if cv:
+            for itime in range(rdm_pat.shape[0]):
+                one_two_pat.append(rdm_pat[itime, 0, 1])
+                one_three_pat.append(rdm_pat[itime, 0, 2])
+                one_four_pat.append(rdm_pat[itime, 0, 3])
+                two_three_pat.append(rdm_pat[itime, 1, 2])
+                two_four_pat.append(rdm_pat[itime, 1, 3])
+                three_four_pat.append(rdm_pat[itime, 2, 3])
 
-            one_two_rand.append(rdm_rand[0, 1, itime])
-            one_three_rand.append(rdm_rand[0, 2, itime])
-            one_four_rand.append(rdm_rand[0, 3, itime])
-            two_three_rand.append(rdm_rand[1, 2, itime])
-            two_four_rand.append(rdm_rand[1, 3, itime])
-            three_four_rand.append(rdm_rand[2, 3, itime])
-                        
+                one_two_rand.append(rdm_rand[itime, 0, 1])
+                one_three_rand.append(rdm_rand[itime, 0, 2])
+                one_four_rand.append(rdm_rand[itime, 0, 3])
+                two_three_rand.append(rdm_rand[itime, 1, 2])
+                two_four_rand.append(rdm_rand[itime, 1, 3])
+                three_four_rand.append(rdm_rand[itime, 2, 3])
+        else:
+            for itime in range(rdm_pat.shape[2]):
+                one_two_pat.append(rdm_pat[0, 1, itime])
+                one_three_pat.append(rdm_pat[0, 2, itime])
+                one_four_pat.append(rdm_pat[0, 3, itime])
+                two_three_pat.append(rdm_pat[1, 2, itime])
+                two_four_pat.append(rdm_pat[1, 3, itime])
+                three_four_pat.append(rdm_pat[2, 3, itime])
+
+                one_two_rand.append(rdm_rand[0, 1, itime])
+                one_three_rand.append(rdm_rand[0, 2, itime])
+                one_four_rand.append(rdm_rand[0, 3, itime])
+                two_three_rand.append(rdm_rand[1, 2, itime])
+                two_four_rand.append(rdm_rand[1, 3, itime])
+                three_four_rand.append(rdm_rand[2, 3, itime])
+
         one_two_pat = np.array(one_two_pat)
         one_three_pat = np.array(one_three_pat)
         one_four_pat = np.array(one_four_pat) 
@@ -561,3 +575,117 @@ def get_cm(clf, cv, X, y, times):
         scores.append(roc_auc_score(y[:], pred_rock[:, itime, :], multi_class='ovr'))
     
     return np.array(cms), np.array(scores)
+
+
+# Function to compute cross-validated Mahalanobis distances
+def cv_mahalanobis(X, y, n_splits=10):
+    """
+    Compute cross-validated Mahalanobis distances between conditions for each time point.
+
+    Parameters:
+        X: ndarray of shape (n_trials, n_channels, n_times)
+           Multivariate time-series data.
+        y: ndarray of shape (n_trials,)
+           Condition labels for each trial.
+        n_splits: int
+           Number of cross-validation folds.
+
+    Returns:
+        distances: ndarray of shape (n_times, n_conditions, n_conditions)
+           Cross-validated Mahalanobis distances between conditions at each time point.
+    """
+    import numpy as np
+    from sklearn.model_selection import KFold
+    from scipy.linalg import inv
+    n_trials, n_channels, n_times = X.shape
+    conditions = np.unique(y)
+    n_conditions = len(conditions)
+    
+    # Initialize array to store distances
+    distances = np.zeros((n_times, n_conditions, n_conditions))
+    
+    # Cross-validation
+    kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
+    for time_idx in range(n_times):
+        X_time = X[:, :, time_idx]  # Data at this time point
+        cv_distances = np.zeros((n_conditions, n_conditions, n_splits))
+        
+        for fold_idx, (train_idx, test_idx) in enumerate(kf.split(X)):
+            # Split data into training and testing
+            X_train, X_test = X_time[train_idx], X_time[test_idx]
+            y_train, y_test = y[train_idx], y[test_idx]
+            
+            # Compute the mean and covariance for each condition in training data
+            means = {cond: X_train[y_train == cond].mean(axis=0) for cond in conditions}
+            cov = np.cov(X_train.T) + 1e-5 * np.eye(n_channels)  # Regularize covariance
+            
+            # Precompute covariance inverse
+            cov_inv = inv(cov)
+            
+            # Compute Mahalanobis distances for each pair of conditions
+            for i, cond1 in enumerate(conditions):
+                for j, cond2 in enumerate(conditions):
+                    diff_mean = means[cond1] - means[cond2]
+                    cv_distances[i, j, fold_idx] = np.sqrt(diff_mean.T @ cov_inv @ diff_mean)
+        
+        # Average distances across folds
+        distances[time_idx] = cv_distances.mean(axis=2)
+    
+    return distances
+
+
+
+# Function to compute LOOCV Mahalanobis distances
+def loocv_mahalanobis(X, y):
+    """
+    Compute leave-one-out cross-validated Mahalanobis distances between conditions for each time point.
+
+    Parameters:
+        X: ndarray of shape (n_trials, n_channels, n_times)
+           Multivariate time-series data.
+        y: ndarray of shape (n_trials,)
+           Condition labels for each trial.
+
+    Returns:
+        distances: ndarray of shape (n_times, n_conditions, n_conditions)
+           LOOCV Mahalanobis distances between conditions at each time point.
+    """
+    import numpy as np
+    from scipy.linalg import inv
+    n_trials, n_channels, n_times = X.shape
+    conditions = np.unique(y)
+    n_conditions = len(conditions)
+
+    # Initialize array to store distances
+    distances = np.zeros((n_times, n_conditions, n_conditions))
+
+    for time_idx in range(n_times):
+        X_time = X[:, :, time_idx]  # Data at this time point
+
+        # Initialize temporary storage for distances
+        temp_distances = np.zeros((n_trials, n_conditions, n_conditions))
+
+        for test_idx in range(n_trials):
+            # Split data into training and testing
+            train_idx = np.setdiff1d(np.arange(n_trials), test_idx)
+            X_train, X_test = X_time[train_idx], X_time[test_idx]
+            y_train, y_test = y[train_idx], y[test_idx]
+
+            # Compute the mean and covariance for each condition in the training data
+            means = {cond: X_train[y_train == cond].mean(axis=0) for cond in conditions}
+            cov = np.cov(X_train.T) + 1e-5 * np.eye(n_channels)  # Regularize covariance
+
+            # Precompute covariance inverse
+            cov_inv = inv(cov)
+
+            # Compute Mahalanobis distances for each pair of conditions
+            for i, cond1 in enumerate(conditions):
+                for j, cond2 in enumerate(conditions):
+                    diff_mean = means[cond1] - means[cond2]
+                    temp_distances[test_idx, i, j] = np.sqrt(diff_mean.T @ cov_inv @ diff_mean)
+
+        # Average distances across LOOCV iterations
+        distances[time_idx] = temp_distances.mean(axis=0)
+
+    return distances
+

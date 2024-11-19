@@ -14,6 +14,7 @@ lock = 'button'
 analysis = 'usual'
 analysis = 'pat_high_rdm_high'
 analysis = 'pat_high_rdm_low'
+analysis = 'rdm_high_rdm_low'
 jobs = -1
 
 data_path = DATA_DIR
