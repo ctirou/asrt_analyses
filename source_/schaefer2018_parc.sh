@@ -12,31 +12,44 @@ export FREESURFER_HOME="/Applications/freesurfer/7.3.2"
 export SUBJECTS_DIR="/Users/coum/Desktop/asrt/freesurfer"
 source $FREESURFER_HOME/SetUpFreeSurfer.sh
 
-subject = 'sub01'
+n_parcels=200
+n_networks=7
 
-# In individual surface space
-# Left hemisphere
-mris_ca_label -l $SUBJECTS_DIR/$subject/label/lh.cortex.label \
-  $subject lh $SUBJECTS_DIR/$subject/surf/lh.sphere.reg \
-  <gcs_file_dir>/lh.Schaefer2018_<N>Parcels_<7/17>Networks.gcs \
-  $SUBJECTS_DIR/$subject/label/lh.Schaefer2018_<N>Parcels_<7/17>Networks_order.annot
-# Right hemisphere
-mris_ca_label -l $SUBJECTS_DIR/$subject/label/rh.cortex.label \
-  $subject rh $SUBJECTS_DIR/$subject/surf/rh.sphere.reg \
-  <gcs_file_dir>/rh.Schaefer2018_<N>Parcels_<7/17>Networks.gcs \
-  $SUBJECTS_DIR/$subject/label/rh.Schaefer2018_<N>Parcels_<7/17>Networks_order.annot
-# Visualize (optional)
-freeview -f $SUBJECTS_DIR/<subject_name>/surf/<?h>.inflated:annot=$SUBJECTS_DIR/<subject_name>/label/<?h>.Schaefer2018_<N>Parcels_<7/17>Networks_order.annot
+subjects=("sub01" "sub02" "sub04" "sub07" "sub08" "sub09" "sub10" "sub12" "sub13" "sub14" "sub15")
 
-# In individual volume space
-mri_aparc2aseg --s $subject --o <output>.mgz --annot Schaefer2018_<N>Parcels_<7/17>Networks_order
-# Visualize (optional)
-freeview -v <output>.mgz:colormap=lut:lut=<lookup_table>
+for subject in "${subjects[@]}"; do
+    echo "### Processing $subject... ###"
+  # In individual surface space
+  # Left hemisphere
+  mris_ca_label -l $SUBJECTS_DIR/$subject/label/lh.cortex.label \
+    $subject lh $SUBJECTS_DIR/$subject/surf/lh.sphere.reg \
+    $SUBJECTS_DIR/Schaefer2018/gcs/lh.Schaefer2018_${n_parcels}Parcels_${n_networks}Networks.gcs \
+    $SUBJECTS_DIR/$subject/label/lh.Schaefer2018_${n_parcels}Parcels_${n_networks}Networks.annot
+  # Right hemisphere
+  mris_ca_label -l $SUBJECTS_DIR/$subject/label/rh.cortex.label \
+    $subject rh $SUBJECTS_DIR/$subject/surf/rh.sphere.reg \
+    $SUBJECTS_DIR/Schaefer2018/gcs/rh.Schaefer2018_${n_parcels}Parcels_${n_networks}Networks.gcs \
+    $SUBJECTS_DIR/$subject/label/rh.Schaefer2018_${n_parcels}Parcels_${n_networks}Networks.annot
 
-mris_anatomical_stats <subject_name> lh \
-  -f $SUBJECTS_DIR/<subject_name>/stats/lh.Schaefer2018_<N>Parcels_<7/17>Networks.stats \
-  -b -a $SUBJECTS_DIR/<subject_name>/label/lh.Schaefer2018_<N>Parcels_<7/17>Networks.annot
+  # Visualize (optional)
+  # freeview -f $SUBJECTS_DIR/$subject/surf/lh.inflated:annot=$SUBJECTS_DIR/$subject/label/lh.Schaefer2018_${n_parcels}Parcels_${n_networks}Networks.annot
 
-mris_anatomical_stats <subject_name> rh \
-  -f $SUBJECTS_DIR/<subject_name>/stats/rh.Schaefer2018_<N>Parcels_<7/17>Networks.stats \
-  -b -a $SUBJECTS_DIR/<subject_name>/label/rh.Schaefer2018_<N>Parcels_<7/17>Networks.annot
+  # In individual volume space
+  mri_aparc2aseg --s $subject --o $SUBJECTS_DIR/$subject/mri/Schaefer2018_${n_parcels}Parcels_${n_networks}Networks.mgz --annot Schaefer2018_${n_parcels}Parcels_${n_networks}Networks
+  # Visualize (optional)
+  # freeview -v Schaefer2018_${n_parcels}Parcels_${n_networks}Networks.mgz:colormap=lut:lut=$SUBJECTS_DIR/Schaefer2018/lut/Schaefer2018_${n_parcels}Parcels_${n_networks}Networks_order_LUT.txt
+
+  mris_anatomical_stats \
+    -f $SUBJECTS_DIR/$subject/stats/lh.Schaefer2018_${n_parcels}Parcels_${n_networks}Networks.stats \
+    -b -a $SUBJECTS_DIR/$subject/label/lh.Schaefer2018_${n_parcels}Parcels_${n_networks}Networks.annot \
+    $subject lh
+
+  mris_anatomical_stats \
+    -f $SUBJECTS_DIR/$subject/stats/rh.Schaefer2018_${n_parcels}Parcels_${n_networks}Networks.stats \
+    -b -a $SUBJECTS_DIR/$subject/label/rh.Schaefer2018_${n_parcels}Parcels_${n_networks}Networks.annot \
+    $subject rh
+    
+    echo "### $subject processing completed. ###"
+
+done
+echo "################## All subjects processed. ##################"
