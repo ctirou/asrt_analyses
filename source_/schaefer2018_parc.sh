@@ -12,8 +12,8 @@ export FREESURFER_HOME="/Applications/freesurfer/7.3.2"
 export SUBJECTS_DIR="/Users/coum/Desktop/asrt/freesurfer"
 source $FREESURFER_HOME/SetUpFreeSurfer.sh
 
-n_parcels=200
-n_networks=7
+n_parcels=1000
+n_networks=17
 
 subjects=("sub01" "sub02" "sub04" "sub07" "sub08" "sub09" "sub10" "sub12" "sub13" "sub14" "sub15")
 

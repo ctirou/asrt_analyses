@@ -12,8 +12,8 @@ from config import *
 lock = 'button'
 analysis = 'usual'
 analysis = 'pat_high_rdm_high'
-analysis = 'pat_high_rdm_low'
-analysis = 'rdm_high_rdm_low'
+# analysis = 'pat_high_rdm_low'
+# analysis = 'rdm_high_rdm_low'
 
 analyses = ['usual', 'pat_high_rdm_high', 'pat_high_rdm_low', 'rdm_high_rdm_low']
 
@@ -194,3 +194,27 @@ for analysis in analyses:
     plt.legend()
     plt.savefig(op.join(figures_dir, 'low_high_within_sub_corr.pdf'), transparent=True)
     plt.close()
+
+# Get time points average
+idx = np.where((times >= 0.03) & (times <= 0.5))[0]
+diff = diff_learn - diff_prac
+diff = np.mean(diff[:, idx], axis=1)
+
+mean_diff = np.mean(diff)
+
+mean_learn_idx = np.mean(learn_index_df, axis=0)
+
+# Compute Spearman correlation with updated `diff`
+all_rhos = []
+for sub in tqdm(range(len(subjects))):
+    # Correlation between learning index and mean diff for the subject
+    rhos = spearmanr(learn_index_df.iloc[sub, :], diff[sub, :])[0]
+    all_rhos.append(rhos)
+
+all_rhos = np.array(all_rhos)
+
+# Optionally calculate the mean rho across subjects
+mean_rho = np.mean(all_rhos)
+
+# Print or visualize results
+print(f"Mean Spearman correlation across subjects: {mean_rho}")
