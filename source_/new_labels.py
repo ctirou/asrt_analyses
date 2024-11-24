@@ -3,6 +3,8 @@ import os.path as op
 import mne
 from base import ensure_dir
 from config import *
+from mne import get_volume_labels_from_aseg
+
 
 overwrite = False
 verbose = True
@@ -42,7 +44,7 @@ for subject in subjects:
         vol_src = mne.read_source_spaces(vol_src_fname, verbose=verbose)    
         aseg_labels.extend(mne.get_volume_labels_from_src(vol_src, subject, subjects_dir))
 
-    # Combine cortical and subcortical labels
+    # Combine cortical and subcortical labels 
     labels = cx_labels + aseg_labels
     
     # Iterate over region groups
@@ -69,3 +71,14 @@ for subject in subjects:
             else:
                 # If it's a single hemisphere label, save it directly
                 big_label.save(res_path / subject / f'{label_list_name}.label')
+                
+subjects_dir = FREESURFER_DIR
+subject = 'sub01'
+parc = 'Schaefer2018_100Parcels_7Networks'
+hemi = 'lh'
+# Get all cortical labels    
+cx_labels = mne.read_labels_from_annot(subject=subject, parc=parc, hemi=hemi, subjects_dir=subjects_dir, sort=True, verbose=verbose)
+
+aseg_fname = subjects_dir / subject / "mri" / f"{parc}.mgz"
+aseg_fname = subjects_dir / subject / "mri" / f"BN_Atlas_subcotex_aseg.mgz"
+labels_aseg = get_volume_labels_from_aseg(aseg_fname, return_colors=True)

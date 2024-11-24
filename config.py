@@ -13,7 +13,7 @@ if os.getenv("MB_ENV") is not None:
     DATA_DIR = Path('/Volumes/Ultra_Touch/asrt/preprocessed')
     RAW_DATA_DIR = Path('/Volumes/Ultra_Touch/asrt/raws')
     RESULTS_DIR = Path('/Volumes/Ultra_Touch/asrt/results')
-    FREESURFER_DIR = Path('/Users/coum/Desktop/asrt/freesurfer')
+    FREESURFER_DIR = Path('/Volumes/Ultra_Touch/asrt/freesurfer')
     TIMEG_DATA_DIR = Path('/Volumes/Ultra_Touch/pred_asrt')
 elif os.getenv("CLUSTER_ENV") is not None:
     RAW_DATA_DIR = Path('/sps/crnl/Romain/ASRT_MEG/data/raws')
