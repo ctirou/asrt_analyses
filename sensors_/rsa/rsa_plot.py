@@ -189,8 +189,14 @@ for analysis in analyses:
     rev_high = all_highs[:, :, 1:, :].mean((1, 2)) - all_highs[:, :, 0, :].mean(axis=1)
     rev_low = all_lows[:, :, 1:, :].mean((1, 2)) - all_lows[:, :, 0, :].mean(axis=1)
     diff = rev_low - rev_high
-    plt.subplots(1, 1, figsize=(14, 5))
+    plt.subplots(1, 1, figsize=(16, 11))
     plt.plot(times,  diff.mean(0), label='(low_post - low_pre) - (high_post - high_pre)', color='C1', alpha=0.6)
+    plt.plot(times, rev_high.mean(0), label='high_post - high_pre', alpha=0.6)
+    plt.plot(times, rev_low.mean(0), label='low_post - low_pre', alpha=0.6)
+    plt.plot(times, all_highs[:, :, 1:, :].mean((0, 1, 2)), label='high_post')
+    plt.plot(times, all_highs[:, :, 0, :].mean((0, 1)), label='high_pre')
+    plt.plot(times, all_lows[:, :, 1:, :].mean((0, 1, 2)), label='low_post')
+    plt.plot(times, all_lows[:, :, 0, :].mean((0, 1)), label='low_pre')
     p_values_unc = ttest_1samp(diff,  axis=0, popmean=0)[1]
     sig_unc = p_values_unc < 0.05
     p_values = decod_stats(diff, -1)
@@ -212,8 +218,14 @@ for analysis in analyses:
         rev_high = all_highs[:, :, i, :].mean(1) - all_highs[:, :, 0, :].mean(axis=1)
         rev_low = all_lows[:, :, i, :].mean(1) - all_lows[:, :, 0, :].mean(axis=1)
         diff = rev_low - rev_high
-        plt.subplots(1, 1, figsize=(14, 5))
+        plt.subplots(1, 1, figsize=(16, 11))
         plt.plot(times,  diff.mean(0), label='(low_post - low_pre) - (high_post - high_pre)', color='C1', alpha=0.6)
+        plt.plot(times, rev_high.mean(0), label='high_post - high_pre', alpha=0.6)
+        plt.plot(times, rev_low.mean(0), label='low_post - low_pre', alpha=0.6)
+        plt.plot(times, all_highs[:, :, i, :].mean((0, 1)), label='high_post')
+        plt.plot(times, all_highs[:, :, 0, :].mean((0, 1)), label='high_pre')
+        plt.plot(times, all_lows[:, :, i, :].mean((0, 1)), label='low_post')
+        plt.plot(times, all_lows[:, :, 0, :].mean((0, 1)), label='low_pre')
         p_values_unc = ttest_1samp(diff,  axis=0, popmean=0)[1]
         sig_unc = p_values_unc < 0.05
         p_values = decod_stats(diff, -1)

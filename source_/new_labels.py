@@ -71,14 +71,11 @@ for subject in subjects:
             else:
                 # If it's a single hemisphere label, save it directly
                 big_label.save(res_path / subject / f'{label_list_name}.label')
-                
-subjects_dir = FREESURFER_DIR
-subject = 'sub01'
-parc = 'Schaefer2018_100Parcels_7Networks'
-hemi = 'lh'
-# Get all cortical labels    
-cx_labels = mne.read_labels_from_annot(subject=subject, parc=parc, hemi=hemi, subjects_dir=subjects_dir, sort=True, verbose=verbose)
 
-aseg_fname = subjects_dir / subject / "mri" / f"{parc}.mgz"
-aseg_fname = subjects_dir / subject / "mri" / f"BN_Atlas_subcotex_aseg.mgz"
-labels_aseg = get_volume_labels_from_aseg(aseg_fname, return_colors=True)
+subject = subjects[0]
+big_label = 'frontal_lobe'
+
+from mne import read_label
+label_names = ['cortex_regions', 'frontal_lobe', 'parietal_lobe', 'occipital_lobe', 'temporal_lobe', 'cerebellum', 'left_hemisphere', 'right_hemisphere']
+
+stcs = mne.extract_label_time_course(stc, labels, src, mode='mean', return_generator=False)
