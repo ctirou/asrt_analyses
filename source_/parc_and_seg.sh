@@ -1,22 +1,20 @@
 ### PARCELLATION
-cd /Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt/mri_data
+cd /Users/coum/Desktop/asrt/mri_data
 export FREESURFER_HOME="/Applications/freesurfer/7.3.2"
-export SUBJECTS_DIR=/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt/freesurfer
+export SUBJECTS_DIR="/Users/coum/Desktop/asrt/freesurfer"
 source $FREESURFER_HOME/SetUpFreeSurfer.sh
 
 ls *.nii | parallel jobs 15 recon-all -s {.} -i {} -all -qcache
 
 ### SEGMENTATION -- BRAINNETOME ATLAS --
-cd /Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt/freesurfer
+cd /Users/coum/Desktop/asrt/freesurfer
 export FREESURFER_HOME="/Applications/freesurfer/7.3.2"
-export SUBJECTS_DIR=/Users/coum/Library/CloudStorage/OneDrive-etu.univ-lyon1.fr/asrt/freesurfer
+export SUBJECTS_DIR="/Users/coum/Desktop/asrt/freesurfer"
 source $FREESURFER_HOME/SetUpFreeSurfer.sh
-
 Subject="sub01"
-
 subjects=("sub01" "sub02" "sub04" "sub07" "sub08" "sub09" "sub10" "sub12" "sub13" "sub14" "sub15")
 for Subject in "${subjects[@]}"; do
-    echo "################## Processing $Subject... ##################"
+    echo "# Processing $Subject... #"
     ## mapping BN_atlas cortex to subjects
     mris_ca_label -l $SUBJECTS_DIR/$Subject/label/lh.cortex.label $Subject lh $SUBJECTS_DIR/$Subject/surf/lh.sphere.reg $SUBJECTS_DIR/lh.BN_Atlas.gcs $SUBJECTS_DIR/$Subject/label/lh.BN_Atlas.annot
     mris_ca_label -l $SUBJECTS_DIR/$Subject/label/rh.cortex.label $Subject rh $SUBJECTS_DIR/$Subject/surf/rh.sphere.reg $SUBJECTS_DIR/rh.BN_Atlas.gcs $SUBJECTS_DIR/$Subject/label/rh.BN_Atlas.annot
@@ -61,9 +59,9 @@ for Subject in "${subjects[@]}"; do
     wb_command -add-to-spec-file ./$Subject.native.wb.spec CORTEX_RIGHT ./$Subject.R.BN_Atlas.native.label.gii
 
     ### mapping BN_atlas subcortex to subjects 
-    mri_ca_label $SUBJECTS_DIR/$Subject/mri/brain.mgz $SUBJECTS_DIR/$Subject/mri/transforms/talairach.m3z $SUBJECTS_DIR/BN_Atlas_subcortex.gca $SUBJECTS_DIR/$Subject/mri/BN_Atlas_subcortex_aseg.mgz
+    mri_ca_label $SUBJECTS_DIR/$Subject/mri/brain.mgz $SUBJECTS_DIR/$Subject/mri/transforms/talairach.m3z $SUBJECTS_DIR/BN_Atlas_subcortex.gca $SUBJECTS_DIR/$Subject/mri/BN_Atlas.mgz
     ### Segmentation stats
-    mri_segstats --seg $SUBJECTS_DIR/$Subject/mri/BN_Atlas_subcortex_aseg.mgz --ctab $SUBJECTS_DIR/BN_Atlas_246_LUT.txt --excludeid 0 --sum $SUBJECTS_DIR/$Subject/stats/BN_Atlas_subcortex_aseg.stats
-    echo "################## $Subject processing completed. ##################"
+    mri_segstats --seg $SUBJECTS_DIR/$Subject/mri/BN_Atlas.mgz --ctab $SUBJECTS_DIR/BN_Atlas_246_LUT.txt --excludeid 0 --sum $SUBJECTS_DIR/$Subject/stats/BN_Atlas.stats
+    echo "# $Subject processing completed. #"
 done
 echo "################## All subjects processed. ##################"
