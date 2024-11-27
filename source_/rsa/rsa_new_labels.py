@@ -16,7 +16,7 @@ data_path = DATA_DIR
 subjects_dir = FREESURFER_DIR
 parc = 'aparc'
 hemi = 'both'
-verbose = True
+verbose = 'error'
 overwrite = True
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
@@ -31,6 +31,9 @@ def process_subject(subject, lock, jobs, rsync):
     src_fname = RESULTS_DIR / "src" / f"{subject}-src.fif"
     src = mne.read_source_spaces(src_fname, verbose=verbose)
     bem_fname = RESULTS_DIR / "bem" / f"{subject}-bem-sol.fif"    
+    
+    res_path = RESULTS_DIR / f'networks_{n_parcels}_{n_networks}' / subject
+    ensure_dir(res_path)
     
     for epoch_num in [0, 1, 2, 3, 4]:
         
@@ -74,29 +77,41 @@ def process_subject(subject, lock, jobs, rsync):
         gc.collect()
 
         for inetwork, network in enumerate(networks):
+            
+            print("Processing", subject, epoch_num, network)
+            
             # parc = f'aparc.{network}' if network not in networks[-n_networks:] else f"Shaefer2018_{str(n_parcels)}_{str(n_networks)}.{network}"
             # parc = f"Shaefer2018_{str(n_parcels)}_{str(n_networks)}.{network}"
             hemi = 'lh' if 'left' in network else 'rh' if 'right' in network else 'both'
             # labels = mne.read_labels_from_annot(subject=subject, parc=parc, hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
             parc = f"Schaefer2018_{n_parcels}Parcels_{n_networks}Networks"
             labels = mne.read_labels_from_annot(subject=subject, parc=parc, hemi=hemi, subjects_dir=subjects_dir, regexp=network, verbose=verbose, sort=True)        
-                
-            # loop across labels
-            for ilabel, label in enumerate(labels):
-                print(f"{str(ilabel+1).zfill(2)}/{len(labels)}", subject, epoch_num, label.name)
-                res_path = RESULTS_DIR / analysis / 'source' / label.name / lock / 'rdm' / subject
-                # get stcs in label
-                stcs_data = [stc.in_label(label).data for stc in stcs]
-                stcs_data = np.array(stcs_data)
-                assert len(stcs_data) == len(behav)
+            
+            lh_label = mne.read_label(res_path / f'{network}-lh.label')
+            rh_label = mne.read_label(res_path / f'{network}-rh.label')
+            
+            stcs_data = [stc.in_label(lh_label + rh_label).data for stc in stcs]
+            stcs_data = np.array(stcs_data)
+            
+            # all_labels = []    
+            # # loop across labels
+            # for ilabel, label in enumerate(labels):
+            #     print(f"{str(ilabel+1).zfill(2)}/{len(labels)}", subject, epoch_num, label.name)
+                # res_path = RESULTS_DIR / analysis / 'source' / label.name / lock / 'rdm' / subject
+            #     # get stcs in label
+            #     stcs_data = [stc.in_label(label).data for stc in stcs]
+            #     stcs_data = np.array(stcs_data)
+            #     all_labels.append(stcs_data)
+            #     # assert len(stcs_data) == len(behav)
+            # all_labels = np.array(all_labels)
 
             if not op.exists(res_path / f"pat-{epoch_num}.npy") or not op.exists(res_path / f"rand-{epoch_num}.npy") or overwrite:
-                ensure_dir(res_path)
+                # ensure_dir(res_path)
 
-                # get stcs in label
-                stcs_data = [stc.in_label(label).data for stc in stcs]
-                stcs_data = np.array(stcs_data)
-                assert len(stcs_data) == len(behav)
+                # # get stcs in label
+                # stcs_data = [stc.in_label(label).data for stc in stcs]
+                # stcs_data = np.array(stcs_data)
+                # assert len(stcs_data) == len(behav)
 
                 pattern = behav.trialtypes == 1
                 X_pat = stcs_data[pattern]
