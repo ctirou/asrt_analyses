@@ -1,13 +1,11 @@
-import os
 import os.path as op
 import mne
-from base import ensure_dir
+from base import ensure_dir, remove_common_vertex
 from config import *
-from mne import get_volume_labels_from_aseg
-
+import pandas as pd
 
 overwrite = False
-verbose = True
+verbose = 'error'
 jobs = -1
 
 subjects = SUBJS
@@ -30,6 +28,8 @@ new_labels_names = ['cortex_regions', 'subcortex_regions',
                     'corpus_callosum', 
                     'left_hemisphere', 'right_hemisphere']
 
+save_label = False
+
 for subject in subjects:
     ensure_dir(res_path / subject)
     
@@ -49,29 +49,74 @@ for subject in subjects:
     
     # Iterate over region groups
     for i, (label_list, label_list_name) in enumerate(zip(new_labels, new_labels_names)):
+        print(f"### Processing {subject} - {label_list_name} ###")
         
         # Filter the labels based on the current list
         filtered_labels = [label for label in labels if label.name in label_list and label.name not in BAD_VOLUME_LABELS]
         
         if filtered_labels:
-            # Start with the first label and sum the remaining to create a combined label
-            big_label = filtered_labels[0]
-            for label in filtered_labels[1:]:
-                big_label += label
+            if save_label:
+                # Start with the first label and sum the remaining to create a combined label
+                big_label = filtered_labels[0]
+                for label in filtered_labels[1:]:
+                    big_label += label
+                # If it's a BiHemiLabel (both hemispheres), save left and right separately
+                if isinstance(big_label, mne.BiHemiLabel):
+                    # Save left hemisphere
+                    if big_label.lh is not None:
+                        big_label.lh.save(res_path / subject / f'{label_list_name}-lh.label')
+                    # Save right hemisphere
+                    if big_label.rh is not None:
+                        big_label.rh.save(res_path / subject / f'{label_list_name}-rh.label')
+                else:
+                    big_label.save(res_path / subject / f'{label_list_name}.label')
+                    # If it's a single hemisphere label, save it directly
             
-            # If it's a BiHemiLabel (both hemispheres), save left and right separately
-            if isinstance(big_label, mne.BiHemiLabel):
-                # Save left hemisphere
-                if big_label.lh is not None:
-                    big_label.lh.save(res_path / subject / f'{label_list_name}-lh.label')
-                
-                # Save right hemisphere
-                if big_label.rh is not None:
-                    big_label.rh.save(res_path / subject / f'{label_list_name}-rh.label')
-            else:
-                # If it's a single hemisphere label, save it directly
-                big_label.save(res_path / subject / f'{label_list_name}.label')
+            # Remove common vertices for each combination of filtered_labels
+            corrected_labels = []
+            for i, label1 in enumerate(filtered_labels):
+                for label2 in filtered_labels[i+1:]:
+                    # if label2.name[0].isupper(): # subcortical labels have their names starting with uppercase
+                    label2 = remove_common_vertex(label1, label2)
+                    print(f"Removed common vertices between {label1.name} and {label2.name}")
+                corrected_labels.append(label1)
+            
+            # Update filtered_labels with corrected_labels
+            filtered_labels = corrected_labels
+            
+            # label_list_name = 'frontal_lobe'
+            parc = "aparc." + label_list_name
+            hemi = 'lh' if 'left' in label_list_name else 'rh' if 'right' in label_list_name else 'both'
+            mne.write_labels_to_annot(labels=filtered_labels, subject=subject, parc=parc, overwrite=True, subjects_dir=subjects_dir, hemi=hemi, sort=True, verbose=verbose)
+            
+            # read_labels = mne.read_labels_from_annot(subject=subject, parc=parc, hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
 
+cuneus_lh = labels[6]
+hpc_lh = labels[76]
+# Check intersection
+intersection = set(cuneus_lh.vertices).intersection(hpc_lh.vertices)
+print(f"Intersection between cuneus_lh and hippocampus_lh: {intersection}")
+# Remove intersection vertices from hpc_lh
+
+new_hpc_lh = remove_common_vertex(cuneus_lh, hpc_lh)
+
+for subject in subjects:    
+    
+    n_networks = "17"
+    n_parcels = "200"
+    parc = f"Schaefer2018_{n_parcels}Parcels_{n_networks}Networks"
+    hemi = "both"
+    network_names = schaefer_7 if n_networks == "7" else schaefer_17    
+    for i, network in enumerate(network_names):
+        
+        labels = mne.read_labels_from_annot(subject=subject, parc=parc, hemi=hemi, subjects_dir=subjects_dir, regexp=network, verbose=verbose)
+        
+        print(f"Processing {subject} - {network} - {len(labels)}")
+        
+        parc_fname = f"Shaefer2018_{n_parcels}_{n_networks}.{network}"
+        mne.write_labels_to_annot(labels=labels, subject=subject, parc=parc_fname, subjects_dir=subjects_dir, hemi=hemi, sort=True, overwrite=True, verbose=verbose)
+        
+        
 # Get aseg labels
 subject = "sub01"
 mgz_fname = op.join(FREESURFER_DIR, subject, 'mri', 'BN_Atlas.mgz')

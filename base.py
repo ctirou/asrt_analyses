@@ -689,3 +689,24 @@ def loocv_mahalanobis(X, y):
 
     return distances
 
+def remove_common_vertex(base_label, target_label):
+    """Remove common vertices between two labels"""
+    import numpy as np
+    from mne import Label
+    
+    base_vertices = base_label.vertices
+    target_vertices = target_label.vertices
+    
+    intersection = set(base_vertices).intersection(target_vertices)
+    
+    corrected_vertices = np.setdiff1d(target_vertices, list(intersection))
+    intersection_indices = [np.where(target_vertices == v)[0][0] for v in intersection]
+    corrected_pos = np.delete(target_label.pos, intersection_indices, axis=0)
+    corrected_label = Label(vertices=corrected_vertices, 
+                  pos=corrected_pos, 
+                  hemi=target_label.hemi, 
+                  name=target_label.name, 
+                  color=target_label.color, 
+                  subject=target_label.subject)
+    
+    return corrected_label
