@@ -135,22 +135,22 @@ cortex_regions = ['bankssts-lh', 'bankssts-rh', 'caudalanteriorcingulate-lh', 'c
                   'supramarginal-rh', 'temporalpole-lh', 'temporalpole-rh', 'transversetemporal-lh', 
                   'transversetemporal-rh']
 
-subcortex_regions = ['Left-Cerebral-White-Matter', 'Left-Cerebral-Cortex', 'Left-Lateral-Ventricle', 
-                     'Left-Inf-Lat-Vent', 'Left-Cerebellum-White-Matter', 'Left-Cerebellum-Cortex', 
-                     'Left-Thalamus-Proper', 'Left-Caudate', 'Left-Putamen', 'Left-Pallidum', '4th-Ventricle',
-                     'Brain-Stem', 'Left-Hippocampus', 'Left-Amygdala', 'CSF', 'Left-Accumbens-area', 
-                     'Left-VentralDC', 'Left-vessel', 'Left-choroid-plexus', 'Right-Cerebral-White-Matter',
-                     'Right-Cerebral-Cortex', 'Right-Lateral-Ventricle', 'Right-Inf-Lat-Vent', 
-                     'Right-Cerebellum-White-Matter', 'Right-Cerebellum-Cortex', 'Right-Thalamus-Proper', 
-                     'Right-Caudate', 'Right-Putamen', 'Right-Pallidum', 'Right-Hippocampus', 'Right-Amygdala',
-                     'Right-Accumbens-area', 'Right-VentralDC', 'Right-vessel', 'Right-choroid-plexus',
+subcortex_regions = ['Cerebral-White-Matter-lh', 'Cerebral-Cortex-lh', 'Lateral-Ventricle-lh', 
+                     'Inf-Lat-Vent-lh', 'Cerebellum-White-Matter-lh', 'Cerebellum-Cortex-lh', 
+                     'Thalamus-Proper-lh', 'Caudate-lh', 'Putamen-lh', 'Pallidum-lh', '4th-Ventricle',
+                     'Brain-Stem', 'Hippocampus-lh', 'Amygdala-lh', 'CSF', 'Accumbens-area-lh', 
+                     'VentralDC-lh', 'vessel-lh', 'choroid-plexus-lh', 'Cerebral-White-Matter-rh',
+                     'Cerebral-Cortex-rh', 'Lateral-Ventricle-rh', 'Inf-Lat-Vent-rh', 
+                     'Cerebellum-White-Matter-rh', 'Cerebellum-Cortex-rh', 'Thalamus-Proper-rh', 
+                     'Caudate-rh', 'Putamen-rh', 'Pallidum-rh', 'Hippocampus-rh', 'Amygdala-rh',
+                     'Accumbens-area-rh', 'VentralDC-rh', 'vessel-rh', 'choroid-plexus-rh',
                      'WM-hypointensities', 'CC_Posterior', 'CC_Mid_Posterior', 'CC_Central', 'CC_Mid_Anterior', 
                      'CC_Anterior']
 
 frontal_lobe = ['caudalmiddlefrontal-lh', 'frontalpole-lh', 'medialorbitofrontal-lh', 'rostralmiddlefrontal-lh',
-                'superiorfrontal-lh', 'Left-Caudate', 'Left-Putamen', 'Left-Accumbens-area', 'Left-Thalamus-Proper',
+                'superiorfrontal-lh', 'Caudate-lh', 'Putamen-lh', 'Accumbens-area-lh', 'Thalamus-Proper-lh',
                 'caudalmiddlefrontal-rh', 'frontalpole-rh', 'medialorbitofrontal-rh', 'rostralmiddlefrontal-rh', 
-                'superiorfrontal-rh', 'Right-Caudate', 'Right-Putamen', 'Right-Accumbens-area', 'Right-Thalamus-Proper']
+                'superiorfrontal-rh', 'Caudate-rh', 'Putamen-rh', 'Accumbens-area-rh', 'Thalamus-Proper-rh']
 
 parietal_lobe = ['inferiorparietal-lh', 'postcentral-lh', 'supramarginal-lh', 'paracentral-lh',
                  'inferiorparietal-rh', 'postcentral-rh', 'supramarginal-rh', 'paracentral-rh']
@@ -160,17 +160,17 @@ occipital_lobe = ['cuneus-lh', 'lateraloccipital-lh', 'lingual-lh', 'pericalcari
 
 temporal_lobe = ['entorhinal-lh', 'fusiform-lh', 'inferiortemporal-lh', 'middletemporal-lh',
                  'parahippocampal-lh', 'superiortemporal-lh', 'temporalpole-lh', 'transversetemporal-lh',
-                 'Left-Hippocampus', 'Left-Amygdala', 
+                 'Hippocampus-lh', 'Amygdala-lh', 
                  'entorhinal-rh', 'fusiform-rh', 'inferiortemporal-rh', 'middletemporal-rh',
                  'parahippocampal-rh', 'superiortemporal-rh', 'temporalpole-rh', 'transversetemporal-rh',
-                 'Right-Hippocampus', 'Right-Amygdala']
+                 'Hippocampus-rh', 'Amygdala-rh']
 
-cerebellum = ['Left-Cerebellum-White-Matter', 'Left-Cerebellum-Cortex', 
-              'Right-Cerebellum-White-Matter', 'Right-Cerebellum-Cortex']
+cerebellum = ['Cerebellum-White-Matter-lh', 'Cerebellum-Cortex-lh', 
+              'Cerebellum-White-Matter-rh', 'Cerebellum-Cortex-rh']
 
-ventricular_and_brainstem = ['Left-Lateral-Ventricle', 'Left-Inf-Lat-Vent', 'Right-Lateral-Ventricle', 
-                             'Right-Inf-Lat-Vent', '4th-Ventricle', 'CSF', 'Left-choroid-plexus', 
-                             'Right-choroid-plexus', 'Brain-Stem', 'Left-vessel', 'Right-vessel', 
+ventricular_and_brainstem = ['Lateral-Ventricle-lh', 'Inf-Lat-Vent-lh', 'Lateral-Ventricle-rh', 
+                             'Inf-Lat-Vent-rh', '4th-Ventricle', 'CSF', 'choroid-plexus-lh', 
+                             'choroid-plexus-rh', 'Brain-Stem', 'vessel-lh', 'vessel-rh', 
                              'WM-hypointensities']
 
 corpus_callosum = ['CC_Anterior', 'CC_Mid_Anterior', 'CC_Central', 'CC_Mid_Posterior', 'CC_Posterior']
@@ -182,11 +182,11 @@ left_hemisphere = ['bankssts-lh', 'caudalanteriorcingulate-lh', 'caudalmiddlefro
                    'parsopercularis-lh', 'parsorbitalis-lh', 'parstriangularis-lh', 'pericalcarine-lh', 'postcentral-lh',
                    'posteriorcingulate-lh', 'precentral-lh', 'precuneus-lh', 'rostralanteriorcingulate-lh',
                    'rostralmiddlefrontal-lh', 'superiorfrontal-lh', 'superiorparietal-lh', 'superiortemporal-lh',
-                   'supramarginal-lh', 'temporalpole-lh', 'transversetemporal-lh', 'Left-Cerebral-White-Matter',
-                   'Left-Cerebral-Cortex', 'Left-Lateral-Ventricle', 'Left-Inf-Lat-Vent', 'Left-Cerebellum-White-Matter',
-                   'Left-Cerebellum-Cortex', 'Left-Thalamus-Proper', 'Left-Caudate', 'Left-Putamen', 'Left-Pallidum',
-                   'Left-Hippocampus', 'Left-Amygdala', 'Left-Accumbens-area', 'Left-VentralDC', 'Left-vessel',
-                   'Left-choroid-plexus']
+                   'supramarginal-lh', 'temporalpole-lh', 'transversetemporal-lh', 'Cerebral-White-Matter-lh',
+                   'Cerebral-Cortex-lh', 'Lateral-Ventricle-lh', 'Inf-Lat-Vent-lh', 'Cerebellum-White-Matter-lh',
+                   'Cerebellum-Cortex-lh', 'Thalamus-Proper-lh', 'Caudate-lh', 'Putamen-lh', 'Pallidum-lh',
+                   'Hippocampus-lh', 'Amygdala-lh', 'Accumbens-area-lh', 'VentralDC-lh', 'vessel-lh',
+                   'choroid-plexus-lh']
 
 right_hemisphere = ['bankssts-rh', 'caudalanteriorcingulate-rh', 'caudalmiddlefrontal-rh', 'cuneus-rh',
                     'entorhinal-rh', 'frontalpole-rh', 'fusiform-rh', 'inferiorparietal-rh', 'inferiortemporal-rh',
@@ -195,11 +195,11 @@ right_hemisphere = ['bankssts-rh', 'caudalanteriorcingulate-rh', 'caudalmiddlefr
                     'parsopercularis-rh', 'parsorbitalis-rh', 'parstriangularis-rh', 'pericalcarine-rh', 'postcentral-rh',
                     'posteriorcingulate-rh', 'precentral-rh', 'precuneus-rh', 'rostralanteriorcingulate-rh',
                     'rostralmiddlefrontal-rh', 'superiorfrontal-rh', 'superiorparietal-rh', 'superiortemporal-rh',
-                    'supramarginal-rh', 'temporalpole-rh', 'transversetemporal-rh', 'Right-Cerebral-White-Matter',
-                    'Right-Cerebral-Cortex', 'Right-Lateral-Ventricle', 'Right-Inf-Lat-Vent', 'Right-Cerebellum-White-Matter',
-                    'Right-Cerebellum-Cortex', 'Right-Thalamus-Proper', 'Right-Caudate', 'Right-Putamen', 'Right-Pallidum',
-                    'Right-Hippocampus', 'Right-Amygdala', 'Right-Accumbens-area', 'Right-VentralDC', 'Right-vessel',
-                    'Right-choroid-plexus']
+                    'supramarginal-rh', 'temporalpole-rh', 'transversetemporal-rh', 'Cerebral-White-Matter-rh',
+                    'Cerebral-Cortex-rh', 'Lateral-Ventricle-rh', 'Inf-Lat-Vent-rh', 'Cerebellum-White-Matter-rh',
+                    'Cerebellum-Cortex-rh', 'Thalamus-Proper-rh', 'Caudate-rh', 'Putamen-rh', 'Pallidum-rh',
+                    'Hippocampus-rh', 'Amygdala-rh', 'Accumbens-area-rh', 'VentralDC-rh', 'vessel-rh',
+                    'choroid-plexus-rh']
 
 NEW_LABELS = ['corpus_callosum',
               'cortex_regions', 
@@ -211,3 +211,19 @@ NEW_LABELS = ['corpus_callosum',
               'subcortex_regions',
               'temporal_lobe',
               'ventricular_and_brainstem']
+
+NEW_LABELS2 = ['corpus_callosum',
+              'cortex_regions', 
+              'frontal_lobe',
+              'left_hemisphere',
+              'occipital_lobe',
+              'parietal_lobe',
+              'right_hemisphere',
+              'subcortex_regions',
+              'temporal_lobe',
+              'ventricular_and_brainstem']
+
+schaefer_7 = ['Vis', 'SomMot', 'DorsAttn', 'SalVentAttn', 'Limbic', 'Cont', 'Default']
+
+schaefer_17 = ['VisCent', 'VisPeri', 'SomMotA', 'SomMotB', 'DorsAttnA', 'DorsAttnB', 'SalVentAttnA', 'SalVentAttnB',
+               'LimbicA', 'LimbicB', 'ContA', 'ContB', 'ContC', 'DefaultA', 'DefaultB', 'DefaultC', 'TempPar']
