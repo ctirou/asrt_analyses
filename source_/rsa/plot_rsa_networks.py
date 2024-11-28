@@ -11,7 +11,7 @@ from tqdm.auto import tqdm
 from matplotlib.ticker import FuncFormatter
 
 lock = 'stim'
-analysis = 'usual'
+# analysis = 'usual'
 analysis = 'pat_high_rdm_high'
 # analysis = 'pat_high_rdm_low'
 # analysis = 'rdm_high_rdm_low'
@@ -19,7 +19,7 @@ jobs = -1
 
 data_path = DATA_DIR
 subjects, epochs_list = SUBJS, EPOCHS
-figures_dir = FIGURES_DIR / "RSA" / "source" / lock / analysis
+figures_dir = FIGURES_DIR / "RSA" / "source" / lock / analysis / "networks"
 ensure_dir(figures_dir)
 metric = 'mahalanobis'
 
@@ -81,7 +81,7 @@ color3 = "C7"
 color1 = "#008080"
 color2 = "#FFA500"
 # plot in out and diff
-fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(20, 13))
+fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(15, 5))
 fig.suptitle(f"high and low {lock} {analysis}", style='italic')
 for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
     ax.plot(times, rsa_high[label].mean((0, 1)), label='high', color=color2, alpha=1)
@@ -97,7 +97,7 @@ plt.savefig(op.join(figures_dir, 'low_high.pdf'), transparent=True)
 plt.close()
 
 # plot rsa
-fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(20, 13))
+fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(15, 5))
 fig.suptitle(f'{metric} low - high average {lock} {analysis}', style='italic')
 for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
     practice = rsa[label][:, 0, :].mean(0).astype(np.float64)
@@ -120,16 +120,16 @@ for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
     diff = rsa[label][:, 1:, :].mean((1)) - rsa[label][:, 0, :]
     p_values_unc = ttest_1samp(diff.astype(np.float64), axis=0, popmean=0)[1]
     sig_unc = p_values_unc < 0.05
-    ax.fill_between(times, 0, learning, where=sig_unc, color='C2', alpha=0.2)
+    ax.fill_between(times, 0, learning, where=sig_unc, color=color1, alpha=0.2)
     p_values = decod_stats(diff, jobs)
     sig = p_values < 0.05
-    ax.fill_between(times, 0, learning, where=sig, color='black', alpha=0.3)
+    ax.fill_between(times, 0, learning, where=sig, color=color2, alpha=0.3)
 plt.savefig(op.join(figures_dir, 'low_high_ave.pdf'))
 plt.close()
 
 # plot the difference in vs. out sequence for each epoch
 for k in range(1, 5):
-    fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(20, 13))
+    fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(15, 5))
     fig.suptitle(f'{metric} low - high session {k} {lock} {analysis}', style='italic')
     for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
         ax.plot(times, rsa[label][:, 0, :].mean(0), label='practice', color='C7', alpha=0.6)
@@ -154,7 +154,7 @@ for k in range(1, 5):
     plt.close()
 
 # plot correlations
-fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(20, 13))
+fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(15, 5))
 fig.suptitle(f"{metric} correlations {lock} {analysis}", style='italic')
 for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
     diff = rsa_low[label] - rsa_high[label]
@@ -180,7 +180,7 @@ plt.close()
 
 learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices.csv', sep="\t", index_col=0)
 # plot across subjects
-fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(20, 13))
+fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(15, 5))
 fig.suptitle(f'{metric} across subjects corr {lock} {analysis}', style='italic')
 for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
     all_pvalues, all_rhos = [], []
@@ -201,7 +201,7 @@ plt.savefig(op.join(figures_dir, 'low_high_across_sub_corr.pdf'), transparent=Tr
 plt.close()
 
 # plot within subjects
-fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(20, 13))
+fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(15, 5))
 fig.suptitle(f'{metric} within subjects corr {lock} {analysis}', style='italic')
 for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
     diff = rsa_low[label] - rsa_high[label]
