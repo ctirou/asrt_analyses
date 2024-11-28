@@ -82,7 +82,7 @@ def get_rdm(epoch, behav):
     from scipy.spatial.distance import pdist, squareform
     import scipy.stats
     import statsmodels.api as sm
-    from tqdm.auto import tqdm
+    # from tqdm.auto import tqdm
     from sklearn.covariance import LedoitWolf
     import pandas as pd
     # Prepare the design matrix                        
@@ -106,7 +106,8 @@ def get_rdm(epoch, behav):
 
     coefs = np.zeros((nconditions, nchs, ntimes))
     resids = np.zeros_like(meg_data_V)
-    for ich in tqdm(range(nchs)):
+    # for ich in tqdm(range(nchs)):
+    for ich in range(nchs):
         for itime in range(ntimes):
             y = meg_data_V[:, ich, itime]
             
@@ -118,7 +119,7 @@ def get_rdm(epoch, behav):
     
     # Calculate pairwise mahalanobis distance between regression coefficients        
     rdm_times = np.zeros((nconditions, nconditions, ntimes))
-    for itime in tqdm(range(ntimes)):
+    for itime in range(ntimes):
         response = coefs[:, :, itime] # (4, 248)
         residuals = resids[:, :, itime] # (51, 248)
         
@@ -409,7 +410,7 @@ def get_in_out_seq(sequence, similarities, random_lows, analysis):
                 out_seq.append(pat_sim)
     return np.array(in_seq), np.array(out_seq)
 
-def get_all_high_low(res_path, sequence, analysis, cv):
+def get_all_high_low(res_path, sequence, analysis, cv=False):
     import numpy as np
     # create lists of possible combinations between stimuli
     one_twos_pat = list()

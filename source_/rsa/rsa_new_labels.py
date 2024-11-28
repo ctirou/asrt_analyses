@@ -32,8 +32,10 @@ def process_subject(subject, lock, jobs, rsync):
     src = mne.read_source_spaces(src_fname, verbose=verbose)
     bem_fname = RESULTS_DIR / "bem" / f"{subject}-bem-sol.fif"    
     
-    res_path = RESULTS_DIR / f'networks_{n_parcels}_{n_networks}' / subject
+    res_path = RESULTS_DIR / "RSA" / 'source' / f'networks_{n_parcels}_{n_networks}' / lock / 'rdm' / subject
     ensure_dir(res_path)
+    
+    label_path = RESULTS_DIR / f'networks_{n_parcels}_{n_networks}' / subject
     
     for epoch_num in [0, 1, 2, 3, 4]:
         
@@ -87,8 +89,8 @@ def process_subject(subject, lock, jobs, rsync):
             parc = f"Schaefer2018_{n_parcels}Parcels_{n_networks}Networks"
             labels = mne.read_labels_from_annot(subject=subject, parc=parc, hemi=hemi, subjects_dir=subjects_dir, regexp=network, verbose=verbose, sort=True)        
             
-            lh_label = mne.read_label(res_path / f'{network}-lh.label')
-            rh_label = mne.read_label(res_path / f'{network}-rh.label')
+            lh_label = mne.read_label(label_path / f'{network}-lh.label')
+            rh_label = mne.read_label(label_path / f'{network}-rh.label')
             
             stcs_data = [stc.in_label(lh_label + rh_label).data for stc in stcs]
             stcs_data = np.array(stcs_data)
@@ -105,7 +107,7 @@ def process_subject(subject, lock, jobs, rsync):
             #     # assert len(stcs_data) == len(behav)
             # all_labels = np.array(all_labels)
 
-            if not op.exists(res_path / f"pat-{epoch_num}.npy") or not op.exists(res_path / f"rand-{epoch_num}.npy") or overwrite:
+            if not op.exists(res_path / f"{network}-pat-{epoch_num}.npy") or not op.exists(res_path / f"{network}-rand-{epoch_num}.npy") or overwrite:
                 # ensure_dir(res_path)
 
                 # # get stcs in label
@@ -118,14 +120,14 @@ def process_subject(subject, lock, jobs, rsync):
                 y_pat = behav.positions[pattern]
                 assert X_pat.shape[0] == y_pat.shape[0]
                 rdm_pat = get_rdm(X_pat, y_pat)
-                np.save(res_path / f"pat-{epoch_num}.npy", rdm_pat)
+                np.save(res_path / f"{network}-pat-{epoch_num}.npy", rdm_pat)
 
                 random = behav.trialtypes == 2
                 X_rand = stcs_data[random]
                 y_rand = behav.positions[random]
                 assert X_rand.shape[0] == y_rand.shape[0]
                 rdm_rand = get_rdm(X_rand, y_rand)
-                np.save(res_path / f"rand-{epoch_num}.npy", rdm_rand)
+                np.save(res_path / f"{network}-rand-{epoch_num}.npy", rdm_rand)
             
             del stcs_data, X_pat, y_pat, X_rand, y_rand
             gc.collect()
