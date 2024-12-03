@@ -171,7 +171,6 @@ class LDA(LinearDiscriminantAnalysis):
         self.intercept_ = (-0.5 * np.diag(np.dot(self.means_, self.coef_.T))
                            + np.log(self.priors_))
         
-# Function to compute cross-validated Mahalanobis distances
 def cv_mahalanobis(X, y, n_splits=10):
     """
     Compute cross-validated Mahalanobis distances between conditions for each time point.
@@ -189,62 +188,77 @@ def cv_mahalanobis(X, y, n_splits=10):
            Cross-validated Mahalanobis distances between conditions at each time point.
     """
     import numpy as np
-    from sklearn.model_selection import KFold
+    from sklearn.model_selection import StratifiedKFold
+    from sklearn.covariance import LedoitWolf
     from scipy.linalg import inv
+    from scipy.spatial.distance import pdist, squareform
+    from tqdm.auto import tqdm
+    
     n_trials, n_channels, n_times = X.shape
     conditions = np.unique(y)
     n_conditions = len(conditions)
-    
+
     # Initialize array to store distances
     distances = np.zeros((n_times, n_conditions, n_conditions))
-    
-    # Cross-validation
-    kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
-    for time_idx in range(n_times):
+
+    # Cross-validation with stratified splitting
+    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
+
+    for time_idx in tqdm(range(n_times)):
         X_time = X[:, :, time_idx]  # Data at this time point
         cv_distances = np.zeros((n_conditions, n_conditions, n_splits))
-        
-        for fold_idx, (train_idx, test_idx) in enumerate(kf.split(X)):
+
+        for fold_idx, (train_idx, test_idx) in enumerate(skf.split(X, y)):
             # Split data into training and testing
             X_train, X_test = X_time[train_idx], X_time[test_idx]
             y_train, y_test = y[train_idx], y[test_idx]
-            
+
             # Compute the mean and covariance for each condition in training data
             means = {cond: X_train[y_train == cond].mean(axis=0) for cond in conditions}
-            cov = np.cov(X_train.T) + 1e-5 * np.eye(n_channels)  # Regularize covariance
-            
-            # Precompute covariance inverse
-            cov_inv = inv(cov)
-            
+            residuals = X_train - np.array([means[cond] for cond in y_train])
+
+            # Regularized covariance estimation
+            lw = LedoitWolf(assume_centered=True)
+            cov = lw.fit(residuals)
+            cov_inv = inv(cov.covariance_)
+
             # Compute Mahalanobis distances for each pair of conditions
             for i, cond1 in enumerate(conditions):
                 for j, cond2 in enumerate(conditions):
                     diff_mean = means[cond1] - means[cond2]
                     cv_distances[i, j, fold_idx] = np.sqrt(diff_mean.T @ cov_inv @ diff_mean)
-        
+
         # Average distances across folds
         distances[time_idx] = cv_distances.mean(axis=2)
-    
+
     return distances
 
-
-# Function to compute LOOCV Mahalanobis distances
-def loocv_mahalanobis(X, y):
+def cv_mahalanobis_psd(X, y, n_splits=10, n_pseudo_trials=10):
     """
-    Compute leave-one-out cross-validated Mahalanobis distances between conditions for each time point.
+    Compute cross-validated Mahalanobis distances between conditions for each time point,
+    incorporating pseudo-trials.
 
     Parameters:
         X: ndarray of shape (n_trials, n_channels, n_times)
            Multivariate time-series data.
         y: ndarray of shape (n_trials,)
            Condition labels for each trial.
+        n_splits: int
+           Number of cross-validation folds.
+        n_pseudo_trials: int
+           Number of pseudo-trials to create for each condition.
 
     Returns:
         distances: ndarray of shape (n_times, n_conditions, n_conditions)
-           LOOCV Mahalanobis distances between conditions at each time point.
+           Cross-validated Mahalanobis distances between conditions at each time point.
     """
     import numpy as np
+    from sklearn.model_selection import StratifiedKFold
+    from sklearn.covariance import LedoitWolf
     from scipy.linalg import inv
+    from scipy.spatial.distance import pdist, squareform
+    from tqdm.auto import tqdm
+    
     n_trials, n_channels, n_times = X.shape
     conditions = np.unique(y)
     n_conditions = len(conditions)
@@ -252,279 +266,50 @@ def loocv_mahalanobis(X, y):
     # Initialize array to store distances
     distances = np.zeros((n_times, n_conditions, n_conditions))
 
-    for time_idx in range(n_times):
+    # Cross-validation with stratified splitting
+    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
+
+    for time_idx in tqdm(range(n_times)):
         X_time = X[:, :, time_idx]  # Data at this time point
+        cv_distances = np.zeros((n_conditions, n_conditions, n_splits))
 
-        # Initialize temporary storage for distances
-        temp_distances = np.zeros((n_trials, n_conditions, n_conditions))
-
-        for test_idx in range(n_trials):
+        for fold_idx, (train_idx, test_idx) in enumerate(skf.split(X, y)):
             # Split data into training and testing
-            train_idx = np.setdiff1d(np.arange(n_trials), test_idx)
             X_train, X_test = X_time[train_idx], X_time[test_idx]
             y_train, y_test = y[train_idx], y[test_idx]
 
-            # Compute the mean and covariance for each condition in the training data
-            means = {cond: X_train[y_train == cond].mean(axis=0) for cond in conditions}
-            cov = np.cov(X_train.T) + 1e-5 * np.eye(n_channels)  # Regularize covariance
+            # Create pseudo-trials for the training data
+            pseudo_means = []
+            for cond in conditions:
+                cond_trials = X_train[y_train == cond]
+                n_trials_in_condition = len(cond_trials)
+                # Shuffle and average trials into pseudo-trials
+                np.random.shuffle(cond_trials)
+                pseudo_means.append(np.array([
+                    cond_trials[i::n_pseudo_trials].mean(axis=0) 
+                    for i in range(n_pseudo_trials)
+                ]))
+            pseudo_means = np.vstack(pseudo_means)  # Shape: (n_pseudo_trials * n_conditions, n_channels)
 
-            # Precompute covariance inverse
-            cov_inv = inv(cov)
+            # Assign pseudo-labels
+            pseudo_labels = np.repeat(conditions, n_pseudo_trials)
+
+            # Compute the mean for each condition in pseudo-trials
+            means = {cond: pseudo_means[pseudo_labels == cond].mean(axis=0) for cond in conditions}
+
+            # Estimate covariance from pseudo-trials
+            residuals = pseudo_means - np.array([means[cond] for cond in pseudo_labels])
+            lw = LedoitWolf(assume_centered=True)
+            cov = lw.fit(residuals)
+            cov_inv = inv(cov.covariance_)
 
             # Compute Mahalanobis distances for each pair of conditions
             for i, cond1 in enumerate(conditions):
                 for j, cond2 in enumerate(conditions):
                     diff_mean = means[cond1] - means[cond2]
-                    temp_distances[test_idx, i, j] = np.sqrt(diff_mean.T @ cov_inv @ diff_mean)
+                    cv_distances[i, j, fold_idx] = np.sqrt(diff_mean.T @ cov_inv @ diff_mean)
 
-        # Average distances across LOOCV iterations
-        distances[time_idx] = temp_distances.mean(axis=0)
+        # Average distances across folds
+        distances[time_idx] = cv_distances.mean(axis=2)
 
     return distances
-
-
-from sklearn.base import BaseEstimator
-import numpy as np
-from scipy.spatial.distance import mahalanobis
-from scipy.linalg import inv
-
-class CvMahalanobis(BaseEstimator):
-    _estimator_type = 'distance'
-
-    def __init__(self, random_state=None, verbose=0):
-        self.random_state = random_state
-        self.verbose = verbose
-
-    def fit(self, X, y):
-        """
-        Compute the class-wise mean vectors and the pooled covariance matrix.
-        
-        Parameters:
-        X : array-like of shape (n_samples, n_features)
-            Feature matrix.
-        y : array-like of shape (n_samples,)
-            Target labels.
-        
-        Returns:
-        self : object
-        """
-        X = np.array(X)
-        y = np.array(y)
-
-        self.classes_ = np.unique(y)
-        self.class_means_ = {}
-        n_features = X.shape[1]
-
-        # Compute mean vectors for each class
-        for cls in self.classes_:
-            self.class_means_[cls] = np.mean(X[y == cls], axis=0)
-
-        # Compute pooled covariance matrix
-        cov_matrices = [np.cov(X[y == cls].T) for cls in self.classes_]
-        self.pooled_cov_ = np.mean(cov_matrices, axis=0)
-        self.inv_pooled_cov_ = inv(self.pooled_cov_)
-
-        return self
-
-    def predict(self, X, y):
-        """
-        Compute the Mahalanobis distance between class means in the training
-        and testing sets.
-
-        Parameters:
-        X : array-like of shape (n_samples, n_features)
-            Feature matrix.
-        y : array-like of shape (n_samples,)
-            Target labels.
-        
-        Returns:
-        distances : dict
-            A dictionary where keys are class pairs and values are their Mahalanobis distances.
-        """
-        X = np.array(X)
-        y = np.array(y)
-
-        test_class_means = {}
-        for cls in self.classes_:
-            test_class_means[cls] = np.mean(X[y == cls], axis=0)
-
-        # Calculate Mahalanobis distances between all class pairs
-        distances = {}
-        for cls_train in self.classes_:
-            for cls_test in self.classes_:
-                dist = mahalanobis(
-                    self.class_means_[cls_train], 
-                    test_class_means[cls_test], 
-                    self.inv_pooled_cov_
-                )
-                distances[(cls_train, cls_test)] = dist
-
-        return distances
-    
-from sklearn.base import BaseEstimator
-import numpy as np
-from scipy.spatial.distance import mahalanobis
-from scipy.linalg import inv
-
-class CvMahalanobisRDM(BaseEstimator):
-    _estimator_type = 'distance'
-
-    def __init__(self, random_state=None, verbose=0):
-        self.random_state = random_state
-        self.verbose = verbose
-
-    def fit(self, X, y):
-        """
-        Compute the class-wise mean vectors and the pooled covariance matrix.
-        
-        Parameters:
-        X : array-like of shape (n_samples, n_features)
-            Feature matrix.
-        y : array-like of shape (n_samples,)
-            Target labels.
-        
-        Returns:
-        self : object
-        """
-        X = np.array(X)
-        y = np.array(y)
-
-        self.classes_ = np.unique(y)
-        self.class_means_ = {}
-        n_features = X.shape[1]
-
-        # Compute mean vectors for each class
-        for cls in self.classes_:
-            self.class_means_[cls] = np.mean(X[y == cls], axis=0)
-
-        # Compute pooled covariance matrix
-        cov_matrices = [np.cov(X[y == cls].T) for cls in self.classes_]
-        self.pooled_cov_ = np.mean(cov_matrices, axis=0)
-        self.inv_pooled_cov_ = inv(self.pooled_cov_)
-
-        return self
-
-    def predict(self, X, y):
-        """
-        Compute the Representational Dissimilarity Matrix (RDM) based on
-        Mahalanobis distances between class means.
-
-        Parameters:
-        X : array-like of shape (n_samples, n_features)
-            Feature matrix.
-        y : array-like of shape (n_samples,)
-            Target labels.
-        
-        Returns:
-        rdm : np.ndarray of shape (n_classes, n_classes)
-            The Representational Dissimilarity Matrix (RDM) where element (i, j)
-            is the Mahalanobis distance between class i and class j.
-        """
-        X = np.array(X)
-        y = np.array(y)
-
-        test_class_means = {}
-        for cls in self.classes_:
-            test_class_means[cls] = np.mean(X[y == cls], axis=0)
-
-        # Initialize the RDM matrix
-        n_classes = len(self.classes_)
-        rdm = np.zeros((n_classes, n_classes))
-
-        # Compute Mahalanobis distances for all pairs of classes
-        for i, cls_train in enumerate(self.classes_):
-            for j, cls_test in enumerate(self.classes_):
-                dist = mahalanobis(
-                    self.class_means_[cls_train],
-                    test_class_means[cls_test],
-                    self.inv_pooled_cov_
-                )
-                rdm[i, j] = dist
-
-        return rdm
-    
-import numpy as np
-from scipy.spatial.distance import mahalanobis
-from scipy.linalg import inv
-
-class CvMahalanobisND:
-    def __init__(self):
-        self.class_means_ = {}
-        self.inv_pooled_cov_ = None
-        self.classes_ = None
-
-    def fit(self, X, y):
-        """
-        Compute the class-wise mean vectors and the pooled covariance matrix.
-        
-        Parameters:
-        X : array-like of shape (n_samples, n_features)
-            Feature matrix.
-        y : array-like of shape (n_samples,)
-            Target labels.
-        
-        Returns:
-        self : object
-        """
-        X = np.array(X)
-        y = np.array(y)
-
-        self.classes_ = np.unique(y)
-        self.class_means_ = {}
-
-        # Compute mean vectors for each class
-        for cls in self.classes_:
-            self.class_means_[cls] = np.mean(X[y == cls], axis=0)
-
-        # Compute pooled covariance matrix
-        cov_matrices = [np.cov(X[y == cls].T) for cls in self.classes_]
-        pooled_cov = np.mean(cov_matrices, axis=0)
-        self.inv_pooled_cov_ = inv(pooled_cov)
-
-        return self
-
-    def predict(self, X, y):
-        """
-        Compute the RDM for each slice along the last dimension of X.
-
-        Parameters:
-        X : array-like of shape (n_samples, n_features, n_slices)
-            Feature tensor.
-        y : array-like of shape (n_samples,)
-            Target labels.
-        
-        Returns:
-        rdm_slices : list of np.ndarray
-            A list of RDMs, one for each slice in the last dimension of X.
-        """
-        X = np.array(X)
-        y = np.array(y)
-
-        n_slices = X.shape[-1]
-        rdm_slices = []
-
-        for slice_idx in range(n_slices):
-            X_slice = X[:, :, slice_idx]
-
-            # Compute class means for the current slice
-            slice_class_means = {}
-            for cls in self.classes_:
-                slice_class_means[cls] = np.mean(X_slice[y == cls], axis=0)
-
-            # Initialize the RDM for this slice
-            n_classes = len(self.classes_)
-            rdm = np.zeros((n_classes, n_classes))
-
-            # Compute Mahalanobis distances for all pairs of classes
-            for i, cls_train in enumerate(self.classes_):
-                for j, cls_test in enumerate(self.classes_):
-                    dist = mahalanobis(
-                        self.class_means_[cls_train],
-                        slice_class_means[cls_test],
-                        self.inv_pooled_cov_
-                    )
-                    rdm[i, j] = dist
-
-            rdm_slices.append(rdm)
-
-        return rdm_slices
