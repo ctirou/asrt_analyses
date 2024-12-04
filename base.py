@@ -131,7 +131,7 @@ def get_rdm(epoch, behav):
         VI = np.linalg.inv(cov.covariance_) # inverse of covariance matrix needed for mahalonobis
         rdm = squareform(pdist(response, metric="mahalanobis", VI=VI))
         # rdm = squareform(pdist(response, metric="cosine"))
-        assert np.isnan(rdm).any()
+        assert ~np.isnan(rdm).any()
         rdm_times[:, :, itime] = rdm # rdm_times (4, 4, 163), rdm (4, 4)
     
     return rdm_times

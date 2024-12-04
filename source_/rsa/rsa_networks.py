@@ -12,6 +12,7 @@ import sys
 subjects = SUBJS
 
 analysis = 'RSA'
+lock = 'stim'
 data_path = DATA_DIR
 subjects_dir = FREESURFER_DIR
 parc = 'aparc'
@@ -24,16 +25,13 @@ def process_subject(subject, lock, jobs, rsync):
     
     # network and custom label_names
     n_parcels = 200
-    n_networks = 7
+    n_networks = 17
     # networks = (NEW_LABELS + schaefer_7) if n_networks == 7 else (NEW_LABELS + schaefer_17)
     networks = schaefer_7 if n_networks == 7 else schaefer_17
         
     src_fname = RESULTS_DIR / "src" / f"{subject}-src.fif"
     src = mne.read_source_spaces(src_fname, verbose=verbose)
     bem_fname = RESULTS_DIR / "bem" / f"{subject}-bem-sol.fif"    
-    
-    res_path = RESULTS_DIR / "RSA" / 'source' / f'networks_{n_parcels}_{n_networks}' / lock / 'rdm' / subject
-    ensure_dir(res_path)
     
     label_path = RESULTS_DIR / f'networks_{n_parcels}_{n_networks}' / subject
     
@@ -80,6 +78,9 @@ def process_subject(subject, lock, jobs, rsync):
 
         for inetwork, network in enumerate(networks):
             
+            res_path = RESULTS_DIR / "RSA" / 'source' / f'networks_{n_parcels}_{n_networks}' / network / lock / 'rdm' / subject
+            ensure_dir(res_path)
+
             print("Processing", subject, epoch_num, network)
             
             # parc = f'aparc.{network}' if network not in networks[-n_networks:] else f"Shaefer2018_{str(n_parcels)}_{str(n_networks)}.{network}"
@@ -107,7 +108,7 @@ def process_subject(subject, lock, jobs, rsync):
             #     # assert len(stcs_data) == len(behav)
             # all_labels = np.array(all_labels)
 
-            if not op.exists(res_path / f"{network}-pat-{epoch_num}.npy") or not op.exists(res_path / f"{network}-rand-{epoch_num}.npy") or overwrite:
+            if not op.exists(res_path / f"pat-{epoch_num}.npy") or not op.exists(res_path / f"rand-{epoch_num}.npy") or overwrite:
                 # ensure_dir(res_path)
 
                 # # get stcs in label
@@ -120,14 +121,14 @@ def process_subject(subject, lock, jobs, rsync):
                 y_pat = behav.positions[pattern]
                 assert X_pat.shape[0] == y_pat.shape[0]
                 rdm_pat = get_rdm(X_pat, y_pat)
-                np.save(res_path / f"{network}-pat-{epoch_num}.npy", rdm_pat)
+                np.save(res_path / f"pat-{epoch_num}.npy", rdm_pat)
 
                 random = behav.trialtypes == 2
                 X_rand = stcs_data[random]
                 y_rand = behav.positions[random]
                 assert X_rand.shape[0] == y_rand.shape[0]
                 rdm_rand = get_rdm(X_rand, y_rand)
-                np.save(res_path / f"{network}-rand-{epoch_num}.npy", rdm_rand)
+                np.save(res_path / f"rand-{epoch_num}.npy", rdm_rand)
             
             del stcs_data, X_pat, y_pat, X_rand, y_rand
             gc.collect()
@@ -154,6 +155,5 @@ if is_cluster:
         print("Error: SLURM_ARRAY_TASK_ID is not set correctly or is out of bounds.")
         sys.exit(1)
 else:
-    lock = 'stim'
     for subject in subjects:
         process_subject(subject, lock, jobs=-1, rsync=False)
