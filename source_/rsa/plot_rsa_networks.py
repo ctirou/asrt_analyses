@@ -33,6 +33,7 @@ def format_func(value, tick_number):
 n_parcels = 200
 n_networks = 7
 networks = schaefer_7 if n_networks == 7 else schaefer_17
+names_corrected = pd.read_csv(FREESURFER_DIR / 'Schaefer2018' / f'{n_networks}NetworksOrderedNames.csv', header=0)[' Network Name'].tolist()
 
 def process_label(networks):
     """Process both surface and volume labels."""
@@ -71,15 +72,15 @@ label_names = schaefer_7
 # define parameters    
 chance = 25
 # ncols = 4
-ncols = 4
+ncols = 4 if n_networks == 7 else 6
 # nrows = 10 if lock == 'stim' else 9
-nrows = 2
+nrows = 2 if n_networks == 7 else 3
 far_left = [0] + [i for i in range(0, len(label_names), ncols*2)]
 color1, color2 = ("#1982C4", "#74B3CE") if lock == 'stim' else ("#D76A03", "#EC9F05")
 color3 = "C7"
 
-color1 = "#008080"
-color2 = "#FFA500"
+# # color3 = "#008080"
+color3 = "#FFA500"
 # plot in out and diff
 fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(15, 5))
 fig.suptitle(f"high and low {lock} {analysis}", style='italic')
@@ -97,50 +98,75 @@ plt.savefig(op.join(figures_dir, 'low_high.pdf'), transparent=True)
 plt.close()
 
 # plot rsa
-fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(15, 5))
-fig.suptitle(f'{metric} low - high average {lock} {analysis}', style='italic')
-for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
+fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(25, 5))
+fig.suptitle(f'average low - high {lock} {analysis}', style='italic')
+for i, (ax, label, name) in enumerate(zip(axs.flat, label_names, names_corrected)):
+    # plot reverse difference high vs. low sequence averaging all sessions
+    rev_high = rsa_high[label][:, 1:, :].mean((1)) - rsa_high[label][:, 0, :]
+    rev_low = rsa_low[label][:, 1:, :].mean((1)) - rsa_low[label][:, 0, :]
+    rev_diff = rev_low - rev_high
+    
     practice = rsa[label][:, 0, :].mean(0).astype(np.float64)
     learning = rsa[label][:, 1:5, :].mean((0, 1)).astype(np.float64)
     if lock == 'stim':
         ax.axvspan(0, 0.2, color='grey', alpha=.2)
     else:
         ax.axvline(0, color='black', alpha=.7)
-    ax.plot(times, practice, label='practice')
-    ax.plot(times, learning, label='learning')
-    ax.set_title(f"${label}$", fontsize=8)     
-    ax.axhline(0, color='black', ls='dashed', alpha=.5)
-    if i == 0:
-        legend = ax.legend()
-        plt.setp(legend.get_texts(), fontsize=8)  # Adjust legend size
+    # ax.plot(times, practice, label='practice')
+    # ax.plot(times, learning, label='learning')
+    # ax.plot(times, rev_diff.mean(0), label='(low_post - low_pre) - (high_post - high_pre)', color='C1', alpha=0.6)
+
     # for tick in ax.xaxis.get_major_ticks():  # Adjust x-axis label size
     #     tick.label.set_fontsize(8)
     # for tick in ax.yaxis.get_major_ticks():  # Adjust y-axis label size
     #     tick.label.set_fontsize(8)
-    diff = rsa[label][:, 1:, :].mean((1)) - rsa[label][:, 0, :]
-    p_values_unc = ttest_1samp(diff.astype(np.float64), axis=0, popmean=0)[1]
+    # diff = rsa[label][:, 1:, :].mean((1)) - rsa[label][:, 0, :]
+    # p_values_unc = ttest_1samp(diff.astype(np.float64), axis=0, popmean=0)[1]
+    # sig_unc = p_values_unc < 0.05
+    # ax.fill_between(times, 0, learning, where=sig_unc, color=color1, alpha=0.2)
+    # p_values = decod_stats(diff, jobs)
+    # sig = p_values < 0.05
+    # ax.fill_between(times, 0, learning, where=sig, color=color2, alpha=0.3)
+    # ax.fill_between(times, 0, rev_diff.mean(0), where=sig_unc, color=color1, alpha=0.2, label='uncorrected')
+    # ax.fill_between(times, 0, rev_diff.mean(0), where=sig, color=color2, alpha=0.3, label='corrected')
+    if lock == 'stim':
+        ax.axvspan(0, 0.2, color='grey', alpha=.1)
+    else:
+        ax.axvline(0, color='black')
+    if i == 0:
+        legend = ax.legend()
+        plt.setp(legend.get_texts(), fontsize=8)  # Adjust legend size
+    sem = np.std(rev_diff, axis=0) / np.sqrt(len(subjects))
+    ax.fill_between(times, rev_diff.mean(0) - sem, rev_diff.mean(0) + sem, color=color1, alpha=.7)
+    ax.set_title(f"${name}$", fontsize=8)     
+    ax.axhline(0, color='black', ls='dashed', alpha=.5)
+    p_values_unc = ttest_1samp(rev_diff,  axis=0, popmean=0)[1]
     sig_unc = p_values_unc < 0.05
-    ax.fill_between(times, 0, learning, where=sig_unc, color=color1, alpha=0.2)
-    p_values = decod_stats(diff, jobs)
+    p_values = decod_stats(rev_diff, -1)
     sig = p_values < 0.05
-    ax.fill_between(times, 0, learning, where=sig, color=color2, alpha=0.3)
+    ax.fill_between(times, rev_diff.mean(0) - sem, rev_diff.mean(0) + sem, where=sig, color='black', alpha=.8, label='significant')
+    ax.axhline(0, color='black', linestyle='dashed')
 plt.savefig(op.join(figures_dir, 'low_high_ave.pdf'))
 plt.close()
 
 # plot the difference in vs. out sequence for each epoch
 for k in range(1, 5):
-    fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(15, 5))
-    fig.suptitle(f'{metric} low - high session {k} {lock} {analysis}', style='italic')
-    for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
-        ax.plot(times, rsa[label][:, 0, :].mean(0), label='practice', color='C7', alpha=0.6)
-        ax.plot(times, rsa[label][:, k, :].mean(0) - rsa[label][:, 0, :].mean(0), label='low - high - practice', color='C1', alpha=0.6)
-        diff = rsa[label][:, k, :] - rsa[label][:, 0, :]
-        p_values_unc = ttest_1samp(diff, axis=0, popmean=0)[1]
+    fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(25, 5))
+    fig.suptitle(f'low - high session {k} {lock} {analysis}', style='italic')
+    for i, (ax, label, name) in enumerate(zip(axs.flat, label_names, names_corrected)):
+        # ax.plot(times, rsa[label][:, 0, :].mean(0), label='practice', color='C7', alpha=0.6)
+        # ax.plot(times, rsa[label][:, k, :].mean(0) - rsa[label][:, 0, :].mean(0), label='low - high - practice', color='C1', alpha=0.6)
+        # diff = rsa[label][:, k, :] - rsa[label][:, 0, :]
+        rev_high = rsa_high[label][:, k, :] - rsa_high[label][:, 0, :]
+        rev_low = rsa_low[label][:, k, :] - rsa_low[label][:, 0, :]
+        rev_diff = rev_low - rev_high
+        sem = np.std(rev_diff, axis=0) / np.sqrt(len(subjects))
+        ax.fill_between(times, rev_diff.mean(0) - sem, rev_diff.mean(0) + sem, color=color1, alpha=.7)
+        p_values_unc = ttest_1samp(rev_diff, axis=0, popmean=0)[1]
         sig_unc = p_values_unc < 0.05
-        p_values = decod_stats(diff, -1)
+        p_values = decod_stats(rev_diff, -1)
         sig = p_values < 0.05
-        ax.fill_between(times, 0, rsa[label][:, k, :].mean(0) - rsa[label][:, 0, :].mean(0), where=sig_unc, alpha=0.2, color=color1, label='uncorrected')
-        ax.fill_between(times, 0, rsa[label][:, k, :].mean(0) - rsa[label][:, 0, :].mean(0), where=sig, alpha=0.4, color=color2, label='corrected')
+        ax.fill_between(times, rev_diff.mean(0) - sem, rev_diff.mean(0) + sem, where=sig, alpha=0.8, color='black', label='significant')
         ax.axhline(0, color='black', linestyle='dashed')
         if lock == 'stim':
             ax.axvspan(0, 0.2, color='grey', alpha=.2)
@@ -148,27 +174,34 @@ for k in range(1, 5):
             ax.axvline(0, color='black')
         if i ==0:    
             ax.legend()
-        ax.set_title(f"${label}$", fontsize=8)     
+        ax.set_title(f"${name}$", fontsize=8)     
         # plt.gca().set_ylim(-0.04, 0.12)
     plt.savefig(op.join(figures_dir, 'low_high_%s.pdf' % (str(k))))
     plt.close()
 
 # plot correlations
-fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(15, 5))
+fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(25, 5))
 fig.suptitle(f"{metric} correlations {lock} {analysis}", style='italic')
-for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
-    diff = rsa_low[label] - rsa_high[label]
+for i, (ax, label, name) in enumerate(zip(axs.flat, label_names, names_corrected)):
+    rev_diff_corr = list()   
+    for i in range(5):
+        rev_low = rsa_low[label][:, i, :] - rsa_low[label][:, 0, :]
+        rev_high = rsa_high[label][:, i, :] - rsa_high[label][:, 0, :]
+        rev_diff_corr.append(rev_low - rev_high)
+    rev_diff_corr = np.array(rev_diff_corr).swapaxes(0, 1)    
+    
     rhos = [[spearmanr([0, 1, 2, 3, 4], diff[sub, :, itime])[0] for itime in range(len(times))] for sub in range(len(subjects))]
     rhos = np.array(rhos)
-    ax.plot(times, rhos.mean(0), label='rhos')
+    sem = np.std(rhos, axis=0) / np.sqrt(len(subjects))
+    ax.fill_between(times, rhos.mean(0) - sem, rhos.mean(0) + sem, color=color1, alpha=.7, label='rhos')
     p_values_unc = ttest_1samp(rhos, axis=0, popmean=0)[1]
     sig_unc = p_values_unc < 0.05
     p_values = decod_stats(rhos, -1)
     sig = p_values < 0.05
-    ax.fill_between(times, rhos.mean(0), 0, where=sig_unc, color=color1, alpha=.2, label='uncorrected')
-    ax.fill_between(times, rhos.mean(0), 0, where=sig, color=color2, alpha=.4, label='corrected')
+    # ax.fill_between(times, rhos.mean(0), 0, where=sig_unc, color=color1, alpha=.2, label='uncorrected')
+    ax.fill_between(times, rhos.mean(0) - sem, rhos.mean(0) + sem, color='black', where=sig, label='significant', alpha=.8)
     ax.axhline(0, color="black", linestyle="dashed")
-    ax.set_title(f"${label}$", fontsize=8)
+    ax.set_title(f"${name}$", fontsize=8)
     if lock == 'stim':
         ax.axvspan(0, 0.2, color='grey', alpha=.2)
     else:
@@ -180,51 +213,61 @@ plt.close()
 
 learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices.csv', sep="\t", index_col=0)
 # plot across subjects
-fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(15, 5))
+fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(25, 5))
 fig.suptitle(f'{metric} across subjects corr {lock} {analysis}', style='italic')
-for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
+for i, (ax, label, name) in enumerate(zip(axs.flat, label_names, names_corrected)):
+    rev_low = rsa_low[label][:, -1, :] - rsa_low[label][:, 0, :]
+    rev_high = rsa_high[label][:, -1, :] - rsa_high[label][:, 0, :]
+    rev_diff_corr = rev_low - rev_high  
     all_pvalues, all_rhos = [], []
     for t in range(len(times)):
-        rho, pval = spearmanr(learn_index_df["4"], rsa[label][:, -1, t])
+        rho, pval = spearmanr(learn_index_df["4"], rev_diff[:, t])
         all_rhos.append(rho)
         all_pvalues.append(pval)
-    ax.plot(times, all_rhos, label='rho')
+    sem = np.std(all_rhos) / np.sqrt(len(subjects))
+    ax.fill_between(times, all_rhos - sem, all_rhos + sem, color=color1, alpha=.7, label='rhos')
+    # ax.plot(times, all_rhos, label='rho')
     sig = (np.asarray(all_pvalues) < 0.05)
-    ax.fill_between(times, all_rhos, 0, where=sig, color=color2, alpha=.4, label='significant')  # Solid line at the bottom when sig is true
+    ax.fill_between(times, all_rhos - sem, all_rhos + sem, where=sig, color='black', alpha=.8, label='significant')  # Solid line at the bottom when sig is true
     if lock == 'stim':
         ax.axvspan(0, 0.2, color='grey', alpha=.2)
     else:
         ax.axvline(0, color='black')
-    ax.set_title(f"${label}$", fontsize=8)
+    ax.set_title(f"${name}$", fontsize=8)
     ax.axhline(0, color='black', linestyle='dashed')
 plt.savefig(op.join(figures_dir, 'low_high_across_sub_corr.pdf'), transparent=True)
 plt.close()
 
 # plot within subjects
-fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(15, 5))
+fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(25, 5))
 fig.suptitle(f'{metric} within subjects corr {lock} {analysis}', style='italic')
 for i, (ax, label) in enumerate(zip(axs.flat, label_names)):
-    diff = rsa_low[label] - rsa_high[label]
+    rev_diff_corr = list()   
+    for i in range(5):
+        rev_low = rsa_low[label][:, i, :] - rsa_low[label][:, 0, :]
+        rev_high = rsa_high[label][:, i, :] - rsa_high[label][:, 0, :]
+        rev_diff_corr.append(rev_low - rev_high)
+    rev_diff_corr = np.array(rev_diff_corr).swapaxes(0, 1)    
     all_rhos = []
     for sub in tqdm(range(len(subjects))):
         rhos = []
         for t in range(len(times)):
-            rhos.append(spearmanr(learn_index_df.iloc[sub, :], diff[sub, :, t])[0])
+            rhos.append(spearmanr(learn_index_df.iloc[sub, :], rev_diff_corr[sub, :, t])[0])
         all_rhos.append(rhos)
     all_rhos = np.array(all_rhos)
-    ax.plot(times, all_rhos.mean(0), label='rhos')
+    sem = np.std(all_rhos, axis=0) / np.sqrt(len(subjects))
+    ax.fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, color=color1, alpha=.7, label='rhos')
     p_values_unc = ttest_1samp(all_rhos, axis=0, popmean=0)[1]
     sig_unc = p_values_unc < 0.05
     p_values = decod_stats(all_rhos, -1)
     sig = p_values < 0.05
-    ax.fill_between(times, all_rhos.mean(0), 0, where=sig_unc, color=color1, alpha=.2, label='uncorrected')
-    ax.fill_between(times, all_rhos.mean(0), 0, where=sig, color=color2, alpha=.4, label='corrected')
+    ax.fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, where=sig, color='black', alpha=.8, label='significant')
     ax.axhline(0, color="black", linestyle="dashed")
     if lock == 'stim':
         ax.axvspan(0, 0.2, color='grey', alpha=.2)
     else:
         ax.axvline(0, color='black')
-    ax.set_title(f"${label}$", fontsize=8)
+    ax.set_title(f"${name}$", fontsize=8)
     ax.axhline(0, color='black', linestyle='dashed')
 plt.savefig(op.join(figures_dir, 'low_high_within_sub_corr.pdf'), transparent=True)
 plt.close()

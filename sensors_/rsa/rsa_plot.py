@@ -53,6 +53,8 @@ for analysis in analyses:
 
     diff_prac = all_lows[:, :, 0, :].mean(axis=1) - all_highs[:, :, 0, :].mean(axis=1)
     diff_learn = all_lows[:, :, 1:, :].mean(axis=(1)) - all_highs[:, :, 1:, :].mean(axis=(1))
+    
+    all_diff = (all_lows - all_highs).mean(axis=1)
 
     color1 = "#008080"
     color2 = "#FFA500"
@@ -246,20 +248,20 @@ for analysis in analyses:
     # plot reverse correlations
     rev_diff_corr = list()   
     for i in range(5):
-        rev_high = all_highs[:, :, i, :].mean(1) - all_highs[:, :, 0, :].mean(axis=1)
         rev_low = all_lows[:, :, i, :].mean(1) - all_lows[:, :, 0, :].mean(axis=1)
+        rev_high = all_highs[:, :, i, :].mean(1) - all_highs[:, :, 0, :].mean(axis=1)
         rev_diff_corr.append(rev_low - rev_high)
-    rev_diff_corr = np.array(rev_diff_corr)
-    rhos = [[spear([0, 1, 2, 3, 4], rev_diff_corr[:, sub, itime])[0] for itime in range(len(times))] for sub in range(len(subjects))]
+    rev_diff_corr = np.array(rev_diff_corr).swapaxes(0, 1)
+    rhos = [[spear([0, 1, 2, 3, 4], rev_diff_corr[sub, :, itime])[0] for itime in range(len(times))] for sub in range(len(subjects))]
     rhos = np.array(rhos)
-    plt.subplots(1, 1, figsize=(16, 11))
-    plt.plot(times, rhos.mean(0))
+    plt.subplots(1, 1, figsize=(14, 5))
+    plt.plot(times, rhos.mean(0), label='rhos')
     p_values_unc = ttest_1samp(rhos, axis=0, popmean=0)[1]
     sig_unc = p_values_unc < 0.05
     p_values = decod_stats(rhos, -1)
     sig = p_values < .05
-    plt.fill_between(times, 0, rhos.mean(0), where=sig, color=color2, alpha=.3, label='corrected')
     plt.fill_between(times, 0, rhos.mean(0), where=sig_unc, color=color1, alpha=.2, label='uncorrected')
+    plt.fill_between(times, 0, rhos.mean(0), where=sig, color=color2, alpha=.3, label='corrected')
     plt.axhline(0, color='black', linestyle='dashed')
     if lock == 'stim':
         plt.axvspan(0, 0.2, color='grey', alpha=.2)
@@ -274,9 +276,13 @@ for analysis in analyses:
 
     learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices.csv', sep="\t", index_col=0)
     # plot across subjects
+    
+    for i in range(5):
+        print(np.array_equal(diff[:, i, :], rev_diff_corr[:, i, :]))
+    
     all_pvalues, all_rhos = [], []
     for t in range(len(times)):
-        rho, pval = spear(learn_index_df["4"], rev_diff[:, -1, t])
+        rho, pval = spear(learn_index_df["4"], rev_diff_corr[:, -1, t])
         all_rhos.append(rho)
         all_pvalues.append(pval)
     plt.subplots(1, 1, figsize=(14, 5))
@@ -294,12 +300,11 @@ for analysis in analyses:
     plt.close()
 
     # plot within subjects
-    diff = all_lows.mean(1) - all_highs.mean(1)
     all_rhos = []
     for sub in tqdm(range(len(subjects))):
         rhos = []
         for t in range(len(times)):
-            rhos.append(spear(learn_index_df.iloc[sub, :], diff[sub, :, t])[0])
+            rhos.append(spear(learn_index_df.iloc[sub, :], rev_diff_corr[sub, :, t])[0])
         all_rhos.append(rhos)
     all_rhos = np.array(all_rhos)
     plt.subplots(1, 1, figsize=(14, 5))
