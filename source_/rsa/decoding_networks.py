@@ -106,7 +106,7 @@ def process_subject(subject, lock, trialtype, jobs, rsync):
         res_path = RESULTS_DIR / "RSA" / 'source' / f'networks_{n_parcels}_{n_networks}' / network / lock / 'scores' / subject
         ensure_dir(res_path)
     
-        print("Processing", subject, network)
+        print("Processing", subject, lock, trial_type, network)
         
         # parc = f'aparc.{network}' if network not in networks[-n_networks:] else f"Shaefer2018_{str(n_parcels)}_{str(n_networks)}.{network}"
         # parc = f"Shaefer2018_{str(n_parcels)}_{str(n_networks)}.{network}"
@@ -168,7 +168,7 @@ def process_subject(subject, lock, trialtype, jobs, rsync):
     
 if is_cluster:
     lock = str(sys.argv[1])
-    trialtype = str(sys.argv[2])
+    trial_type = str(sys.argv[2])
     jobs = 10
     # Check that SLURM_ARRAY_TASK_ID is available and use it to get the subject
     try:

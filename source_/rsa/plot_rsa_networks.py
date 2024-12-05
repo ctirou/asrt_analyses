@@ -22,7 +22,7 @@ subjects, epochs_list = SUBJS, EPOCHS
 figures_dir = FIGURES_DIR / "RSA" / "source" / lock / analysis / "networks"
 ensure_dir(figures_dir)
 metric = 'mahalanobis'
-
+trial_type = 'all'
 # get times
 times = np.load(data_path / "times.npy")
 
@@ -37,10 +37,12 @@ names_corrected = pd.read_csv(FREESURFER_DIR / 'Schaefer2018' / f'{n_networks}Ne
 
 def process_label(networks):
     """Process both surface and volume labels."""
-    rsa, rsa_high, rsa_low, corr = {}, {}, {}, {}
+    decoding, rsa, rsa_high, rsa_low, corr = {}, {}, {}, {}, {}
     for network in networks:
         print(f"Processing {network}...")
         all_high, all_low = [], []
+        if not network in decoding:
+            decoding[network] = []
 
         for subject in subjects:
             # Read the behav file to get the sequence 
@@ -52,7 +54,10 @@ def process_label(networks):
             
             all_high.append(sub_high)
             all_low.append(sub_low)
-
+            
+            score = np.load(RESULTS_DIR / "RSA" / 'source' / f'networks_{n_parcels}_{n_networks}' / network / lock / 'scores' / subject / f"{trial_type}-scores.npy")
+            decoding[network].append(score)
+            
         all_high, all_low = np.array(all_high).mean(1), np.array(all_low).mean(1)
         diff_low_high = np.squeeze(all_low - all_high)
         rsa[network] = diff_low_high
@@ -64,9 +69,11 @@ def process_label(networks):
             for sub in range(len(subjects))
         ]
         corr[network] = np.array(all_rhos)
-    return rsa, rsa_high, rsa_low, corr
+        decoding[network] = np.array(decoding[network])
+        
+    return decoding, rsa, rsa_high, rsa_low, corr
 
-rsa, rsa_high, rsa_low, corr = process_label(networks)
+decoding, rsa, rsa_high, rsa_low, corr = process_label(networks)
 
 label_names = schaefer_7
 # define parameters    
@@ -79,8 +86,25 @@ far_left = [0] + [i for i in range(0, len(label_names), ncols*2)]
 color1, color2 = ("#1982C4", "#74B3CE") if lock == 'stim' else ("#D76A03", "#EC9F05")
 color3 = "C7"
 
-# # color3 = "#008080"
-color3 = "#FFA500"
+color3 = "#008080"
+# color3 = "#FFA500"
+
+# plot decoding
+chance = 25
+fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(25, 5))
+for i, (ax, label, name) in enumerate(zip(axs.flat, label_names, names_corrected)):
+    score = decoding[label] * 100
+    sem = np.std(score, axis=0) / np.sqrt(len(subjects))
+    ax.plot(times, score.mean(0))
+    # ax.fill_between(times, score.mean(0) - sem, score.mean(0) + sem, color="C7", alpha=.7)
+    ax.axhline(chance, color='black', linestyle='dashed')
+    ax.set_title(f"${name}$", fontsize=8)     
+    ax.axhline(0, color='black', ls='dashed', alpha=.5)
+    p_values = decod_stats(score, jobs)
+    sig = p_values < 0.05
+    ax.fill_between(times, chance, score.mean(0), where=sig, color=color3, alpha=.8, label='significant')
+plt.show()
+
 # plot in out and diff
 fig, axs = plt.subplots(nrows=nrows, ncols=ncols, sharey=True, sharex=True, layout='tight', figsize=(15, 5))
 fig.suptitle(f"high and low {lock} {analysis}", style='italic')
