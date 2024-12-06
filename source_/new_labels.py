@@ -19,16 +19,16 @@ ensure_dir(res_path)
 new_labels = [cortex_regions, subcortex_regions, 
               frontal_lobe, parietal_lobe, occipital_lobe, temporal_lobe, cerebellum, 
               ventricular_and_brainstem, 
-              corpus_callosum, 
+              corpus_callosum,
               left_hemisphere, right_hemisphere]
 
 new_labels_names = ['cortex_regions', 'subcortex_regions', 
                     'frontal_lobe', 'parietal_lobe', 'occipital_lobe', 'temporal_lobe', 'cerebellum', 
                     'ventricular_and_brainstem', 
-                    'corpus_callosum', 
+                    'corpus_callosum',
                     'left_hemisphere', 'right_hemisphere']
 
-save_label = False
+save_label = True
 
 for subject in subjects:
     ensure_dir(res_path / subject)
@@ -55,23 +55,6 @@ for subject in subjects:
         filtered_labels = [label for label in labels if label.name in label_list and label.name not in BAD_VOLUME_LABELS]
         
         if filtered_labels:
-            if save_label:
-                # Start with the first label and sum the remaining to create a combined label
-                big_label = filtered_labels[0]
-                for label in filtered_labels[1:]:
-                    big_label += label
-                # If it's a BiHemiLabel (both hemispheres), save left and right separately
-                if isinstance(big_label, mne.BiHemiLabel):
-                    # Save left hemisphere
-                    if big_label.lh is not None:
-                        big_label.lh.save(res_path / subject / f'{label_list_name}-lh.label')
-                    # Save right hemisphere
-                    if big_label.rh is not None:
-                        big_label.rh.save(res_path / subject / f'{label_list_name}-rh.label')
-                else:
-                    big_label.save(res_path / subject / f'{label_list_name}.label')
-                    # If it's a single hemisphere label, save it directly
-            
             # Remove common vertices for each combination of filtered_labels
             corrected_labels = []
             for i, label1 in enumerate(filtered_labels):
@@ -81,15 +64,58 @@ for subject in subjects:
                     print(f"Removed common vertices between {label1.name} and {label2.name}")
                 corrected_labels.append(label1)
             
-            # Update filtered_labels with corrected_labels
-            filtered_labels = corrected_labels
+            # if save_label:
+            #     # Start with the first label and sum the remaining to create a combined label
+            #     big_label = corrected_labels[0]
+            #     for label in corrected_labels[1:]:
+            #         big_label += label
+            #     # If it's a BiHemiLabel (both hemispheres), save left and right separately
+            #     if isinstance(big_label, mne.BiHemiLabel):
+            #         # Save left hemisphere
+            #         if big_label.lh is not None:
+            #             big_label.lh.save(res_path / subject / f'{label_list_name}-lh.label')
+            #         # Save right hemisphere
+            #         if big_label.rh is not None:
+            #             big_label.rh.save(res_path / subject / f'{label_list_name}-rh.label')
+            #     else:
+            #         big_label.save(res_path / subject / f'{label_list_name}.label')
+            #         # If it's a single hemisphere label, save it directly
             
             # label_list_name = 'frontal_lobe'
             parc = "aparc." + label_list_name
             hemi = 'lh' if 'left' in label_list_name else 'rh' if 'right' in label_list_name else 'both'
-            mne.write_labels_to_annot(labels=filtered_labels, subject=subject, parc=parc, overwrite=True, subjects_dir=subjects_dir, hemi=hemi, sort=True, verbose=verbose)
+            mne.write_labels_to_annot(labels=corrected_labels, subject=subject, parc=parc, overwrite=True, subjects_dir=subjects_dir, hemi=hemi, sort=True, verbose=verbose)
             
             # read_labels = mne.read_labels_from_annot(subject=subject, parc=parc, hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
+            
+            # Visualize on a brain plot
+            brain = mne.viz.Brain(subject, hemi='both', subjects_dir=subjects_dir,
+                                cortex='low_contrast', theme='dark', alpha=.5)
+
+            for label in filtered_labels:
+                brain.add_label(label, borders=True)
+                
+            # Add labels and store their colors for the legend
+            import matplotlib.pyplot as plt
+            from matplotlib.patches import Patch
+            legend_elements = []
+            for label in filtered_labels:
+                brain.add_label(label, borders=False)
+                legend_elements.append(Patch(facecolor=label.color, label=label.name))
+            # Create a legend using matplotlib
+            fig, ax = plt.subplots(figsize=(5, 3))
+            ax.legend(handles=legend_elements, loc='center')
+            ax.axis('off')
+            plt.show()
+            
+            # Load aseg.mgz for subcortical visualization
+            aseg_path = subjects_dir / subject / 'mri' / "aseg.mgz"
+            aseg_data = mne.read_source_spaces(aseg_path)
+
+            # Visualize aseg volume
+            brain = mne.viz.Brain(subject, hemi='both', subjects_dir=subjects_dir,
+                                cortex='low_contrast', background='white', volume=aseg_path)
+            
 
 cuneus_lh = labels[6]
 hpc_lh = labels[76]

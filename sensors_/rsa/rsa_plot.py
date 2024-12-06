@@ -277,8 +277,8 @@ for analysis in analyses:
     learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices.csv', sep="\t", index_col=0)
     # plot across subjects
     
-    for i in range(5):
-        print(np.array_equal(diff[:, i, :], rev_diff_corr[:, i, :]))
+    # for i in range(5):
+    #     print(np.array_equal(diff[:, i, :], rev_diff_corr[:, i, :]))
     
     all_pvalues, all_rhos = [], []
     for t in range(len(times)):
