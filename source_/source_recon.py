@@ -46,11 +46,11 @@ for subject in subjects:
     # cortex source space
     # src_fname = op.join(res_path, "src", "%s-src.fif" % (subject))
     # if not op.exists(src_fname) or overwrite:
-        src = mne.setup_source_space(subject, spacing='oct6',
-                                        subjects_dir=subjects_dir,
-                                        add_dist=True,
-                                        n_jobs=jobs,
-                                        verbose=verbose)
+        # src = mne.setup_source_space(subject, spacing='oct6',
+        #                                 subjects_dir=subjects_dir,
+        #                                 add_dist=True,
+        #                                 n_jobs=jobs,
+        #                                 verbose=verbose)
     #     mne.write_source_spaces(src_fname, src, overwrite=True)
                                 
     # volume source space
@@ -61,13 +61,13 @@ for subject in subjects:
     # aseg_labels = mne.get_volume_labels_from_aseg(aseg_fname, atlas_ids=lut_lab[0])
     # volume_labels = ['rHipp_L', 'rHipp_R', 'cHipp_L', 'cHipp_R']
     
-    ## Freesurfer default aseg atlas
-    aseg_fname = subjects_dir / subject / 'mri' / 'aseg.mgz'
-    aseg_labels = mne.get_volume_labels_from_aseg(aseg_fname)
+    # ## Freesurfer default aseg atlas
+    # aseg_fname = subjects_dir / subject / 'mri' / 'aseg.mgz'
+    # aseg_labels = mne.get_volume_labels_from_aseg(aseg_fname)
     
-    vol_labels_lh = [l for l in aseg_labels if l.startswith('Left')]
-    vol_labels_rh = [l for l in aseg_labels if l.startswith('Right')]
-    vol_labels_others = [l for l in aseg_labels if not l.startswith(('Left', 'Right'))]
+    # vol_labels_lh = [l for l in aseg_labels if l.startswith('Left')]
+    # vol_labels_rh = [l for l in aseg_labels if l.startswith('Right')]
+    # vol_labels_others = [l for l in aseg_labels if not l.startswith(('Left', 'Right'))]
     
     # vol_src_lh_fname = op.join(res_path, "src", "%s-lh-vol-src.fif" % (subject))
     # if not op.exists(vol_src_lh_fname) or overwrite:
@@ -105,17 +105,30 @@ for subject in subjects:
     #         verbose=verbose)
     #     mne.write_source_spaces(vol_src_others_fname, vol_src_others, overwrite=True)
 
-    vol_src_fname = op.join(res_path, "src", "%s-vol-src.fif" % (subject))
+    vol_src_fname = op.join(res_path, "src", "%s-all-vol-src.fif" % (subject))
     # if not op.exists(vol_src_others_fname) or overwrite:
     vol_src = mne.setup_volume_source_space(
         subject,
         bem=model_fname,
-        mri="aseg.mgz",
+        mri="aparc+aseg.mgz",
         volume_label=best_labels,
         subjects_dir=subjects_dir,
         n_jobs=jobs,
         verbose=verbose)
     mne.write_source_spaces(vol_src_fname, vol_src, overwrite=True)
+    
+    # Load the source space
+    src = mne.read_source_spaces(vol_src_fname)
+
+    # Check the structure of the source space
+    print(src)
+
+    # Plot the volume source spaces
+    mne.viz.plot_volume_source_space(src, src_color='red', show=True)
+    
+    src.plot(subjects_dir=subjects_dir)
+    
+    labels = mne.get_volume_labels_from_src(src, subject, subjects_dir)
         
     del src, vol_src_lh, vol_src_rh, vol_src_others, vol_src
     gc.collect()
