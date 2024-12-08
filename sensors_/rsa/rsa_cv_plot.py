@@ -10,7 +10,6 @@ from base import *
 from config import *
 
 lock = 'button'
-data = 'loocv'
 data = 'k10'
 analysis = 'usual'
 analysis = 'pat_high_rdm_high'
@@ -70,7 +69,7 @@ for lock in ['stim', 'button']:
             plt.axvline(0, color='black')
         plt.legend()
         plt.title(f'{metric} high vs. low {analysis}', style='italic')
-        plt.savefig(op.join(figures_dir, 'low_high.pdf'), transparent=True)
+        plt.savefig(op.join(figures_dir, 'low_vs_high.pdf'), transparent=True)
         plt.close()
 
         plt.subplots(1, 1, figsize=(16, 11))
@@ -101,7 +100,7 @@ for lock in ['stim', 'button']:
         for i in range(1, 5):
             rev_high_ = all_highs[:, :, i, :].mean(1) - all_highs[:, :, 0, :].mean(axis=1)
             rev_low_ = all_lows[:, :, i, :].mean(1) - all_lows[:, :, 0, :].mean(axis=1)
-            diff_ = rev_low - rev_high
+            diff_ = rev_low_ - rev_high_
             plt.subplots(1, 1, figsize=(16, 11))
             plt.plot(times,  diff_.mean(0), label='(low_post - low_pre) - (high_post - high_pre)', color='C1', alpha=0.6)
             plt.plot(times, rev_high_.mean(0), label='high_post - high_pre', alpha=0.6)
@@ -125,9 +124,7 @@ for lock in ['stim', 'button']:
             plt.title(f'reverse low - high {analysis} session {i}', style='italic')
             plt.savefig(op.join(figures_dir, f'rev_low_high_{i}.pdf'))
             plt.close()
-            
-        ##### SO FAR SO GOOD #####
-            
+                        
         # plot correlations
         diff_corr = all_lows.mean(axis=1) - all_highs.mean(axis=1)
         rhos = [[spearmanr([0, 1, 2, 3, 4], diff_corr[sub, :, itime])[0] for itime in range(len(times))] for sub in range(len(subjects))]
@@ -148,7 +145,7 @@ for lock in ['stim', 'button']:
         plt.axhline(0, color='black', linestyle='dashed')
         plt.legend()
         plt.title(f'cv {metric} correlations {analysis}', style='italic')
-        plt.savefig(op.join(figures_dir, 'low_high_corr.pdf'), transparent=True)
+        plt.savefig(op.join(figures_dir, 'corr.pdf'), transparent=True)
         plt.close()
 
         learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices.csv', sep="\t", index_col=0)
@@ -169,7 +166,7 @@ for lock in ['stim', 'button']:
         plt.axhline(0, color='black', linestyle='dashed')
         plt.legend()
         plt.title(f'cv {metric} across subjects corr {analysis}', style='italic')
-        plt.savefig(op.join(figures_dir, 'low_high_across_sub_corr.pdf'), transparent=True)
+        plt.savefig(op.join(figures_dir, 'as.pdf'), transparent=True)
         plt.close()
 
         # plot within subjects
@@ -197,20 +194,23 @@ for lock in ['stim', 'button']:
         plt.axhline(0, color='black', linestyle='dashed')
         plt.legend()
         plt.title(f'cv {metric} within subjects corr {analysis}', style='italic')
-        plt.savefig(op.join(figures_dir, 'low_high_within_sub_corr.pdf'), transparent=True)
+        plt.savefig(op.join(figures_dir, 'ws.pdf'), transparent=True)
         plt.close()
 
         # WITHOUT PRACTICE #
-
+        rev_high = all_highs[:, :, 1:, :].mean(axis=1)
+        rev_low = all_lows[:, :, 1:, :].mean(axis=1)
+        diff = rev_low - rev_high
+        
         # plot average
         plt.subplots(1, 1, figsize=(14, 5))
-        plt.plot(times, diff_learn.mean((0, 1)), label='low - high', color='C1', alpha=0.6)
-        p_values_unc = ttest_1samp(diff_learn.mean(1), axis=0, popmean=0)[1]
+        plt.plot(times, diff.mean((0, 1)), label='low - high', color='C1', alpha=0.6)
+        p_values_unc = ttest_1samp(diff.mean(1), axis=0, popmean=0)[1]
         sig_unc = p_values_unc < 0.05
-        p_values = decod_stats(diff_learn.mean(1), -1)
+        p_values = decod_stats(diff.mean(1), -1)
         sig = p_values < 0.05
-        plt.fill_between(times, 0, diff_learn.mean((0, 1)), where=sig_unc, color=color1, alpha=0.2, label='uncorrected')
-        plt.fill_between(times, 0, diff_learn.mean((0, 1)), where=sig, color=color2, alpha=0.3, label='corrected')
+        plt.fill_between(times, 0, diff.mean((0, 1)), where=sig_unc, color=color1, alpha=0.2, label='uncorrected')
+        plt.fill_between(times, 0, diff.mean((0, 1)), where=sig, color=color2, alpha=0.3, label='corrected')
         plt.axhline(0, color='black', linestyle='dashed')
         if lock == 'stim':
             plt.axvspan(0, 0.2, color='grey', alpha=.2)
@@ -224,38 +224,13 @@ for lock in ['stim', 'button']:
         # plot the difference in vs. out sequence for each epoch
         for i in range(4):
             plt.subplots(1, 1, figsize=(14, 5))
-            plt.plot(times, diff_prac.mean(0), label='practice', color='C7', alpha=0.6)
-            plt.plot(times, diff_learn[:, i, :].mean(0), label='low - high', color='C1', alpha=0.6)
-            diff = diff_learn[:, i, :]
-            p_values_unc = ttest_1samp(diff, axis=0, popmean=0)[1]
+            plt.plot(times, diff[:, i, :].mean(0), label='low - high', color='C1', alpha=0.6)
+            p_values_unc = ttest_1samp(diff[:, i, :], axis=0, popmean=0)[1]
             sig_unc = p_values_unc < 0.05
-            p_values = decod_stats(diff, -1)
+            p_values = decod_stats(diff[:, i, :], -1)
             sig = p_values < 0.05
-            plt.fill_between(times, 0, diff_learn[:, i, :].mean(0), where=sig_unc, alpha=0.2, color=color1, label='uncorrected')
-            plt.fill_between(times, 0, diff_learn[:, i, :].mean(0), where=sig, alpha=0.4, color=color2, label='corrected')
-            plt.axhline(0, color='black', linestyle='dashed')
-            if lock == 'stim':
-                plt.axvspan(0, 0.2, color='grey', alpha=.2)
-            else:
-                plt.axvline(0, color='black')    
-            plt.legend()
-            # plt.gca().set_ylim(-0.04, 0.12)
-            plt.title(f'cv {metric} low - high session {i+1} {analysis}', style='italic')
-            plt.savefig(op.join(figures_dir, 'np_low_high_%s.pdf' % (str(i+1))))
-            plt.close()
-
-        # plot the difference in vs. out sequence for each epoch
-        for i in range(4):
-            plt.subplots(1, 1, figsize=(14, 5))
-            plt.plot(times, diff_prac.mean(0), label='practice', color='C7', alpha=0.6)
-            plt.plot(times, diff_learn[:, i, :].mean(0), label='low - high', color='C1', alpha=0.6)
-            diff = diff_learn[:, i, :]
-            p_values_unc = ttest_1samp(diff, axis=0, popmean=0)[1]
-            sig_unc = p_values_unc < 0.05
-            p_values = decod_stats(diff, -1)
-            sig = p_values < 0.05
-            plt.fill_between(times, 0, diff_learn[:, i, :].mean(0), where=sig_unc, alpha=0.2, color=color1, label='uncorrected')
-            plt.fill_between(times, 0, diff_learn[:, i, :].mean(0), where=sig, alpha=0.4, color=color2, label='corrected')
+            plt.fill_between(times, 0, diff[:, i, :].mean(0), where=sig_unc, alpha=0.2, color=color1, label='uncorrected')
+            plt.fill_between(times, 0, diff[:, i, :].mean(0), where=sig, alpha=0.4, color=color2, label='corrected')
             plt.axhline(0, color='black', linestyle='dashed')
             if lock == 'stim':
                 plt.axvspan(0, 0.2, color='grey', alpha=.2)
@@ -287,14 +262,14 @@ for lock in ['stim', 'button']:
         plt.axhline(0, color='black', linestyle='dashed')
         plt.legend()
         plt.title(f'cv {metric} correlations {analysis}', style='italic')
-        plt.savefig(op.join(figures_dir, 'np_low_high_corr.pdf'), transparent=True)
+        plt.savefig(op.join(figures_dir, 'np_corr.pdf'), transparent=True)
         plt.close()
 
         learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices.csv', sep="\t", index_col=0)
         # plot across subjects
         all_pvalues, all_rhos = [], []
         for t in range(len(times)):
-            rho, pval = spearmanr(learn_index_df["4"], diff_learn[:, -1, t])
+            rho, pval = spearmanr(learn_index_df["4"], diff[:, -1, t])
             all_rhos.append(rho)
             all_pvalues.append(pval)
         plt.subplots(1, 1, figsize=(14, 5))
@@ -308,7 +283,7 @@ for lock in ['stim', 'button']:
         plt.axhline(0, color='black', linestyle='dashed')
         plt.legend()
         plt.title(f'cv {metric} across subjects corr {analysis}', style='italic')
-        plt.savefig(op.join(figures_dir, 'np_low_high_across_sub_corr.pdf'), transparent=True)
+        plt.savefig(op.join(figures_dir, 'np_ws.pdf'), transparent=True)
         plt.close()
 
         # plot within subjects
@@ -317,7 +292,7 @@ for lock in ['stim', 'button']:
         for sub in tqdm(range(len(subjects))):
             rhos = []
             for t in range(len(times)):
-                rhos.append(spearmanr(learn_index_df.iloc[sub, 1:], diff[sub, 1:, t])[0])
+                rhos.append(spearmanr(learn_index_df.iloc[sub, 1:], diff[sub, :, t])[0])
             all_rhos.append(rhos)
         all_rhos = np.array(all_rhos)
         plt.subplots(1, 1, figsize=(14, 5))
@@ -336,5 +311,5 @@ for lock in ['stim', 'button']:
         plt.axhline(0, color='black', linestyle='dashed')
         plt.legend()
         plt.title(f'cv {metric} within subjects corr {analysis}', style='italic')
-        plt.savefig(op.join(figures_dir, 'np_low_high_within_sub_corr.pdf'), transparent=True)
+        plt.savefig(op.join(figures_dir, 'np_as.pdf'), transparent=True)
         plt.close()
