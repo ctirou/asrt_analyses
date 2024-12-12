@@ -295,7 +295,7 @@ for lock in ['stim', 'button']:
         plt.savefig(op.join(figures_dir, 'rev_as.pdf'), transparent=True)
         plt.close()
 
-        # plot within subjects
+        # plot reverse within subjects
         all_rhos = []
         for sub in tqdm(range(len(subjects))):
             rhos = []
