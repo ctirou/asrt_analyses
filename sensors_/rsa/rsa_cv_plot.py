@@ -10,7 +10,7 @@ from base import *
 from config import *
 
 lock = 'button'
-data = 'k10'
+data = 'new_k10'
 analysis = 'usual'
 analysis = 'pat_high_rdm_high'
 # analysis = 'pat_high_rdm_low'

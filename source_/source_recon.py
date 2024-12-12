@@ -44,14 +44,14 @@ for subject in subjects:
         mne.bem.write_bem_solution(bem_fname, bem, overwrite=True, verbose=verbose)
     
     # cortex source space
-    # src_fname = op.join(res_path, "src", "%s-src.fif" % (subject))
-    # if not op.exists(src_fname) or overwrite:
-        # src = mne.setup_source_space(subject, spacing='oct6',
-        #                                 subjects_dir=subjects_dir,
-        #                                 add_dist=True,
-        #                                 n_jobs=jobs,
-        #                                 verbose=verbose)
-    #     mne.write_source_spaces(src_fname, src, overwrite=True)
+    src_fname = op.join(res_path, "src", "%s-src.fif" % (subject))
+    if not op.exists(src_fname) or overwrite:
+        src = mne.setup_source_space(subject, spacing='oct6',
+                                        subjects_dir=subjects_dir,
+                                        add_dist=True,
+                                        n_jobs=jobs,
+                                        verbose=verbose)
+        mne.write_source_spaces(src_fname, src, overwrite=True)
                                 
     # volume source space
     ## Brainnetome atlas -- does not work for now
@@ -110,7 +110,7 @@ for subject in subjects:
     vol_src = mne.setup_volume_source_space(
         subject,
         bem=model_fname,
-        mri="aparc+aseg.mgz",
+        mri="aseg.mgz",
         volume_label=best_labels,
         subjects_dir=subjects_dir,
         n_jobs=jobs,
@@ -126,10 +126,20 @@ for subject in subjects:
     # Plot the volume source spaces
     mne.viz.plot_volume_source_space(src, src_color='red', show=True)
     
-    src.plot(subjects_dir=subjects_dir)
+    vol_src.plot(subjects_dir=subjects_dir)
     
     labels = mne.get_volume_labels_from_src(src, subject, subjects_dir)
-        
+    
+    mixed = src + vol_src
+    # visualize source spaces
+    fig = mne.viz.plot_alignment(
+    subject=subject,
+    subjects_dir=subjects_dir,
+    surfaces="white",
+    coord_frame="mri",
+    src=mixed)
+    mne.viz.set_3d_view(fig, azimuth=180, elevation=90, distance=0.30, focalpoint=(-0.03, -0.01, 0.03))
+    
     del src, vol_src_lh, vol_src_rh, vol_src_others, vol_src
     gc.collect()
     
