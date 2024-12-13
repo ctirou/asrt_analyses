@@ -578,7 +578,6 @@ def get_cm(clf, cv, X, y, times):
     return np.array(cms), np.array(scores)
 
 
-# Function to compute cross-validated Mahalanobis distances
 def cv_mahalanobis(X, y, n_splits=10):
     """
     Compute cross-validated Mahalanobis distances between conditions for each time point.
@@ -596,97 +595,48 @@ def cv_mahalanobis(X, y, n_splits=10):
            Cross-validated Mahalanobis distances between conditions at each time point.
     """
     import numpy as np
-    from sklearn.model_selection import KFold
+    from sklearn.model_selection import StratifiedKFold
+    from sklearn.covariance import LedoitWolf
     from scipy.linalg import inv
+    from scipy.spatial.distance import pdist, squareform
+    from tqdm.auto import tqdm
+    
     n_trials, n_channels, n_times = X.shape
     conditions = np.unique(y)
     n_conditions = len(conditions)
-    
+
     # Initialize array to store distances
     distances = np.zeros((n_times, n_conditions, n_conditions))
-    
-    # Cross-validation
-    kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
-    for time_idx in range(n_times):
+
+    # Cross-validation with stratified splitting
+    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
+
+    for time_idx in tqdm(range(n_times)):
         X_time = X[:, :, time_idx]  # Data at this time point
         cv_distances = np.zeros((n_conditions, n_conditions, n_splits))
-        
-        for fold_idx, (train_idx, test_idx) in enumerate(kf.split(X)):
+
+        for fold_idx, (train_idx, test_idx) in enumerate(skf.split(X, y)):
             # Split data into training and testing
             X_train, X_test = X_time[train_idx], X_time[test_idx]
             y_train, y_test = y[train_idx], y[test_idx]
-            
+
             # Compute the mean and covariance for each condition in training data
             means = {cond: X_train[y_train == cond].mean(axis=0) for cond in conditions}
-            cov = np.cov(X_train.T) + 1e-5 * np.eye(n_channels)  # Regularize covariance
-            
-            # Precompute covariance inverse
-            cov_inv = inv(cov)
-            
+            residuals = X_train - np.array([means[cond] for cond in y_train])
+
+            # Regularized covariance estimation
+            lw = LedoitWolf(assume_centered=True)
+            cov = lw.fit(residuals)
+            cov_inv = inv(cov.covariance_)
+
             # Compute Mahalanobis distances for each pair of conditions
             for i, cond1 in enumerate(conditions):
                 for j, cond2 in enumerate(conditions):
                     diff_mean = means[cond1] - means[cond2]
                     cv_distances[i, j, fold_idx] = np.sqrt(diff_mean.T @ cov_inv @ diff_mean)
-        
+
         # Average distances across folds
         distances[time_idx] = cv_distances.mean(axis=2)
-    
-    return distances
-
-
-
-# Function to compute LOOCV Mahalanobis distances
-def loocv_mahalanobis(X, y):
-    """
-    Compute leave-one-out cross-validated Mahalanobis distances between conditions for each time point.
-
-    Parameters:
-        X: ndarray of shape (n_trials, n_channels, n_times)
-           Multivariate time-series data.
-        y: ndarray of shape (n_trials,)
-           Condition labels for each trial.
-
-    Returns:
-        distances: ndarray of shape (n_times, n_conditions, n_conditions)
-           LOOCV Mahalanobis distances between conditions at each time point.
-    """
-    import numpy as np
-    from scipy.linalg import inv
-    n_trials, n_channels, n_times = X.shape
-    conditions = np.unique(y)
-    n_conditions = len(conditions)
-
-    # Initialize array to store distances
-    distances = np.zeros((n_times, n_conditions, n_conditions))
-
-    for time_idx in range(n_times):
-        X_time = X[:, :, time_idx]  # Data at this time point
-
-        # Initialize temporary storage for distances
-        temp_distances = np.zeros((n_trials, n_conditions, n_conditions))
-
-        for test_idx in range(n_trials):
-            # Split data into training and testing
-            train_idx = np.setdiff1d(np.arange(n_trials), test_idx)
-            X_train, X_test = X_time[train_idx], X_time[test_idx]
-            y_train, y_test = y[train_idx], y[test_idx]
-
-            # Compute the mean and covariance for each condition in the training data
-            means = {cond: X_train[y_train == cond].mean(axis=0) for cond in conditions}
-            cov = np.cov(X_train.T) + 1e-5 * np.eye(n_channels)  # Regularize covariance
-
-            # Precompute covariance inverse
-            cov_inv = inv(cov)
-
-            # Compute Mahalanobis distances for each pair of conditions
-            for i, cond1 in enumerate(conditions):
-                for j, cond2 in enumerate(conditions):
-                    diff_mean = means[cond1] - means[cond2]
-                    temp_distances[test_idx, i, j] = np.sqrt(diff_mean.T @ cov_inv @ diff_mean)
-
-        # Average distances across LOOCV iterations
-        distances[time_idx] = temp_distances.mean(axis=0)
 
     return distances
 

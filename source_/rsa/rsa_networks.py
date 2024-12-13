@@ -18,14 +18,14 @@ subjects_dir = FREESURFER_DIR
 parc = 'aparc'
 hemi = 'both'
 verbose = 'error'
-overwrite = False
+overwrite = True
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
 def process_subject(subject, lock, jobs, rsync):
     
     # network and custom label_names
     n_parcels = 200
-    n_networks = 17
+    n_networks = 7
     # networks = (NEW_LABELS + schaefer_7) if n_networks == 7 else (NEW_LABELS + schaefer_17)
     networks = schaefer_7 if n_networks == 7 else schaefer_17
         
@@ -118,16 +118,16 @@ def process_subject(subject, lock, jobs, rsync):
 
                 pattern = behav.trialtypes == 1
                 X_pat = stcs_data[pattern]
-                y_pat = behav.positions[pattern]
+                y_pat = behav.positions[pattern].reset_index(drop=True)
                 assert X_pat.shape[0] == y_pat.shape[0]
-                rdm_pat = get_rdm(X_pat, y_pat)
+                rdm_pat = cv_mahalanobis(X_pat, y_pat)
                 np.save(res_path / f"pat-{epoch_num}.npy", rdm_pat)
 
                 random = behav.trialtypes == 2
                 X_rand = stcs_data[random]
-                y_rand = behav.positions[random]
+                y_rand = behav.positions[random].reset_index(drop=True)
                 assert X_rand.shape[0] == y_rand.shape[0]
-                rdm_rand = get_rdm(X_rand, y_rand)
+                rdm_rand = cv_mahalanobis(X_rand, y_rand)
                 np.save(res_path / f"rand-{epoch_num}.npy", rdm_rand)
                 
                 del X_pat, y_pat, X_rand, y_rand
