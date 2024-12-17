@@ -21,31 +21,48 @@ lock = 'stim'
 
 # get times
 times = np.load(data_path / "times.npy")
+timesg = np.load(data_path / "times_gen.npy")
 
 figures_dir = FIGURES_DIR / "RSA" / "sensors"
 ensure_dir(figures_dir)
 
 all_highs, all_lows = [], []
-decoding = []
+decoding, src_decoding = [], []
+patterns, randoms = [], []
 
 for subject in tqdm(subjects):
     
     res_path = RESULTS_DIR / 'RSA' / 'sensors' / lock / f"{data}_rdm" / subject
     ensure_dir(res_path)
         
-    # Read the behav file to get the sequence 
+    # RSA stuff
     behav_dir = op.join(RAW_DATA_DIR, "%s/behav_data/" % (subject)) 
     sequence = get_sequence(behav_dir)
     high, low = get_all_high_low(res_path, sequence, analysis, cv=True)    
     all_highs.append(high)    
     all_lows.append(low)
-    
+    # Decoding stuff
     res_path = RESULTS_DIR / 'decoding' / 'sensors' / lock / 'pattern'
     decoding.append(np.load(res_path / f"{subject}-all-scores.npy"))
+    res_path = RESULTS_DIR / 'decoding' / 'source' / lock / 'pattern' / 'all'
+    src_decoding.append(np.load(res_path / f"{subject}-scores.npy"))
     
+    pat, rand = [], []
+    timeg_path = TIMEG_DATA_DIR / 'results' / 'sensors' / lock
+    for i in range(5):
+        pat.append(np.load(timeg_path / f"{subject}-epoch{i}-pattern-scores.npy"))
+        rand.append(np.load(timeg_path / f"{subject}-epoch{i}-random-scores.npy"))
+    patterns.append(np.array(pat))
+    randoms.append(np.array(rand))
+    
+decoding = np.array(decoding)
+src_decoding = np.array(src_decoding)
+
+patterns = np.array(patterns)
+randoms = np.array(randoms)
+
 all_highs = np.array(all_highs)
 all_lows = np.array(all_lows)
-decoding = np.array(decoding)
 
 high = all_highs[:, :, 1:, :].mean((1, 2)) - all_highs[:, :, 0, :].mean(axis=1)
 low = all_lows[:, :, 1:, :].mean((1, 2)) - all_lows[:, :, 0, :].mean(axis=1)
@@ -94,16 +111,22 @@ if lock == 'stim':
     axd['A'].axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1, label='Stimulus onset')
 else:
     axd['A'].axvline(0, color='black', label='Button press')
+axd['A'].axhline(0.25, color='black', linestyle='dashed')
 p_values = decod_stats(decoding - 0.25, -1)
 sig = p_values < 0.05
-# sig_span(axd['A'], sig, times)
 sem = np.std(decoding, axis=0) / np.sqrt(len(subjects))
-axd['A'].plot(times, decoding.mean(0), alpha=1)
+axd['A'].plot(times, decoding.mean(0), label='Sensor space', alpha=1)
 axd['A'].fill_between(times, decoding.mean(0) - sem, decoding.mean(0) + sem, alpha=0.2)
-axd['A'].axhline(0.25, color='black', linestyle='dashed')
+axd['A'].fill_between(times, .23, .233, where=sig, alpha=0.4, color="#FF0000", capstyle='round')
+p_values = decod_stats(src_decoding - 0.25, -1)
+sig = p_values < 0.05
+sem = np.std(src_decoding, axis=0) / np.sqrt(len(subjects))
+axd['A'].plot(times, src_decoding.mean(0), color="#5BBCD6", label='Source space', alpha=1)
+axd['A'].fill_between(times, src_decoding.mean(0) - sem, src_decoding.mean(0) + sem, alpha=0.2, color="#5BBCD6")
+axd['A'].fill_between(times, .22, .223, where=sig, alpha=0.4, color="#5BBCD6", capstyle='round')
 axd['A'].set_ylabel('Accuracy')
-axd['A'].fill_between(times, .23, .233, where=sig, alpha=0.3, color="#F2AD00", capstyle='round', label='Significant')
 axd['A'].legend(frameon=False)
+axd['A'].set_xlabel('Time (s)')
 axd['A'].set_title(f'Decoding of Pattern trials', style='italic')
             
 ### B1 ####        
@@ -135,7 +158,7 @@ axd['B2'].set_ylabel('cvMahalanobis')
 # axd['B2'].set_xticklabels([])
 axd['B2'].set_title(f'cvMahalanobis of Random and Pattern trials', style='italic')
 
-### D1 ###
+### D1 ### put uncorrected
 rhos = np.array([[spear([0, 1, 2, 3, 4], diff_sess[sub, :, itime])[0] for itime in range(len(times))] for sub in range(len(subjects))])
 sem = np.std(rhos, axis=0) / np.sqrt(len(subjects))
 axd['D1'].plot(times, rhos.mean(0))
@@ -168,8 +191,9 @@ axd['D2'].set_xlabel('Time (s)')
 axd['D2'].set_title(f'Within subject learning index correlation', style='italic')
 
 ### C ###
-idx_times = np.where((times >= 0.3) & (times <= 0.5))[0]
-mdiff = diff_sess[:, :, idx_times].mean(2)
+# correlation between rsa and learning index
+idx_rsa = np.where((times >= 0.3) & (times <= 0.5))[0]
+mdiff = diff_sess[:, :, idx_rsa].mean(2)
 rhos, pvals = [], []
 for sess in range(5):
     rho, pval = spear(learn_index_df.iloc[:, sess], mdiff[:, sess])
@@ -178,20 +202,33 @@ for sess in range(5):
 rhos = np.array(rhos)
 pvals = np.array(pvals)
 sig = pvals < .05
-axd['C'].plot(range(5), rhos, marker='o', linestyle='-', alpha=0.6)
+
+# correlation between rsa and time generalization
+idx_rsa = np.where((times >= .3) & (times <= .5))[0]
+idx_timeg = np.where((timesg >= -.5 ) & (timesg <= 0))[0]
+rsa = diff_sess.copy()[:, :, idx_rsa].mean(2)
+contrasts = patterns - randoms
+timeg = np.array([[np.diag(coco[i, :, :]) for i in range(5)] for coco in contrasts])[:, :, idx_timeg].mean(2)
+rhos_sess = np.array([spear(rsa[:, sess], timeg[:, sess])[0] for sess in range(5)])
+
+axd['C'].plot(range(5), np.nan_to_num(rhos), marker='o', alpha=0.6, label='RSA x Learning index')
+axd['C'].plot(range(5), np.nan_to_num(rhos_sess), marker='o', alpha=0.6, label='RSA x Time gen.')
 axd['C'].axhline(0, color='black', linestyle='dashed')
-for i, (rho, pval) in enumerate(zip(rhos, pvals)):
-    if sig[i]:
-        axd['C'].text(i, rho, '*', fontsize=12, ha='center', va='bottom', color='red')
 axd['C'].set_xticks(range(5))
-axd['C'].set_xticklabels([f'Session {i}' for i in range(5)])
+axd['C'].set_xticklabels(['Practice'] + [f'Session {i}' for i in range(1, 5)])
 axd['C'].set_ylabel("Spearman's rho")
-axd['C'].set_title(f'Correlation with learning index', style='italic')
-# handles, labels = axd['B1'].get_legend_handles_labels()
-# fig.legend(handles, labels, loc='upper right', title='Conditions')
+axd['C'].legend(frameon=False)
+axd['C'].set_title(f'Correlations', style='italic')
+
+rhos_sub = np.array([spear(rsa[sub], timeg[sub])[0] for sub in range(len(subjects))])
 
 plt.savefig(figures_dir /  f"{lock}.pdf", transparent=True)
 plt.close()
+
+# for i, (rho, pval) in enumerate(zip(rhos, pvals)):
+#     if sig[i]:
+#         axd['C'].text(i, rho, '*', fontsize=12, ha='center', va='bottom', color='red')
+
 # handles, labels = [], []
 # for ax in axd.values():
 #     for handle, label in zip(*ax.get_legend_handles_labels()):

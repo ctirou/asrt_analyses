@@ -1,11 +1,13 @@
+import os.path as op
 import numpy as np
 import pandas as pd
 import mne
-from mne.decoding import SlidingEstimator, cross_val_multiscore
+from mne.decoding import SlidingEstimator, UnsupervisedSpatialFilter, cross_val_multiscore
 from sklearn.pipeline import make_pipeline
 from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
+from sklearn.decomposition import PCA
 from base import ensure_dir, get_volume_estimate_time_course
 from config import *
 from mne.beamformer import make_lcmv, apply_lcmv_epochs
@@ -17,7 +19,7 @@ from tqdm.auto import tqdm
 subjects = SUBJS
 
 analysis = "decoding"
-lock = "button" # "stim", "button"
+lock = "stim" # "stim", "button"
 trial_type = 'pattern' # "all", "pattern", or "random"
 data_path = DATA_DIR
 subjects_dir = FREESURFER_DIR
@@ -30,7 +32,7 @@ scoring = "accuracy"
 parc='aparc'
 # parc='aseg'
 hemi = 'both'
-verbose = 'error'
+verbose = True
 jobs = -1
 
 # get times
@@ -44,6 +46,7 @@ gc.collect()
 clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
 clf = SlidingEstimator(clf, scoring=scoring, n_jobs=jobs, verbose=verbose)
 cv = StratifiedKFold(folds, shuffle=True)
+pca = UnsupervisedSpatialFilter(PCA(300), average=False)
 
 for subject in subjects:
             
@@ -101,6 +104,19 @@ for subject in subjects:
                     pick_ori=None, rank=rank, reduce_rank=True, verbose=verbose)
     stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
     
+    stcs_data = np.array([stc.data for stc in stcs])
+    X = pca.fit_transform(stcs_data)
+    pattern = behav.trialtypes == 1
+    X = stcs_data[pattern]
+    y = behav.positions[pattern].reset_index(drop=True)
+    assert X.shape[0] == y.shape[0]
+    
+    score_path = RESULTS_DIR / analysis / 'source' / lock / trial_type / 'all'
+    ensure_dir(score_path)
+    if not op.exists(score_path / f"{subject}-scores.npy"):
+        scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=verbose)
+        np.save(score_path / f"{subject}-scores.npy", scores.mean(0))
+        
     all_labels = mne.read_labels_from_annot(subject=subject, parc=parc, hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
     labels = [label for label in all_labels if label.name in SURFACE_LABELS_RT]
     
