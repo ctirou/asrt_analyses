@@ -7,15 +7,14 @@ import gc
 import sys
 
 overwrite = False
-verbose = True
+verbose = 'error'
 jobs = -1
 
 subjects = SUBJS
 epochs_list = EPOCHS
-data_path = HOME
+data_path = DATA_DIR
 subjects_dir = FREESURFER_DIR
-res_path = data_path / 'results'
-ensure_dir(res_path)
+res_path = RESULTS_DIR
 
 # create results directories
 folders = ["src", "bem", "trans", "fwd"]
@@ -33,7 +32,7 @@ for subject in subjects:
     # bem model
     bem_fname = op.join(res_path, "bem", "%s-bem-sol.fif" % (subject))
     model_fname = op.join(res_path, "bem", "%s-bem.fif" % (subject))
-    if not op.exists(bem_fname) or False:
+    if not op.exists(bem_fname) or overwrite:
         conductivity = (.3,)
         model = mne.make_bem_model(subject=subject, ico=4,
                                 conductivity=conductivity,
@@ -52,6 +51,7 @@ for subject in subjects:
                                         n_jobs=jobs,
                                         verbose=verbose)
         mne.write_source_spaces(src_fname, src, overwrite=True)
+    src = mne.read_source_spaces(src_fname, verbose=verbose)
                                 
     # volume source space
     ## Brainnetome atlas -- does not work for now
@@ -105,50 +105,50 @@ for subject in subjects:
     #         verbose=verbose)
     #     mne.write_source_spaces(vol_src_others_fname, vol_src_others, overwrite=True)
 
-    vol_src_fname = op.join(res_path, "src", "%s-all-vol-src.fif" % (subject))
-    # if not op.exists(vol_src_others_fname) or overwrite:
-    vol_src = mne.setup_volume_source_space(
-        subject,
-        bem=model_fname,
-        mri="aseg.mgz",
-        volume_label=best_labels,
-        subjects_dir=subjects_dir,
-        n_jobs=jobs,
-        verbose=verbose)
-    mne.write_source_spaces(vol_src_fname, vol_src, overwrite=True)
+    # vol_src_fname = op.join(res_path, "src", "%s-all-vol-src.fif" % (subject))
+    # # if not op.exists(vol_src_others_fname) or overwrite:
+    # vol_src = mne.setup_volume_source_space(
+    #     subject,
+    #     bem=model_fname,
+    #     mri="aseg.mgz",
+    #     volume_label=best_labels,
+    #     subjects_dir=subjects_dir,
+    #     n_jobs=jobs,
+    #     verbose=verbose)
+    # mne.write_source_spaces(vol_src_fname, vol_src, overwrite=True)
     
-    # Load the source space
-    src = mne.read_source_spaces(vol_src_fname)
+    # # Load the source space
+    # src = mne.read_source_spaces(vol_src_fname)
 
-    # Check the structure of the source space
-    print(src)
+    # # Check the structure of the source space
+    # print(src)
 
-    # Plot the volume source spaces
-    mne.viz.plot_volume_source_space(src, src_color='red', show=True)
+    # # Plot the volume source spaces
+    # mne.viz.plot_volume_source_space(src, src_color='red', show=True)
     
-    vol_src.plot(subjects_dir=subjects_dir)
+    # vol_src.plot(subjects_dir=subjects_dir)
     
-    labels = mne.get_volume_labels_from_src(src, subject, subjects_dir)
+    # labels = mne.get_volume_labels_from_src(src, subject, subjects_dir)
     
-    mixed = src + vol_src
-    # visualize source spaces
-    fig = mne.viz.plot_alignment(
-    subject=subject,
-    subjects_dir=subjects_dir,
-    surfaces="white",
-    coord_frame="mri",
-    src=mixed)
-    mne.viz.set_3d_view(fig, azimuth=180, elevation=90, distance=0.30, focalpoint=(-0.03, -0.01, 0.03))
+    # mixed = src + vol_src
+    # # visualize source spaces
+    # fig = mne.viz.plot_alignment(
+    # subject=subject,
+    # subjects_dir=subjects_dir,
+    # surfaces="white",
+    # coord_frame="mri",
+    # src=mixed)
+    # mne.viz.set_3d_view(fig, azimuth=180, elevation=90, distance=0.30, focalpoint=(-0.03, -0.01, 0.03))
     
-    del src, vol_src_lh, vol_src_rh, vol_src_others, vol_src
-    gc.collect()
+    # del src, vol_src_lh, vol_src_rh, vol_src_others, vol_src
+    # gc.collect()
     
     for lock in ['stim', 'button']:
         all_epochs = list()
         for epoch_num in range(5):
         
             epoch_fname = op.join(data_path, lock, f"{subject}-{epoch_num}-epo.fif")
-            epoch = mne.read_epochs(epoch_fname, verbose="error", preload=False)
+            epoch = mne.read_epochs(epoch_fname, verbose=verbose, preload=False)
             all_epochs.append(epoch)
             
             # create trans file
@@ -160,6 +160,17 @@ for subject in subjects:
                 coreg.omit_head_shape_points(distance=5.0 / 1000)
                 coreg.fit_icp(n_iterations=100, verbose=True)
                 mne.write_trans(trans_fname, coreg.trans, overwrite=True)
+            
+            fwd_fname = op.join(res_path, "fwd", lock, f"{subject}-{epoch_num}-fwd.fif")
+            # compute forward solution
+            if not op.exists(fwd_fname) or overwrite:
+                fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,
+                                            src=src, bem=bem_fname,
+                                            meg=True, eeg=False,
+                                            mindist=5.0,
+                                            n_jobs=jobs,
+                                            verbose=True)
+                mne.write_forward_solution(fwd_fname, fwd, overwrite=True)
                             
             del epoch
             gc.collect()
@@ -180,6 +191,16 @@ for subject in subjects:
             coreg.omit_head_shape_points(distance=5.0 / 1000)
             coreg.fit_icp(n_iterations=100, verbose=True)
             mne.write_trans(trans_fname, coreg.trans, overwrite=True)
+        
+        fwd_fname = op.join(res_path, "fwd", lock, f"{subject}-all-fwd.fif")
+        if not op.exists(fwd_fname) or overwrite:
+            fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,
+                                        src=src, bem=bem_fname,
+                                        meg=True, eeg=False,
+                                        mindist=5.0,
+                                        n_jobs=jobs,
+                                        verbose=True)
+            mne.write_forward_solution(fwd_fname, fwd, overwrite=True)
                 
         del epoch
         gc.collect()

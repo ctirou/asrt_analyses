@@ -27,7 +27,7 @@ figures_dir = FIGURES_DIR / "RSA" / "sensors"
 ensure_dir(figures_dir)
 
 all_highs, all_lows = [], []
-decoding, src_decoding = [], []
+decoding, pca_decod, no_pca_decod, max_power  = [], [], [], []
 patterns, randoms = [], []
 
 for subject in tqdm(subjects):
@@ -45,8 +45,12 @@ for subject in tqdm(subjects):
     res_path = RESULTS_DIR / 'decoding' / 'sensors' / lock / 'pattern'
     decoding.append(np.load(res_path / f"{subject}-all-scores.npy"))
     res_path = RESULTS_DIR / 'decoding' / 'source' / lock / 'pattern' / 'all'
-    src_decoding.append(np.load(res_path / f"{subject}-scores.npy"))
-    
+    pca_decod.append(np.load(res_path / f"{subject}-scores.npy"))
+    res_path = RESULTS_DIR / 'decoding' / 'source' / lock / 'pattern' / 'all-nopca'
+    no_pca_decod.append(np.load(res_path / f"{subject}-scores.npy"))
+    # res_path = RESULTS_DIR / 'decoding' / 'source' / lock / 'pattern' / 'max-power'
+    # max_power.append(np.load(res_path / f"{subject}-scores.npy"))
+    # Time generalization stuff    
     pat, rand = [], []
     timeg_path = TIMEG_DATA_DIR / 'results' / 'sensors' / lock
     for i in range(5):
@@ -56,7 +60,9 @@ for subject in tqdm(subjects):
     randoms.append(np.array(rand))
     
 decoding = np.array(decoding)
-src_decoding = np.array(src_decoding)
+pca_decod = np.array(pca_decod)
+no_pca_decod = np.array(no_pca_decod)
+max_power = np.array(max_power)
 
 patterns = np.array(patterns)
 randoms = np.array(randoms)
@@ -77,22 +83,12 @@ diff_sess = np.array(diff_sess).swapaxes(0, 1)
 
 learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices.csv', sep="\t", index_col=0)
 
-def sig_span(ax, sig, times, lab=True):
-    for i, (start, end) in enumerate(zip(times[:-1], times[1:])):
-        if sig[np.where(times == start)[0][0]]:
-            if lab:
-                label = 'Significant' if not any(sig[:i]) else None
-            else:
-                label = None
-            ax.axvspan(start, end, facecolor="#F2AD00", alpha=0.3, label=label, edgecolor=None)
-
-innerB = [['B1'],
-         ['B2']]
-innerD = [['D1'],
-          ['D2']]
+innerB = [['B1'], ['B2']]
+innerD = [['D1'], ['D2']]
+innerC = [['C1', 'C2']]
 
 outer = [['A', innerB],
-          ['C', innerD]]
+         [innerC, innerD]]
 
 fig, axd = plt.subplot_mosaic(outer, sharex=False, figsize=(16, 10))
 plt.rcParams.update({'font.size': 10, 'font.family': 'serif', 'font.serif': 'Avenir'})
@@ -100,7 +96,7 @@ for ax in axd.values():
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     ax.set_prop_cycle(cycler('color', colors['Darjeeling1']))
-    if ax not in [axd['A'], axd['C']]:
+    if ax not in [axd['A'], axd['C1'], axd['C2']]:
         if lock == 'stim':
             ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
         else:
@@ -117,25 +113,36 @@ sig = p_values < 0.05
 sem = np.std(decoding, axis=0) / np.sqrt(len(subjects))
 axd['A'].plot(times, decoding.mean(0), label='Sensor space', alpha=1)
 axd['A'].fill_between(times, decoding.mean(0) - sem, decoding.mean(0) + sem, alpha=0.2)
-axd['A'].fill_between(times, .23, .233, where=sig, alpha=0.4, color="#FF0000", capstyle='round')
-p_values = decod_stats(src_decoding - 0.25, -1)
+axd['A'].fill_between(times, .23, .233, where=sig, alpha=0.4, facecolor="#FF0000", capstyle='round')
+# p_values = decod_stats(pca_decod - 0.25, -1) # with pca
+# sig = p_values < 0.05
+# sem = np.std(pca_decod, axis=0) / np.sqrt(len(subjects))
+# axd['A'].plot(times, pca_decod.mean(0), color="#5BBCD6", label='Source space (PCA)' , alpha=1)
+# axd['A'].fill_between(times, pca_decod.mean(0) - sem, pca_decod.mean(0) + sem, alpha=0.2, color="#5BBCD6")
+# axd['A'].fill_between(times, .22, .223, where=sig, alpha=0.4, facecolor="#5BBCD6", capstyle='round')
+p_values = decod_stats(no_pca_decod - 0.25, -1)
 sig = p_values < 0.05
-sem = np.std(src_decoding, axis=0) / np.sqrt(len(subjects))
-axd['A'].plot(times, src_decoding.mean(0), color="#5BBCD6", label='Source space', alpha=1)
-axd['A'].fill_between(times, src_decoding.mean(0) - sem, src_decoding.mean(0) + sem, alpha=0.2, color="#5BBCD6")
-axd['A'].fill_between(times, .22, .223, where=sig, alpha=0.4, color="#5BBCD6", capstyle='round')
+sem = np.std(no_pca_decod, axis=0) / np.sqrt(len(subjects))
+axd['A'].plot(times, no_pca_decod.mean(0), color="#FFA07A", label='Source space', alpha=1)
+axd['A'].fill_between(times, no_pca_decod.mean(0) - sem, no_pca_decod.mean(0) + sem, alpha=0.2, color="#FFA07A")
+axd['A'].fill_between(times, .22, .223, where=sig, alpha=0.4, facecolor="#FFA07A", capstyle='round')
+# p_values = decod_stats(max_power - 0.25, -1)
+# sig = p_values < 0.05
+# sem = np.std(max_power, axis=0) / np.sqrt(len(subjects))
+# axd['A'].plot(times, max_power.mean(0), color="#F2AD00", label='Source space (max power)', alpha=1)
+# axd['A'].fill_between(times, max_power.mean(0) - sem, max_power.mean(0) + sem, alpha=0.2, color="#F2AD00")
 axd['A'].set_ylabel('Accuracy')
 axd['A'].legend(frameon=False)
 axd['A'].set_xlabel('Time (s)')
-axd['A'].set_title(f'Decoding of Pattern trials', style='italic')
+axd['A'].set_title(f'Decoding of pattern trials', style='italic')
             
 ### B1 ####        
 axd['B1'].plot(times, diff.mean(0), alpha=1, label='Random - Pattern', zorder=10)
 p_values = decod_stats(diff, -1)
 sig = p_values < 0.05
-sig_span(axd['B1'], sig, times)
 sem = np.std(diff, axis=0) / np.sqrt(len(subjects))
 axd['B1'].fill_between(times, diff.mean(0) - sem, diff.mean(0) + sem, alpha=0.2, zorder=5)
+axd["B1"].fill_between(times, 0, diff.mean(0) - sem, where=sig, alpha=0.3, label='Significance - corrected', facecolor="#F2AD00")
 axd['B1'].axhline(0, color='black', linestyle='dashed')
 axd['B1'].legend(frameon=False)
 axd['B1'].set_ylabel('Similarity index')
@@ -146,19 +153,18 @@ axd['B1'].set_title(f'Similarity index', style='italic')
 ### B2 ###
 sem_high = np.std(high, axis=0) / np.sqrt(len(subjects))
 sem_low = np.std(low, axis=0) / np.sqrt(len(subjects))
-sig_span(axd['B2'], sig, times, lab=False)
-axd['B2'].plot(times, high.mean(0), label='Pattern', alpha=1)
-axd['B2'].plot(times, low.mean(0), label='Random', alpha=1)
-axd['B2'].fill_between(times, high.mean(0) - sem_high, high.mean(0) + sem_high, alpha=0.2)
-axd['B2'].fill_between(times, low.mean(0) - sem_low, low.mean(0) + sem_low, alpha=0.2)
-# axd['B2'].fill_between(times, high.mean(0) + sem_high, low.mean(0) - sem_low, where=sig, alpha=0.3, label='Significant')
-# axd['B2'].legend(["_", 'Pattern', 'Random'])
+axd['B2'].plot(times, high.mean(0), label='Pattern', color="#FFA07A", alpha=1)
+axd['B2'].plot(times, low.mean(0), label='Random', color="#5BBCD6", alpha=1)
+axd['B2'].fill_between(times, high.mean(0) - sem_high, high.mean(0) + sem_high, alpha=0.2, color="#FFA07A")
+axd['B2'].fill_between(times, low.mean(0) - sem_low, low.mean(0) + sem_low, alpha=0.2, color="#5BBCD6")
+axd['B2'].fill_between(times, high.mean(0) + sem_high, low.mean(0) - sem_low, where=sig, alpha=0.3, facecolor="#F2AD00")
+axd['B2'].legend()
 axd['B2'].legend(frameon=False)
 axd['B2'].set_ylabel('cvMahalanobis')
 # axd['B2'].set_xticklabels([])
-axd['B2'].set_title(f'cvMahalanobis of Random and Pattern trials', style='italic')
+axd['B2'].set_title(f'cvMD within random and pattern elements', style='italic')
 
-### D1 ### put uncorrected
+### D1 ###
 rhos = np.array([[spear([0, 1, 2, 3, 4], diff_sess[sub, :, itime])[0] for itime in range(len(times))] for sub in range(len(subjects))])
 sem = np.std(rhos, axis=0) / np.sqrt(len(subjects))
 axd['D1'].plot(times, rhos.mean(0))
@@ -167,11 +173,13 @@ sig_unc = p_values_unc < 0.05
 p_values = decod_stats(rhos, -1)
 sig = p_values < .05
 axd['D1'].fill_between(times, rhos.mean(0) - sem, rhos.mean(0) + sem, alpha=0.2)
-# axd['D1'].fill_between(times, 0, rhos.mean(0), where=sig_unc, alpha=.2, label='Uncorrected')
-# axd['D1'].fill_between(times, 0, rhos.mean(0), where=sig, alpha=.3, label='Corrected')
+axd['D1'].fill_between(times, 0, rhos.mean(0) - sem, where=sig_unc, alpha=.3, label='Significance - uncorrected', facecolor="#7294D4")
+# axd['D1'].fill_between(times, -.5, -.503, where=sig_unc, alpha=.4, label='Uncorrected', color="#7294D4")
+# axd['D1'].fill_between(times, 0, rhos.mean(0) - sem, where=sig, alpha=.3, label='Corrected', color="#F2AD00")
 axd['D1'].axhline(0, color='black', linestyle='dashed')
 axd['D1'].set_ylabel("Spearman's rho")
 axd['D1'].set_xticklabels([])
+axd['D1'].legend(frameon=False, loc="lower right")
 axd['D1'].set_title(f'Within subject block correlation', style='italic')
 
 ### D2 ###
@@ -183,25 +191,97 @@ sig_unc = p_values_unc < 0.05
 p_values = decod_stats(all_rhos, -1)
 sig = p_values < 0.05
 axd['D2'].fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, alpha=0.2)
-# axd['D2'].fill_between(times, all_rhos.mean(0), 0, where=sig_unc, alpha=.2, label='Uncorrected')
-# axd['D2'].fill_between(times, all_rhos.mean(0), 0, where=sig, alpha=.4, label='Corrected')
+axd['D2'].fill_between(times, all_rhos.mean(0) - sem, 0, where=sig_unc, alpha=.3, label='Significance - uncorrected', facecolor="#7294D4")
+# axd['D2'].fill_between(times, -.5, -.503, where=sig_unc, alpha=.4, label='Uncorrected', color="#7294D4")
+# axd['D2'].fill_between(times, all_rhos.mean(0) - sem, 0, where=sig, alpha=.4, label='Corrected', color="#F2AD00")
 axd['D2'].axhline(0, color="black", linestyle="dashed")
 axd['D2'].set_ylabel("Spearman's rho")
 axd['D2'].set_xlabel('Time (s)')
+axd['D2'].legend(frameon=False, loc="lower right")
 axd['D2'].set_title(f'Within subject learning index correlation', style='italic')
 
-### C ###
-# correlation between rsa and learning index
+# Define a colormap for consistent subject coloring
+cmap = plt.cm.get_cmap('tab20', len(subjects))
+### C1 ###
+# Correlation between RSA and learning index
 idx_rsa = np.where((times >= 0.3) & (times <= 0.5))[0]
 mdiff = diff_sess[:, :, idx_rsa].mean(2)
-rhos, pvals = [], []
-for sess in range(5):
-    rho, pval = spear(learn_index_df.iloc[:, sess], mdiff[:, sess])
-    rhos.append(rho)
-    pvals.append(pval)
-rhos = np.array(rhos)
-pvals = np.array(pvals)
-sig = pvals < .05
+slopes, intercepts = [], []
+for sub, subject in enumerate(subjects):
+    # Linear fit
+    slope, intercept = np.polyfit(learn_index_df.iloc[sub], mdiff[sub], 1)
+    axd['C1'].plot(
+        learn_index_df.iloc[sub], 
+        slope * learn_index_df.iloc[sub] + intercept, 
+        alpha=0.6, 
+        label=f'{subject} Fit', 
+        color=cmap(sub))
+    # Scatter points for raw data
+    axd['C1'].scatter(
+        learn_index_df.iloc[sub], 
+        mdiff[sub], 
+        alpha=0.6, 
+        label=f'{subject} Data', 
+        color=cmap(sub), 
+        marker='o'
+    )
+    slopes.append(slope)
+    intercepts.append(intercept)
+# Mean fit line
+mean_slope, mean_intercept = np.mean(slopes), np.mean(intercepts)
+axd['C1'].plot(
+    learn_index_df.iloc[sub], 
+    mean_slope * learn_index_df.iloc[sub] + mean_intercept, 
+    color='black', 
+    lw=4, 
+    label='Mean Fit')
+# Labels, legend, and grid for C1
+axd['C1'].set_xlabel('Learning Index', fontsize=12)
+axd['C1'].set_ylabel('Similarity Index', fontsize=12)
+# axd['C1'].legend(frameon=False, fontsize=10, loc='upper left', ncol=2)
+axd['C1'].grid(True, linestyle='--', alpha=0.7)
+
+### C2 ###
+# Correlation between RSA and blocks
+sess = np.array([[0, 1, 2, 3, 4] for _ in range(len(subjects))])
+slopes, intercepts = [], []
+for sub, subject in enumerate(subjects):
+    # Linear fit
+    slope, intercept = np.polyfit(sess[sub], mdiff[sub], 1)
+    axd['C2'].plot(
+        sess[sub], 
+        slope * sess[sub] + intercept, 
+        alpha=0.6, 
+        label=f'{subject} Fit', 
+        color=cmap(sub))
+    # Scatter points for raw data
+    axd['C2'].scatter(
+        sess[sub], 
+        mdiff[sub], 
+        alpha=0.6, 
+        label=f'{subject} Data', 
+        color=cmap(sub), 
+        marker='o')
+    slopes.append(slope)
+    intercepts.append(intercept)
+# Mean fit line
+mean_slope, mean_intercept = np.mean(slopes), np.mean(intercepts)
+axd['C2'].plot(
+    sess[sub], 
+    mean_slope * sess[sub] + mean_intercept, 
+    color='black', 
+    lw=4, 
+    label='Mean Fit')
+# Labels, legend, and grid for C2
+axd['C2'].set_xlabel('Blocks', fontsize=12)
+axd['C2'].set_yticks([0, 1, 2, 3, 4])
+axd['C2'].sharey(axd['C1'])
+# axd['C2'].legend(frameon=False, fontsize=10, loc='upper left', ncol=2)
+axd['C2'].grid(True, linestyle='--', alpha=0.7)
+axd['C2'].set_yticklabels([])
+
+plt.savefig(figures_dir /  f"{lock}.pdf", transparent=True)
+plt.close()
 
 # correlation between rsa and time generalization
 idx_rsa = np.where((times >= .3) & (times <= .5))[0]
@@ -209,21 +289,49 @@ idx_timeg = np.where((timesg >= -.5 ) & (timesg <= 0))[0]
 rsa = diff_sess.copy()[:, :, idx_rsa].mean(2)
 contrasts = patterns - randoms
 timeg = np.array([[np.diag(coco[i, :, :]) for i in range(5)] for coco in contrasts])[:, :, idx_timeg].mean(2)
-rhos_sess = np.array([spear(rsa[:, sess], timeg[:, sess])[0] for sess in range(5)])
+slopes, intercepts = [], []
+fig, ax = plt.subplots(1, 1, figsize=(8, 5))
+ax.set_prop_cycle(cycler('color', colors['Darjeeling1'] + colors['Darjeeling2'] + colors['Moonrise3']))
+for sub, subject in enumerate(subjects):
+    slope, intercept = np.polyfit(timeg[sub], rsa[sub], 1)
+    ax.plot(timeg[sub], slope * timeg[sub] + intercept, alpha=0.6, label=subject)
+    slopes.append(slope)
+    intercepts.append(intercept)
+ax.plot(timeg[sub], np.mean(slopes) * timeg[sub] + np.mean(intercepts), color='black', lw=4, label='Mean')
+ax.set_xlabel('Time generalization')
+ax.set_ylabel('Similarity index')
+ax.legend(frameon=False)
 
-axd['C'].plot(range(5), np.nan_to_num(rhos), marker='o', alpha=0.6, label='RSA x Learning index')
-axd['C'].plot(range(5), np.nan_to_num(rhos_sess), marker='o', alpha=0.6, label='RSA x Time gen.')
-axd['C'].axhline(0, color='black', linestyle='dashed')
-axd['C'].set_xticks(range(5))
-axd['C'].set_xticklabels(['Practice'] + [f'Session {i}' for i in range(1, 5)])
-axd['C'].set_ylabel("Spearman's rho")
-axd['C'].legend(frameon=False)
-axd['C'].set_title(f'Correlations', style='italic')
+# ### C1 ###
+# # correlation between rsa and learning index
+# idx_rsa = np.where((times >= 0.3) & (times <= 0.5))[0]
+# mdiff = diff_sess[:, :, idx_rsa].mean(2)
+# slopes, intercepts = [], []
+# for sub, subject in enumerate(subjects):
+#     # Linear fit
+#     slope, intercept = np.polyfit(learn_index_df.iloc[sub], mdiff[sub], 1)
+#     axd['C1'].plot(learn_index_df.iloc[sub], slope * learn_index_df.iloc[sub] + intercept, alpha=0.6)
+#     slopes.append(slope)
+#     intercepts.append(intercept)
+# axd['C1'].plot(learn_index_df.iloc[sub], np.mean(slopes) * learn_index_df.iloc[sub] + np.mean(intercepts), color='black', lw=4, label='Mean fit')
+# axd['C1'].set_xlabel('Learning index')
+# axd['C1'].set_ylabel('Similarity index')
+# axd['C1'].legend(frameon=False)
 
-rhos_sub = np.array([spear(rsa[sub], timeg[sub])[0] for sub in range(len(subjects))])
-
-plt.savefig(figures_dir /  f"{lock}.pdf", transparent=True)
-plt.close()
+# ### C2 ###
+# # correlation between rsa and blocks
+# sess = np.array([[0, 1, 2, 3, 4] for _ in range(len(subjects))])
+# slopes, intercepts = [], []
+# for sub, subject in enumerate(subjects):
+#     # Linear fit
+#     slope, intercept = np.polyfit(sess[sub], mdiff[sub], 1)
+#     axd['C2'].plot(sess[sub], slope * sess[sub] + intercept, alpha=0.6)
+#     slopes.append(slope)
+#     intercepts.append(intercept)
+# axd['C2'].plot(sess[sub], np.mean(slopes) * sess[sub] + np.mean(intercepts), color='black', lw=4, label='Mean fit')
+# axd['C2'].set_xlabel('Blocks')
+# axd['C2'].set_xticks([0, 1, 2, 3, 4])
+# axd['C2'].sharey(axd['C1'])
 
 # for i, (rho, pval) in enumerate(zip(rhos, pvals)):
 #     if sig[i]:

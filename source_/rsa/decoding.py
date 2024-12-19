@@ -35,6 +35,8 @@ hemi = 'both'
 verbose = True
 jobs = -1
 
+overwrite = True
+
 # get times
 epoch_fname = DATA_DIR / lock / 'sub01-0-epo.fif'
 epochs = mne.read_epochs(epoch_fname, verbose=verbose)
@@ -47,9 +49,9 @@ clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000,
 clf = SlidingEstimator(clf, scoring=scoring, n_jobs=jobs, verbose=verbose)
 cv = StratifiedKFold(folds, shuffle=True)
 pca = UnsupervisedSpatialFilter(PCA(300), average=False)
-
+    
 for subject in subjects:
-            
+    
     epo_dir = data_path / lock
     epo_fnames = [epo_dir / f'{f}' for f in sorted(os.listdir(epo_dir)) if '.fif' in f and subject in f]
     all_epo = [mne.read_epochs(fname, preload=True, verbose="error") for fname in epo_fnames]
@@ -69,16 +71,9 @@ for subject in subjects:
         for epo in all_bsl:
             epo.info['dev_head_t'] = all_epo[0].info['dev_head_t']
         epoch_bsl = mne.concatenate_epochs(all_bsl)
-
-    # read forward solution    
-    # fwd_fname = res_path / analysis / "fwd" / lock / f"{subject}-mixed-lh-fwd.fif"
-    # fwd = mne.read_forward_solution(fwd_fname, ordered=False, verbose=verbose)
-    # labels = mne.get_volume_labels_from_src(fwd['src'], subject, subjects_dir)
     
     src_fname = res_path / "src" / f"{subject}-src.fif"
     src = mne.read_source_spaces(src_fname, verbose=verbose)
-    bem_fname = res_path / "bem" / f"{subject}-bem-sol.fif"    
-
     # compute data covariance matrix on evoked data
     data_cov = mne.compute_covariance(epoch, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
     # compute noise covariance
@@ -86,77 +81,70 @@ for subject in subjects:
         noise_cov = mne.compute_covariance(epoch_bsl, method="empirical", rank="info", verbose=verbose)
     else:
         noise_cov = mne.compute_covariance(epoch, tmin=-.2, tmax=0, method="empirical", rank="info", verbose=verbose)
-    info = epoch.info
     # conpute rank
-    rank = mne.compute_rank(noise_cov, info=info, rank=None, tol_kind='relative', verbose=verbose)
-    trans_fname = os.path.join(res_path, "trans", lock, "%s-all-trans.fif" % (subject))
-
-    # compute forward solution
-    fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,
-                                src=src, bem=bem_fname,
-                                meg=True, eeg=False,
-                                mindist=5.0,
-                                n_jobs=jobs,
-                                verbose=verbose)
-
-    # compute source estimates
-    filters = make_lcmv(info, fwd, data_cov=data_cov, noise_cov=noise_cov,
-                    pick_ori=None, rank=rank, reduce_rank=True, verbose=verbose)
+    # rank = mne.compute_rank(noise_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)
+    # read forward solution
+    fwd_fname = res_path / "fwd" / lock / f"{subject}-all-fwd.fif"
+    fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
+    
+    filters = make_lcmv(epoch.info, fwd, data_cov=data_cov, noise_cov=noise_cov,
+                    pick_ori=None, rank='info', reg=0.05, reduce_rank=True, verbose=verbose)    
     stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
     
-    stcs_data = np.array([stc.data for stc in stcs])
-    X = pca.fit_transform(stcs_data)
     pattern = behav.trialtypes == 1
-    X = stcs_data[pattern]
+    stcs_data = np.array([stc.data for stc in stcs])[pattern]
+    X = pca.fit_transform(stcs_data)
+    # X = stcs_data.copy()
     y = behav.positions[pattern].reset_index(drop=True)
     assert X.shape[0] == y.shape[0]
     
-    score_path = RESULTS_DIR / analysis / 'source' / lock / trial_type / 'all'
+    score_path = RESULTS_DIR / analysis / 'source' / lock / trial_type / 'max-power'
     ensure_dir(score_path)
-    if not op.exists(score_path / f"{subject}-scores.npy"):
+    if not op.exists(score_path / f"{subject}-scores.npy") or overwrite:
         scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=verbose)
         np.save(score_path / f"{subject}-scores.npy", scores.mean(0))
-        
-    all_labels = mne.read_labels_from_annot(subject=subject, parc=parc, hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
-    labels = [label for label in all_labels if label.name in SURFACE_LABELS_RT]
     
-    del epoch, fwd, src, data_cov, noise_cov, rank, info, filters
-    gc.collect()
+
+all_labels = mne.read_labels_from_annot(subject=subject, parc=parc, hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
+labels = [label for label in all_labels if label.name in SURFACE_LABELS_RT]
+
+del epoch, fwd, src, data_cov, noise_cov, filters
+gc.collect()
+
+for ilabel, label in enumerate(labels):
     
-    for ilabel, label in enumerate(labels):
-        
-        print(subject, f"{str(ilabel+1).zfill(2)}/{len(labels)}", label.name)
-        # results dir
-        res_dir = res_path / analysis / 'source' / lock / trial_type / label.name
-        ensure_dir(res_dir)
-        
-        # get stcs in label
-        stcs_data = [stc.in_label(label).data for stc in stcs] # stc.in_label() doesn't work anymore for volume source space            
-        stcs_data = np.array(stcs_data)
-        assert len(stcs_data) == len(behav)
-
-        if trial_type == 'pattern':
-            pattern = behav.trialtypes == 1
-            X = stcs_data[pattern]
-            y = behav.positions[pattern]
-        elif trial_type == 'random':
-            random = behav.trialtypes == 2
-            X = stcs_data[random]
-            y = behav.positions[random]
-        else:
-            X = stcs_data
-            y = behav.positions
-        y = y.reset_index(drop=True)            
-        assert X.shape[0] == y.shape[0]
-
-        del stcs_data
-        gc.collect()
-
-        scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=verbose)
-        np.save(res_dir / f"{subject}-scores.npy", scores.mean(0))
+    print(subject, f"{str(ilabel+1).zfill(2)}/{len(labels)}", label.name)
+    # results dir
+    res_dir = res_path / analysis / 'source' / lock / trial_type / label.name
+    ensure_dir(res_dir)
             
-        del X, y, scores
-        gc.collect()
+    # get stcs in label
+    stcs_data = [stc.in_label(label).data for stc in stcs] # stc.in_label() doesn't work anymore for volume source space            
+    stcs_data = np.array(stcs_data)
+    assert len(stcs_data) == len(behav)
+
+    if trial_type == 'pattern':
+        pattern = behav.trialtypes == 1
+        X = stcs_data[pattern]
+        y = behav.positions[pattern]
+    elif trial_type == 'random':
+        random = behav.trialtypes == 2
+        X = stcs_data[random]
+        y = behav.positions[random]
+    else:
+        X = stcs_data
+        y = behav.positions
+    y = y.reset_index(drop=True)            
+    assert X.shape[0] == y.shape[0]
+
+    del stcs_data
+    gc.collect()
+
+    scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=verbose)
+    np.save(res_dir / f"{subject}-scores.npy", scores.mean(0))
+        
+    del X, y, scores
+    gc.collect()
     
 labels = mne.get_volume_labels_from_src(fwd['src'], subject, subjects_dir)
 label_tc = get_volume_estimate_time_course(stcs, fwd, subject, subjects_dir)

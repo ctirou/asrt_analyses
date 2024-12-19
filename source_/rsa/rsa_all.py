@@ -21,19 +21,18 @@ overwrite = True
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
 def process_subject(subject, lock, jobs, rsync):
-    # get label names
-    best_labels = SURFACE_LABELS if lock == 'stim' else SURFACE_LABELS_RT
+    # # get label names
+    # best_labels = SURFACE_LABELS if lock == 'stim' else SURFACE_LABELS_RT
 
-    # get labels
-    all_labels = mne.read_labels_from_annot(subject=subject, parc=parc, hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
-    labels = [label for label in all_labels if label.name in best_labels]
+    # # get labels
+    # all_labels = mne.read_labels_from_annot(subject=subject, parc=parc, hemi=hemi, subjects_dir=subjects_dir, verbose=verbose)
+    # labels = [label for label in all_labels if label.name in best_labels]
     
-    del all_labels
-    gc.collect()
+    # del all_labels
+    # gc.collect()
     
-    src_fname = RESULTS_DIR / "src" / f"{subject}-src.fif"
-    src = mne.read_source_spaces(src_fname, verbose=verbose)
-    bem_fname = RESULTS_DIR / "bem" / f"{subject}-bem-sol.fif"    
+    res_path = RESULTS_DIR / analysis / 'source' / 'all-nopca' / lock / 'rdm' / subject
+    ensure_dir(res_path)
     
     for epoch_num in [0, 1, 2, 3, 4]:
         
@@ -51,70 +50,81 @@ def process_subject(subject, lock, jobs, rsync):
             noise_cov = mne.compute_covariance(epoch_bsl, method="empirical", rank="info", verbose=verbose)
         else:
             noise_cov = mne.compute_covariance(epoch, tmin=-.2, tmax=0, method="empirical", rank="info", verbose=verbose)
-            
-        # read forward solution    
-        # fwd_fname = RESULTS_DIR / "fwd" / lock / f"{subject}-{epoch_num}-fwd.fif"
-        # fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
-        # compute data covariance matrix on evoked data
+        # compute data covariance matrix
         data_cov = mne.compute_covariance(epoch, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
-
-        info = epoch.info
         # conpute rank
-        rank = mne.compute_rank(noise_cov, info=info, rank=None, tol_kind='relative', verbose=verbose)
-        trans_fname = os.path.join(RESULTS_DIR, "trans", lock, "%s-%i-trans.fif" % (subject, epoch_num))
-        fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,
-                                    src=src, bem=bem_fname,
-                                    meg=True, eeg=False,
-                                    mindist=5.0,
-                                    n_jobs=jobs,
-                                    verbose=verbose)
+        rank = mne.compute_rank(noise_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)
+        # read forward solution
+        fwd_fname = RESULTS_DIR / "fwd" / lock / f"{subject}-{epoch_num}-fwd.fif"
+        fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
         # compute source estimates
-        filters = make_lcmv(info, fwd, data_cov=data_cov, noise_cov=noise_cov,
-                        pick_ori=None, rank=rank, reduce_rank=True, verbose=verbose)
+        filters = make_lcmv(epoch.info, fwd, data_cov=data_cov, noise_cov=noise_cov,
+                        pick_ori=None, rank='info', reg=0.05, reduce_rank=True, verbose=verbose)    
         stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
         
-        del epoch, epoch_fname, behav_fname, fwd, data_cov, noise_cov, rank, info, filters
+        del epoch, epoch_fname, behav_fname, fwd, data_cov, noise_cov, rank, filters
         gc.collect()
+        
+        stcs_data = np.array([stc.data for stc in stcs])
+        assert len(stcs_data) == len(behav)
 
-        # loop across labels
-        for ilabel, label in enumerate(labels):
-            print(f"{str(ilabel+1).zfill(2)}/{len(labels)}", subject, epoch_num, label.name)
-            
-            res_path = RESULTS_DIR / analysis / 'source' / label.name / lock / 'rdm' / subject
+        pattern = behav.trialtypes == 1
+        X_pat = stcs_data[pattern]
+        y_pat = behav.positions[pattern].reset_index(drop=True)
+        assert X_pat.shape[0] == y_pat.shape[0]
+        rdm_pat = cv_mahalanobis(X_pat, y_pat)
+        np.save(res_path / f"pat-{epoch_num}.npy", rdm_pat)
 
-            if not op.exists(res_path / f"pat-{epoch_num}.npy") or not op.exists(res_path / f"rand-{epoch_num}.npy") or overwrite:
-                ensure_dir(res_path)
-
-                # get stcs in label
-                stcs_data = [stc.in_label(label).data for stc in stcs]
-                stcs_data = np.array(stcs_data)
-                assert len(stcs_data) == len(behav)
-
-                pattern = behav.trialtypes == 1
-                X_pat = stcs_data[pattern]
-                y_pat = behav.positions[pattern]
-                assert X_pat.shape[0] == y_pat.shape[0]
-                rdm_pat = get_rdm(X_pat, y_pat)
-                np.save(res_path / f"pat-{epoch_num}.npy", rdm_pat)
-
-                random = behav.trialtypes == 2
-                X_rand = stcs_data[random]
-                y_rand = behav.positions[random]
-                assert X_rand.shape[0] == y_rand.shape[0]
-                rdm_rand = get_rdm(X_rand, y_rand)
-                np.save(res_path / f"rand-{epoch_num}.npy", rdm_rand)
-            
-            del stcs_data, X_pat, y_pat, X_rand, y_rand
-            gc.collect()
+        random = behav.trialtypes == 2
+        X_rand = stcs_data[random]
+        y_rand = behav.positions[random].reset_index(drop=True)
+        assert X_rand.shape[0] == y_rand.shape[0]
+        rdm_rand = cv_mahalanobis(X_rand, y_rand)
+        np.save(res_path / f"rand-{epoch_num}.npy", rdm_rand)
+        
+        del stcs, stcs_data, X_pat, y_pat, X_rand, y_rand
+        gc.collect()
     
-    del labels, stcs
-    gc.collect()
+
+    #     # loop across labels
+    #     for ilabel, label in enumerate(labels):
+    #         print(f"{str(ilabel+1).zfill(2)}/{len(labels)}", subject, epoch_num, label.name)
+            
+    #         res_path = RESULTS_DIR / analysis / 'source' / label.name / lock / 'rdm' / subject
+
+    #         if not op.exists(res_path / f"pat-{epoch_num}.npy") or not op.exists(res_path / f"rand-{epoch_num}.npy") or overwrite:
+    #             ensure_dir(res_path)
+
+    #             # get stcs in label
+    #             stcs_data = [stc.in_label(label).data for stc in stcs]
+    #             stcs_data = np.array(stcs_data)
+    #             assert len(stcs_data) == len(behav)
+
+    #             pattern = behav.trialtypes == 1
+    #             X_pat = stcs_data[pattern]
+    #             y_pat = behav.positions[pattern]
+    #             assert X_pat.shape[0] == y_pat.shape[0]
+    #             rdm_pat = get_rdm(X_pat, y_pat)
+    #             np.save(res_path / f"pat-{epoch_num}.npy", rdm_pat)
+
+    #             random = behav.trialtypes == 2
+    #             X_rand = stcs_data[random]
+    #             y_rand = behav.positions[random]
+    #             assert X_rand.shape[0] == y_rand.shape[0]
+    #             rdm_rand = get_rdm(X_rand, y_rand)
+    #             np.save(res_path / f"rand-{epoch_num}.npy", rdm_rand)
+            
+    #         del stcs_data, X_pat, y_pat, X_rand, y_rand
+    #         gc.collect()
     
-    if rsync:
-        source = RESULTS_DIR / analysis / 'source'
-        destination = "coum@crnl-dycog369.crnl.local:/Users/coum/Desktop/asrt/results/RSA/"
-        options = "-av"
-        rsync_files(source, destination, options)
+    # del labels, stcs
+    # gc.collect()
+    
+    # if rsync:
+    #     source = RESULTS_DIR / analysis / 'source'
+    #     destination = "coum@crnl-dycog369.crnl.local:/Users/coum/Desktop/asrt/results/RSA/"
+    #     options = "-av"
+    #     rsync_files(source, destination, options)
     
 if is_cluster:
     lock = str(sys.argv[1])
