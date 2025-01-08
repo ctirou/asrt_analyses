@@ -16,8 +16,8 @@ import gc
 # params
 subjects, epochs_list = SUBJS, EPOCHS
 
-lock = "button" # "stim", "button"
-trial_type = 'pattern' # "all", "pattern", or "random"
+lock = "stim" # "stim", "button"
+trial_type = 'all' # "all", "pattern", or "random"
 data_path = DATA_DIR
 subjects_dir = FREESURFER_DIR
 res_path = RESULTS_DIR
@@ -26,21 +26,14 @@ ensure_dir(res_path)
 folds = 10
 solver = 'lbfgs'
 scoring = "accuracy"
-verbose = True
+verbose = 'error'
 jobs = -1
 parc = 'aparc'
 overwrite = False
 
-# # get times
-# epoch_fname = DATA_DIR / lock / 'sub01-0-epo.fif'
-# epochs = mne.read_epochs(epoch_fname, verbose=verbose)
-# times = epochs.times
-# del epochs, epoch_fname
-# gc.collect()
-
 # set-up the classifier and cv structure
 clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
-clf = SlidingEstimator(clf, scoring=scoring, n_jobs=jobs, verbose=verbose)
+clf = SlidingEstimator(clf, scoring=scoring, n_jobs=jobs, verbose=True)
 cv = StratifiedKFold(folds, shuffle=True)
 
 vertices_df = dict()
@@ -59,7 +52,8 @@ for subject in subjects:
     # to store info on vertices
     sub_vertices_info = dict()
 
-    for hemi in ['lh', 'rh', 'others']:
+    # for hemi in ['lh', 'rh', 'others']:
+    for hemi in ['lh', 'rh']:
         # create mixed source space
         vol_src_fname = op.join(res_path, "src", "%s-%s-vol-src.fif" % (subject, hemi))
         vol_src = mne.read_source_spaces(vol_src_fname, verbose=verbose)
@@ -84,6 +78,7 @@ for subject in subjects:
             # path to trans file
             trans_fname = os.path.join(res_path, "trans", lock, "%s-%i-trans.fif" % (subject, epoch_num))
             # compute forward solution
+            fwd_fname = op.join(res_path, "fwd", lock, f"{subject}-{epoch_num}-fwd.fif")
             fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,
                                         src=mixed_src, bem=bem_fname,
                                         meg=True, eeg=False,
@@ -121,36 +116,38 @@ for subject in subjects:
         offsets = np.cumsum([0] + [len(s["vertno"]) for s in vol_src])
         label_tc, vertices_info = get_volume_estimate_tc(all_stcs, fwd, offsets, subject, subjects_dir)
         # subcortex labels
-        labels_subcx = list(label_tc.keys())
+        # labels_subcx = list(label_tc.keys())
+        labels_subcx = [label for label in label_tc.keys() if label in ['Hippocampus-lh', 'Hippocampus-rh', 'Thalamus-Proper-lh', 'Thalamus-Proper-rh']]
         sub_vertices_info.update(vertices_info)
         del vol_src, mixed_src, fwd, offsets
         gc.collect()
-
-        for ilabel, label in enumerate(labels_subcx):
-            print(subject, lock, trial_type, hemi, f"{str(ilabel+1).zfill(2)}/{len(labels_subcx)}", label) 
-            # results dir
-            res_dir = res_path / 'source' / lock / trial_type / label
-            ensure_dir(res_dir)
-            if not os.path.exists(res_dir / f"{subject}-scores.npy") or overwrite:
-                if trial_type == 'pattern':    
-                    pattern = behav.trialtypes == 1
-                    X = label_tc[label][pattern]
-                    y = behav.positions[pattern]
-                elif trial_type == 'random':
-                    random = behav.trialtypes == 2
-                    X = label_tc[label][random]
-                    y = behav.positions[random]
-                else:
-                    X = label_tc[label]
-                    y = behav.positions
-                y = y.reset_index(drop=True)            
-                assert X.shape[0] == y.shape[0]
-                if X.shape[1] < 1:
-                    continue            
-                scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=verbose)
-                np.save(res_dir / f"{subject}-scores.npy", scores.mean(0))
-                del X, y, scores
-                gc.collect()
+        
+        if labels_subcx: 
+            for ilabel, label in enumerate(labels_subcx):
+                print(subject, lock, trial_type, hemi, f"{str(ilabel+1).zfill(2)}/{len(labels_subcx)}", label) 
+                # results dir
+                res_dir = res_path / 'source' / lock / trial_type / label
+                ensure_dir(res_dir)
+                if not os.path.exists(res_dir / f"{subject}-scores.npy") or overwrite:
+                    if trial_type == 'pattern':    
+                        pattern = behav.trialtypes == 1
+                        X = label_tc[label][pattern]
+                        y = behav.positions[pattern]
+                    elif trial_type == 'random':
+                        random = behav.trialtypes == 2
+                        X = label_tc[label][random]
+                        y = behav.positions[random]
+                    else:
+                        X = label_tc[label]
+                        y = behav.positions
+                    y = y.reset_index(drop=True)            
+                    assert X.shape[0] == y.shape[0]
+                    if X.shape[1] < 1:
+                        continue            
+                    scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=True)
+                    np.save(res_dir / f"{subject}-scores.npy", scores.mean(0))
+                    del X, y, scores
+                    gc.collect()
         
         del label_tc, labels_subcx
         gc.collect()

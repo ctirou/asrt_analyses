@@ -113,25 +113,7 @@ sig = p_values < 0.05
 sem = np.std(decoding, axis=0) / np.sqrt(len(subjects))
 axd['A'].plot(times, decoding.mean(0), alpha=1)
 axd['A'].fill_between(times, decoding.mean(0) - sem, decoding.mean(0) + sem, alpha=0.2)
-# axd['A'].fill_between(times, .23, .233, where=sig, alpha=0.4, facecolor="#FF0000", capstyle='round')
 axd['A'].fill_between(times, decoding.mean(0) - sem, .25, where=sig, alpha=0.3, facecolor="#F2AD00", capstyle='round', label='Significance - corrected')
-# p_values = decod_stats(pca_decod - 0.25, -1) # with pca
-# sig = p_values < 0.05
-# sem = np.std(pca_decod, axis=0) / np.sqrt(len(subjects))
-# axd['A'].plot(times, pca_decod.mean(0), color="#5BBCD6", label='Source space (PCA)' , alpha=1)
-# axd['A'].fill_between(times, pca_decod.mean(0) - sem, pca_decod.mean(0) + sem, alpha=0.2, color="#5BBCD6")
-# axd['A'].fill_between(times, .22, .223, where=sig, alpha=0.4, facecolor="#5BBCD6", capstyle='round')
-# p_values = decod_stats(no_pca_decod - 0.25, -1)
-# sig = p_values < 0.05
-# sem = np.std(no_pca_decod, axis=0) / np.sqrt(len(subjects))
-# axd['A'].plot(times, no_pca_decod.mean(0), color="#FFA07A", label='Source space', alpha=1)
-# axd['A'].fill_between(times, no_pca_decod.mean(0) - sem, no_pca_decod.mean(0) + sem, alpha=0.2, color="#FFA07A")
-# axd['A'].fill_between(times, .22, .223, where=sig, alpha=0.4, facecolor="#FFA07A", capstyle='round')
-# p_values = decod_stats(max_power - 0.25, -1)
-# sig = p_values < 0.05
-# sem = np.std(max_power, axis=0) / np.sqrt(len(subjects))
-# axd['A'].plot(times, max_power.mean(0), color="#F2AD00", label='Source space (max power)', alpha=1)
-# axd['A'].fill_between(times, max_power.mean(0) - sem, max_power.mean(0) + sem, alpha=0.2, color="#F2AD00")
 axd['A'].set_ylabel('Accuracy', fontsize=12)
 axd['A'].legend(loc='upper left', frameon=False)
 axd['A'].set_xlabel('Time (s)', fontsize=12)

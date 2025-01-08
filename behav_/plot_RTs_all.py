@@ -149,8 +149,21 @@ ax.set_xticklabels(['Practice', '1', '2', '3', '4'])
 plt.tight_layout()
 fig.savefig(figures_dir / 'behav' / 'mean_RT.pdf', transparent=True)
 
+# Plot learning index as a histogram
+fig, ax = plt.subplots(1, 1, figsize=(8, 5))
+ax.autoscale()
+learning_indices_mean = learn_index_df.mean(axis=0)
+learning_indices_stderr = learn_index_df.sem(axis=0)
+ax.bar(sessions, learning_indices_mean, yerr=learning_indices_stderr, alpha=0.7, capsize=5)
+ax.set_xlabel("Session")
+ax.set_ylabel("Learning Index")
+ax.spines['top'].set_visible(False)
+ax.spines['right'].set_visible(False)
+plt.tight_layout()
+fig.savefig(figures_dir / 'behav' / 'learning_index_all.pdf', transparent=True)
+
 # combined RT and learning index
-fig, ax = plt.subplots(1, 1, figsize=(7, 7), layout="tight")
+fig, ax = plt.subplots(1, 1, figsize=(6, 6), layout="tight")
 plt.rcParams.update({'font.family': 'serif', 'font.serif': 'Avenir'})
 ax.autoscale()
 # Scatter plot individual subject values
@@ -192,16 +205,4 @@ axlow.set_xlabel("Session", fontsize=12)
 axlow.set_ylim(bottom=0)  # Set the lower limit of the y-axis to 0 to reduce the height
 fig.savefig(figures_dir / 'behav' / 'combined.pdf', transparent=True)
 
-# Plot learning index as a histogram
-fig, ax = plt.subplots(1, 1, figsize=(8, 5))
-ax.autoscale()
-learning_indices_mean = learn_index_df.mean(axis=0)
-learning_indices_stderr = learn_index_df.sem(axis=0)
-ax.bar(sessions, learning_indices_mean, yerr=learning_indices_stderr, alpha=0.7, capsize=5)
-ax.set_xlabel("Session")
-ax.set_ylabel("Learning Index")
-ax.spines['top'].set_visible(False)
-ax.spines['right'].set_visible(False)
-plt.tight_layout()
-fig.savefig(figures_dir / 'behav' / 'learning_index_all.pdf', transparent=True)
 

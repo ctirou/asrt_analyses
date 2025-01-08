@@ -17,7 +17,7 @@ data_path = DATA_DIR
 subjects_dir = FREESURFER_DIR
 parc = 'aparc'
 hemi = 'both'
-verbose = 'error'
+verbose = True
 overwrite = True
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
@@ -28,10 +28,6 @@ def process_subject(subject, lock, jobs, rsync):
     n_networks = 7
     # networks = (NEW_LABELS + schaefer_7) if n_networks == 7 else (NEW_LABELS + schaefer_17)
     networks = schaefer_7 if n_networks == 7 else schaefer_17
-        
-    src_fname = RESULTS_DIR / "src" / f"{subject}-src.fif"
-    src = mne.read_source_spaces(src_fname, verbose=verbose)
-    bem_fname = RESULTS_DIR / "bem" / f"{subject}-bem-sol.fif"    
     
     label_path = RESULTS_DIR / f'networks_{n_parcels}_{n_networks}' / subject
     
@@ -53,21 +49,20 @@ def process_subject(subject, lock, jobs, rsync):
             noise_cov = mne.compute_covariance(epoch, tmin=-.2, tmax=0, method="empirical", rank="info", verbose=verbose)
             
         # read forward solution    
-        # fwd_fname = RESULTS_DIR / "fwd" / lock / f"{subject}-{epoch_num}-fwd.fif"
-        # fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
+        fwd_fname = RESULTS_DIR / "fwd" / lock / f"{subject}-{epoch_num}-fwd.fif"
+        fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
         # compute data covariance matrix on evoked data
         data_cov = mne.compute_covariance(epoch, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
-
         info = epoch.info
         # conpute rank
         rank = mne.compute_rank(noise_cov, info=info, rank=None, tol_kind='relative', verbose=verbose)
         trans_fname = os.path.join(RESULTS_DIR, "trans", lock, "%s-%i-trans.fif" % (subject, epoch_num))
-        fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,
-                                    src=src, bem=bem_fname,
-                                    meg=True, eeg=False,
-                                    mindist=5.0,
-                                    n_jobs=jobs,
-                                    verbose=verbose)
+        # fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,
+        #                             src=src, bem=bem_fname,
+        #                             meg=True, eeg=False,
+        #                             mindist=5.0,
+        #                             n_jobs=jobs,
+        #                             verbose=verbose)
         # compute source estimates
         filters = make_lcmv(info, fwd, data_cov=data_cov, noise_cov=noise_cov,
                         pick_ori=None, rank=rank, reduce_rank=True, verbose=verbose)
@@ -76,7 +71,7 @@ def process_subject(subject, lock, jobs, rsync):
         del epoch, epoch_fname, behav_fname, fwd, data_cov, noise_cov, rank, info, filters
         gc.collect()
 
-        for inetwork, network in enumerate(networks):
+        for inetwork, network in enumerate(networks[:-2]):
             
             res_path = RESULTS_DIR / "RSA" / 'source' / f'networks_{n_parcels}_{n_networks}' / network / lock / 'rdm' / subject
             ensure_dir(res_path)
