@@ -90,7 +90,7 @@ innerC = [['C1', 'C2']]
 outer = [['A', innerB],
          [innerC, innerD]]
 
-fig, axd = plt.subplot_mosaic(outer, sharex=False, figsize=(16, 10))
+fig, axd = plt.subplot_mosaic(outer, sharex=False, figsize=(16, 11), layout='tight')
 plt.rcParams.update({'font.size': 10, 'font.family': 'serif', 'font.serif': 'Avenir'})
 for ax in axd.values():
     ax.spines['top'].set_visible(False)
@@ -101,8 +101,8 @@ for ax in axd.values():
             ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
         else:
             ax.axvline(0, color='black')
-
-### A ###            
+            
+### A ### Decoding
 if lock == 'stim':
     axd['A'].axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1, label='Stimulus onset')
 else:
@@ -114,12 +114,12 @@ sem = np.std(decoding, axis=0) / np.sqrt(len(subjects))
 axd['A'].plot(times, decoding.mean(0), alpha=1)
 axd['A'].fill_between(times, decoding.mean(0) - sem, decoding.mean(0) + sem, alpha=0.2)
 axd['A'].fill_between(times, decoding.mean(0) - sem, .25, where=sig, alpha=0.3, facecolor="#F2AD00", capstyle='round', label='Significance - corrected')
-axd['A'].set_ylabel('Accuracy', fontsize=12)
+axd['A'].set_ylabel('Accuracy', fontsize=11)
 axd['A'].legend(loc='upper left', frameon=False)
-axd['A'].set_xlabel('Time (s)', fontsize=12)
-axd['A'].set_title(f'Sensor space decoding of pattern trials', style='italic')
-            
-### B1 ####        
+axd['A'].set_xlabel('Time (s)', fontsize=11)
+axd['A'].set_title(f'Sensor space decoding', style='italic', fontsize=13)
+
+### B1 ### Similarity index
 axd['B1'].axhline(0, color='grey', alpha=0.5)
 axd['B1'].plot(times, diff.mean(0), alpha=1, label='Random - Pattern', zorder=10)
 p_values = decod_stats(diff, -1)
@@ -128,12 +128,12 @@ sem = np.std(diff, axis=0) / np.sqrt(len(subjects))
 axd['B1'].fill_between(times, diff.mean(0) - sem, diff.mean(0) + sem, alpha=0.2, zorder=5)
 axd["B1"].fill_between(times, 0, diff.mean(0) - sem, where=sig, alpha=0.3, label='Significance - corrected', facecolor="#F2AD00")
 axd['B1'].legend(frameon=False)
-axd['B1'].set_ylabel('Similarity index', fontsize=12)
+axd['B1'].set_ylabel('Similarity index', fontsize=11)
 axd['B1'].yaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter('%.2f'))
 axd['B1'].set_xticklabels([])
-axd['B1'].set_title(f'Similarity index', style='italic')
+axd['B1'].set_title(f'Similarity index', style='italic', fontsize=13)
 
-### B2 ###
+### B2 ### cvMD
 sem_high = np.std(high, axis=0) / np.sqrt(len(subjects))
 sem_low = np.std(low, axis=0) / np.sqrt(len(subjects))
 axd['B2'].plot(times, high.mean(0), label='Pattern', color="#FFA07A", alpha=1)
@@ -142,11 +142,11 @@ axd['B2'].fill_between(times, high.mean(0) - sem_high, high.mean(0) + sem_high, 
 axd['B2'].fill_between(times, low.mean(0) - sem_low, low.mean(0) + sem_low, alpha=0.2, color="#5BBCD6")
 axd['B2'].fill_between(times, high.mean(0) + sem_high, low.mean(0) - sem_low, where=sig, alpha=0.3, facecolor="#F2AD00", label='Significance - corrected')
 axd['B2'].legend(frameon=False)
-axd['B2'].set_ylabel('cvMD', fontsize=12)
+axd['B2'].set_ylabel('cvMD', fontsize=11)
 # axd['B2'].set_xticklabels([])
-axd['B2'].set_title(f'cvMD within random and pattern elements', style='italic')
+axd['B2'].set_title(f'cvMD within random and pattern elements', style='italic', fontsize=13)
 
-### D1 ###
+### D1 ### Within subject block correlation
 axd['D1'].axhline(0, color='grey', alpha=0.5)
 rhos = np.array([[spear([0, 1, 2, 3, 4], diff_sess[sub, :, itime])[0] for itime in range(len(times))] for sub in range(len(subjects))])
 sem = np.std(rhos, axis=0) / np.sqrt(len(subjects))
@@ -157,14 +157,13 @@ p_values = decod_stats(rhos, -1)
 sig = p_values < .05
 axd['D1'].fill_between(times, rhos.mean(0) - sem, rhos.mean(0) + sem, alpha=0.2)
 axd['D1'].fill_between(times, 0, rhos.mean(0) - sem, where=sig_unc, alpha=.3, label='Significance - uncorrected', facecolor="#7294D4")
-# axd['D1'].fill_between(times, -.5, -.503, where=sig_unc, alpha=.4, label='Uncorrected', color="#7294D4")
-# axd['D1'].fill_between(times, 0, rhos.mean(0) - sem, where=sig, alpha=.3, label='Corrected', color="#F2AD00")
-axd['D1'].set_ylabel("Spearman's rho", fontsize=12)
+axd['D1'].fill_between(times, 0, rhos.mean(0) - sem, where=sig, alpha=.3, facecolor="#F2AD00", label='Significance - corrected')
+axd['D1'].set_ylabel("Spearman's rho", fontsize=11)
 axd['D1'].set_xticklabels([])
 axd['D1'].legend(frameon=False, loc="lower right")
-axd['D1'].set_title(f'Within subject block correlation', style='italic')
+axd['D1'].set_title(f'Within subject block correlation', style='italic', fontsize=13)
 
-### D2 ###
+### D2 ### Within subject learning index correlation
 axd['D2'].axhline(0, color="grey", alpha=0.5)
 all_rhos = np.array([[spear(learn_index_df.iloc[sub, :], diff_sess[sub, :, t])[0] for t in range(len(times))] for sub in range(len(subjects))])
 sem = np.std(all_rhos, axis=0) / np.sqrt(len(subjects))
@@ -175,33 +174,31 @@ p_values = decod_stats(all_rhos, -1)
 sig = p_values < 0.05
 axd['D2'].fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, alpha=0.2)
 axd['D2'].fill_between(times, all_rhos.mean(0) - sem, 0, where=sig_unc, alpha=.3, label='Significance - uncorrected', facecolor="#7294D4")
-# axd['D2'].fill_between(times, -.5, -.503, where=sig_unc, alpha=.4, label='Uncorrected', color="#7294D4")
-# axd['D2'].fill_between(times, all_rhos.mean(0) - sem, 0, where=sig, alpha=.4, label='Corrected', color="#F2AD00")
-axd['D2'].set_ylabel("Spearman's rho", fontsize=12)
-axd['D2'].set_xlabel('Time (s)', fontsize=12)
+axd['D2'].fill_between(times, all_rhos.mean(0) - sem, 0, where=sig, alpha=.4, facecolor="#F2AD00", label='Significance - corrected')
+axd['D2'].set_ylabel("Spearman's rho", fontsize=11)
+axd['D2'].set_xlabel('Time (s)', fontsize=11)
 axd['D2'].legend(frameon=False, loc="lower right")
-axd['D2'].set_title(f'Within subject learning index correlation', style='italic')
+axd['D2'].set_title(f'Within subject learning index correlation', style='italic', fontsize=13)
 
-### C1 ###
-# Define a colormap for consistent subject coloring
+### C1 ### Blocks fit
 cmap = plt.cm.get_cmap('tab20', len(subjects))
-# Correlation between RSA and learning index
 idx_rsa = np.where((times >= 0.3) & (times <= 0.5))[0]
 mdiff = diff_sess[:, :, idx_rsa].mean(2)
+sess = np.array([[0, 1, 2, 3, 4] for _ in range(len(subjects))])
 slopes, intercepts = [], []
 for sub, subject in enumerate(subjects):
     # Linear fit
-    slope, intercept = np.polyfit(learn_index_df.iloc[sub][1:], mdiff[sub][1:], 1)
+    slope, intercept = np.polyfit(sess[sub][1:], mdiff[sub][1:], 1)
     axd['C1'].plot(
-        learn_index_df.iloc[sub][1:], 
-        slope * learn_index_df.iloc[sub][1:] + intercept, 
+        sess[sub], 
+        slope * sess[sub] + intercept, 
         alpha=0.6, 
         # label=f'{subject} Fit', 
         color=cmap(sub))
     # Scatter points for raw data
     axd['C1'].scatter(
-        learn_index_df.iloc[sub][1:], 
-        mdiff[sub][1:], 
+        sess[sub], 
+        mdiff[sub], 
         alpha=0.6, 
         # label=f'{subject} Data', 
         color=cmap(sub), 
@@ -211,35 +208,36 @@ for sub, subject in enumerate(subjects):
 # Mean fit line
 mean_slope, mean_intercept = np.mean(slopes), np.mean(intercepts)
 axd['C1'].plot(
-    learn_index_df.iloc[sub][1:], 
-    mean_slope * learn_index_df.iloc[sub][1:] + mean_intercept, 
+    sess[sub], 
+    mean_slope * sess[sub] + mean_intercept, 
     color='black', 
     lw=4, 
     label='Mean fit')
 # Labels, legend, and grid for C1
-axd['C1'].set_xlabel('Learning Index', fontsize=12)
-axd['C1'].set_ylabel('Similarity Index', fontsize=12)
+axd['C1'].set_xlabel('Session', fontsize=11)
+# axd['C1'].set_xticks([0, 1, 2, 3, 4])
+axd['C1'].set_xticks([0, 1, 2, 3, 4])
 # axd['C1'].legend(frameon=False, fontsize=10, loc='upper left', ncol=2)
-axd['C1'].grid(True, linestyle='--', alpha=0.7)
+# axd['C1'].grid(True, linestyle='--', alpha=0.7)
+# axd['C1'].set_yticklabels([])
 axd['C1'].legend(frameon=False)
+axd['C1'].set_title(f'Similarity index and blocks fit', style='italic', fontsize=13)
 
-### C2 ###
-# Correlation between RSA and blocks
-sess = np.array([[0, 1, 2, 3, 4] for _ in range(len(subjects))])
+### C2 ### Learning index fit
 slopes, intercepts = [], []
 for sub, subject in enumerate(subjects):
     # Linear fit
-    slope, intercept = np.polyfit(sess[sub][1:], mdiff[sub][1:], 1)
+    slope, intercept = np.polyfit(learn_index_df.iloc[sub][1:], mdiff[sub][1:], 1)
     axd['C2'].plot(
-        sess[sub][1:], 
-        slope * sess[sub][1:] + intercept, 
+        learn_index_df.iloc[sub], 
+        slope * learn_index_df.iloc[sub] + intercept, 
         alpha=0.6, 
         # label=f'{subject} Fit', 
         color=cmap(sub))
     # Scatter points for raw data
     axd['C2'].scatter(
-        sess[sub][1:], 
-        mdiff[sub][1:], 
+        learn_index_df.iloc[sub], 
+        mdiff[sub], 
         alpha=0.6, 
         # label=f'{subject} Data', 
         color=cmap(sub), 
@@ -249,19 +247,19 @@ for sub, subject in enumerate(subjects):
 # Mean fit line
 mean_slope, mean_intercept = np.mean(slopes), np.mean(intercepts)
 axd['C2'].plot(
-    sess[sub][1:], 
-    mean_slope * sess[sub][1:] + mean_intercept, 
+    learn_index_df.iloc[sub], 
+    mean_slope * learn_index_df.iloc[sub] + mean_intercept, 
     color='black', 
     lw=4, 
     label='Mean fit')
 # Labels, legend, and grid for C2
-axd['C2'].set_xlabel('Blocks', fontsize=12)
-axd['C2'].set_yticks([0, 1, 2, 3, 4])
-axd['C2'].sharey(axd['C1'])
+axd['C2'].set_xlabel('Learning Index', fontsize=11)
+axd['C2'].set_ylabel('Similarity Index', fontsize=11)
 # axd['C2'].legend(frameon=False, fontsize=10, loc='upper left', ncol=2)
-axd['C2'].grid(True, linestyle='--', alpha=0.7)
-# axd['C2'].set_yticklabels([])
+# axd['C2'].grid(True, linestyle='--', alpha=0.7)
 axd['C2'].legend(frameon=False)
+axd['C2'].sharey(axd['C1'])
+axd['C2'].set_title(f'Similarity index and learning index fit', style='italic', fontsize=13)
 
 plt.savefig(figures_dir /  f"{lock}-new.pdf", transparent=True)
 plt.close()

@@ -81,10 +81,11 @@ for subject in tqdm(subjects):
         subdict[subject][i]["random_low"] = np.mean(subdict[subject][i]["random_low"])
 
         highs.append(np.mean(subdict[subject][i]["pattern"]))
-        highs.append(np.mean(subdict[subject][i]["random_high"]))
-        lows.append(np.mean(subdict[subject][i]["random_low"]))
+        # highs.append(np.mean(subdict[subject][i]["random_high"]))
+        lows.append(np.mean(subdict[subject][i]["random_high"]))
         
         learning_index = (np.mean(lows) - np.mean(highs)) / np.mean(lows)
+        # learning_index = np.mean(lows) - np.mean(highs)
         learn_index_dict[subject][i] = learning_index if i != 0 else 0
 
 # Save learning indices to CSV
@@ -162,7 +163,7 @@ ax.spines['right'].set_visible(False)
 plt.tight_layout()
 fig.savefig(figures_dir / 'behav' / 'learning_index_all.pdf', transparent=True)
 
-# combined RT and learning index
+# Combined RT and learning index
 fig, ax = plt.subplots(1, 1, figsize=(6, 6), layout="tight")
 plt.rcParams.update({'font.family': 'serif', 'font.serif': 'Avenir'})
 ax.autoscale()
