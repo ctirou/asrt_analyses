@@ -51,8 +51,8 @@ def process_subject(subject, lock, jobs, rsync):
             epoch_fname = op.join(data_path, lock, f"{subject}-{epoch_num}-epo.fif")
             epoch = mne.read_epochs(epoch_fname, verbose=verbose, preload=False)
             
-            times = epoch.times
-            win = np.where((times >= -1.5) & (times <= 1.5))[0]
+            # times = epoch.times
+            # win = np.where((times >= -1.5) & (times <= 1.5))[0]
             
             if lock == 'button': 
                 epoch_bsl_fname = data_path / 'bsl' / f'{subject}_{epoch_num}_bl-epo.fif'
@@ -66,7 +66,7 @@ def process_subject(subject, lock, jobs, rsync):
             # conpute rank
             rank = mne.compute_rank(noise_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)
             # path to trans file
-            fwd_fname = RESULTS_DIR / "fwd" / lock / f"{subject}-{epoch_num}-fwd.fif"
+            fwd_fname = data_path / "fwd" / lock / f"{subject}-{epoch_num}-fwd.fif"
             fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
             # compute source estimates
             filters = make_lcmv(epoch.info, fwd, data_cov=data_cov, noise_cov=noise_cov,
@@ -90,18 +90,20 @@ def process_subject(subject, lock, jobs, rsync):
                 if not os.path.exists(res_path / f"{subject}-{epoch_num}-scores.npy") or overwrite:
                     if trial_type == 'pattern':
                         pattern = behav.trialtypes == 1
-                        X = stcs_data[pattern][:, :, win]
+                        # X = stcs_data[pattern][:, :, win]
+                        X = stcs_data[pattern]
                         y = behav.positions[pattern]
                     elif trial_type == 'random':
                         random = behav.trialtypes == 2
-                        X = stcs_data[random][:, :, win]
+                        # X = stcs_data[random][:, :, win]
+                        X = stcs_data[random]
                         y = behav.positions[random]
                     else:
                         X = stcs_data
                         y = behav.positions    
                     y = y.reset_index(drop=True)            
                     assert X.shape[0] == y.shape[0]
-                    scores = cross_val_multiscore(clf, X, y, cv=cv)
+                    scores = cross_val_multiscore(clf, X, y, cv=cv)                    
                     np.save(op.join(res_path, f"{subject}-{epoch_num}-scores.npy"), scores.mean(0))
 
                     del stcs_data, X, y, scores
@@ -117,7 +119,7 @@ def process_subject(subject, lock, jobs, rsync):
             gc.collect()
         
         behav_df = pd.concat(all_behavs)
-        all_stcs = np.array(all_stcs)
+        # all_stcs = np.array(all_stcs)
         del all_behavs
         gc.collect()
         
@@ -133,15 +135,17 @@ def process_subject(subject, lock, jobs, rsync):
                 assert len(stcs_data) == len(behav_data)
                 if trial_type == 'pattern':
                     pattern = behav_data.trialtypes == 1
-                    X = stcs_data[pattern][:, :, win]
+                    # X = stcs_data[pattern][:, :, win]
+                    X = stcs_data[pattern]
                     y = behav_data.positions[pattern]
                 elif trial_type == 'random':
                     random = behav_data.trialtypes == 2
-                    X = stcs_data[random][:, :, win]
+                    # X = stcs_data[random][:, :, win]
+                    X = stcs_data[random]
                     y = behav_data.positions[random]
                 else:
                     X = stcs_data
-                    y = behav_data.positions    
+                    y = behav_data.positions
                 y = y.reset_index(drop=True)
                 assert X.shape[0] == y.shape[0]
                 del stcs_data, behav_data

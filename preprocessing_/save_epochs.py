@@ -15,7 +15,7 @@ is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
 subjects = SUBJS
 mode_ICA = True
-generalizing = False
+generalizing = True
 filtering = True
 overwrite = True
 verbose = True
@@ -27,9 +27,11 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
         # Set path
         data_path = RAW_DATA_DIR
         if generalizing:
-                res_path = TIMEG_DATA_DIR 
+                res_path = TIMEG_DATA_DIR
+                tmin,tmax = -1.5, 1.5 
         else:
                 res_path = DATA_DIR
+                tmin, tmax = -0.2, 0.6
 
         meg_sessions = ['2_PRACTICE', '3_EPOCH_1', '4_EPOCH_2', '5_EPOCH_3', '6_EPOCH_4']
 
@@ -180,14 +182,14 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                 reject = dict(mag=5e-12)
                 picks = mne.pick_types(raw.info, meg=True, eeg=False, eog=False, stim=False) # by default eog is True
                 if generalizing:
-                        epochs_stim = mne.Epochs(raw, events_stim, tmin=-4, tmax=4, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)
+                        epochs_stim = mne.Epochs(raw, events_stim, tmin=tmin, tmax=tmax, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)
                         epochs_bsl = epochs_stim.copy().crop(-.2, 0)                   
-                        epochs_button = mne.Epochs(raw, events_button, tmin=-4, tmax=4, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)                        
+                        epochs_button = mne.Epochs(raw, events_button, tmin=tmin, tmax=tmax, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)                        
                 else:
-                        epochs_stim = mne.Epochs(raw, events_stim, tmin=-0.2, tmax=0.6, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)                   
+                        epochs_stim = mne.Epochs(raw, events_stim, tmin=tmin, tmax=tmax, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)                   
                         epochs_bsl = epochs_stim.copy().crop(-.2, 0)           
                         epochs_stim.apply_baseline((-0.2, 0))                
-                        epochs_button = mne.Epochs(raw, events_button, tmin=-0.2, tmax=0.6, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)                        
+                        epochs_button = mne.Epochs(raw, events_button, tmin=tmin, tmax=tmax, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)                        
                 # Free memory
                 del raw
                 gc.collect()
