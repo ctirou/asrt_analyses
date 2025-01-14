@@ -12,15 +12,8 @@ import pandas as pd
 
 data_path = TIMEG_DATA_DIR
 subjects, subjects_dir = SUBJS, FREESURFER_DIR
-folds = 10
-solver = 'lbfgs'
-scoring = "accuracy"
-hemi = 'both'
-parc = 'aparc'
-verbose = True
-is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
+
 lock = 'stim'
-overwrite = False
 # network and custom label_names
 n_parcels = 200
 n_networks = 7
@@ -30,43 +23,46 @@ figures_dir = FIGURES_DIR / "time_gen" / "source" / lock / f"networks_{n_parcels
 ensure_dir(figures_dir)
 
 names_corrected = pd.read_csv(FREESURFER_DIR / 'Schaefer2018' / f'{n_networks}NetworksOrderedNames.csv', header=0)[' Network Name'].tolist()[:-2]
+times = np.linspace(-1.5, 1.5, 305)
 
 # Load data
-times = np.linspace(-1.5, 1.5, 305)
-for i, (network, name) in enumerate(zip(networks, names_corrected)):
-    all_patterns, all_randoms = [], []
-    patterns, randoms = [], []
-    
+all_diags = {}
+patterns, randoms = {}, {}
+all_patterns, all_randoms = {}, {}
+for network in networks:
+    print(f"Processing {network}...")
+    if not network in patterns:
+        patterns[network], randoms[network] = [], []
+        all_patterns[network], all_randoms[network] = [], []
+        all_diags[network] = []
+    all_pat, all_rand = [], []
+    patpat, randrand = [], []
+    diags =[]
     for subject in subjects:
-        pattern, random = [], []
+        pat, rand = [], []
         for i in [0, 1, 2, 3, 4]:
-            pattern.append(np.load(res_dir / network / 'pattern' / f"{subject}-{i}-scores.npy"))
-            random.append(np.load(res_dir / network / 'random' / f"{subject}-{i}-scores.npy"))
-        
-        all_pattern = np.load(res_dir / network / 'pattern' / f"{subject}-all-scores.npy")
-        all_patterns.append(all_pattern)
-        all_random = np.load(res_dir / network / 'random' / f"{subject}-all-scores.npy")
-        all_randoms.append(all_random)
-        
-        patterns.append(np.array(pattern))
-        randoms.append(np.array(random))
+            pat.append(np.load(res_dir / network / 'pattern' / f"{subject}-{i}-scores.npy"))
+            rand.append(np.load(res_dir / network / 'random' / f"{subject}-{i}-scores.npy"))
+        patpat.append(np.array(pat))
+        randrand.append(np.array(rand))
+        all_pat.append(np.load(res_dir / network / 'pattern' / f"{subject}-all-scores.npy"))
+        all_rand.append(np.load(res_dir / network / 'random' / f"{subject}-all-scores.npy"))
+        diags.append(np.diag(np.load(res_dir / network / 'pattern' / f"{subject}-all-scores.npy")))
+    all_patterns[network] = np.array(all_pat)
+    all_randoms[network] = np.array(all_rand)
+    all_diags[network] = np.array(diags)
+    patterns[network] = np.array(patpat)
+    randoms[network] = np.array(randrand)
     
-    all_patterns = np.array(all_patterns)
-    all_randoms = np.array(all_randoms)
-    all_contrast = all_patterns - all_randoms
-    
-patterns = np.array(patterns)
-randoms = np.array(randoms)
-contrast = patterns - randoms
-
 # plot average for all networks
 fig, axes = plt.subplots(5, 1, figsize=(6, 11), sharex=True, layout='tight')
 for i, (network, name) in enumerate(zip(networks, names_corrected)):
+    all_contrast = all_patterns[network] - all_randoms[network]
     # pval = gat_stats(all_contrast, -1)
     # ensure_dir(res_dir / network / "pval")
     # np.save(res_dir / network / "pval" / "all_contrast-pval.npy", pval)
-    pval = np.load(res_dir / network / "pval" / "all_contrast-pval.npy")
-    sig = np.array(pval < 0.05)
+    # pval = np.load(res_dir / network / "pval" / "all_contrast-pval.npy")
+    # sig = np.array(pval < 0.05)
     im = axes[i].imshow(
         all_contrast.mean(0),
         interpolation="lanczos",
@@ -84,31 +80,84 @@ for i, (network, name) in enumerate(zip(networks, names_corrected)):
         axes[i].set_xlabel("Testing Time (s)")
     cbar = plt.colorbar(im, ax=axes[i])
     cbar.set_label("accuracy")
-    xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
-    axes[i].contour(xx, yy, sig, colors='Gray', levels=[0],
-                        linestyles='solid', linewidths=1)
+    # xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
+    # axes[i].contour(xx, yy, sig, colors='Gray', levels=[0],
+    #                     linestyles='solid', linewidths=1)
+fig.savefig(figures_dir / "all_contrast.pdf", transparent=True)
+
+# plot pattern for all networks
+fig, axes = plt.subplots(5, 1, figsize=(6, 11), sharex=True, layout='tight')
+for i, (network, name) in enumerate(zip(networks, names_corrected)):
+    im = axes[i].imshow(
+        all_patterns[network].mean(0),
+        interpolation="lanczos",
+        origin="lower",
+        cmap="RdBu_r",
+        extent=times[[0, -1, 0, -1]],
+        aspect=0.5,
+        vmin=0,
+        vmax=0.5)
+    axes[i].set_ylabel("Training Time (s)")
+    axes[i].set_title(f"${name}$", fontsize=10)
+    axes[i].axvline(0, color="k", alpha=.5)
+    axes[i].axhline(0, color="k", alpha=.5)
+    if network == networks[-1]:
+        axes[i].set_xlabel("Testing Time (s)")
+    cbar = plt.colorbar(im, ax=axes[i])
+    cbar.set_label("accuracy")
+fig.savefig(figures_dir / "all_pattern.pdf", transparent=True)
+
+# plot pattern for all networks
+fig, axes = plt.subplots(5, 1, figsize=(6, 11), sharex=True, layout='tight')
+for i, (network, name) in enumerate(zip(networks, names_corrected)):
+    im = axes[i].imshow(
+        patterns[network].mean((0, 1)),
+        interpolation="lanczos",
+        origin="lower",
+        cmap="RdBu_r",
+        extent=times[[0, -1, 0, -1]],
+        aspect=0.5,
+        vmin=0.2,
+        vmax=0.3)
+    axes[i].set_ylabel("Training Time (s)")
+    axes[i].set_title(f"${name}$", fontsize=10)
+    axes[i].axvline(0, color="k", alpha=.5)
+    axes[i].axhline(0, color="k", alpha=.5)
+    if network == networks[-1]:
+        axes[i].set_xlabel("Testing Time (s)")
+    cbar = plt.colorbar(im, ax=axes[i])
+    cbar.set_label("accuracy")
+
+# plot pattern for all networks
+fig, axes = plt.subplots(5, 1, figsize=(6, 11), sharex=True, layout='tight')
+for i, (network, name) in enumerate(zip(networks, names_corrected)):
+    diags = np.array([np.diag(patterns[network][sub, :, :].mean(1)) for sub in range(len(subjects))])
+    axes[i].axhline(.25, color="k", alpha=.5)
+    axes[i].axvspan(0, 0.2, color="grey", alpha=.1)
+    axes[i].plot(times, np.diag(patterns[network].mean((0, 1))))
+    axes[i].set_title(f"${name}$", fontsize=10)
+    # pval = decod_stats(diags - .25, -1)
+    # sig = pval < .05
+    # axes[i].fill_between(times, .25, np.diag(patterns[network].mean((0, 1))), where=sig, color="red", alpha=.4)
+
+# plot diag for all networks
+fig, axes = plt.subplots(5, 1, figsize=(6, 11), sharex=True, layout='tight')
+for i, (network, name) in enumerate(zip(networks, names_corrected)):
+    axes[i].plot(times, all_diags[network].mean(0))
+    # pval = decod_stats(all_diags[network] - .25, -1)
+    # sig = pval < .05
+    axes[i].axhline(.25, color="k", alpha=.5)
+    axes[i].axvspan(0, 0.2, color="grey", alpha=.1)
+    # axes[i].fill_between(times, .25, all_diags[network].mean(0), where=sig, color="C7")
+    axes[i].set_title(f"${name}$", fontsize=10)
+fig.savefig(figures_dir / "all_diag.pdf", transparent=True)
+
 # plot average per network
 for name, network in zip(names_corrected, networks):
     ensure_dir(figures_dir / network)
-    # Load data
-    all_patterns, all_randoms = [], []
-    for subject in subjects:
-        all_pattern = np.load(res_dir / network / 'all_pattern' / f"{subject}-all-scores.npy")
-        all_patterns.append(all_pattern)
-        all_random = np.load(res_dir / network / 'all_random' / f"{subject}-all-scores.npy")
-        all_randoms.append(all_random)
-    all_patterns = np.array(all_patterns)
-    all_randoms = np.array(all_randoms)
-    all_contrast = all_patterns - all_randoms
-    # pval = gat_stats(all_contrast, -1)
-    # ensure_dir(res_dir / network / "pval")
-    # np.save(res_dir / network / "pval" / "all_contrast-pval.npy", pval)
-    pval = np.load(res_dir / network / "pval" / "all_contrast-pval.npy")
-    sig = np.array(pval < 0.05)
-    # Plot all_pattern
     fig, ax = plt.subplots(1, 1, figsize=(16, 7), layout='tight')
     im = ax.imshow(
-        all_patterns.mean(0),
+        all_patterns[network].mean(0),
         interpolation="lanczos",
         origin="lower",
         cmap="RdBu_r",
@@ -128,7 +177,7 @@ for name, network in zip(names_corrected, networks):
     # Plot all_random
     fig, ax = plt.subplots(1, 1, figsize=(16, 7), layout='tight')
     im = ax.imshow(
-        all_randoms.mean(0),
+        all_randoms[network].mean(0),
         interpolation="lanczos",
         origin="lower",
         cmap="RdBu_r",
@@ -146,6 +195,7 @@ for name, network in zip(names_corrected, networks):
     fig.savefig(figures_dir / network / "all_random.pdf")
     plt.close()
     # Plot all_contrast
+    all_contrast = all_patterns[network] - all_randoms[network]
     fig, ax = plt.subplots(1, 1, figsize=(16, 7), layout='tight')
     im = ax.imshow(
         all_contrast.mean(0),

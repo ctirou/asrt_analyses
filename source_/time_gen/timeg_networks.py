@@ -2,7 +2,7 @@ import mne
 import os
 import os.path as op
 import numpy as np
-from mne.decoding import cross_val_multiscore, GeneralizingEstimator
+from mne.decoding import cross_val_multiscore, GeneralizingEstimator, SlidingEstimator
 from mne.beamformer import make_lcmv, apply_lcmv_epochs
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
@@ -28,11 +28,10 @@ is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 lock = 'stim'
 overwrite = False
 
-def process_subject(subject, lock, jobs, rsync):    
-    # define classifier
+def process_subject(subject, lock, jobs, rsync):
     clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
     clf = GeneralizingEstimator(clf, scoring=scoring, n_jobs=jobs)
-    cv = StratifiedKFold(folds, shuffle=True)
+    cv = StratifiedKFold(folds, shuffle=True, random_state=42)    
     # network and custom label_names
     n_parcels = 200
     n_networks = 7
@@ -50,10 +49,6 @@ def process_subject(subject, lock, jobs, rsync):
             # read epoch
             epoch_fname = op.join(data_path, lock, f"{subject}-{epoch_num}-epo.fif")
             epoch = mne.read_epochs(epoch_fname, verbose=verbose, preload=False)
-            
-            # times = epoch.times
-            # win = np.where((times >= -1.5) & (times <= 1.5))[0]
-            
             if lock == 'button': 
                 epoch_bsl_fname = data_path / 'bsl' / f'{subject}_{epoch_num}_bl-epo.fif'
                 epoch_bsl = mne.read_epochs(epoch_bsl_fname, verbose=verbose, preload=False)
@@ -103,6 +98,7 @@ def process_subject(subject, lock, jobs, rsync):
                         y = behav.positions    
                     y = y.reset_index(drop=True)            
                     assert X.shape[0] == y.shape[0]
+                    # define classifier
                     scores = cross_val_multiscore(clf, X, y, cv=cv)                    
                     np.save(op.join(res_path, f"{subject}-{epoch_num}-scores.npy"), scores.mean(0))
 
@@ -127,20 +123,19 @@ def process_subject(subject, lock, jobs, rsync):
             print("Processing", subject, 'all', trial_type, network)
             res_path = res_dir / lock / f'networks_{n_parcels}_{n_networks}' / network / trial_type
             ensure_dir(res_path)
-
+            lh_label = mne.read_label(label_path / f'{network}-lh.label')
+            rh_label = mne.read_label(label_path / f'{network}-rh.label')
+            stcs_data = [stc.in_label(lh_label + rh_label).data for stc in all_stcs]
+            stcs_data = np.array(stcs_data)
+            behav_data = behav_df.reset_index(drop=True)
+            assert len(stcs_data) == len(behav_data)
             if not op.exists(res_path / f"{subject}-all-scores.npy") or overwrite:
-                stcs_data = [stc.in_label(lh_label + rh_label).data for stc in all_stcs]
-                stcs_data = np.array(stcs_data)
-                behav_data = behav_df.reset_index(drop=True)
-                assert len(stcs_data) == len(behav_data)
                 if trial_type == 'pattern':
                     pattern = behav_data.trialtypes == 1
-                    # X = stcs_data[pattern][:, :, win]
                     X = stcs_data[pattern]
                     y = behav_data.positions[pattern]
                 elif trial_type == 'random':
                     random = behav_data.trialtypes == 2
-                    # X = stcs_data[random][:, :, win]
                     X = stcs_data[random]
                     y = behav_data.positions[random]
                 else:
