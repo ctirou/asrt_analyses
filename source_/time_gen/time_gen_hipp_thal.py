@@ -38,18 +38,11 @@ def process_subject(subject, lock, jobs):
     clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
     clf = GeneralizingEstimator(clf, scoring=scoring, n_jobs=jobs)
     cv = StratifiedKFold(folds, shuffle=True, random_state=42)
-    # read source space
-    src_fname =  RESULTS_DIR / 'src' / f"{subject}-src.fif"
-    src = mne.read_source_spaces(src_fname, verbose=verbose)
-    # path to bem file
-    bem_fname = op.join(data_path, "bem", "%s-bem-sol.fif" % (subject))
-    
-    # for hemi in ['lh', 'rh', 'others']:
-    for hemi in ['lh', 'rh']:
-        # create mixed source space
-        vol_src_fname =  RESULTS_DIR / 'src' / f"{subject}-{hemi}-vol-src.fif"
-        vol_src = mne.read_source_spaces(vol_src_fname, verbose=verbose)
-        mixed_src = src + vol_src
+    # create mixed source space
+    vol_src_fname =  RESULTS_DIR / 'src' / f"{subject}-hipp-thal-{hemi}-vol-src.fif"
+    vol_src = mne.read_source_spaces(vol_src_fname, verbose=verbose)
+
+    for region in ['Hipp', 'Thal']:
 
         for trial_type in ['pattern', 'random']:
             all_behavs = list()
@@ -75,21 +68,19 @@ def process_subject(subject, lock, jobs):
                 # path to trans file
                 trans_fname = os.path.join(data_path, "trans", lock, "%s-%i-trans.fif" % (subject, epoch_num))            
                 # compute forward solution
-                fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,
-                                            src=mixed_src, bem=bem_fname,
-                                            meg=True, eeg=False,
-                                            mindist=5.0,
-                                            n_jobs=jobs,
-                                            verbose=verbose)
+                fwd_fname = data_path / "fwd" / lock / f"{subject}-hipp-thal-{epoch_num}-fwd.fif"
+                fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
                 # compute source estimates
                 filters = make_lcmv(epoch.info, fwd, data_cov=data_cov, noise_cov=noise_cov,
                                 pick_ori=None, rank=rank, reduce_rank=True, verbose=verbose)
                 stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
 
-                offsets = np.cumsum([0] + [len(s["vertno"]) for s in vol_src])
+                offsets = np.cumsum([0] + [len(s["vertno"]) for s in fwd["src"]]) ### need vol src here, fwd["src"] is mixed so does not work
                 label_tc, _ = get_volume_estimate_tc(stcs, fwd, offsets, subject, subjects_dir)
+                
                 # subcortex labels
-                labels = [label for label in label_tc.keys() if label not in BAD_VOLUME_LABELS]
+                labels = [label for label in label_tc.keys() if region in label]
+                data = np.concatenate([label_tc[label] for label in labels], axis=1) # this works
                 
                 del noise_cov, data_cov, filters
                 gc.collect()

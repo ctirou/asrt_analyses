@@ -28,7 +28,8 @@ is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 lock = 'stim'
 overwrite = False
 
-def process_subject(subject, lock, jobs, rsync):
+def process_subject(subject, lock, jobs):
+    # define classifier
     clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
     clf = GeneralizingEstimator(clf, scoring=scoring, n_jobs=jobs)
     cv = StratifiedKFold(folds, shuffle=True, random_state=42)    
@@ -37,7 +38,7 @@ def process_subject(subject, lock, jobs, rsync):
     n_networks = 7
     # networks = (NEW_LABELS + schaefer_7) if n_networks == 7 else (NEW_LABELS + schaefer_17)
     networks = schaefer_7 if n_networks == 7 else schaefer_17
-    label_path = RESULTS_DIR / f'networks_{n_parcels}_{n_networks}' / subject
+    label_path = RESULTS_DIR / f'networks_{n_parcels}_{n_networks}' / subject    
     
     for trial_type in ['pattern', 'random']:
         all_behavs = list()
@@ -85,12 +86,10 @@ def process_subject(subject, lock, jobs, rsync):
                 if not os.path.exists(res_path / f"{subject}-{epoch_num}-scores.npy") or overwrite:
                     if trial_type == 'pattern':
                         pattern = behav.trialtypes == 1
-                        # X = stcs_data[pattern][:, :, win]
                         X = stcs_data[pattern]
                         y = behav.positions[pattern]
                     elif trial_type == 'random':
                         random = behav.trialtypes == 2
-                        # X = stcs_data[random][:, :, win]
                         X = stcs_data[random]
                         y = behav.positions[random]
                     else:
@@ -98,7 +97,6 @@ def process_subject(subject, lock, jobs, rsync):
                         y = behav.positions    
                     y = y.reset_index(drop=True)            
                     assert X.shape[0] == y.shape[0]
-                    # define classifier
                     scores = cross_val_multiscore(clf, X, y, cv=cv)                    
                     np.save(op.join(res_path, f"{subject}-{epoch_num}-scores.npy"), scores.mean(0))
 
@@ -115,7 +113,6 @@ def process_subject(subject, lock, jobs, rsync):
             gc.collect()
         
         behav_df = pd.concat(all_behavs)
-        # all_stcs = np.array(all_stcs)
         del all_behavs
         gc.collect()
         
@@ -160,10 +157,10 @@ if is_cluster:
     try:
         subject_num = int(os.getenv("SLURM_ARRAY_TASK_ID"))
         subject = subjects[subject_num]
-        process_subject(subject, lock, jobs, rsync=True)
+        process_subject(subject, lock, jobs)
     except (IndexError, ValueError) as e:
         print("Error: SLURM_ARRAY_TASK_ID is not set correctly or is out of bounds.")
         sys.exit(1)
 else:
     for subject in subjects:
-        process_subject(subject, lock, jobs=-1, rsync=False)
+        process_subject(subject, lock, jobs=-1)
