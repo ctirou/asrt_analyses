@@ -9,7 +9,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import make_pipeline
 from sklearn.model_selection import StratifiedKFold
 import pandas as pd
-from base import ensure_dir, get_volume_estimate_tc, rsync_files
+from base import ensure_dir, get_volume_estimate_tc
 from config import *
 import gc
 import sys
@@ -17,18 +17,16 @@ import sys
 # stim disp = 500 ms
 # RSI = 750 ms in task
 data_path = TIMEG_DATA_DIR
-analysis = 'time_generalization'
 subjects, subjects_dir = SUBJS, FREESURFER_DIR
 folds = 10
 solver = 'lbfgs'
 scoring = "accuracy"
-hemi = 'both'
-parc = 'aparc'
-jobs = -1
 verbose = True
-lock = 'stim'
-overwrite = False
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
+
+lock = 'stim'
+jobs = -1
+overwrite = False
 
 res_path = data_path / 'results' / 'source'
 ensure_dir(res_path)
@@ -38,11 +36,11 @@ def process_subject(subject, lock, jobs):
     clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
     clf = GeneralizingEstimator(clf, scoring=scoring, n_jobs=jobs)
     cv = StratifiedKFold(folds, shuffle=True, random_state=42)
-    # create mixed source space
-    vol_src_fname =  RESULTS_DIR / 'src' / f"{subject}-hipp-thal-{hemi}-vol-src.fif"
+    # read volume source space
+    vol_src_fname =  RESULTS_DIR / 'src' / f"{subject}-hipp-thal-vol-src.fif"
     vol_src = mne.read_source_spaces(vol_src_fname, verbose=verbose)
 
-    for region in ['Hipp', 'Thal']:
+    for region in ['Hippocampus', 'Thalamus']:
 
         for trial_type in ['pattern', 'random']:
             all_behavs = list()
@@ -64,9 +62,7 @@ def process_subject(subject, lock, jobs):
                 # compute data covariance matrix on evoked data
                 data_cov = mne.compute_covariance(epoch, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
                 # conpute rank
-                rank = mne.compute_rank(noise_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)
-                # path to trans file
-                trans_fname = os.path.join(data_path, "trans", lock, "%s-%i-trans.fif" % (subject, epoch_num))            
+                rank = mne.compute_rank(noise_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)    
                 # compute forward solution
                 fwd_fname = data_path / "fwd" / lock / f"{subject}-hipp-thal-{epoch_num}-fwd.fif"
                 fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
@@ -74,44 +70,40 @@ def process_subject(subject, lock, jobs):
                 filters = make_lcmv(epoch.info, fwd, data_cov=data_cov, noise_cov=noise_cov,
                                 pick_ori=None, rank=rank, reduce_rank=True, verbose=verbose)
                 stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
-
-                offsets = np.cumsum([0] + [len(s["vertno"]) for s in fwd["src"]]) ### need vol src here, fwd["src"] is mixed so does not work
+                # get data from volume source space
+                offsets = np.cumsum([0] + [len(s["vertno"]) for s in vol_src]) # need vol src here, fwd["src"] is mixed so does not work
                 label_tc, _ = get_volume_estimate_tc(stcs, fwd, offsets, subject, subjects_dir)
-                
-                # subcortex labels
+                # get data from regions of interest
                 labels = [label for label in label_tc.keys() if region in label]
-                data = np.concatenate([label_tc[label] for label in labels], axis=1) # this works
+                stcs_data = np.concatenate([label_tc[label] for label in labels], axis=1) # this works
                 
                 del noise_cov, data_cov, filters
                 gc.collect()
                 
-                for ilabel, label in enumerate(labels):
-                    print(subject, lock, trial_type, hemi, f"{str(ilabel+1).zfill(2)}/{len(labels)}", label) 
-                    # results dir
-                    res_dir = res_path / 'source' / lock / label / trial_type
-                    ensure_dir(res_dir)
-                    
-                    if not os.path.exists(res_dir / f"{subject}-{epoch_num}-scores.npy") or overwrite:
-                        if trial_type == 'pattern':    
-                            pattern = behav.trialtypes == 1
-                            X = label_tc[label][pattern]
-                            y = behav.positions[pattern]
-                        elif trial_type == 'random':
-                            random = behav.trialtypes == 2
-                            X = label_tc[label][random]
-                            y = behav.positions[random]
-                        else:
-                            X = label_tc[label]
-                            y = behav.positions
-                        y = y.reset_index(drop=True)            
-                        assert X.shape[0] == y.shape[0]
-                        # if X.shape[1] < 1:
-                        #     continue            
-                        scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=verbose)
-                        np.save(res_dir / f"{subject}-{epoch_num}-scores.npy", scores.mean(0))
+                print(f"Processing {subject} - {epoch_num} - {region} - {trial_type}...")
+                # results dir
+                res_dir = res_path / 'source' / lock / region / trial_type
+                ensure_dir(res_dir)
                 
-                        del X, y, scores
-                        gc.collect()
+                if not os.path.exists(res_dir / f"{subject}-{epoch_num}-scores.npy") or overwrite:
+                    if trial_type == 'pattern':    
+                        pattern = behav.trialtypes == 1
+                        X = stcs_data[pattern]
+                        y = behav.positions[pattern]
+                    elif trial_type == 'random':
+                        random = behav.trialtypes == 2
+                        X = stcs_data[random]
+                        y = behav.positions[random]
+                    else:
+                        X = stcs_data
+                        y = behav.positions
+                    y = y.reset_index(drop=True)            
+                    assert X.shape[0] == y.shape[0]        
+                    scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=verbose)
+                    np.save(res_dir / f"{subject}-{epoch_num}-scores.npy", scores.mean(0))
+            
+                    del X, y, scores
+                    gc.collect()
                 
                 # append epochs
                 all_behavs.append(behav)
@@ -124,36 +116,38 @@ def process_subject(subject, lock, jobs):
             
             behav_df = pd.concat(all_behavs)
             all_stcs = np.array(all_stcs)
+            
             del all_behavs
             gc.collect()
+            
             label_tc, _ = get_volume_estimate_tc(all_stcs, fwd, offsets, subject, subjects_dir)
-            # subcortex labels
-            labels = [label for label in label_tc.keys() if label not in BAD_VOLUME_LABELS]
-            for ilabel, label in enumerate(labels):
-                # results dir
-                res_dir = res_path / 'source' / lock / label / trial_type
-                ensure_dir(res_dir)
-                if not os.path.exists(res_dir / f"{subject}-all-scores.npy") or overwrite:
-                    print(subject, lock, trial_type, hemi, f"{str(ilabel+1).zfill(2)}/{len(labels)}", label) 
-                    if trial_type == 'pattern':    
-                        pattern = behav_df.trialtypes == 1
-                        X = label_tc[label][pattern]
-                        y = behav_df.positions[pattern]
-                    elif trial_type == 'random':
-                        random = behav_df.trialtypes == 2
-                        X = label_tc[label][random]
-                        y = behav_df.positions[random]
-                    else:
-                        X = label_tc[label]
-                        y = behav_df.positions
-                    y = y.reset_index(drop=True)            
-                    assert X.shape[0] == y.shape[0]
-                    if X.shape[1] < 1:
-                        continue            
-                    scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=verbose)
-                    np.save(res_dir / f"{subject}-all-scores.npy", scores.mean(0))
-                    del X, y, scores
-                    gc.collect()
+            labels = [label for label in label_tc.keys() if region in label]
+            stcs_data = np.concatenate([label_tc[label] for label in labels], axis=1) # this works
+            
+            print(f"Processing {subject} - all - {region} - {trial_type}...")
+            # results dir
+            res_dir = res_path / 'source' / lock / region / trial_type
+            ensure_dir(res_dir)
+            
+            if not os.path.exists(res_dir / f"{subject}-all-scores.npy") or overwrite:
+                if trial_type == 'pattern':    
+                    pattern = behav_df.trialtypes == 1
+                    X = stcs_data[pattern]
+                    y = behav_df.positions[pattern]
+                elif trial_type == 'random':
+                    random = behav_df.trialtypes == 2
+                    X = stcs_data[random]
+                    y = behav_df.positions[random]
+                else:
+                    X = stcs_data
+                    y = behav_df.positions
+                y = y.reset_index(drop=True)            
+                assert X.shape[0] == y.shape[0]
+                scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=verbose)
+                np.save(res_dir / f"{subject}-all-scores.npy", scores.mean(0))
+                
+                del X, y, scores
+                gc.collect()
             
             del behav_df, all_stcs
             gc.collect()

@@ -6,10 +6,6 @@ from config import *
 import gc
 import sys
 
-overwrite = False
-verbose = 'error'
-jobs = -1
-
 subjects = SUBJS
 epochs_list = EPOCHS
 data_path = DATA_DIR
@@ -17,12 +13,18 @@ data_path = DATA_DIR
 subjects_dir = FREESURFER_DIR
 res_path = RESULTS_DIR
 
+lock = 'stim'
+jobs = -1
+
+overwrite = True
+verbose = True
+
 # create results directories
 folders = ["src", "bem", "trans", "fwd"]
-for lock in ['stim', 'button']:
+for lockf in ['stim', 'button']:
     for f in folders:
         if f in folders[-2:]:
-            path = op.join(res_path, f, lock)
+            path = op.join(res_path, f, lockf)
             ensure_dir(path)
         else:
             ensure_dir(os.path.join(res_path, f))
@@ -215,7 +217,7 @@ def process_subject(subject, lock, jobs):
                                         verbose=verbose)
             mne.write_forward_solution(fwd_fname, fwd, overwrite=True, verbose=verbose)
             del fwd
-                        
+        
         del epoch
         gc.collect()
     

@@ -81,7 +81,7 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                         # Filter raw
                         ica.apply(raw)
                 if filtering:
-                        raw.filter(0.1, 30, n_jobs=jobs)
+                        raw.filter(0.1, 30, n_jobs=jobs) # test by 25
                 # Select events of interest (only photodiode for good triplets and correct answers)
                 if subject == 'sub06' and meg_session == '6_EPOCH_4':
                         events = mne.find_events(raw, shortest_event=1, verbose=verbose)
