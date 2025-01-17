@@ -188,7 +188,7 @@ def process_subject(subject, lock, jobs):
     # del src, vol_src_lh, vol_src_rh, vol_src_others, vol_src
     # gc.collect()
     
-    all_epochs = list()
+    # all_epochs = list()
     
     for epoch_num in range(5):
         print(f"Processing {subject} {lock} {epoch_num}...")

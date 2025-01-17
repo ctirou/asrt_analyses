@@ -20,17 +20,16 @@ verbose = True
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
 lock = 'stim'
-jobs = -1
 overwrite = False
 
-def process_subject(subject, lock, jobs):
+def process_subject(subject, lock):
     # read volume source space
     vol_src_fname =  RESULTS_DIR / 'src' / f"{subject}-hipp-thal-vol-src.fif"
     vol_src = mne.read_source_spaces(vol_src_fname, verbose=verbose)
 
     for region in ['Hippocampus', 'Thalamus']:
         # define results path
-        res_path = RESULTS_DIR / 'RSA' / 'source' / lock / subject / 'rdm'
+        res_path = RESULTS_DIR / 'RSA' / 'source' / region / lock / subject / 'rdm'
         ensure_dir(res_path)
             
         for epoch_num in [0, 1, 2, 3, 4]:
@@ -94,15 +93,14 @@ def process_subject(subject, lock, jobs):
             
 if is_cluster:
     lock = str(sys.argv[1])
-    jobs = 20
     # Check that SLURM_ARRAY_TASK_ID is available and use it to get the subject
     try:
         subject_num = int(os.getenv("SLURM_ARRAY_TASK_ID"))
         subject = subjects[subject_num]
-        process_subject(subject, lock, jobs)
+        process_subject(subject, lock)
     except (IndexError, ValueError) as e:
         print("Error: SLURM_ARRAY_TASK_ID is not set correctly or is out of bounds.")
         sys.exit(1)
 else:
     for subject in subjects:
-        process_subject(subject, lock, jobs=-1)
+        process_subject(subject, lock)

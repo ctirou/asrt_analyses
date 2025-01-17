@@ -126,7 +126,7 @@ def process_subject(subject, lock, jobs):
             
             print(f"Processing {subject} - all - {region} - {trial_type}...")
             # results dir
-            res_dir = res_path / 'source' / lock / region / trial_type
+            res_dir = res_path / lock / region / trial_type
             ensure_dir(res_dir)
             
             if not os.path.exists(res_dir / f"{subject}-all-scores.npy") or overwrite:
