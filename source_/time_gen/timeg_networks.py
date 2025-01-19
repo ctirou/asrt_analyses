@@ -22,8 +22,8 @@ scoring = "accuracy"
 hemi = 'both'
 parc = 'aparc'
 verbose = True
-res_dir = data_path / 'results' / 'source'
-ensure_dir(res_dir)
+res_path = data_path / 'results' / 'source'
+ensure_dir(res_path)
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 lock = 'stim'
 overwrite = False
@@ -50,19 +50,14 @@ def process_subject(subject, lock, jobs):
             # read epoch
             epoch_fname = op.join(data_path, lock, f"{subject}-{epoch_num}-epo.fif")
             epoch = mne.read_epochs(epoch_fname, verbose=verbose, preload=False)
-            if lock == 'button': 
-                epoch_bsl_fname = data_path / 'bsl' / f'{subject}_{epoch_num}_bl-epo.fif'
-                epoch_bsl = mne.read_epochs(epoch_bsl_fname, verbose=verbose, preload=False)
-                # compute noise covariance
-                noise_cov = mne.compute_covariance(epoch_bsl, method="empirical", rank="info", verbose=verbose)
-            else:
-                noise_cov = mne.compute_covariance(epoch, tmin=-.2, tmax=0, method="empirical", rank="info", verbose=verbose)
             # compute data covariance matrix on evoked data
-            data_cov = mne.compute_covariance(epoch, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
+            data_cov = mne.compute_covariance(epoch, tmin=epoch.times[0], tmax=epoch.times[-1], method="auto", rank="info", verbose=verbose)
+            # read noise cov computed on resting state
+            noise_cov = mne.read_cov(data_path / 'noise_cov' / f"{subject}-rs2-cov.fif", verbose=verbose)
             # conpute rank
             rank = mne.compute_rank(noise_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)
-            # path to trans file
-            fwd_fname = data_path / "fwd" / lock / f"{subject}-{epoch_num}-fwd.fif"
+            # read forward solution
+            fwd_fname = RESULTS_DIR / "fwd" / lock / f"{subject}-{epoch_num}-fwd.fif"
             fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
             # compute source estimates
             filters = make_lcmv(epoch.info, fwd, data_cov=data_cov, noise_cov=noise_cov,
@@ -74,8 +69,8 @@ def process_subject(subject, lock, jobs):
 
             for network in networks[:-2]:                
                 print("Processing", subject, epoch_num, trial_type, network)
-                res_path = res_dir / lock / f'networks_{n_parcels}_{n_networks}' / network / trial_type
-                ensure_dir(res_path)
+                res_dir = res_path / lock / network / trial_type
+                ensure_dir(res_dir)
                 lh_label = mne.read_label(label_path / f'{network}-lh.label')
                 rh_label = mne.read_label(label_path / f'{network}-rh.label')
                 stcs_data = [stc.in_label(lh_label + rh_label).data for stc in stcs]
@@ -83,7 +78,7 @@ def process_subject(subject, lock, jobs):
                 assert len(stcs_data) == len(behav)
                 
                 # run time generalization decoding on unique epoch
-                if not os.path.exists(res_path / f"{subject}-{epoch_num}-scores.npy") or overwrite:
+                if not os.path.exists(res_dir / f"{subject}-{epoch_num}-scores.npy") or overwrite:
                     if trial_type == 'pattern':
                         pattern = behav.trialtypes == 1
                         X = stcs_data[pattern]
@@ -98,7 +93,7 @@ def process_subject(subject, lock, jobs):
                     y = y.reset_index(drop=True)            
                     assert X.shape[0] == y.shape[0]
                     scores = cross_val_multiscore(clf, X, y, cv=cv)                    
-                    np.save(op.join(res_path, f"{subject}-{epoch_num}-scores.npy"), scores.mean(0))
+                    np.save(op.join(res_dir, f"{subject}-{epoch_num}-scores.npy"), scores.mean(0))
 
                     del stcs_data, X, y, scores
                     gc.collect()
@@ -118,7 +113,7 @@ def process_subject(subject, lock, jobs):
         
         for network in networks[:-2]:
             print("Processing", subject, 'all', trial_type, network)
-            res_path = res_dir / lock / f'networks_{n_parcels}_{n_networks}' / network / trial_type
+            res_path = res_dir / lock / network / trial_type
             ensure_dir(res_path)
             lh_label = mne.read_label(label_path / f'{network}-lh.label')
             rh_label = mne.read_label(label_path / f'{network}-rh.label')

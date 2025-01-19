@@ -32,9 +32,6 @@ verbose = True
 overwrite = True
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
-res_path = data_path / 'results' / 'source'
-ensure_dir(res_path)
-
 def process_subject(subject, lock, trial_type, jobs):
     # define classifier
     clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
@@ -45,9 +42,11 @@ def process_subject(subject, lock, trial_type, jobs):
     vol_src = mne.read_source_spaces(vol_src_fname, verbose=verbose)
 
     for region in ['Hippocampus', 'Thalamus']:
-
         all_behavs = list()
         all_stcs = list()
+        # results dir
+        res_dir = RESULTS_DIR / "RSA" / 'source' / region / lock / 'scores' / trial_type
+        ensure_dir(res_dir)
             
         for epoch_num in [0, 1, 2, 3, 4]:
             # read behav
@@ -56,14 +55,14 @@ def process_subject(subject, lock, trial_type, jobs):
             epoch_fname = op.join(data_path, lock, f"{subject}-{epoch_num}-epo.fif")
             epoch = mne.read_epochs(epoch_fname, verbose=verbose, preload=False)
             if lock == 'button': 
-                epoch_bsl_fname = data_path / 'bsl' / f'{subject}_{epoch_num}_bl-epo.fif'
+                epoch_bsl_fname = data_path / 'bsl' / f'{subject}-{epoch_num}-epo.fif'
                 epoch_bsl = mne.read_epochs(epoch_bsl_fname, verbose=verbose, preload=False)
                 # compute noise covariance
-                noise_cov = mne.compute_covariance(epoch_bsl, method="empirical", rank="info", verbose=verbose)
+                noise_cov = mne.compute_covariance(epoch_bsl, method="oas", rank="info", verbose=verbose)
             else:
-                noise_cov = mne.compute_covariance(epoch, tmin=-.2, tmax=0, method="empirical", rank="info", verbose=verbose)
+                noise_cov = mne.compute_covariance(epoch, tmin=-.2, tmax=0, method="oas", rank="info", verbose=verbose)
             # compute data covariance matrix on evoked data
-            data_cov = mne.compute_covariance(epoch, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
+            data_cov = mne.compute_covariance(epoch, tmin=0, tmax=.6, method="oas", rank="info", verbose=verbose)
             # conpute rank
             rank = mne.compute_rank(noise_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)    
             # compute forward solution
@@ -84,11 +83,8 @@ def process_subject(subject, lock, trial_type, jobs):
             gc.collect()
             
             print(f"Processing {subject} - {epoch_num} - {region} - {trial_type}...")
-            # results dir
-            res_path = RESULTS_DIR / "RSA" / 'source' / region / lock / 'scores' / subject
-            ensure_dir(res_path)
                 
-            if not os.path.exists(res_path / f"{subject}-{epoch_num}-scores.npy") or overwrite:
+            if not os.path.exists(res_dir / f"{subject}-{epoch_num}-scores.npy") or overwrite:
                 if trial_type == 'pattern':    
                     pattern = behav.trialtypes == 1
                     X = stcs_data[pattern]
@@ -103,7 +99,7 @@ def process_subject(subject, lock, trial_type, jobs):
                 y = y.reset_index(drop=True)            
                 assert X.shape[0] == y.shape[0]        
                 scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=verbose)
-                np.save(res_path / f"{subject}-{epoch_num}-scores.npy", scores.mean(0))
+                np.save(res_dir / f"{subject}-{epoch_num}-scores.npy", scores.mean(0))
         
                 del X, y, scores
                 gc.collect()
@@ -128,11 +124,8 @@ def process_subject(subject, lock, trial_type, jobs):
         stcs_data = np.concatenate([label_tc[label] for label in labels], axis=1) # this works
         
         print(f"Processing {subject} - all - {region} - {trial_type}...")
-        # results dir
-        res_path = RESULTS_DIR / "RSA" / 'source' / region / lock / 'scores' / subject
-        ensure_dir(res_path)
         
-        if not os.path.exists(res_path / f"{subject}-all-scores.npy") or overwrite:
+        if not os.path.exists(res_dir / f"{subject}-all-scores.npy") or overwrite:
             if trial_type == 'pattern':    
                 pattern = behav_df.trialtypes == 1
                 X = stcs_data[pattern]
@@ -147,7 +140,7 @@ def process_subject(subject, lock, trial_type, jobs):
             y = y.reset_index(drop=True)            
             assert X.shape[0] == y.shape[0]
             scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=verbose)
-            np.save(res_path / f"{subject}-all-scores.npy", scores.mean(0))
+            np.save(res_dir / f"{subject}-all-scores.npy", scores.mean(0))
             
             del X, y, scores
             gc.collect()

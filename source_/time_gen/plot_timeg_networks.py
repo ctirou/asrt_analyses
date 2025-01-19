@@ -17,13 +17,14 @@ lock = 'stim'
 n_parcels = 200
 n_networks = 7
 networks = schaefer_7[:-2] if n_networks == 7 else schaefer_17[:-2]
-res_dir = data_path / 'results' / 'source' / lock / f'networks_{n_parcels}_{n_networks}'
-figures_dir = FIGURES_DIR / "time_gen" / "source" / lock / f"networks_{n_parcels}_{n_networks}"
+networks = networks + ['Hippocampus', 'Thalamus']
+res_dir = data_path / 'results' / 'source' / lock
+figures_dir = FIGURES_DIR / "time_gen" / "source" / lock
 ensure_dir(figures_dir)
-
 overwrite = False
 
 names = pd.read_csv(FREESURFER_DIR / 'Schaefer2018' / f'{n_networks}NetworksOrderedNames.csv', header=0)[' Network Name'].tolist()[:-2]
+names = names + ['Hippocampus', 'Thalamus']
 times = np.linspace(-1.5, 1.5, 305)
 chance = .25
 threshold = .05
@@ -64,57 +65,8 @@ for network in networks:
     patterns[network] = np.array(patpat)
     randoms[network] = np.array(randrand)
     
-    # save time gen pvals
-    ensure_dir(res_dir / network / "pval")
-    if not op.exists(res_dir / network / "pval" / "all_pattern-pval.npy") or overwrite:
-        pval = gat_stats(all_patterns[network] - chance, -1)
-        np.save(res_dir / network / "pval" / "all_pattern-pval.npy", pval)
-    if not op.exists(res_dir / network / "pval" / "all_random-pval.npy") or overwrite:
-        pval = gat_stats(all_randoms[network] - chance, -1)
-        np.save(res_dir / network / "pval" / "all_random-pval.npy", pval)
-    if not op.exists(res_dir / network / "pval" / "all_contrast-pval.npy") or overwrite:
-        pval = gat_stats(all_patterns[network] - all_randoms[network], -1)
-        np.save(res_dir / network / "pval" / "all_contrast-pval.npy", pval)
-    
-    # save blocks x time gen correlation and pvals
-    ensure_dir(res_dir / network / "corr")
-    if not op.exists(res_dir / network / "corr" / "rhos_blocks.npy") or overwrite:
-        contrasts = patterns[network] - randoms[network]
-        contrasts = zscore(contrasts, axis=-1)
-        all_rhos = []
-        for sub in range(len(subjects)):
-            rhos = np.empty((times.shape[0], times.shape[0]))
-            vector = [0, 1, 2, 3, 4]  # vector to correlate with
-            contrast = contrasts[sub]
-            results = Parallel(n_jobs=-1)(delayed(compute_spearman)(t, g, vector, contrast) for t in range(len(times)) for g in range(len(times)))
-            for idx, (t, g) in enumerate([(t, g) for t in range(len(times)) for g in range(len(times))]):
-                rhos[t, g] = results[idx]
-            all_rhos.append(rhos)
-        all_rhos = np.array(all_rhos)
-        np.save(res_dir / network / "corr" / "rhos_blocks.npy", all_rhos)
-        pval = gat_stats(all_rhos, -1)
-        np.save(res_dir / network / "corr" / "pval_blocks-pval.npy", pval)
-    
-    # save learn df x time gen correlation and pvals
-    if not op.exists(res_dir / network / "corr" / "rhos_learn.npy") or overwrite:
-        contrasts = patterns[network] - randoms[network]
-        contrasts = zscore(contrasts, axis=-1)  # je sais pas si zscore avant correlation pour la RSA mais c'est mieux je pense
-        all_rhos = []
-        for sub in range(len(subjects)):
-            rhos = np.empty((times.shape[0], times.shape[0]))
-            vector = learn_index_df.iloc[sub]  # vector to correlate with
-            contrast = contrasts[sub]
-            results = Parallel(n_jobs=-1)(delayed(compute_spearman)(t, g, vector, contrast) for t in range(len(times)) for g in range(len(times)))
-            for idx, (t, g) in enumerate([(t, g) for t in range(len(times)) for g in range(len(times))]):
-                rhos[t, g] = results[idx]
-            all_rhos.append(rhos)
-        all_rhos = np.array(all_rhos)
-        np.save(res_dir / network / "corr" / "rhos_learn.npy", all_rhos)
-        pval = gat_stats(all_rhos, -1)
-        np.save(res_dir / network / "corr" / "pval_learn-pval.npy", pval)    
-
 ### plot pattern for all networks ###
-fig, axes = plt.subplots(5, 1, figsize=(6, 12), sharex=True, layout='tight')
+fig, axes = plt.subplots(7, 1, figsize=(6, 12), sharex=True, sharey=True, layout='tight')
 fig.suptitle("Pattern", fontsize=14)
 for i, (network, name) in enumerate(zip(networks, names)):
     im = axes[i].imshow(
@@ -141,7 +93,7 @@ for i, (network, name) in enumerate(zip(networks, names)):
                         linestyles='solid', linewidths=1)
 fig.savefig(figures_dir / "all_pattern.pdf", transparent=True)
 ### plot random for all networks ###
-fig, axes = plt.subplots(5, 1, figsize=(6, 12), sharex=True, layout='tight')
+fig, axes = plt.subplots(7, 1, figsize=(6, 12), sharex=True, layout='tight')
 fig.suptitle("Random", fontsize=14)
 for i, (network, name) in enumerate(zip(networks, names)):
     im = axes[i].imshow(
@@ -167,8 +119,8 @@ for i, (network, name) in enumerate(zip(networks, names)):
     axes[i].contour(xx, yy, sig, colors='Gray', levels=[0],
                         linestyles='solid', linewidths=1)
 fig.savefig(figures_dir / "all_random.pdf", transparent=True)
-### plot average for all networks ###
-fig, axes = plt.subplots(5, 1, figsize=(6, 12), sharex=True, layout='tight')
+### plot contrast for all networks ###
+fig, axes = plt.subplots(7, 1, figsize=(6, 12), sharex=True, layout='tight')
 fig.suptitle("Contrast = Pattern – Random", fontsize=14)
 for i, (network, name) in enumerate(zip(networks, names)):
     all_contrast = all_patterns[network] - all_randoms[network]
@@ -179,8 +131,8 @@ for i, (network, name) in enumerate(zip(networks, names)):
         cmap="RdBu_r",
         extent=times[[0, -1, 0, -1]],
         aspect=0.5,
-        vmin=-0.05,
-        vmax=0.05)
+        vmin=-0.01,
+        vmax=0.01)
     axes[i].set_ylabel("Training Time (s)")
     axes[i].set_title(f"${name}$", fontsize=10)
     axes[i].axvline(0, color="k", alpha=.5)
@@ -196,7 +148,7 @@ for i, (network, name) in enumerate(zip(networks, names)):
                         linestyles='solid', linewidths=1)
 fig.savefig(figures_dir / "all_contrast.pdf", transparent=True)
 ### plot diagonal for all networks ###
-fig, axes = plt.subplots(5, 1, figsize=(6, 12), sharex=True, layout='tight')
+fig, axes = plt.subplots(7, 1, figsize=(6, 12), sharex=True, layout='tight')
 fig.suptitle("Contrast diagonal", fontsize=14)
 for i, (network, name) in enumerate(zip(networks, names)):
     axes[i].plot(times, all_diags[network].mean(0))
@@ -209,7 +161,7 @@ for i, (network, name) in enumerate(zip(networks, names)):
 fig.savefig(figures_dir / "all_diagonal.pdf", transparent=True)
 
 ### plot blocks x time gen correlation for all networks ###
-fig, axes = plt.subplots(5, 1, figsize=(6, 12), sharex=True, layout='tight')
+fig, axes = plt.subplots(7, 1, figsize=(6, 12), sharex=True, layout='tight')
 fig.suptitle("blocks x time gen correlation", fontsize=14)
 for i, (network, name) in enumerate(zip(networks, names)):
     rhos = np.load(res_dir / network / "corr" / "rhos_blocks.npy")
@@ -238,7 +190,7 @@ for i, (network, name) in enumerate(zip(networks, names)):
 fig.savefig(figures_dir / "blocks_corr.pdf", transparent=True)
 
 ### plot learn df x time gen correlation for all networks ###
-fig, axes = plt.subplots(5, 1, figsize=(6, 12), sharex=True, layout='tight')
+fig, axes = plt.subplots(7, 1, figsize=(6, 12), sharex=True, layout='tight')
 fig.suptitle("learn df x time gen correlation", fontsize=14)
 for i, (network, name) in enumerate(zip(networks, names)):
     rhos = np.load(res_dir / network / "corr" / "rhos_learn.npy")

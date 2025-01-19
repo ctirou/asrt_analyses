@@ -45,6 +45,9 @@ def process_subject(subject, lock, jobs):
         for trial_type in ['pattern', 'random']:
             all_behavs = list()
             all_stcs = list()
+            # results dir
+            res_dir = res_path / lock / region / trial_type
+            ensure_dir(res_dir)
             
             for epoch_num in [0, 1, 2, 3, 4]:
                 # read behav
@@ -52,17 +55,12 @@ def process_subject(subject, lock, jobs):
                 # read epoch
                 epoch_fname = op.join(data_path, lock, f"{subject}-{epoch_num}-epo.fif")
                 epoch = mne.read_epochs(epoch_fname, verbose=verbose, preload=False)
-                if lock == 'button': 
-                    epoch_bsl_fname = data_path / 'bsl' / f'{subject}_{epoch_num}_bl-epo.fif'
-                    epoch_bsl = mne.read_epochs(epoch_bsl_fname, verbose=verbose, preload=False)
-                    # compute noise covariance
-                    noise_cov = mne.compute_covariance(epoch_bsl, method="empirical", rank="info", verbose=verbose)
-                else:
-                    noise_cov = mne.compute_covariance(epoch, tmin=-.2, tmax=0, method="empirical", rank="info", verbose=verbose)
                 # compute data covariance matrix on evoked data
-                data_cov = mne.compute_covariance(epoch, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
+                data_cov = mne.compute_covariance(epoch, tmin=epoch.times[0], tmax=epoch.times[-1], method="auto", rank="info", verbose=verbose)
+                # read noise cov computed on resting state
+                noise_cov = mne.read_cov(data_path / 'noise_cov' / f"{subject}-rs2-cov.fif", verbose=verbose)
                 # conpute rank
-                rank = mne.compute_rank(noise_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)    
+                rank = mne.compute_rank(noise_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)
                 # compute forward solution
                 fwd_fname = data_path / "fwd" / lock / f"{subject}-hipp-thal-{epoch_num}-fwd.fif"
                 fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
@@ -81,9 +79,6 @@ def process_subject(subject, lock, jobs):
                 gc.collect()
                 
                 print(f"Processing {subject} - {epoch_num} - {region} - {trial_type}...")
-                # results dir
-                res_dir = res_path / 'source' / lock / region / trial_type
-                ensure_dir(res_dir)
                 
                 if not os.path.exists(res_dir / f"{subject}-{epoch_num}-scores.npy") or overwrite:
                     if trial_type == 'pattern':    
@@ -125,9 +120,6 @@ def process_subject(subject, lock, jobs):
             stcs_data = np.concatenate([label_tc[label] for label in labels], axis=1) # this works
             
             print(f"Processing {subject} - all - {region} - {trial_type}...")
-            # results dir
-            res_dir = res_path / lock / region / trial_type
-            ensure_dir(res_dir)
             
             if not os.path.exists(res_dir / f"{subject}-all-scores.npy") or overwrite:
                 if trial_type == 'pattern':    
