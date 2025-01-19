@@ -9,18 +9,16 @@ from config import *
 import gc
 import sys
 
-# stim disp = 500 ms
-# RSI = 750 ms in task
 data_path = DATA_DIR
 subjects, subjects_dir = SUBJS, FREESURFER_DIR
 folds = 10
 solver = 'lbfgs'
 scoring = "accuracy"
-verbose = True
-is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
-
 lock = 'stim'
-overwrite = False
+
+is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
+overwrite = True
+verbose = True
 
 def process_subject(subject, lock):
     # read volume source space
@@ -29,8 +27,8 @@ def process_subject(subject, lock):
 
     for region in ['Hippocampus', 'Thalamus']:
         # define results path
-        res_path = RESULTS_DIR / 'RSA' / 'source' / region / lock / subject / 'rdm'
-        ensure_dir(res_path)
+        res_dir = RESULTS_DIR / 'RSA' / 'source' / region / lock / subject / 'rdm'
+        ensure_dir(res_dir)
             
         for epoch_num in [0, 1, 2, 3, 4]:
             # read behav
@@ -42,11 +40,11 @@ def process_subject(subject, lock):
                 epoch_bsl_fname = data_path / 'bsl' / f'{subject}_{epoch_num}_bl-epo.fif'
                 epoch_bsl = mne.read_epochs(epoch_bsl_fname, verbose=verbose, preload=False)
                 # compute noise covariance
-                noise_cov = mne.compute_covariance(epoch_bsl, method="empirical", rank="info", verbose=verbose)
+                noise_cov = mne.compute_covariance(epoch_bsl, method="oas", rank="info", verbose=verbose)
             else:
-                noise_cov = mne.compute_covariance(epoch, tmin=-.2, tmax=0, method="empirical", rank="info", verbose=verbose)
+                noise_cov = mne.compute_covariance(epoch, tmin=-.2, tmax=0, method="oas", rank="info", verbose=verbose)
             # compute data covariance matrix on evoked data
-            data_cov = mne.compute_covariance(epoch, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
+            data_cov = mne.compute_covariance(epoch, tmin=0, tmax=.6, method="oas", rank="info", verbose=verbose)
             # conpute rank
             rank = mne.compute_rank(noise_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)    
             # compute forward solution
@@ -67,21 +65,21 @@ def process_subject(subject, lock):
             gc.collect()
             
             print(f"Processing {subject} - {epoch_num} - {region}...")
-            if not op.exists(res_path / f"pat-{epoch_num}.npy") or not op.exists(res_path / f"rand-{epoch_num}.npy") or overwrite:
+            if not op.exists(res_dir / f"pat-{epoch_num}.npy") or not op.exists(res_dir / f"rand-{epoch_num}.npy") or overwrite:
 
                 pattern = behav.trialtypes == 1
                 X_pat = stcs_data[pattern]
                 y_pat = behav.positions[pattern].reset_index(drop=True)
                 assert X_pat.shape[0] == y_pat.shape[0]
                 rdm_pat = cv_mahalanobis(X_pat, y_pat)
-                np.save(res_path / f"pat-{epoch_num}.npy", rdm_pat)
+                np.save(res_dir / f"pat-{epoch_num}.npy", rdm_pat)
                 
                 random = behav.trialtypes == 2
                 X_rand = stcs_data[random]
                 y_rand = behav.positions[random].reset_index(drop=True)
                 assert X_rand.shape[0] == y_rand.shape[0]
                 rdm_rand = cv_mahalanobis(X_rand, y_rand)
-                np.save(res_path / f"rand-{epoch_num}.npy", rdm_rand)
+                np.save(res_dir / f"rand-{epoch_num}.npy", rdm_rand)
                 
                 del X_pat, y_pat, X_rand, y_rand
                 gc.collect()
