@@ -18,12 +18,15 @@ verbose = True
         
 # Set path
 data_path = RAW_DATA_DIR
-res_path = TIMEG_DATA_DIR / "noise_cov"
+res_path = TIMEG_DATA_DIR / "noise_cov_emp"
+res_path = TIMEG_DATA_DIR / "noise_cov_auto"
+res_path = TIMEG_DATA_DIR / "noise_cov_oas"
 ensure_dir(res_path)
         
 def process_subject(subject, mode_ICA, filtering, overwrite, jobs, verbose):
         
-        meg_sessions = ['1_RESTING_1', '7_RESTING_2'] if subject == 'sub01' else ['1_RESTING_STATE_1', '7_RESTING_STATE_2']
+        # meg_sessions = ['1_RESTING_1', '7_RESTING_2'] if subject == 'sub01' else ['1_RESTING_STATE_1', '7_RESTING_STATE_2']
+        meg_sessions = ['7_RESTING_2'] if subject == 'sub01' else ['7_RESTING_STATE_2']
         
         # Loop across sessions
         for session_num, meg_session in enumerate(meg_sessions):
@@ -82,7 +85,6 @@ def process_subject(subject, mode_ICA, filtering, overwrite, jobs, verbose):
                         # Free memory
                         del raw
                         gc.collect()
-
 
 if is_cluster:
     # Check that SLURM_ARRAY_TASK_ID is available and use it to get the subject
