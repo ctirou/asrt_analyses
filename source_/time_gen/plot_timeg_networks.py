@@ -217,3 +217,31 @@ for i, (network, name) in enumerate(zip(networks, names)):
     cbar = plt.colorbar(im, ax=axes[i])
     cbar.set_label("accuracy")
 fig.savefig(figures_dir / "learn_corr.pdf", transparent=True)
+
+ensure_dir(figures_dir / "per_session")
+### plot session by session ###
+for network, name in zip(networks, names):
+    contrasts = patterns[network] - randoms[network]
+    fig, axes = plt.subplots(1, 5, sharey=True, figsize=(25, 3), layout='tight')
+    fig.suptitle(f"{name}", fontsize=14)
+    for i in range(5):
+        im = axes[i].imshow(
+            contrasts[:, i].mean(0),
+            interpolation="lanczos",
+            origin="lower",
+            cmap="RdBu_r",
+            extent=times[[0, -1, 0, -1]],
+            aspect=0.5,
+            vmin=-0.01,
+            vmax=0.01)
+        axes[i].set_xlabel("Testing Time (s)")
+        axes[i].set_title(f"Session {i}", fontsize=10)
+        axes[i].axvline(0, color="k", alpha=.5)
+        axes[i].axhline(0, color="k", alpha=.5)
+        if i == 0:
+            axes[i].set_ylabel("Training Time (s)")
+        # if i == 4:
+        #     cbar = plt.colorbar(im, ax=axes[i])
+        #     cbar.set_label("accuracy")
+    fig.savefig(figures_dir / "per_session" / f"{network}.pdf", transparent=True)
+    fig.close()

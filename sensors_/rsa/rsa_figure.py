@@ -21,7 +21,7 @@ lock = 'stim'
 
 # get times
 times = np.load(data_path / "times.npy")
-timesg = np.load(data_path / "times_gen.npy")
+# timesg = np.load(data_path / "times_gen.npy")
 
 figures_dir = FIGURES_DIR / "RSA" / "sensors"
 ensure_dir(figures_dir)
@@ -219,7 +219,8 @@ axd['C1'].set_xlabel('Session', fontsize=11)
 axd['C1'].set_xticks([0, 1, 2, 3, 4])
 # axd['C1'].legend(frameon=False, fontsize=10, loc='upper left', ncol=2)
 # axd['C1'].grid(True, linestyle='--', alpha=0.7)
-# axd['C1'].set_yticklabels([])
+# axd['C1'].set_yticklabels([])'
+axd['C1'].set_ylabel('Similarity Index', fontsize=11)
 axd['C1'].legend(frameon=False)
 axd['C1'].set_title(f'Similarity index and blocks fit', style='italic', fontsize=13)
 
@@ -253,15 +254,13 @@ axd['C2'].plot(
     lw=4, 
     label='Mean fit')
 # Labels, legend, and grid for C2
-axd['C2'].set_xlabel('Learning Index', fontsize=11)
-axd['C2'].set_ylabel('Similarity Index', fontsize=11)
 # axd['C2'].legend(frameon=False, fontsize=10, loc='upper left', ncol=2)
 # axd['C2'].grid(True, linestyle='--', alpha=0.7)
 axd['C2'].legend(frameon=False)
 axd['C2'].sharey(axd['C1'])
 axd['C2'].set_title(f'Similarity index and learning index fit', style='italic', fontsize=13)
 
-plt.savefig(figures_dir /  f"{lock}-new.pdf", transparent=True)
+plt.savefig(figures_dir /  f"{lock}.pdf", transparent=True)
 plt.close()
 
 # correlation between rsa and time generalization

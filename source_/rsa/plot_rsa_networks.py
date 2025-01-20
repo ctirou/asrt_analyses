@@ -31,9 +31,10 @@ def format_func(value, tick_number):
 n_parcels = 200
 n_networks = 17
 networks = schaefer_7 if n_networks == 7 else schaefer_17
-names_corrected = pd.read_csv(FREESURFER_DIR / 'Schaefer2018' / f'{n_networks}NetworksOrderedNames.csv', header=0)[' Network Name'].tolist()
-
-figures_dir = FIGURES_DIR / "RSA" / "source" / lock / analysis / f"networks_{n_parcels}_{n_networks}"
+networks += ['Hippocampus', 'Thalamus']
+names = pd.read_csv(FREESURFER_DIR / 'Schaefer2018' / f'{n_networks}NetworksOrderedNames.csv', header=0)[' Network Name'].tolist()
+names += ['Hippocampus', 'Thalamus']
+figures_dir = FIGURES_DIR / "RSA" / "source" / lock
 ensure_dir(figures_dir)
 
 def process_label(networks):
@@ -50,14 +51,14 @@ def process_label(networks):
             behav_dir = op.join(RAW_DATA_DIR, "%s/behav_data/" % (subject)) 
             sequence = get_sequence(behav_dir)
             
-            res_path = RESULTS_DIR / "RSA" / 'source' / f'networks_{n_parcels}_{n_networks}' / network / lock / 'rdm' / subject
+            res_path = RESULTS_DIR / "RSA" / 'source' / network / lock / 'rdm' / subject
             sub_high, sub_low = get_all_high_low(res_path, sequence, analysis)
             
             all_high.append(sub_high)
             all_low.append(sub_low)
             
-            # score = np.load(RESULTS_DIR / "RSA" / 'source' / f'networks_{n_parcels}_{n_networks}' / network / lock / 'scores' / subject / f"{trial_type}-scores.npy")
-            # decoding[network].append(score)
+            score = np.load(RESULTS_DIR / "RSA" / 'source' / network / lock / 'scores' / 'all' / f"{subject}-all-scores.npy")
+            decoding[network].append(score)
             
         all_high, all_low = np.array(all_high).mean(1), np.array(all_low).mean(1)
         diff_low_high = np.squeeze(all_low - all_high)
@@ -70,13 +71,13 @@ def process_label(networks):
             for sub in range(len(subjects))
         ]
         corr[network] = np.array(all_rhos)
-        # decoding[network] = np.array(decoding[network])
+        decoding[network] = np.array(decoding[network])
         
-    # return decoding, rsa, rsa_high, rsa_low, corr
-    return rsa, rsa_high, rsa_low, corr
+    return decoding, rsa, rsa_high, rsa_low, corr
+    # return rsa, rsa_high, rsa_low, corr
 
-# decoding, rsa, rsa_high, rsa_low, corr = process_label(networks)
-rsa, rsa_high, rsa_low, corr = process_label(networks)
+decoding, rsa, rsa_high, rsa_low, corr = process_label(networks)
+# rsa, rsa_high, rsa_low, corr = process_label(networks)
 
 label_names = schaefer_7 if n_networks == 7 else schaefer_17
 # define parameters    

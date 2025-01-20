@@ -41,14 +41,14 @@ def process_subject(subject, epoch_num, lock):
         epoch_bsl_fname = data_path / "bsl" / f"{subject}-{epoch_num}-epo.fif"
         epoch_bsl = mne.read_epochs(epoch_bsl_fname, verbose=verbose)
         # compute noise covariance
-        noise_cov = mne.compute_covariance(epoch_bsl, method="oas", rank="info", verbose=verbose)
+        noise_cov = mne.compute_covariance(epoch_bsl, method="empirical", rank="info", verbose=verbose)
     else:
-        noise_cov = mne.compute_covariance(epoch, tmin=-.2, tmax=0, method="oas", rank="info", verbose=verbose)
+        noise_cov = mne.compute_covariance(epoch, tmin=-.2, tmax=0, method="empirical", rank="info", verbose=verbose)
     # read forward solution    
     fwd_fname = RESULTS_DIR / "fwd" / lock / f"{subject}-{epoch_num}-fwd.fif"
     fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
     # compute data covariance matrix on evoked data
-    data_cov = mne.compute_covariance(epoch, tmin=0, tmax=.6, method="oas", rank="info", verbose=verbose)
+    data_cov = mne.compute_covariance(epoch, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
     info = epoch.info
     # conpute rank
     rank = mne.compute_rank(noise_cov, info=info, rank=None, tol_kind='relative', verbose=verbose)
@@ -69,7 +69,7 @@ def process_subject(subject, epoch_num, lock):
         
         hemi = 'lh' if 'left' in network else 'rh' if 'right' in network else 'both'
         parc = f"Schaefer2018_{n_parcels}Parcels_{n_networks}Networks"
-        labels = mne.read_labels_from_annot(subject=subject, parc=parc, hemi=hemi, subjects_dir=subjects_dir, regexp=network, verbose=verbose, sort=True)        
+        labels = mne.read_labels_from_annot(subject=subject, parc=parc, hemi=hemi, subjects_dir=subjects_dir, regexp=network, verbose=verbose, sort=True)
         
         lh_label = mne.read_label(label_path / f'{network}-lh.label')
         rh_label = mne.read_label(label_path / f'{network}-rh.label')
@@ -85,6 +85,7 @@ def process_subject(subject, epoch_num, lock):
             assert X_pat.shape[0] == y_pat.shape[0]
             rdm_pat = cv_mahalanobis(X_pat, y_pat)
             np.save(res_dir / f"pat-{epoch_num}.npy", rdm_pat)
+            
             random = behav.trialtypes == 2
             X_rand = stcs_data[random]
             y_rand = behav.positions[random].reset_index(drop=True)

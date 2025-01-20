@@ -21,10 +21,10 @@ networks = networks + ['Hippocampus', 'Thalamus']
 res_dir = data_path / 'results' / 'source' / lock
 figures_dir = FIGURES_DIR / "time_gen" / "source" / lock
 ensure_dir(figures_dir)
-overwrite = False
+overwrite = True
 
 names = pd.read_csv(FREESURFER_DIR / 'Schaefer2018' / f'{n_networks}NetworksOrderedNames.csv', header=0)[' Network Name'].tolist()[:-2]
-names = names + ['Hippocampus', 'Thalamus']
+names += ['Hippocampus', 'Thalamus']
 times = np.linspace(-1.5, 1.5, 305)
 chance = .25
 threshold = .05

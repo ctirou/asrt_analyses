@@ -58,11 +58,11 @@ def process_subject(subject, lock, trial_type, jobs):
                 epoch_bsl_fname = data_path / 'bsl' / f'{subject}-{epoch_num}-epo.fif'
                 epoch_bsl = mne.read_epochs(epoch_bsl_fname, verbose=verbose, preload=False)
                 # compute noise covariance
-                noise_cov = mne.compute_covariance(epoch_bsl, method="oas", rank="info", verbose=verbose)
+                noise_cov = mne.compute_covariance(epoch_bsl, method="empirical", rank="info", verbose=verbose)
             else:
-                noise_cov = mne.compute_covariance(epoch, tmin=-.2, tmax=0, method="oas", rank="info", verbose=verbose)
+                noise_cov = mne.compute_covariance(epoch, tmin=-.2, tmax=0, method="empirical", rank="info", verbose=verbose)
             # compute data covariance matrix on evoked data
-            data_cov = mne.compute_covariance(epoch, tmin=0, tmax=.6, method="oas", rank="info", verbose=verbose)
+            data_cov = mne.compute_covariance(epoch, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
             # conpute rank
             rank = mne.compute_rank(noise_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)    
             # compute forward solution

@@ -27,7 +27,7 @@ def process_subject(subject, lock):
 
     for region in ['Hippocampus', 'Thalamus']:
         # define results path
-        res_dir = RESULTS_DIR / 'RSA' / 'source' / region / lock / subject / 'rdm'
+        res_dir = RESULTS_DIR / 'RSA' / 'source' / region / lock / 'rdm' / subject
         ensure_dir(res_dir)
             
         for epoch_num in [0, 1, 2, 3, 4]:
