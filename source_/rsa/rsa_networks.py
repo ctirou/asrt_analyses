@@ -37,7 +37,7 @@ def process_subject(subject, epoch_num, lock):
     behav_fname = data_path / "behav" / f"{subject}-{epoch_num}.pkl"
     behav = pd.read_pickle(behav_fname).reset_index()
     # get session behav and epoch
-    if lock == 'button': 
+    if lock == 'button':
         epoch_bsl_fname = data_path / "bsl" / f"{subject}-{epoch_num}-epo.fif"
         epoch_bsl = mne.read_epochs(epoch_bsl_fname, verbose=verbose)
         # compute noise covariance

@@ -35,7 +35,7 @@ def process_subject(subject, lock, trial_type, jobs):
     # define classifier
     clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
     clf = SlidingEstimator(clf, scoring=scoring, n_jobs=jobs, verbose=verbose)
-    cv = StratifiedKFold(folds, shuffle=True)  
+    cv = StratifiedKFold(folds, shuffle=True, random_state=42)  
     # define networks labels path
     n_parcels = 200
     n_networks = 7
@@ -54,24 +54,24 @@ def process_subject(subject, lock, trial_type, jobs):
             behav = pd.read_pickle(op.join(data_path, 'behav', f'{subject}-{epoch_num}.pkl'))
             # read epoch
             epoch_fname = op.join(data_path, lock, f"{subject}-{epoch_num}-epo.fif")
-            epoch = mne.read_epochs(epoch_fname, verbose=verbose, preload=False)
+            epoch = mne.read_epochs(epoch_fname, verbose=verbose, preload=True)
             if lock == 'button': 
                 epoch_bsl_fname = data_path / 'bsl' / f'{subject}-{epoch_num}-epo.fif'
-                epoch_bsl = mne.read_epochs(epoch_bsl_fname, verbose=verbose, preload=False)
+                epoch_bsl = mne.read_epochs(epoch_bsl_fname, verbose=verbose, preload=True)
                 # compute noise covariance
-                noise_cov = mne.compute_covariance(epoch_bsl, method="empirical", rank="info", verbose=verbose)
+                noise_cov = mne.compute_covariance(epoch_bsl, method="auto", rank="info", verbose=verbose)
             else:
-                noise_cov = mne.compute_covariance(epoch, tmin=-.2, tmax=0, method="empirical", rank="info", verbose=verbose)
+                noise_cov = mne.compute_covariance(epoch, tmin=-.2, tmax=0, method="auto", rank="info", verbose=verbose)
             # compute data covariance matrix on evoked data
-            data_cov = mne.compute_covariance(epoch, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
+            data_cov = mne.compute_covariance(epoch, tmin=0, tmax=.6, method="auto", rank="info", verbose=verbose)
             # conpute rank
-            rank = mne.compute_rank(noise_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)    
+            rank = mne.compute_rank(data_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)
             # read forward solution
             fwd_fname = RESULTS_DIR / "fwd" / lock / f"{subject}-{epoch_num}-fwd.fif"
             fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
             # compute source estimates
             filters = make_lcmv(epoch.info, fwd, data_cov=data_cov, noise_cov=noise_cov,
-                            pick_ori=None, rank=rank, reduce_rank=True, verbose=verbose)
+                            pick_ori=None, rank=rank, reduce_rank=False, reg=0.05, verbose=verbose)
             stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
             
             del noise_cov, data_cov, fwd, filters
@@ -102,7 +102,7 @@ def process_subject(subject, lock, trial_type, jobs):
                 assert X.shape[0] == y.shape[0]
                 scores = cross_val_multiscore(clf, X, y, cv=cv)                    
                 np.save(op.join(res_dir, f"{subject}-{epoch_num}-scores.npy"), scores.mean(0))
-
+                
                 del stcs_data, X, y, scores
                 gc.collect()
         
