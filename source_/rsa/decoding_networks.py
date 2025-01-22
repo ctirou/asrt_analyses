@@ -59,11 +59,11 @@ def process_subject(subject, lock, trial_type, jobs):
                 epoch_bsl_fname = data_path / 'bsl' / f'{subject}-{epoch_num}-epo.fif'
                 epoch_bsl = mne.read_epochs(epoch_bsl_fname, verbose=verbose, preload=True)
                 # compute noise covariance
-                noise_cov = mne.compute_covariance(epoch_bsl, method="auto", rank="info", verbose=verbose)
+                noise_cov = mne.compute_covariance(epoch_bsl, method="empirical", rank="info", verbose=verbose)
             else:
-                noise_cov = mne.compute_covariance(epoch, tmin=-.2, tmax=0, method="auto", rank="info", verbose=verbose)
+                noise_cov = mne.compute_covariance(epoch, tmin=-.2, tmax=0, method="empirical", rank="info", verbose=verbose)
             # compute data covariance matrix on evoked data
-            data_cov = mne.compute_covariance(epoch, tmin=0, tmax=.6, method="auto", rank="info", verbose=verbose)
+            data_cov = mne.compute_covariance(epoch, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
             # conpute rank
             rank = mne.compute_rank(data_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)
             # read forward solution
@@ -71,7 +71,7 @@ def process_subject(subject, lock, trial_type, jobs):
             fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
             # compute source estimates
             filters = make_lcmv(epoch.info, fwd, data_cov=data_cov, noise_cov=noise_cov,
-                            pick_ori=None, rank=rank, reduce_rank=False, reg=0.05, verbose=verbose)
+                            pick_ori=None, rank=rank, reduce_rank=True, reg=0.05, verbose=verbose)
             stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
             
             del noise_cov, data_cov, fwd, filters

@@ -53,10 +53,10 @@ def process_subject(subject, lock, trial_type, jobs):
             behav = pd.read_pickle(op.join(data_path, 'behav', f'{subject}-{epoch_num}.pkl'))
             # read epoch
             epoch_fname = op.join(data_path, lock, f"{subject}-{epoch_num}-epo.fif")
-            epoch = mne.read_epochs(epoch_fname, verbose=verbose, preload=False)
+            epoch = mne.read_epochs(epoch_fname, verbose=verbose, preload=True)
             if lock == 'button': 
                 epoch_bsl_fname = data_path / 'bsl' / f'{subject}-{epoch_num}-epo.fif'
-                epoch_bsl = mne.read_epochs(epoch_bsl_fname, verbose=verbose, preload=False)
+                epoch_bsl = mne.read_epochs(epoch_bsl_fname, verbose=verbose, preload=True)
                 # compute noise covariance
                 noise_cov = mne.compute_covariance(epoch_bsl, method="empirical", rank="info", verbose=verbose)
             else:
@@ -64,12 +64,12 @@ def process_subject(subject, lock, trial_type, jobs):
             # compute data covariance matrix on evoked data
             data_cov = mne.compute_covariance(epoch, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
             # conpute rank
-            rank = mne.compute_rank(noise_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)    
+            rank = mne.compute_rank(data_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)    
             # compute forward solution
             fwd_fname = RESULTS_DIR / "fwd" / lock / f"{subject}-hipp-thal-{epoch_num}-fwd.fif"
             fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
             # compute source estimates
-            filters = make_lcmv(epoch.info, fwd, data_cov=data_cov, noise_cov=noise_cov,
+            filters = make_lcmv(epoch.info, fwd, data_cov=data_cov, noise_cov=noise_cov, reg=0.05,
                             pick_ori=None, rank=rank, reduce_rank=True, verbose=verbose)
             stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
             # get data from volume source space

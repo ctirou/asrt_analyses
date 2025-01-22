@@ -26,7 +26,7 @@ is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
 lock = 'stim'
 jobs = -1
-overwrite = False
+overwrite = True
 
 res_path = data_path / 'results' / 'source'
 ensure_dir(res_path)
@@ -54,20 +54,21 @@ def process_subject(subject, lock, jobs):
                 behav = pd.read_pickle(op.join(data_path, 'behav', f'{subject}-{epoch_num}.pkl'))
                 # read epoch
                 epoch_fname = op.join(data_path, lock, f"{subject}-{epoch_num}-epo.fif")
-                epoch = mne.read_epochs(epoch_fname, verbose=verbose, preload=False)
+                epoch = mne.read_epochs(epoch_fname, verbose=verbose, preload=True)
                 # compute data covariance matrix on evoked data
-                data_cov = mne.compute_covariance(epoch, tmin=epoch.times[0], tmax=epoch.times[-1], method="auto", rank="info", verbose=verbose)
+                data_cov = mne.compute_covariance(epoch, tmin=epoch.times[0], tmax=epoch.times[-1], method="empirical", rank="info", verbose=verbose)
                 # read noise cov computed on resting state
-                noise_cov = mne.read_cov(data_path / 'noise_cov' / f"{subject}-rs2-cov.fif", verbose=verbose)
+                noise_cov = mne.read_cov(data_path / 'noise_cov_emp' / f"{subject}-cov.fif", verbose=verbose)
                 # conpute rank
-                rank = mne.compute_rank(noise_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)
+                rank = mne.compute_rank(data_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)
                 # compute forward solution
                 fwd_fname = data_path / "fwd" / lock / f"{subject}-hipp-thal-{epoch_num}-fwd.fif"
                 fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
                 # compute source estimates
-                filters = make_lcmv(epoch.info, fwd, data_cov=data_cov, noise_cov=noise_cov,
+                filters = make_lcmv(epoch.info, fwd, data_cov=data_cov, noise_cov=noise_cov, reg=.05,
                                 pick_ori=None, rank=rank, reduce_rank=True, verbose=verbose)
                 stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
+                
                 # get data from volume source space
                 offsets = np.cumsum([0] + [len(s["vertno"]) for s in vol_src]) # need vol src here, fwd["src"] is mixed so does not work
                 label_tc, _ = get_volume_estimate_tc(stcs, fwd, offsets, subject, subjects_dir)

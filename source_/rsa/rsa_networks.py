@@ -39,7 +39,7 @@ def process_subject(subject, epoch_num, lock):
     # get session behav and epoch
     if lock == 'button':
         epoch_bsl_fname = data_path / "bsl" / f"{subject}-{epoch_num}-epo.fif"
-        epoch_bsl = mne.read_epochs(epoch_bsl_fname, verbose=verbose)
+        epoch_bsl = mne.read_epochs(epoch_bsl_fname, preload=True, verbose=verbose)
         # compute noise covariance
         noise_cov = mne.compute_covariance(epoch_bsl, method="empirical", rank="info", verbose=verbose)
     else:
@@ -51,9 +51,9 @@ def process_subject(subject, epoch_num, lock):
     data_cov = mne.compute_covariance(epoch, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
     info = epoch.info
     # conpute rank
-    rank = mne.compute_rank(noise_cov, info=info, rank=None, tol_kind='relative', verbose=verbose)
+    rank = mne.compute_rank(data_cov, info=info, rank=None, tol_kind='relative', verbose=verbose)
     # compute source estimates
-    filters = make_lcmv(info, fwd, data_cov=data_cov, noise_cov=noise_cov,
+    filters = make_lcmv(info, fwd, data_cov=data_cov, noise_cov=noise_cov, reg=0.05,
                     pick_ori=None, rank=rank, reduce_rank=True, verbose=verbose)
     stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
     

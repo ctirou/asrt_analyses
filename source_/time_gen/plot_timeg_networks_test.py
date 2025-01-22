@@ -35,6 +35,7 @@ analysis = "tg_0206_emp"
 analysis = "tg_rdm_oas"
 analysis = "tg_rdm_emp"
 analysis = "tg_rdm_auto"
+analysis = "new_tg_rs_auto"
 res_dir = data_path / analysis / lock
 
 def compute_spearman(t, g, vector, contrasts):
