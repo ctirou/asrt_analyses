@@ -79,10 +79,8 @@ def process_subject(subject, lock, trial_type, jobs):
 
             print("Processing", subject, epoch_num, trial_type, network)
             
-            lh_label = mne.read_label(label_path / f'{network}-lh.label')
-            rh_label = mne.read_label(label_path / f'{network}-rh.label')
-            stcs_data = [stc.in_label(lh_label + rh_label).data for stc in stcs]
-            stcs_data = np.array(stcs_data)
+            lh_label, rh_label = mne.read_label(label_path / f'{network}-lh.label'), mne.read_label(label_path / f'{network}-rh.label')
+            stcs_data = np.array([stc.in_label(lh_label + rh_label).data for stc in stcs])
             assert len(stcs_data) == len(behav)
             
             # run time generalization decoding on unique epoch
@@ -100,7 +98,7 @@ def process_subject(subject, lock, trial_type, jobs):
                     y = behav.positions    
                 y = y.reset_index(drop=True)            
                 assert X.shape[0] == y.shape[0]
-                scores = cross_val_multiscore(clf, X, y, cv=cv)                    
+                scores = cross_val_multiscore(clf, X, y, cv=cv)   
                 np.save(op.join(res_dir, f"{subject}-{epoch_num}-scores.npy"), scores.mean(0))
                 
                 del stcs_data, X, y, scores

@@ -7,6 +7,7 @@ from config import *
 from mne.beamformer import make_lcmv, apply_lcmv_epochs
 import gc
 import sys
+from joblib import Parallel, delayed
 
 # params
 subjects = SUBJS
@@ -19,7 +20,7 @@ lock = 'stim'
 
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 verbose = True
-overwrite = True
+overwrite = False
 
 def process_subject(subject, epoch_num, lock):
     
@@ -71,13 +72,10 @@ def process_subject(subject, epoch_num, lock):
         parc = f"Schaefer2018_{n_parcels}Parcels_{n_networks}Networks"
         labels = mne.read_labels_from_annot(subject=subject, parc=parc, hemi=hemi, subjects_dir=subjects_dir, regexp=network, verbose=verbose, sort=True)
         
-        lh_label = mne.read_label(label_path / f'{network}-lh.label')
-        rh_label = mne.read_label(label_path / f'{network}-rh.label')
+        lh_label, rh_label = mne.read_label(label_path / f'{network}-lh.label'), mne.read_label(label_path / f'{network}-rh.label')        
+        stcs_data = np.array([stc.in_label(lh_label + rh_label).data for stc in stcs])
         
-        stcs_data = [stc.in_label(lh_label + rh_label).data for stc in stcs]
-        stcs_data = np.array(stcs_data)
-        
-        if not op.exists(res_dir / f"pat-{epoch_num}.npy") or not op.exists(res_dir / f"rand-{epoch_num}.npy") or overwrite:
+        if not op.exists(res_dir / f"pat-{epoch_num}.npy") or overwrite:
 
             pattern = behav.trialtypes == 1
             X_pat = stcs_data[pattern]
@@ -85,15 +83,17 @@ def process_subject(subject, epoch_num, lock):
             assert X_pat.shape[0] == y_pat.shape[0]
             rdm_pat = cv_mahalanobis(X_pat, y_pat)
             np.save(res_dir / f"pat-{epoch_num}.npy", rdm_pat)
-            
+            del X_pat, y_pat
+            gc.collect()
+        
+        if not op.exists(res_dir / f"rand-{epoch_num}.npy") or overwrite:    
             random = behav.trialtypes == 2
             X_rand = stcs_data[random]
             y_rand = behav.positions[random].reset_index(drop=True)
             assert X_rand.shape[0] == y_rand.shape[0]
             rdm_rand = cv_mahalanobis(X_rand, y_rand)
             np.save(res_dir / f"rand-{epoch_num}.npy", rdm_rand)
-            
-            del X_pat, y_pat, X_rand, y_rand
+            del X_rand, y_rand
             gc.collect()
         
         del stcs_data, labels, lh_label, rh_label
@@ -114,6 +114,8 @@ if is_cluster:
         print("Error: SLURM_ARRAY_TASK_ID is not set correctly or is out of bounds.")
         sys.exit(1)
 else:
-    for subject in subjects:
-        for epoch_num in range(5):
-            process_subject(subject, epoch_num, lock)
+    # for subject in subjects:
+    #     for epoch_num in range(5):
+    #         process_subject(subject, epoch_num, lock)
+    lock = 'stim'
+    Parallel(-1)(delayed(process_subject)(subject, epoch_num, lock) for subject in subjects for epoch_num in range(5))

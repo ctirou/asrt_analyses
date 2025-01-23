@@ -51,7 +51,7 @@ for network in networks:
     for subject in subjects:        
         score = np.load(RESULTS_DIR / "RSA" / 'source' / network / lock / 'scores' / trial_type / f"{subject}-all-scores.npy")
         decoding[network].append(score)
-        # RSA stuff
+        # # RSA stuff
         behav_dir = op.join(RAW_DATA_DIR, "%s/behav_data/" % (subject))
         sequence = get_sequence(behav_dir)
         res_path = RESULTS_DIR / "RSA" / 'source' / network / lock / 'rdm' / subject
@@ -81,10 +81,11 @@ design = [['A', [['B1'], ['B2']], [['C1'], ['C2']]],
 plt.rcParams.update({'font.size': 10, 'font.family': 'serif', 'font.serif': 'Avenir'})
 cmap = plt.cm.get_cmap('tab20', len(label_names))
 
-fig, axd = plt.subplot_mosaic(design, sharex=True, figsize=(20, 12), layout='tight')
+fig, axd = plt.subplot_mosaic(design, sharex=True, figsize=(15, 18), layout='tight')
 for ax in axd.values():
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
+    ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
 ### Plot decoding ###
 for i, (label, name, j) in enumerate(zip(label_names, names_corrected, ['A', 'D', 'G', 'J', 'M', 'P', 'S'])):
     if lock == 'stim':
@@ -100,25 +101,26 @@ for i, (label, name, j) in enumerate(zip(label_names, names_corrected, ['A', 'D'
     axd[j].fill_between(times, score.mean(0) - sem, chance, where=sig, color=cmap(i), alpha=.5)
     axd[j].axhline(chance, color='grey', alpha=.5)
     axd[j].set_ylabel('Accuracy (%)', fontsize=12)
-    axd[j].set_title(f'{name} network decoding', style='italic')
-### Plot similarity index ###
+    # axd[j].set_title(f'{name} network decoding', style='italic')
 for i, (label, name, j) in enumerate(zip(label_names, names_corrected, ['B1', 'E1', 'H1', 'K1', 'N1', 'Q1', 'T1'])):
     axd[j].axhline(0, color='grey', alpha=.5)
     high = all_highs[label][:, :, 1:, :].mean((1, 2)) - all_highs[label][:, :, 0, :].mean(1)
     low = all_lows[label][:, :, 1:, :].mean((1, 2)) - all_lows[label][:, :, 0, :].mean(axis=1)
     diff = low - high
-    axd[j].plot(times, diff.mean(0), alpha=1, label='Random - Pattern', zorder=10, color=cmap(i))
+    p_values = decod_stats(diff, jobs)
+    sig = p_values < threshold
+    # Main plot
+    axd[j].plot(times, diff.mean(0), alpha=1, label='Random - Pattern', zorder=10, color='C7')
+    # Plot significant regions separately
+    for start, end in contiguous_regions(sig):
+        axd[j].plot(times[start:end], diff.mean(0)[start:end], alpha=1, zorder=10, color=cmap(i))
     sem = np.std(diff, axis=0) / np.sqrt(len(subjects))
-    sig = p_values < 0.05
-    axd[j].fill_between(times, diff.mean(0) - sem, diff.mean(0) + sem, alpha=0.2, zorder=5, color=cmap(i))
-    axd[j].fill_between(times, 0, diff.mean(0) - sem, where=sig, alpha=0.3, label='Significance - corrected', facecolor="#F2AD00")
-    p_values_unc = ttest_1samp(diff, axis=0, popmean=0)[1]
-    sig_unc = p_values_unc < 0.05
-    axd[j].fill_between(times, 0, diff.mean(0) - sem, where=sig_unc, alpha=.3, label='Significance - uncorrected', facecolor="#7294D4")
-    # axd[j].legend(frameon=False)
+    axd[j].fill_between(times, diff.mean(0) - sem, diff.mean(0) + sem, alpha=0.2, zorder=5, color='C7')
+    # Highlight significant regions
+    axd[j].fill_between(times, diff.mean(0) - sem, diff.mean(0) + sem, where=sig, alpha=0.2, zorder=5, color=cmap(i))
     axd[j].set_ylabel('Sim.', fontsize=11)
     axd[j].yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
-    axd[j].set_xticklabels([])
+    axd[j].set_xticklabels([])    
     # axd[j].set_title(f'Similarity index', style='italic', fontsize=11)
 ### Plot cvMD ###
 for i, (label, name, j) in enumerate(zip(label_names, names_corrected, ['B2', 'E2', 'H2', 'K2', 'N2', 'Q2', 'T2'])):
@@ -128,9 +130,9 @@ for i, (label, name, j) in enumerate(zip(label_names, names_corrected, ['B2', 'E
     sem_high = np.std(high, axis=0) / np.sqrt(len(subjects))
     sem_low = np.std(low, axis=0) / np.sqrt(len(subjects))
     axd[j].plot(times, high.mean(0), label='Pattern', color=cmap(i), alpha=1)
-    axd[j].plot(times, low.mean(0), label='Random', color=cmap(i), alpha=1)
+    axd[j].plot(times, low.mean(0), label='Random', color='C7', alpha=1)
     axd[j].fill_between(times, high.mean(0) - sem_high, high.mean(0) + sem_high, alpha=0.2, color=cmap(i))
-    axd[j].fill_between(times, low.mean(0) - sem_low, low.mean(0) + sem_low, alpha=0.2, color=cmap(i))
+    axd[j].fill_between(times, low.mean(0) - sem_low, low.mean(0) + sem_low, alpha=0.2, color='C7')
     # sig = p_values < 0.05
     # axd[j].fill_between(times, high.mean(0) + sem_high, low.mean(0) - sem_low, where=sig, alpha=0.3, label='Significance - corrected', facecolor="#F2AD00")
     # p_values_unc = ttest_1samp(diff, axis=0, popmean=0)[1]
@@ -174,4 +176,4 @@ for i, (label, name, j) in enumerate(zip(label_names, names_corrected, ['C2', 'F
     # axd[j].set_xlabel('Time (s)', fontsize=11)
     # axd[j].legend(frameon=False, loc="lower right")
     # axd[j].set_title(f'Subject x learning index correlation', style='italic', fontsize=13)
-fig.savefig(figures_dir / f"{lock}.pdf", transparent=True)
+# fig.savefig(figures_dir / f"{lock}.pdf", transparent=True)

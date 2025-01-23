@@ -21,12 +21,12 @@ solver = 'lbfgs'
 scoring = "accuracy"
 hemi = 'both'
 parc = 'aparc'
-verbose = True
+verbose = False
 res_path = data_path / 'results' / 'source'
 ensure_dir(res_path)
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 lock = 'stim'
-overwrite = True
+overwrite = False
 
 def process_subject(subject, lock, jobs):
     # define classifier
@@ -40,110 +40,116 @@ def process_subject(subject, lock, jobs):
     networks = schaefer_7 if n_networks == 7 else schaefer_17
     label_path = RESULTS_DIR / f'networks_{n_parcels}_{n_networks}' / subject    
     
-    for trial_type in ['pattern', 'random']:
-        all_behavs = list()
-        all_stcs = list()
+    # for trial_type in ['pattern', 'random']:
+    #     all_behavs = list()
+    #     all_stcs = list()
         
-        for epoch_num in [0, 1, 2, 3, 4]:
-            # read behav
-            behav = pd.read_pickle(op.join(data_path, 'behav', f'{subject}-{epoch_num}.pkl'))
-            # read epoch
-            epoch_fname = op.join(data_path, lock, f"{subject}-{epoch_num}-epo.fif")
-            epoch = mne.read_epochs(epoch_fname, verbose=verbose, preload=True)
-            # compute data covariance matrix on evoked data
-            data_cov = mne.compute_covariance(epoch, tmin=epoch.times[0], tmax=epoch.times[-1], method="empirical", rank="info", verbose=verbose)
-            # read noise cov computed on resting state
-            noise_cov = mne.read_cov(data_path / 'noise_cov_emp' / f"{subject}-cov.fif", verbose=verbose)
-            # conpute rank
-            rank = mne.compute_rank(data_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)
-            # read forward solution
-            fwd_fname = RESULTS_DIR / "fwd" / lock / f"{subject}-{epoch_num}-fwd.fif"
-            fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
-            # compute source estimates
-            filters = make_lcmv(epoch.info, fwd, data_cov=data_cov, noise_cov=noise_cov, reg=.05,
-                                pick_ori=None, rank=rank, reduce_rank=True, verbose=verbose)
-            stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
+    for epoch_num in [0, 1, 2, 3, 4]:
+        # read behav
+        behav = pd.read_pickle(op.join(data_path, 'behav', f'{subject}-{epoch_num}.pkl'))
+        # read epoch
+        epoch_fname = op.join(data_path, lock, f"{subject}-{epoch_num}-epo.fif")
+        epoch = mne.read_epochs(epoch_fname, verbose=verbose, preload=True)
+        # compute data covariance matrix on evoked data
+        data_cov = mne.compute_covariance(epoch, tmin=epoch.times[0], tmax=epoch.times[-1], method="empirical", rank="info", verbose=verbose)
+        # read noise cov computed on resting state
+        noise_cov = mne.read_cov(data_path / 'noise_cov_emp' / f"{subject}-rs-cov.fif", verbose=verbose)
+        # conpute rank
+        data_rank = mne.compute_rank(data_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)
+        noise_rank = mne.compute_rank(noise_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)
+    
+        print(subject, epoch_num, f"Data rank: {data_rank}, Noise rank: {noise_rank}")
+            
+            
+            
+        #     # read forward solution
+        #     fwd_fname = RESULTS_DIR / "fwd" / lock / f"{subject}-{epoch_num}-fwd.fif"
+        #     fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
+        #     # compute source estimates
+        #     filters = make_lcmv(epoch.info, fwd, data_cov=data_cov, noise_cov=noise_cov, reg=.05,
+        #                         pick_ori=None, rank=rank, reduce_rank=True, verbose=verbose)
+        #     stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
 
-            del noise_cov, data_cov, fwd, filters
-            gc.collect()
+        #     del noise_cov, data_cov, fwd, filters
+        #     gc.collect()
 
-            for network in networks[:-2]:
-                print("Processing", subject, epoch_num, trial_type, network)
-                res_dir = res_path / lock / network / trial_type
-                ensure_dir(res_dir)
-                lh_label = mne.read_label(label_path / f'{network}-lh.label')
-                rh_label = mne.read_label(label_path / f'{network}-rh.label')
-                stcs_data = [stc.in_label(lh_label + rh_label).data for stc in stcs]
-                stcs_data = np.array(stcs_data)
-                assert len(stcs_data) == len(behav)
+        #     for network in networks[:-2]:
+        #         print("Processing", subject, epoch_num, trial_type, network)
+        #         res_dir = res_path / lock / network / trial_type
+        #         ensure_dir(res_dir)
+        #         lh_label, rh_label = mne.read_label(label_path / f'{network}-lh.label'), mne.read_label(label_path / f'{network}-rh.label')
+        #         stcs_data = np.array([stc.in_label(lh_label + rh_label).data for stc in stcs])
+        #         assert len(stcs_data) == len(behav)
                 
-                # run time generalization decoding on unique epoch
-                if not os.path.exists(res_dir / f"{subject}-{epoch_num}-scores.npy") or overwrite:
-                    if trial_type == 'pattern':
-                        pattern = behav.trialtypes == 1
-                        X = stcs_data[pattern]
-                        y = behav.positions[pattern]
-                    elif trial_type == 'random':
-                        random = behav.trialtypes == 2
-                        X = stcs_data[random]
-                        y = behav.positions[random]
-                    else:
-                        X = stcs_data
-                        y = behav.positions    
-                    y = y.reset_index(drop=True)            
-                    assert X.shape[0] == y.shape[0]
-                    scores = cross_val_multiscore(clf, X, y, cv=cv)                    
-                    np.save(op.join(res_dir, f"{subject}-{epoch_num}-scores.npy"), scores.mean(0))
+        #         # run time generalization decoding on unique epoch
+        #         if not os.path.exists(res_dir / f"{subject}-{epoch_num}-scores.npy") or overwrite:
+        #             if trial_type == 'pattern':
+        #                 pattern = behav.trialtypes == 1
+        #                 X = stcs_data[pattern]
+        #                 y = behav.positions[pattern]
+        #             elif trial_type == 'random':
+        #                 random = behav.trialtypes == 2
+        #                 X = stcs_data[random]
+        #                 y = behav.positions[random]
+        #             else:
+        #                 X = stcs_data
+        #                 y = behav.positions    
+        #             y = y.reset_index(drop=True)            
+        #             assert X.shape[0] == y.shape[0]
+        #             scores = cross_val_multiscore(clf, X, y, cv=cv)
+        #             np.save(op.join(res_dir, f"{subject}-{epoch_num}-scores.npy"), scores.mean(0))
 
-                    del stcs_data, X, y, scores
-                    gc.collect()
+        #             del stcs_data, X, y, scores
+        #             gc.collect()
             
-            # append epochs
-            all_behavs.append(behav)
-            all_stcs.extend(stcs)
+        #     # append epochs
+        #     all_behavs.append(behav)
+        #     all_stcs.extend(stcs)
             
-            del epoch, behav, stcs
-            if trial_type == 'button':
-                del epoch_bsl
-            gc.collect()
+        #     del epoch, behav, stcs
+        #     if trial_type == 'button':
+        #         del epoch_bsl
+        #     gc.collect()
         
-        behav_df = pd.concat(all_behavs)
-        del all_behavs
-        gc.collect()
+        # behav_df = pd.concat(all_behavs)
+        # del all_behavs
+        # gc.collect()
         
-        for network in networks[:-2]:
-            print("Processing", subject, 'all', trial_type, network)
-            res_dir = res_path / lock / network / trial_type
-            ensure_dir(res_dir)
-            lh_label = mne.read_label(label_path / f'{network}-lh.label')
-            rh_label = mne.read_label(label_path / f'{network}-rh.label')
-            stcs_data = [stc.in_label(lh_label + rh_label).data for stc in all_stcs]
-            stcs_data = np.array(stcs_data)
-            behav_data = behav_df.reset_index(drop=True)
-            assert len(stcs_data) == len(behav_data)
-            if not op.exists(res_dir / f"{subject}-all-scores.npy") or overwrite:
-                if trial_type == 'pattern':
-                    pattern = behav_data.trialtypes == 1
-                    X = stcs_data[pattern]
-                    y = behav_data.positions[pattern]
-                elif trial_type == 'random':
-                    random = behav_data.trialtypes == 2
-                    X = stcs_data[random]
-                    y = behav_data.positions[random]
-                else:
-                    X = stcs_data
-                    y = behav_data.positions
-                y = y.reset_index(drop=True)
-                assert X.shape[0] == y.shape[0]
-                del stcs_data, behav_data
-                gc.collect()
-                scores = cross_val_multiscore(clf, X, y, cv=cv)
-                np.save(op.join(res_dir, f"{subject}-all-scores.npy"), scores.mean(0))
-                del X, y, scores
-                gc.collect()
+        # for network in networks[:-2]:
+        #     print("Processing", subject, 'all', trial_type, network)
+        #     res_dir = res_path / lock / network / trial_type
+        #     ensure_dir(res_dir)
+        #     lh_label = mne.read_label(label_path / f'{network}-lh.label')
+        #     rh_label = mne.read_label(label_path / f'{network}-rh.label')
+        #     stcs_data = [stc.in_label(lh_label + rh_label).data for stc in all_stcs]
+        #     stcs_data = np.array(stcs_data)
+        #     behav_data = behav_df.reset_index(drop=True)
+        #     assert len(stcs_data) == len(behav_data)
+            
+        #     if not op.exists(res_dir / f"{subject}-all-scores.npy") or overwrite:
+        #         if trial_type == 'pattern':
+        #             pattern = behav_data.trialtypes == 1
+        #             X = stcs_data[pattern]
+        #             y = behav_data.positions[pattern]
+        #         elif trial_type == 'random':
+        #             random = behav_data.trialtypes == 2
+        #             X = stcs_data[random]
+        #             y = behav_data.positions[random]
+        #         else:
+        #             X = stcs_data
+        #             y = behav_data.positions
+        #         y = y.reset_index(drop=True)
+        #         assert X.shape[0] == y.shape[0]
+        #         del stcs_data, behav_data
+        #         gc.collect()
+        #         scores = cross_val_multiscore(clf, X, y, cv=cv)
+        #         np.save(op.join(res_dir, f"{subject}-all-scores.npy"), scores.mean(0))
+                
+        #         del X, y, scores
+        #         gc.collect()
         
-        del behav_df, all_stcs
-        gc.collect()
+        # del behav_df, all_stcs
+        # gc.collect()
         
 if is_cluster:
     lock = str(sys.argv[1])

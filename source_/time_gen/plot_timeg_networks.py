@@ -1,13 +1,13 @@
 import os
-from base import ensure_dir, gat_stats, decod_stats
+from base import ensure_dir, decod_stats
 from config import *
 import os.path as op
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.stats import ttest_1samp, spearmanr, zscore
-import numba
+from scipy.stats import ttest_1samp, spearmanr
 import pandas as pd
-from joblib import Parallel, delayed
+import matplotlib.colors as mcolors
+
 
 data_path = TIMEG_DATA_DIR
 subjects, subjects_dir = SUBJS, FREESURFER_DIR
@@ -17,14 +17,15 @@ lock = 'stim'
 n_parcels = 200
 n_networks = 7
 networks = schaefer_7[:-2] if n_networks == 7 else schaefer_17[:-2]
-networks = networks + ['Hippocampus', 'Thalamus']
+# networks += ['Hippocampus', 'Thalamus']
 res_dir = data_path / 'results' / 'source' / lock
-figures_dir = FIGURES_DIR / "time_gen" / "source" / lock
+res_dir = data_path / "tg_rs_emp" / lock
+
+figures_dir = FIGURES_DIR / "time_gen" / "source" / lock 
 ensure_dir(figures_dir)
-overwrite = False
 
 names = pd.read_csv(FREESURFER_DIR / 'Schaefer2018' / f'{n_networks}NetworksOrderedNames.csv', header=0)[' Network Name'].tolist()[:-2]
-names = names + ['Hippocampus', 'Thalamus']
+# names += ['Hippocampus', 'Thalamus']
 times = np.linspace(-1.5, 1.5, 305)
 chance = .25
 threshold = .05
@@ -64,7 +65,11 @@ for network in networks:
     
     patterns[network] = np.array(patpat)
     randoms[network] = np.array(randrand)
-    
+
+cmap = "viridis"
+cmap = mcolors.LinearSegmentedColormap.from_list("Zissou1", colors["Zissou1"])
+cmap = "RdBu_r"
+
 ### plot pattern for all networks ###
 fig, axes = plt.subplots(7, 1, figsize=(6, 12), sharex=True, sharey=True, layout='tight')
 fig.suptitle("Pattern", fontsize=14)
@@ -73,7 +78,7 @@ for i, (network, name) in enumerate(zip(networks, names)):
         all_patterns[network].mean(0),
         interpolation="lanczos",
         origin="lower",
-        cmap="RdBu_r",
+        cmap=cmap,
         extent=times[[0, -1, 0, -1]],
         aspect=0.5,
         vmin=0.2,
@@ -100,7 +105,7 @@ for i, (network, name) in enumerate(zip(networks, names)):
         all_randoms[network].mean(0),
         interpolation="lanczos",
         origin="lower",
-        cmap="RdBu_r",
+        cmap=cmap,
         extent=times[[0, -1, 0, -1]],
         aspect=0.5,
         vmin=0.2,
@@ -128,7 +133,7 @@ for i, (network, name) in enumerate(zip(networks, names)):
         all_contrast.mean(0),
         interpolation="lanczos",
         origin="lower",
-        cmap="RdBu_r",
+        cmap=cmap,
         extent=times[[0, -1, 0, -1]],
         aspect=0.5,
         vmin=-0.01,
@@ -217,9 +222,8 @@ for i, (network, name) in enumerate(zip(networks, names)):
     cbar = plt.colorbar(im, ax=axes[i])
     cbar.set_label("accuracy")
 fig.savefig(figures_dir / "learn_corr.pdf", transparent=True)
-
-ensure_dir(figures_dir / "per_session")
 ### plot session by session ###
+ensure_dir(figures_dir / "per_session")
 for network, name in zip(networks, names):
     contrasts = patterns[network] - randoms[network]
     fig, axes = plt.subplots(1, 5, sharey=True, figsize=(25, 3), layout='tight')

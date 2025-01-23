@@ -634,3 +634,18 @@ def remove_common_vertex(base_label, target_label):
                   subject=target_label.subject)
     
     return corrected_label
+
+
+def contiguous_regions(condition):
+    import numpy as np
+    """Find contiguous True regions in a boolean array."""
+    d = np.diff(condition.astype(int))
+    starts = np.where(d == 1)[0] + 1
+    ends = np.where(d == -1)[0] + 1
+
+    if condition[0]:
+        starts = np.r_[0, starts]
+    if condition[-1]:
+        ends = np.r_[ends, condition.size]
+
+    return zip(starts, ends)

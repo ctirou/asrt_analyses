@@ -8,12 +8,19 @@ from mne import read_epochs
 from scipy.stats import spearmanr, ttest_1samp
 from tqdm.auto import tqdm
 from matplotlib.ticker import FormatStrFormatter
+import matplotlib.colors as mcolors
+import pandas as pd
+from joblib import Parallel, delayed
+from scipy.stats import zscore
 
 # analysis = "pat_bsl_filtered_3300_3160"
 data_path = TIMEG_DATA_DIR
 subjects, epochs_list = SUBJS, EPOCHS
 lock = 'stim'
 jobs = -1
+
+def compute_spearman(t, g, vector, contrasts):
+    return spearmanr(vector, contrasts[:, t, g])[0]
 
 # get times
 epoch_fname = TIMEG_DATA_DIR / lock / 'sub01-0-epo.fif'
@@ -28,94 +35,213 @@ ensure_dir(figure_dir)
 res_dir = data_path / 'results' / 'sensors' / lock
 
 # load patterns and randoms time-generalization on all epochs
+all_patterns, all_randoms = [], []
 patterns, randoms = [], []
 for subject in tqdm(subjects):
-    pattern = np.load(op.join(res_dir, f"{subject}-epochall-pattern-scores.npy"))
-    patterns.append(pattern)
-    random = np.load(op.join(res_dir, f"{subject}-epochall-random-scores.npy"))
-    randoms.append(random)
-patterns = np.array(patterns)
-randoms = np.array(randoms)
+    pattern = np.load(op.join(res_dir, "pattern", f"{subject}-all-scores.npy"))
+    all_patterns.append(pattern)
+    random = np.load(op.join(res_dir, "random", f"{subject}-all-scores.npy"))
+    all_randoms.append(random)
+    
+    pat, rand = [], []
+    for i in range(5):
+        pat.append(np.load(res_dir / 'pattern' / f"{subject}-{i}-scores.npy"))
+        rand.append(np.load(res_dir / 'random' / f"{subject}-{i}-scores.npy"))
+    
+    patterns.append(np.array(pat))
+    randoms.append(np.array(rand))
 
+all_patterns, all_randoms = np.array(all_patterns), np.array(all_randoms)
+patterns, randoms = np.array(patterns), np.array(randoms)
+
+learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices.csv', sep="\t", index_col=0)
+chance = .25
+threshold = .05
+
+ensure_dir(res_dir / "pval")
+if not op.exists(res_dir / "pval" / "all_pattern-pval.npy"):
+    pval = gat_stats(all_patterns - chance, jobs)
+    np.save(res_dir / "pval" / "all_pattern-pval.npy", pval)
+if not op.exists(res_dir / "random" / "pval" / "all_random-pval.npy"):
+    pval = gat_stats(all_randoms - chance, jobs)
+    np.save(res_dir / "pval" / "all_random-pval.npy", pval)
+if not op.exists(res_dir / "pval" / "all_contrast-pval.npy"):
+    contrasts = all_patterns - all_randoms
+    pval = gat_stats(contrasts, jobs)
+    np.save(res_dir / "pval" / "all_contrast-pval.npy", pval)
+
+ensure_dir(res_dir / "corr")
+if not op.exists(res_dir / "corr" / "rhos_blocks.npy"):
+    contrasts = patterns - randoms
+    contrasts = zscore(contrasts, axis=-1)
+    all_rhos = []
+    for sub in range(len(subjects)):
+        rhos = np.empty((times.shape[0], times.shape[0]))
+        vector = [0, 1, 2, 3, 4]  # vector to correlate with
+        contrast = contrasts[sub]
+        results = Parallel(n_jobs=-1)(delayed(compute_spearman)(t, g, vector, contrast) for t in range(len(times)) for g in range(len(times)))
+        for idx, (t, g) in enumerate([(t, g) for t in range(len(times)) for g in range(len(times))]):
+            rhos[t, g] = results[idx]
+        all_rhos.append(rhos)
+    all_rhos = np.array(all_rhos)
+    np.save(res_dir / "corr" / "rhos_blocks.npy", all_rhos)
+    pval = gat_stats(all_rhos, -1)
+    np.save(res_dir / "corr" / "pval_blocks-pval.npy", pval)
+
+# save learn df x time gen correlation and pvals
+if not op.exists(res_dir / "corr" / "rhos_learn.npy"):
+    contrasts = patterns - randoms
+    contrasts = zscore(contrasts, axis=-1)  # je sais pas si zscore avant correlation pour la RSA mais c'est mieux je pense
+    all_rhos = []
+    for sub in range(len(subjects)):
+        rhos = np.empty((times.shape[0], times.shape[0]))
+        vector = learn_index_df.iloc[sub]  # vector to correlate with
+        contrast = contrasts[sub]
+        results = Parallel(n_jobs=-1)(delayed(compute_spearman)(t, g, vector, contrast) for t in range(len(times)) for g in range(len(times)))
+        for idx, (t, g) in enumerate([(t, g) for t in range(len(times)) for g in range(len(times))]):
+            rhos[t, g] = results[idx]
+        all_rhos.append(rhos)
+    all_rhos = np.array(all_rhos)
+    np.save(res_dir / "corr" / "rhos_learn.npy", all_rhos)
+    pval = gat_stats(all_rhos, -1)
+    np.save(res_dir / "corr" / "pval_learn-pval.npy", pval)    
+    
+
+cmap = "viridis"
+cmap1 = "RdBu_r"
+cmap2 = mcolors.LinearSegmentedColormap.from_list("Zissou1", colors["Zissou1"])
+
+innerA = [['A1'], ['A2']]
+innerC = [['C1'], ['C2']]
+
+outer = [[innerA, 'B', innerC]]
+
+fig, axd = plt.subplot_mosaic(innerA, figsize=(5, 9), sharex=True, layout='constrained')
+plt.rcParams.update({'font.size': 10, 'font.family': 'serif', 'font.serif': 'Avenir'})
 # plot pattern
-fig, ax = plt.subplots(1, 1, figsize=(16, 7))
-im = ax.imshow(
-    patterns.mean(0),
+im = axd['A1'].imshow(
+    all_patterns.mean(0),
     interpolation="lanczos",
     origin="lower",
-    cmap="RdBu_r",
+    cmap=cmap1,
     extent=times[[0, -1, 0, -1]],
     aspect=0.5,
     vmin=0,
-    vmax=.50)
-ax.set_xlabel("Testing Time (s)")
-ax.set_ylabel("Training Time (s)")
-ax.set_title("pattern", style='italic')
-ax.axvline(0, color="k")
-ax.axhline(0, color="k")
-cbar = plt.colorbar(im, ax=ax)
-cbar.set_label("accuracy")
-fig.savefig(op.join(figure_dir, "mean_pattern.pdf"))
-
+    vmax=.5)
+axd['A1'].set_ylabel("Training Time (s)")
+axd['A1'].set_title("Pattern", style='italic')
+axd['A1'].axvline(0, color="k")
+axd['A1'].axhline(0, color="k")
+cbar = plt.colorbar(im, ax=axd['A1'], location='top', orientation='horizontal', ticks=[0, 0.5])
+cbar.set_label("Accuracy")
+xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
+pval = np.load(res_dir / "pval" / "all_pattern-pval.npy")
+sig = pval < threshold
+axd['A1'].contour(xx, yy, sig, colors='Gray', levels=[0],
+                    linestyles='solid', linewidths=1)
 # plot random
-fig, ax = plt.subplots(1, 1, figsize=(16, 7))
-im = ax.imshow(
-    randoms.mean(0),
+im = axd['A2'].imshow(
+    all_randoms.mean(0),
     interpolation="lanczos",
     origin="lower",
-    cmap="RdBu_r",
+    cmap=cmap1,
     extent=times[[0, -1, 0, -1]],
     aspect=0.5,
-    vmin=.20,
-    vmax=.30)
-ax.set_xlabel("Testing Time (s)")
-ax.set_ylabel("Training Time (s)")
-ax.set_title("random", style="italic")
-ax.axvline(0, color="k")
-ax.axhline(0, color="k")
-cbar = plt.colorbar(im, ax=ax)
-cbar.set_label("accuracy")
-fig.savefig(op.join(figure_dir, "mean_random.pdf"))
+    vmin=0,
+    vmax=.5)
+axd['A2'].set_xlabel("Testing Time (s)")
+axd['A2'].set_ylabel("Training Time (s)")
+axd['A2'].set_title("Random", style="italic")
+axd['A2'].axvline(0, color="k")
+axd['A2'].axhline(0, color="k")
+xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
+pval = np.load(res_dir / "pval" / "all_random-pval.npy")
+sig = pval < threshold
+axd['A2'].contour(xx, yy, sig, colors='Gray', levels=[0],
+                    linestyles='solid', linewidths=1)
+# fig.savefig(figure_dir / "pattern_random.pdf", transparent=True)
 
+fig, axd = plt.subplot_mosaic([["B"]], figsize=(5, 9), sharex=True, layout='constrained')
+plt.rcParams.update({'font.size': 10, 'font.family': 'serif', 'font.serif': 'Avenir'})
 # plot contrast with significance
-contrasts = patterns - randoms
-
-# pval = gat_stats(contrasts, jobs)
-# sig = np.array(pval < 0.05)
-
-# Define the new time range
-time_mask = (times >= -2)
-new_times = times[time_mask]
-new_contrasts = contrasts[:, time_mask, :][:, :, time_mask]
-
-fig, ax = plt.subplots(1, 1, figsize=(11, 5))
-im = ax.imshow(
-    new_contrasts.mean(0),
+contrasts = all_patterns - all_randoms
+im = axd['B'].imshow(
+    contrasts.mean(0),
     interpolation="lanczos",
     origin="lower",
-    cmap="RdBu_r",
-    extent=[new_times[0], new_times[-1], new_times[0], new_times[-1]],
+    cmap=cmap1,
+    extent=times[[0, -1, 0, -1]],
     aspect=0.5,
-    vmin=-0.1,
-    vmax=0.1)
-if not op.exists(figure_dir / "contrast-pval.npy"):
-    pval = gat_stats(new_contrasts, jobs)
-    np.save(figure_dir / "contrast-pval.npy", pval)
-else:
-    pval = np.load(figure_dir / "contrast-pval.npy")
-sig = np.array(pval < 0.05)
-xx, yy = np.meshgrid(new_times, new_times, copy=False, indexing='xy')
-ax.contour(xx, yy, sig, colors='Gray', levels=[0],
+    vmin=-0.25,
+    vmax=0.25)
+axd['B'].set_xlabel("Testing Time (s)")
+axd['B'].set_title("Contrast", style="italic")
+# cbar = plt.colorbar(im, ax=axd['B'], location='top', orientation='horizontal', ticks=[-0.25, 0, 0.25])
+# cbar = plt.colorbar(im, ax=axd['B'], location='right', ticks=[-0.25, 0, 0.25])
+cbar = plt.colorbar(im, ax=axd['B'], location='right', ticks=[-0.25, 0.25])
+cbar.set_label("Difference in accuracy", rotation=270)
+# cbar.ax.yaxis.set_major_formatter(FormatStrFormatter('%.1f'))
+axd['B'].axhline(0, color="k") 
+axd['B'].axvline(0, color="k")
+xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
+pval = np.load(res_dir / "pval" / "all_contrast-pval.npy")
+sig = pval < threshold
+axd['B'].contour(xx, yy, sig, colors='Gray', levels=[0],
                     linestyles='solid', linewidths=1)
-ax.set_xlabel("Testing Time (s)")
-ax.set_ylabel("Training Time (s)")
-# ax.set_title("Paired – Unpaired elements", style='italic')
-cbar = plt.colorbar(im, ax=ax)
-cbar.set_label("Difference in accuracy")
-cbar.ax.yaxis.set_major_formatter(FormatStrFormatter('%.1f'))
-ax.axhline(0, color="k") 
-ax.axvline(0, color="k")
-fig.savefig(figure_dir / "mean_contrast_focused.pdf", transparent=True)
+# fig.savefig(figure_dir / "contrast.pdf", transparent=True)
+
+fig, axd = plt.subplot_mosaic(innerC, figsize=(5, 9), sharex=True, layout='constrained')
+plt.rcParams.update({'font.size': 10, 'font.family': 'serif', 'font.serif': 'Avenir'})
+# plot blocks x time gen correlation
+rhos = np.load(res_dir / "corr" / "rhos_blocks.npy")
+pval = np.load(res_dir / "corr" / "pval_blocks-pval.npy")
+sig = pval < threshold
+im = axd['C1'].imshow(
+    rhos.mean(0),
+    interpolation="lanczos",
+    origin="lower",
+    cmap=cmap2,
+    extent=times[[0, -1, 0, -1]],
+    aspect=0.5,
+    vmin=-0.25,
+    vmax=0.25)
+axd['C1'].set_ylabel("Training Time (s)")
+axd['C1'].set_title("Blocks and time generalization correlation", style='italic')
+axd['C1'].axvline(0, color="k")
+axd['C1'].axhline(0, color="k")
+axd['C1'].yaxis.set_label_position("right")
+axd['C1'].yaxis.tick_right()
+axd['C1'].set_ylabel("Training Time (s)", rotation=270, labelpad=15)
+xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
+axd['C1'].contour(xx, yy, sig, colors='Gray', levels=[0],
+                    linestyles='solid', linewidths=1)
+cbar = plt.colorbar(im, ax=axd['C1'], location='top', orientation='horizontal', ticks=[-0.25, 0.25])
+cbar.set_label("Spearman's rho")
+# plot learn df x time gen correlation
+rhos = np.load(res_dir / "corr" / "rhos_learn.npy")
+pval = np.load(res_dir / "corr" / "pval_learn-pval.npy")
+sig = pval < threshold
+im = axd['C2'].imshow(
+    rhos.mean(0),
+    interpolation="lanczos",
+    origin="lower",
+    cmap=cmap2,
+    extent=times[[0, -1, 0, -1]],
+    aspect=0.5,
+    vmin=-0.25,
+    vmax=0.25)
+axd['C2'].set_xlabel("Testing Time (s)")
+axd['C2'].set_ylabel("Training Time (s)", rotation=270, labelpad=15)
+axd['C2'].set_title("Learning index and time generalization correlation", style='italic')
+axd['C2'].axvline(0, color="k")
+axd['C2'].axhline(0, color="k")
+axd['C2'].yaxis.set_label_position("right")
+axd['C2'].yaxis.tick_right()
+xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
+axd['C2'].contour(xx, yy, sig, colors='Gray', levels=[0],
+                    linestyles='solid', linewidths=1)
+# fig.savefig(figure_dir / "corr.pdf", transparent=True)
+
 
 # # look at the correlations
 # all_patterns, all_randoms = [], []
@@ -169,68 +295,68 @@ fig.savefig(figure_dir / "mean_contrast_focused.pdf", transparent=True)
 #     ax.axhline(0, color="k")
 #     fig.savefig(op.join(figure_dir, f"mean_rho_{trial_type}_1024.pdf"))
     
-chance = .25
-# plot pattern
-color1 = "#1982C4"
-color2 = "#00BFB3"
-fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(40, 15), layout='tight', sharex=True)
-coco = np.array([np.diag(cock) for cock in patterns])
-pval = decod_stats(coco - chance, -1)
-sig = pval < 0.05
-pval_unc = ttest_1samp(coco, popmean=0, axis=0)[1]
-sig_unc = pval_unc < 0.05
-# List to store x-coordinates where sig_unc is true
-x_points = [x for x, sig in zip(times, sig_unc) if sig]
-ax1.set_ylim(0.225, 0.450)
-ax1.plot(times, np.diag(patterns.mean(0)), color=color1)
-ax1.set_title(f"$pattern$", fontsize=15)
-ax1.fill_between(times, chance, np.diag(patterns.mean(0)), color=color2, alpha=.7, where=sig, label = 'corr')
-ax1.axhline(chance, alpha=.7, color='black')
-ax1.axvline(-3, ls="dashed", alpha=.7, color='black')
-ax1.axvline(-1.5, ls="dashed", alpha=.7, color='black')
-ax1.axvline(0, ls="dashed", alpha=.7, color='black')
-ax1.axvline(1.5, ls="dashed", alpha=.7, color='black')
-ax1.axvline(3, ls="dashed", alpha=.7, color='black')
-ax1.scatter(x_points, [0] * len(x_points), color='#DD614A', label='uncorr')
-ax1.legend()
-# plot random
-coco = np.array([np.diag(cock) for cock in randoms])
-pval = decod_stats(coco - chance, -1)
-sig = pval < 0.05
-pval_unc = ttest_1samp(coco, popmean=0, axis=0)[1]
-sig_unc = pval_unc < 0.05
-# List to store x-coordinates where sig_unc is true
-x_points = [x for x, sig in zip(times, sig_unc) if sig]
-ax2.set_ylim(0.225, 0.450)
-ax2.plot(times, np.diag(randoms.mean(0)), color=color1, label='contrasts')
-ax2.set_title(f"$random$", fontsize=15)
-ax2.fill_between(times, chance, np.diag(randoms.mean(0)), color=color2, alpha=.7, where=sig)
-ax2.axhline(chance, alpha=.7, color='black')
-ax2.axvline(-3, ls="dashed", alpha=.7, color='black')
-ax2.axvline(-1.5, ls="dashed", alpha=.7, color='black')
-ax2.axvline(0, ls="dashed", alpha=.7, color='black')
-ax2.axvline(1.5, ls="dashed", alpha=.7, color='black')
-ax2.axvline(3, ls="dashed", alpha=.7, color='black')
-ax2.scatter(x_points, [0] * len(x_points), color='#DD614A')
-# plot contrast with significance
-contrasts = patterns - randoms
-coco = np.array([np.diag(cock) for cock in contrasts])
-pval = decod_stats(coco, -1)
-sig = pval < 0.05
-pval_unc = ttest_1samp(coco, popmean=0, axis=0)[1]
-sig_unc = pval_unc < 0.05
-# List to store x-coordinates where sig_unc is true
-x_points = [x for x, sig in zip(times, sig_unc) if sig]
-ax3.plot(times, np.diag(contrasts.mean(0)), color=color1, label='contrasts')
-ax3.set_title(f"$contrast$", fontsize=15)
-ax3.fill_between(times, 0, np.diag(contrasts.mean(0)), color=color2, alpha=.7, where=sig)
-ax3.axhline(0, alpha=.7, color='black')
-ax3.axvline(-3, ls="dashed", alpha=.7, color='black')
-ax3.axvline(-1.5, ls="dashed", alpha=.7, color='black')
-ax3.axvline(0, ls="dashed", alpha=.7, color='black')
-ax3.axvline(1.5, ls="dashed", alpha=.7, color='black')
-ax3.axvline(3, ls="dashed", alpha=.7, color='black')
-ax3.scatter(x_points, [0] * len(x_points), color='#DD614A')
-fig.savefig(figure_dir / "diags.pdf")
-plt.close()
+# chance = .25
+# # plot pattern
+# color1 = "#1982C4"
+# color2 = "#00BFB3"
+# fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(40, 15), layout='tight', sharex=True)
+# coco = np.array([np.diag(cock) for cock in patterns])
+# pval = decod_stats(coco - chance, -1)
+# sig = pval < 0.05
+# pval_unc = ttest_1samp(coco, popmean=0, axis=0)[1]
+# sig_unc = pval_unc < 0.05
+# # List to store x-coordinates where sig_unc is true
+# x_points = [x for x, sig in zip(times, sig_unc) if sig]
+# ax1.set_ylim(0.225, 0.450)
+# ax1.plot(times, np.diag(patterns.mean(0)), color=color1)
+# ax1.set_title(f"$pattern$", fontsize=15)
+# ax1.fill_between(times, chance, np.diag(patterns.mean(0)), color=color2, alpha=.7, where=sig, label = 'corr')
+# ax1.axhline(chance, alpha=.7, color='black')
+# ax1.axvline(-3, ls="dashed", alpha=.7, color='black')
+# ax1.axvline(-1.5, ls="dashed", alpha=.7, color='black')
+# ax1.axvline(0, ls="dashed", alpha=.7, color='black')
+# ax1.axvline(1.5, ls="dashed", alpha=.7, color='black')
+# ax1.axvline(3, ls="dashed", alpha=.7, color='black')
+# ax1.scatter(x_points, [0] * len(x_points), color='#DD614A', label='uncorr')
+# ax1.legend()
+# # plot random
+# coco = np.array([np.diag(cock) for cock in randoms])
+# pval = decod_stats(coco - chance, -1)
+# sig = pval < 0.05
+# pval_unc = ttest_1samp(coco, popmean=0, axis=0)[1]
+# sig_unc = pval_unc < 0.05
+# # List to store x-coordinates where sig_unc is true
+# x_points = [x for x, sig in zip(times, sig_unc) if sig]
+# ax2.set_ylim(0.225, 0.450)
+# ax2.plot(times, np.diag(randoms.mean(0)), color=color1, label='contrasts')
+# ax2.set_title(f"$random$", fontsize=15)
+# ax2.fill_between(times, chance, np.diag(randoms.mean(0)), color=color2, alpha=.7, where=sig)
+# ax2.axhline(chance, alpha=.7, color='black')
+# ax2.axvline(-3, ls="dashed", alpha=.7, color='black')
+# ax2.axvline(-1.5, ls="dashed", alpha=.7, color='black')
+# ax2.axvline(0, ls="dashed", alpha=.7, color='black')
+# ax2.axvline(1.5, ls="dashed", alpha=.7, color='black')
+# ax2.axvline(3, ls="dashed", alpha=.7, color='black')
+# ax2.scatter(x_points, [0] * len(x_points), color='#DD614A')
+# # plot contrast with significance
+# contrasts = patterns - randoms
+# coco = np.array([np.diag(cock) for cock in contrasts])
+# pval = decod_stats(coco, -1)
+# sig = pval < 0.05
+# pval_unc = ttest_1samp(coco, popmean=0, axis=0)[1]
+# sig_unc = pval_unc < 0.05
+# # List to store x-coordinates where sig_unc is true
+# x_points = [x for x, sig in zip(times, sig_unc) if sig]
+# ax3.plot(times, np.diag(contrasts.mean(0)), color=color1, label='contrasts')
+# ax3.set_title(f"$contrast$", fontsize=15)
+# ax3.fill_between(times, 0, np.diag(contrasts.mean(0)), color=color2, alpha=.7, where=sig)
+# ax3.axhline(0, alpha=.7, color='black')
+# ax3.axvline(-3, ls="dashed", alpha=.7, color='black')
+# ax3.axvline(-1.5, ls="dashed", alpha=.7, color='black')
+# ax3.axvline(0, ls="dashed", alpha=.7, color='black')
+# ax3.axvline(1.5, ls="dashed", alpha=.7, color='black')
+# ax3.axvline(3, ls="dashed", alpha=.7, color='black')
+# ax3.scatter(x_points, [0] * len(x_points), color='#DD614A')
+# fig.savefig(figure_dir / "diags.pdf")
+# plt.close()
 

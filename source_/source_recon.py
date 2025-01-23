@@ -16,14 +16,15 @@ res_path = RESULTS_DIR
 lock = 'stim'
 jobs = -1
 
-overwrite = True
+overwrite = False
 verbose = True
 
 # create results directories
-folders = ["src", "bem", "trans", "fwd"]
+folders = ["src", "vol_src", "bem", "trans", "fwd", "new_fwd"]
 for lockf in ['stim', 'button']:
     for f in folders:
-        if f in folders[-2:]:
+        # if f in folders[-2:]:
+        if f in folders[-3:]:
             path = op.join(res_path, f, lockf)
             ensure_dir(path)
         else:
@@ -101,11 +102,14 @@ def process_subject(subject, lock, jobs):
     #         verbose=verbose)
     #     mne.write_source_spaces(vol_src_thal_fname, vol_src_thal, overwrite=True)
         
-    vol_src_hipp_thal_fname = op.join(res_path, "src", "%s-hipp-thal-vol-src.fif" % (subject))
+    # vol_src_hipp_thal_fname = op.join(res_path, "src", "%s-hipp-thal-vol-src.fif" % (subject))
+    vol_src_hipp_thal_fname = op.join(res_path, "vol_src", "%s-hipp-thal-vol-src.fif" % (subject))
     if not op.exists(vol_src_hipp_thal_fname) or overwrite:
+        surface = subjects_dir / subject / "bem" / "inner_skull.surf" # inner skull surface (to try)
         vol_src_hipp_thal = mne.setup_volume_source_space(
             subject,
-            bem=model_fname,
+            surface=surface,
+            # bem=model_fname,
             mri="aseg.mgz",
             volume_label=hipp_thal_labels,
             subjects_dir=subjects_dir,
@@ -195,7 +199,7 @@ def process_subject(subject, lock, jobs):
         
         epoch_fname = op.join(data_path, lock, f"{subject}-{epoch_num}-epo.fif")
         epoch = mne.read_epochs(epoch_fname, preload=False, verbose=verbose)
-        all_epochs.append(epoch)
+        # all_epochs.append(epoch)
         
         # create trans file
         trans_fname = os.path.join(res_path, "trans", lock, "%s-%i-trans.fif" % (subject, epoch_num))
@@ -207,7 +211,18 @@ def process_subject(subject, lock, jobs):
             coreg.fit_icp(n_iterations=100, verbose=verbose)
             mne.write_trans(trans_fname, coreg.trans, overwrite=True, verbose=verbose)
         # compute forward solution
-        fwd_fname = op.join(res_path, "fwd", lock, f"{subject}-hipp-thal-{epoch_num}-fwd.fif")
+        fwd_fname = res_path / "fwd" / lock / f"{subject}-{epoch_num}-fwd.fif"
+        if not op.exists(fwd_fname) or overwrite:
+            fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,
+                                        src=src, bem=bem_fname,
+                                        meg=True, eeg=False,
+                                        mindist=5.0,
+                                        n_jobs=jobs,
+                                        verbose=verbose)
+            mne.write_forward_solution(fwd_fname, fwd, overwrite=True, verbose=verbose)
+            del fwd        
+        # fwd_fname = op.join(res_path, "fwd", lock, f"{subject}-hipp-thal-{epoch_num}-fwd.fif")
+        fwd_fname = op.join(res_path, "new_fwd", lock, f"{subject}-hipp-thal-{epoch_num}-fwd.fif")
         if not op.exists(fwd_fname) or overwrite:
             fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,
                                         src=mixed, bem=bem_fname,
@@ -221,37 +236,37 @@ def process_subject(subject, lock, jobs):
         del epoch
         gc.collect()
     
-    print(f"Processing {subject} {lock} all...")    
-    for epoch in all_epochs:
-        epoch.info['dev_head_t'] = all_epochs[0].info['dev_head_t']
-    epochs = mne.concatenate_epochs(all_epochs, verbose=verbose)
+    # print(f"Processing {subject} {lock} all...")    
+    # for epoch in all_epochs:
+    #     epoch.info['dev_head_t'] = all_epochs[0].info['dev_head_t']
+    # epochs = mne.concatenate_epochs(all_epochs, verbose=verbose)
     
-    del all_epochs
-    gc.collect()
+    # del all_epochs
+    # gc.collect()
     
-    # create trans file
-    trans_fname = op.join(res_path, "trans", lock, "%s-all-trans.fif" % (subject))
-    if not op.exists(trans_fname) or overwrite:
-        coreg = mne.coreg.Coregistration(epochs.info, subject, subjects_dir)
-        coreg.fit_fiducials(verbose=verbose)
-        coreg.fit_icp(n_iterations=6, verbose=verbose)
-        coreg.omit_head_shape_points(distance=5.0/1000)
-        coreg.fit_icp(n_iterations=100, verbose=verbose)
-        mne.write_trans(trans_fname, coreg.trans, overwrite=True, verbose=verbose)
+    # # create trans file
+    # trans_fname = op.join(res_path, "trans", lock, "%s-all-trans.fif" % (subject))
+    # if not op.exists(trans_fname) or overwrite:
+    #     coreg = mne.coreg.Coregistration(epochs.info, subject, subjects_dir)
+    #     coreg.fit_fiducials(verbose=verbose)
+    #     coreg.fit_icp(n_iterations=6, verbose=verbose)
+    #     coreg.omit_head_shape_points(distance=5.0/1000)
+    #     coreg.fit_icp(n_iterations=100, verbose=verbose)
+    #     mne.write_trans(trans_fname, coreg.trans, overwrite=True, verbose=verbose)
     
-    fwd_fname = op.join(res_path, "fwd", lock, f"{subject}-hipp-thal-all-fwd.fif")
-    if not op.exists(fwd_fname) or overwrite:
-        fwd = mne.make_forward_solution(epochs.info, trans=trans_fname,
-                                    src=src, bem=bem_fname,
-                                    meg=True, eeg=False,
-                                    mindist=5.0,
-                                    n_jobs=jobs,
-                                    verbose=verbose)
-        mne.write_forward_solution(fwd_fname, fwd, overwrite=True, verbose=verbose)
-        del fwd
+    # fwd_fname = op.join(res_path, "fwd", lock, f"{subject}-hipp-thal-all-fwd.fif")
+    # if not op.exists(fwd_fname) or overwrite:
+    #     fwd = mne.make_forward_solution(epochs.info, trans=trans_fname,
+    #                                 src=src, bem=bem_fname,
+    #                                 meg=True, eeg=False,
+    #                                 mindist=5.0,
+    #                                 n_jobs=jobs,
+    #                                 verbose=verbose)
+    #     mne.write_forward_solution(fwd_fname, fwd, overwrite=True, verbose=verbose)
+    #     del fwd
             
-    del epochs, src, vol_src_hipp_thal, mixed
-    gc.collect()
+    # del epochs, src, vol_src_hipp_thal, mixed
+    # gc.collect()
         
 for lock in ['stim', 'button']:
     for subject in subjects:

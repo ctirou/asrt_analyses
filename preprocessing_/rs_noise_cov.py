@@ -80,6 +80,12 @@ def process_subject(subject, mode_ICA, filtering, overwrite, jobs, verbose):
                 del raw
                 gc.collect()
 
+import mne
+for subject in subjects:
+        cov = mne.read_cov(res_path / f"{subject}-cov.fif")
+        rank = mne.compute_rank(cov, )
+        print(subject, rank)
+
 if is_cluster:
     # Check that SLURM_ARRAY_TASK_ID is available and use it to get the subject
     try:
