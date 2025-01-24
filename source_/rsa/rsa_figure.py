@@ -30,8 +30,8 @@ n_parcels = 200
 n_networks = 7
 networks = schaefer_7[:-2] if n_networks == 7 else schaefer_17
 networks += ['Hippocampus', 'Thalamus']
-names_corrected = pd.read_csv(FREESURFER_DIR / 'Schaefer2018' / f'{n_networks}NetworksOrderedNames.csv', header=0)[' Network Name'].tolist()[:-2] + \
-    ['Hippocampus', 'Thalamus']
+names_corrected = pd.read_csv(FREESURFER_DIR / 'Schaefer2018' / f'{n_networks}NetworksOrderedNames.csv', header=0)[' Network Name'].tolist()[:-2] 
+names_corrected += ['Hippocampus', 'Thalamus']
 label_names = schaefer_7[:-2] if n_networks == 7 else schaefer_17
 label_names += ['Hippocampus', 'Thalamus']
 
@@ -162,7 +162,7 @@ for i, (label, name, j) in enumerate(zip(label_names, names_corrected, ['B2', 'E
 ### Plot subject x session correlation ###
 for i, (label, name, j) in enumerate(zip(label_names, names_corrected, ['C1', 'F1', 'I1', 'L1', 'O1', 'R1', 'U1'])):
     axd[j].axhline(0, color='grey', alpha=0.5)
-    rhos = np.array([[spear([0, 1, 2, 3, 4], diff_sess[network][sub, :, itime])[0] for itime in range(len(times))] for sub in range(len(subjects))])
+    rhos = np.array([[spear([0, 1, 2, 3, 4], diff_sess[label][sub, :, itime])[0] for itime in range(len(times))] for sub in range(len(subjects))])
     sem = np.std(rhos, axis=0) / np.sqrt(len(subjects))
     # axd[j].plot(times, rhos.mean(0), color=cmap(i))
     p_values_unc = ttest_1samp(rhos, axis=0, popmean=0)[1]
@@ -188,7 +188,7 @@ for i, (label, name, j) in enumerate(zip(label_names, names_corrected, ['C1', 'F
 ### Plot subject x learning index correlation ###
 for i, (label, name, j) in enumerate(zip(label_names, names_corrected, ['C2', 'F2', 'I2', 'L2', 'O2', 'R2', 'U2'])):
     axd[j].axhline(0, color="grey", alpha=0.5)
-    all_rhos = np.array([[spear(learn_index_df.iloc[sub, :], diff_sess[network][sub, :, t])[0] for t in range(len(times))] for sub in range(len(subjects))])
+    all_rhos = np.array([[spear(learn_index_df.iloc[sub, :], diff_sess[label][sub, :, t])[0] for t in range(len(times))] for sub in range(len(subjects))])
     sem = np.std(all_rhos, axis=0) / np.sqrt(len(subjects))
     axd[j].plot(times, all_rhos.mean(0), color=cmap(i))
     p_values_unc = ttest_1samp(all_rhos, axis=0, popmean=0)[1]
