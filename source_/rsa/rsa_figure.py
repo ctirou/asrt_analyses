@@ -21,7 +21,7 @@ jobs = -1
 
 data_path = DATA_DIR
 subjects, epochs_list = SUBJS, EPOCHS
-metric = 'mahalanobis'
+subjects_dir = FREESURFER_DIR
 trial_type = 'all'
 # get times
 times = np.load(data_path / "times.npy")
@@ -72,36 +72,77 @@ for network in networks:
 learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices.csv', sep="\t", index_col=0)
 chance = 25
 threshold = .05
-design = [['A', 'B', 'C'], 
-          ['D', 'E', 'F'],
-          ['G', 'H', 'I'],
-          ['J', 'K', 'L'], 
-          ['M', 'N', 'O'],
-          ['P', 'Q', 'R'], 
-          ['S', 'T', 'U']]
+design = [['br11', 'br12', 'A', 'B', 'C'], 
+          ['br21', 'br22', 'D', 'E', 'F'],
+          ['br31', 'br32', 'G', 'H', 'I'],
+          ['br41', 'br42', 'J', 'K', 'L'], 
+          ['br51', 'br52', 'M', 'N', 'O'],
+          ['br61', 'br62', 'P', 'Q', 'R'], 
+          ['br71', 'br72', 'S', 'T', 'U']]
 plt.rcParams.update({'font.size': 10, 'font.family': 'serif', 'font.serif': 'Avenir'})
 cmap = plt.cm.get_cmap('tab20', len(label_names))
 cmap = sns.color_palette("colorblind", as_cmap=True)
 
-fig, axd = plt.subplot_mosaic(
-    design, 
-    sharex=False, 
-    figsize=(10, 15), 
-    layout='tight',
-    gridspec_kw={
-        # 'height_ratios': [1, 0.5, 1, 0.5, 1, 0.5, 1],  # Adjust heights
-        'width_ratios': [1, .5, .5]  # Adjust widths if needed
-    }
-)
-for ax in axd.values():
+def plot_onset(ax):
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     if lock == 'stim':
         ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
     else:
         ax.axvline(0, color='black', label='Button press')
+        
+def plot_with_br_title(fig, axd, design, title, row_idx, fontsize=12):
+    """Add a central title for a specific row of 'br' plots."""
+    # Extract only "br" subplot positions for the specific row
+    br_axes = [axd[key] for key in design[row_idx] if "br" in key]
+    # Compute the central x-position and top y-position for the row
+    x_center = sum([ax.get_position().x0 + ax.get_position().x1 for ax in br_axes]) / (2 * len(br_axes))
+    y_top = max([ax.get_position().y1 for ax in br_axes])
+    # Place the title above the selected plots for the given row
+    fig.text(x_center, y_top, title, ha='center', va='top', fontsize=fontsize)
+    
+fig, axd = plt.subplot_mosaic(
+    design, 
+    sharex=False, 
+    figsize=(13, 15), 
+    layout='tight',
+    gridspec_kw={
+        # 'height_ratios': [1, 0.5, 1, 0.5, 1, 0.5, 1],  # Adjust heights
+        'width_ratios': [.3, .3, 1, .5, .5]  # Adjust widths if needed
+    })
+### Plot brain ###
+brain_kwargs = dict(hemi='both', background="white", cortex="low_contrast", surf='inflated', subjects_dir=subjects_dir)
+for i, (label, name, sideA, sideB) in enumerate(zip(label_names, names_corrected, ['br11', 'br21', 'br31', 'br41', 'br51', 'br61', 'br71'], ['br12', 'br22', 'br32', 'br42', 'br52', 'br62', 'br72'])):
+    # Initialize Brain object
+    # Add labels
+    if label in label_names[:-2]:
+        brain = mne.viz.Brain(subject='sub01', alpha=1, **brain_kwargs) 
+        net_name = f'{name.strip()} network'        
+        for hemi in ['lh', 'rh']:
+            brain.add_label(f'{label}', color=cmap[i], hemi=hemi, borders=False, alpha=.85, subdir='n7')
+    else:
+        brain = mne.viz.Brain(subject='sub01', alpha=.5, **brain_kwargs) 
+        net_name = f'{name.strip()}'
+        labels = ['Left-Hippocampus', 'Right-Hippocampus'] if label == 'Hippocampus' else ['Left-Thalamus-Proper', 'Right-Thalamus-Proper']
+        brain.add_volume_labels(aseg='aseg', labels=labels, colors=cmap[i], alpha=.85, legend=False)
+    # Capture snapshots for the desired views
+    brain.show_view('lateral')
+    lateral_img = brain.screenshot()
+    brain.show_view('caudal')
+    caudal_img = brain.screenshot()
+    brain.close()
+    # Display images side by side using Matplotlib
+    axd[sideA].imshow(lateral_img)
+    axd[sideA].axis('off')
+    # axd[sideA].set_title(net_name, fontsize=14)
+    # Call the function to set the br-specific title
+    plot_with_br_title(fig, axd, design, net_name, row_idx=i)
+    axd[sideB].imshow(caudal_img)
+    axd[sideB].axis('off')
+
 ### Plot decoding ###
 for i, (label, name, j) in enumerate(zip(label_names, names_corrected, ['A', 'D', 'G', 'J', 'M', 'P', 'S'])):
+    plot_onset(axd[j])
     score = decoding[label] * 100
     sem = np.std(score, axis=0) / np.sqrt(len(subjects))
     # Get significant clusters
@@ -127,6 +168,7 @@ for i, (label, name, j) in enumerate(zip(label_names, names_corrected, ['A', 'D'
         axd[j].set_xlabel('Time (s)', fontsize=11)
 ### Plot similarity index ###    
 for i, (label, name, j) in enumerate(zip(label_names, names_corrected, ['B', 'E', 'H', 'K', 'N', 'Q', 'T'])):
+    plot_onset(axd[j])
     axd[j].axhline(0, color='grey', alpha=.5)
     high = all_highs[label][:, :, 1:, :].mean((1, 2)) - all_highs[label][:, :, 0, :].mean(1)
     low = all_lows[label][:, :, 1:, :].mean((1, 2)) - all_lows[label][:, :, 0, :].mean(axis=1)
@@ -200,6 +242,7 @@ for i, (label, name, j) in enumerate(zip(label_names, names_corrected, ['B', 'E'
     # axd[j].set_title(f'Subject x session correlation', style='italic', fontsize=13)
 ### Plot subject x learning index correlation ###
 for i, (label, name, j) in enumerate(zip(label_names, names_corrected, ['C', 'F', 'I', 'L', 'O', 'R', 'U'])):
+    plot_onset(axd[j])
     axd[j].axhline(0, color="grey", alpha=0.5)
     all_rhos = np.array([[spear(learn_index_df.iloc[sub, :], diff_sess[label][sub, :, t])[0] for t in range(len(times))] for sub in range(len(subjects))])
     sem = np.std(all_rhos, axis=0) / np.sqrt(len(subjects))
@@ -232,5 +275,34 @@ for i, (label, name, j) in enumerate(zip(label_names, names_corrected, ['C', 'F'
     # axd[j].legend(frameon=False, loc="lower right")
     if j == 'C':
         axd[j].set_title(f'Similarity x Learning corr.', style='italic')
-plt.close()
 fig.savefig(figures_dir / f"{lock}-rsa.pdf", transparent=True)
+plt.close()
+
+
+# # Set parameters
+# network = "Vis"
+# subdir = 'n7'
+# # Visualization parameters
+# brain_kwargs = dict(alpha=.5, background="white", cortex="low_contrast")
+# # Initialize Brain object
+# brain = mne.viz.Brain(subject=subject, hemi='both', surf='inflated', 
+#                        subjects_dir=subjects_dir, **brain_kwargs)
+# # Add labels
+# for hemi in ['lh', 'rh']:
+#     brain.add_label(f'{network}', color=cmap[0], hemi=hemi, borders=False, alpha=.85, subdir='n7')
+# # Add volume labels
+# brain.add_volume_labels(aseg='aseg', labels=['Left-Hippocampus', 'Right-Hippocampus'], colors=cmap[i], alpha=1, legend=False)
+# # Capture snapshots for the desired views
+# brain.show_view('lateral')
+# lateral_img = brain.screenshot()
+# brain.show_view('caudal')
+# caudal_img = brain.screenshot()
+# brain.close()
+# # Display images side by side using Matplotlib
+# fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+# axes[0].imshow(lateral_img)
+# axes[0].axis('off')
+# axes[0].set_title('Visual\nNetwork', fontsize=14)
+# axes[1].imshow(caudal_img)
+# axes[1].axis('off')
+# plt.show()
