@@ -96,13 +96,12 @@ fig, axd = plt.subplot_mosaic(
 for ax in axd.values():
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
-    ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
+    if lock == 'stim':
+        ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
+    else:
+        ax.axvline(0, color='black', label='Button press')
 ### Plot decoding ###
 for i, (label, name, j) in enumerate(zip(label_names, names_corrected, ['A', 'D', 'G', 'J', 'M', 'P', 'S'])):
-    if lock == 'stim':
-        axd[j].axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
-    else:
-        axd[j].axvline(0, color='black', label='Button press')
     score = decoding[label] * 100
     sem = np.std(score, axis=0) / np.sqrt(len(subjects))
     # Get significant clusters
@@ -119,7 +118,7 @@ for i, (label, name, j) in enumerate(zip(label_names, names_corrected, ['A', 'D'
     axd[j].fill_between(times, score.mean(0) - sem, score.mean(0) + sem, where=sig, alpha=0.5, zorder=5, color=cmap[i])    
     axd[j].fill_between(times, score.mean(0) - sem, chance, where=sig, alpha=0.3, zorder=5, facecolor=cmap[i])    
     axd[j].axhline(chance, color='grey', alpha=.5)
-    axd[j].set_ylabel('Accuracy (%)', fontsize=12)
+    axd[j].set_ylabel('Accuracy (%)', fontsize=11)
     axd[j].xaxis.set_major_formatter(FuncFormatter(lambda x, pos: f'{x:.1f}'))
     axd[j].xaxis.set_major_locator(plt.MultipleLocator(0.2))
     if j == 'A':
@@ -232,6 +231,6 @@ for i, (label, name, j) in enumerate(zip(label_names, names_corrected, ['C', 'F'
         axd[j].set_xlabel('Time (s)', fontsize=11)
     # axd[j].legend(frameon=False, loc="lower right")
     if j == 'C':
-        axd[j].set_title(f'Learning index corr.', style='italic')
+        axd[j].set_title(f'Similarity x Learning corr.', style='italic')
 plt.close()
 fig.savefig(figures_dir / f"{lock}-rsa.pdf", transparent=True)

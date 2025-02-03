@@ -246,3 +246,5 @@ colors = {"BottleRocket1":["#A42820", "#5F5647", "#9B110E", "#3F5151", "#4E2A1E"
           "GrandBudapest2":["#E6A0C4", "#C6CDF7", "#D8A499", "#7294D4"],
           "IsleofDogs1":["#9986A5", "#79402E", "#CCBA72", "#0F0D0E", "#D9D0D3", "#8D8680"],
           "IsleofDogs2":["#EAD3BF", "#AA9486", "#B6854D", "#39312F", "#1C1718"]}
+
+colorblind_cmap = ['#0173B2','#DE8F05','#029E73','#D55E00','#CC78BC','#CA9161','#FBAFE4','#949494','#ECE133','#56B4E9']
