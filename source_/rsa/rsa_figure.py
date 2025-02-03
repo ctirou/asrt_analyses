@@ -10,6 +10,7 @@ from scipy.stats import ttest_1samp, spearmanr as spear
 from tqdm.auto import tqdm
 from matplotlib.ticker import FuncFormatter, FormatStrFormatter
 from cycler import cycler
+import seaborn as sns
 
 lock = 'stim'
 # analysis = 'usual'
@@ -71,19 +72,20 @@ for network in networks:
 learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices.csv', sep="\t", index_col=0)
 chance = 25
 threshold = .05
-design = [['A', [['B1'], ['B2']], [['C1'], ['C2']]], 
-          ['D', [['E1'], ['E2']], [['F1'], ['F2']]],
-          ['G', [['H1'], ['H2']], [['I1'], ['I2']]],
-          ['J', [['K1'], ['K2']], [['L1'], ['L2']]], 
-          ['M', [['N1'], ['N2']], [['O1'], ['O2']]],
-          ['P', [['Q1'], ['Q2']], [['R1'], ['R2']]], 
-          ['S', [['T1'], ['T2']], [['U1'], ['U2']]]]
+design = [['A', 'B', 'C'], 
+          ['D', 'E', 'F'],
+          ['G', 'H', 'I'],
+          ['J', 'K', 'L'], 
+          ['M', 'N', 'O'],
+          ['P', 'Q', 'R'], 
+          ['S', 'T', 'U']]
 plt.rcParams.update({'font.size': 10, 'font.family': 'serif', 'font.serif': 'Avenir'})
 cmap = plt.cm.get_cmap('tab20', len(label_names))
+cmap = sns.color_palette("colorblind", as_cmap=True)
 
 fig, axd = plt.subplot_mosaic(
     design, 
-    sharex=True, 
+    sharex=False, 
     figsize=(10, 15), 
     layout='tight',
     gridspec_kw={
@@ -110,16 +112,22 @@ for i, (label, name, j) in enumerate(zip(label_names, names_corrected, ['A', 'D'
     axd[j].plot(times, score.mean(0), alpha=1, label='Random - Pattern', zorder=10, color='C7')
     # Plot significant regions separately
     for start, end in contiguous_regions(sig):
-        axd[j].plot(times[start:end], score.mean(0)[start:end], alpha=1, zorder=10, color=cmap(i))
+        axd[j].plot(times[start:end], score.mean(0)[start:end], alpha=1, zorder=10, color=cmap[i])
     sem = np.std(score, axis=0) / np.sqrt(len(subjects))
     axd[j].fill_between(times, score.mean(0) - sem, score.mean(0) + sem, alpha=0.2, zorder=5, facecolor='C7')
     # Highlight significant regions
-    axd[j].fill_between(times, score.mean(0) - sem, score.mean(0) + sem, where=sig, alpha=0.5, zorder=5, color=cmap(i))    
+    axd[j].fill_between(times, score.mean(0) - sem, score.mean(0) + sem, where=sig, alpha=0.5, zorder=5, color=cmap[i])    
+    axd[j].fill_between(times, score.mean(0) - sem, chance, where=sig, alpha=0.3, zorder=5, facecolor=cmap[i])    
     axd[j].axhline(chance, color='grey', alpha=.5)
     axd[j].set_ylabel('Accuracy (%)', fontsize=12)
-    axd[j].set_title(f'{name} network decoding', style='italic')
+    axd[j].xaxis.set_major_formatter(FuncFormatter(lambda x, pos: f'{x:.1f}'))
+    axd[j].xaxis.set_major_locator(plt.MultipleLocator(0.2))
+    if j == 'A':
+        axd[j].set_title('Decoding', style='italic')
+    if j == 'S':
+        axd[j].set_xlabel('Time (s)', fontsize=11)
 ### Plot similarity index ###    
-for i, (label, name, j) in enumerate(zip(label_names, names_corrected, ['B1', 'E1', 'H1', 'K1', 'N1', 'Q1', 'T1'])):
+for i, (label, name, j) in enumerate(zip(label_names, names_corrected, ['B', 'E', 'H', 'K', 'N', 'Q', 'T'])):
     axd[j].axhline(0, color='grey', alpha=.5)
     high = all_highs[label][:, :, 1:, :].mean((1, 2)) - all_highs[label][:, :, 0, :].mean(1)
     low = all_lows[label][:, :, 1:, :].mean((1, 2)) - all_lows[label][:, :, 0, :].mean(axis=1)
@@ -130,67 +138,73 @@ for i, (label, name, j) in enumerate(zip(label_names, names_corrected, ['B1', 'E
     axd[j].plot(times, diff.mean(0), alpha=1, label='Random - Pattern', zorder=10, color='C7')
     # Plot significant regions separately
     for start, end in contiguous_regions(sig):
-        axd[j].plot(times[start:end], diff.mean(0)[start:end], alpha=1, zorder=10, color=cmap(i))
+        axd[j].plot(times[start:end], diff.mean(0)[start:end], alpha=1, zorder=10, color=cmap[i])
     sem = np.std(diff, axis=0) / np.sqrt(len(subjects))
     axd[j].fill_between(times, diff.mean(0) - sem, diff.mean(0) + sem, alpha=0.2, zorder=5, facecolor='C7')
     # Highlight significant regions
-    axd[j].fill_between(times, diff.mean(0) - sem, diff.mean(0) + sem, where=sig, alpha=0.5, zorder=5, color=cmap(i))
-    axd[j].set_ylabel('Sim.', fontsize=11)
+    axd[j].fill_between(times, diff.mean(0) - sem, diff.mean(0) + sem, where=sig, alpha=0.5, zorder=5, color=cmap[i])
+    axd[j].fill_between(times, diff.mean(0) - sem, 0, where=sig, alpha=0.3, zorder=5, facecolor=cmap[i])
+    axd[j].set_ylabel('Sim. index', fontsize=11)
     axd[j].yaxis.set_major_formatter(FormatStrFormatter('%.1f'))
-    axd[j].set_xticklabels([])    
-    # axd[j].set_title(f'Similarity index', style='italic', fontsize=11)
+    axd[j].xaxis.set_major_formatter(FuncFormatter(lambda x, pos: f'{x:.1f}'))
+    axd[j].xaxis.set_major_locator(plt.MultipleLocator(0.2))
+    # axd[j].set_xticklabels([])
+    if j == 'T':
+        axd[j].set_xlabel('Time (s)', fontsize=11)
+    if j == 'B':
+        axd[j].set_title(f'Similarity index', style='italic')
 ### Plot cvMD ###
-for i, (label, name, j) in enumerate(zip(label_names, names_corrected, ['B2', 'E2', 'H2', 'K2', 'N2', 'Q2', 'T2'])):
-    high = all_highs[label][:, :, 1:, :].mean((1, 2)) - all_highs[label][:, :, 0, :].mean(1)
-    low = all_lows[label][:, :, 1:, :].mean((1, 2)) - all_lows[label][:, :, 0, :].mean(axis=1)
-    diff = low - high
-    sem_high = np.std(high, axis=0) / np.sqrt(len(subjects))
-    sem_low = np.std(low, axis=0) / np.sqrt(len(subjects))
-    axd[j].plot(times, high.mean(0), label='Pattern', color=cmap(i), alpha=1)
-    axd[j].plot(times, low.mean(0), label='Random', color='C7', alpha=1)
-    axd[j].fill_between(times, high.mean(0) - sem_high, high.mean(0) + sem_high, alpha=0.2, color=cmap(i))
-    axd[j].fill_between(times, low.mean(0) - sem_low, low.mean(0) + sem_low, alpha=0.2, color='C7')
+# for i, (label, name, j) in enumerate(zip(label_names, names_corrected, ['B2', 'E2', 'H2', 'K2', 'N2', 'Q2', 'T2'])):
+#     high = all_highs[label][:, :, 1:, :].mean((1, 2)) - all_highs[label][:, :, 0, :].mean(1)
+#     low = all_lows[label][:, :, 1:, :].mean((1, 2)) - all_lows[label][:, :, 0, :].mean(axis=1)
+#     diff = low - high
+#     sem_high = np.std(high, axis=0) / np.sqrt(len(subjects))
+#     sem_low = np.std(low, axis=0) / np.sqrt(len(subjects))
+#     axd[j].plot(times, high.mean(0), label='Pattern', color=cmap[i], alpha=1)
+#     axd[j].plot(times, low.mean(0), label='Random', color='C7', alpha=1)
+#     axd[j].fill_between(times, high.mean(0) - sem_high, high.mean(0) + sem_high, alpha=0.2, color=cmap[i])
+#     axd[j].fill_between(times, low.mean(0) - sem_low, low.mean(0) + sem_low, alpha=0.2, color='C7')
     # sig = p_values < 0.05
     # axd[j].fill_between(times, high.mean(0) + sem_high, low.mean(0) - sem_low, where=sig, alpha=0.3, label='Significance - corrected', facecolor="#F2AD00")
     # p_values_unc = ttest_1samp(diff, axis=0, popmean=0)[1]
     # sig_unc = p_values_unc < 0.05
     # axd[j].fill_between(times, high.mean(0) + sem_high, low.mean(0) - sem_low, where=sig_unc, alpha=.3, label='Significance - uncorrected', facecolor="#7294D4")
     # axd[j].legend(frameon=False)
-    axd[j].set_ylabel('cvMD', fontsize=11)
+    # axd[j].set_ylabel('cvMD', fontsize=11)
     # axd[j].set_xticklabels([])
     # axd[j].set_title(f'cvMD', style='italic', fontsize=11)
 ### Plot subject x session correlation ###
-for i, (label, name, j) in enumerate(zip(label_names, names_corrected, ['C1', 'F1', 'I1', 'L1', 'O1', 'R1', 'U1'])):
-    axd[j].axhline(0, color='grey', alpha=0.5)
-    rhos = np.array([[spear([0, 1, 2, 3, 4], diff_sess[label][sub, :, itime])[0] for itime in range(len(times))] for sub in range(len(subjects))])
-    sem = np.std(rhos, axis=0) / np.sqrt(len(subjects))
-    # axd[j].plot(times, rhos.mean(0), color=cmap(i))
-    p_values_unc = ttest_1samp(rhos, axis=0, popmean=0)[1]
-    sig_unc = p_values_unc < 0.05
-    p_values = decod_stats(rhos, -1)
-    sig = p_values < .05
-    # Main plot
-    axd[j].plot(times, rhos.mean(0), alpha=1, label='Random - Pattern', zorder=10, color='C7')
+# for i, (label, name, j) in enumerate(zip(label_names, names_corrected, ['C1', 'F1', 'I1', 'L1', 'O1', 'R1', 'U1'])):
+#     axd[j].axhline(0, color='grey', alpha=0.5)
+#     rhos = np.array([[spear([0, 1, 2, 3, 4], diff_sess[label][sub, :, itime])[0] for itime in range(len(times))] for sub in range(len(subjects))])
+#     sem = np.std(rhos, axis=0) / np.sqrt(len(subjects))
+    # axd[j].plot(times, rhos.mean(0), color=cmap[i])
+    # p_values_unc = ttest_1samp(rhos, axis=0, popmean=0)[1]
+    # sig_unc = p_values_unc < 0.05
+    # p_values = decod_stats(rhos, -1)
+    # sig = p_values < .05
+    # # Main plot
+    # axd[j].plot(times, rhos.mean(0), alpha=1, label='Random - Pattern', zorder=10, color='C7')
     # Plot significant regions separately
-    for start, end in contiguous_regions(sig):
-        axd[j].plot(times[start:end], rhos.mean(0)[start:end], alpha=1, zorder=10, color=cmap(i))
-    sem = np.std(rhos, axis=0) / np.sqrt(len(subjects))
-    axd[j].fill_between(times, rhos.mean(0) - sem, rhos.mean(0) + sem, alpha=0.2, zorder=5, facecolor='C7')
+    # for start, end in contiguous_regions(sig):
+        # axd[j].plot(times[start:end], rhos.mean(0)[start:end], alpha=1, zorder=10, color=cmap[i])
+    # sem = np.std(rhos, axis=0) / np.sqrt(len(subjects))
+    # axd[j].fill_between(times, rhos.mean(0) - sem, rhos.mean(0) + sem, alpha=0.2, zorder=5, facecolor='C7')
     # Highlight significant regions
-    axd[j].fill_between(times, rhos.mean(0) - sem, rhos.mean(0) + sem, where=sig, alpha=0.5, zorder=5, color=cmap(i))
-    # axd[j].fill_between(times, rhos.mean(0) - sem, rhos.mean(0) + sem, color=cmap(i), alpha=0.2)
+    # axd[j].fill_between(times, rhos.mean(0) - sem, rhos.mean(0) + sem, where=sig, alpha=0.5, zorder=5, color=cmap[i])
+    # axd[j].fill_between(times, rhos.mean(0) - sem, rhos.mean(0) + sem, color=cmap[i], alpha=0.2)
     # axd[j].fill_between(times, 0, rhos.mean(0) - sem, where=sig_unc, alpha=.3, label='Significance - uncorrected', facecolor="#7294D4")
     # axd[j].fill_between(times, 0, rhos.mean(0) - sem, where=sig, alpha=.3, facecolor="#F2AD00", label='Significance - corrected')
-    axd[j].set_ylabel("Rho", fontsize=11)
-    axd[j].set_xticklabels([])
+    # axd[j].set_ylabel("Rho", fontsize=11)
+    # axd[j].set_xticklabels([])
     # axd[j].legend(frameon=False, loc="lower right")
     # axd[j].set_title(f'Subject x session correlation', style='italic', fontsize=13)
 ### Plot subject x learning index correlation ###
-for i, (label, name, j) in enumerate(zip(label_names, names_corrected, ['C2', 'F2', 'I2', 'L2', 'O2', 'R2', 'U2'])):
+for i, (label, name, j) in enumerate(zip(label_names, names_corrected, ['C', 'F', 'I', 'L', 'O', 'R', 'U'])):
     axd[j].axhline(0, color="grey", alpha=0.5)
     all_rhos = np.array([[spear(learn_index_df.iloc[sub, :], diff_sess[label][sub, :, t])[0] for t in range(len(times))] for sub in range(len(subjects))])
     sem = np.std(all_rhos, axis=0) / np.sqrt(len(subjects))
-    axd[j].plot(times, all_rhos.mean(0), color=cmap(i))
+    # axd[j].plot(times, all_rhos.mean(0), color=cmap[i])
     p_values_unc = ttest_1samp(all_rhos, axis=0, popmean=0)[1]
     sig_unc = p_values_unc < 0.05
     p_values = decod_stats(all_rhos, -1)
@@ -199,18 +213,25 @@ for i, (label, name, j) in enumerate(zip(label_names, names_corrected, ['C2', 'F
     axd[j].plot(times, all_rhos.mean(0), alpha=1, label='Random - Pattern', zorder=10, color='C7')
     # Plot significant regions separately
     for start, end in contiguous_regions(sig):
-        axd[j].plot(times[start:end], all_rhos.mean(0)[start:end], alpha=1, zorder=10, color=cmap(i))
+        axd[j].plot(times[start:end], all_rhos.mean(0)[start:end], alpha=1, zorder=10, color=cmap[i])
     sem = np.std(all_rhos, axis=0) / np.sqrt(len(subjects))
     axd[j].fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, alpha=0.2, zorder=5, facecolor='C7')
     # Highlight significant regions
-    axd[j].fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, where=sig, alpha=0.5, zorder=5, color=cmap(i))
-    # axd[j].fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, color=cmap(i), alpha=0.2)
+    axd[j].fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, where=sig, alpha=0.5, zorder=5, color=cmap[i])
+    # axd[j].fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, color=cmap[i], alpha=0.2)
     axd[j].fill_between(times, 0, all_rhos.mean(0) - sem, where=sig_unc, alpha=.3, label='Significance - uncorrected', facecolor="#7294D4")    
-    # axd[j].fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, color=cmap(i), alpha=0.2)
+    # axd[j].fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, color=cmap[i], alpha=0.2)
     # axd[j].fill_between(times, all_rhos.mean(0) - sem, 0, where=sig_unc, alpha=.3, label='Significance - uncorrected', facecolor="#7294D4")
-    # axd[j].fill_between(times, all_rhos.mean(0) - sem, 0, where=sig, alpha=.4, facecolor="#F2AD00", label='Significance - corrected')
-    axd[j].set_ylabel("Rho", fontsize=11)
-    # axd[j].set_xlabel('Time (s)', fontsize=11)
+    axd[j].fill_between(times, all_rhos.mean(0) - sem, 0, where=sig, alpha=.4, facecolor="#F2AD00", label='Significance - corrected')
+    axd[j].set_ylabel("Spearman's rho", fontsize=11)
+    axd[j].yaxis.set_major_formatter(FormatStrFormatter('%.1f'))
+    axd[j].fill_between(times, all_rhos.mean(0) - sem, 0, where=sig, alpha=0.3, zorder=5, facecolor=cmap[i])
+    axd[j].xaxis.set_major_formatter(FuncFormatter(lambda x, pos: f'{x:.1f}'))
+    axd[j].xaxis.set_major_locator(plt.MultipleLocator(0.2))
+    if j == 'U':
+        axd[j].set_xlabel('Time (s)', fontsize=11)
     # axd[j].legend(frameon=False, loc="lower right")
-    # axd[j].set_title(f'Subject x learning index correlation', style='italic', fontsize=13)
+    if j == 'C':
+        axd[j].set_title(f'Learning index corr.', style='italic')
+plt.close()
 fig.savefig(figures_dir / f"{lock}-rsa.pdf", transparent=True)
