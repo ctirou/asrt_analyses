@@ -4,6 +4,9 @@ export FREESURFER_HOME="/Applications/freesurfer/7.3.2"
 export SUBJECTS_DIR="/Users/coum/Desktop/asrt/freesurfer"
 source $FREESURFER_HOME/SetUpFreeSurfer.sh
 
+# Single subject
+# recon-all -s sub01 -i sub01.nii -all -qcache
+
 ls *.nii | parallel jobs 15 recon-all -s {.} -i {} -all -qcache
 
 # Parcellation using Schaeffer2018 #

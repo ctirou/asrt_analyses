@@ -1,12 +1,9 @@
 import os.path as op
-from cycler import cycler
 import matplotlib
-import os
 import numpy as np
-import mne
 import pandas as pd
 import matplotlib.pyplot as plt
-from scipy.stats import ttest_1samp, spearmanr as spear
+from scipy.stats import ttest_1samp, zscore, spearmanr as spear
 from tqdm.auto import tqdm
 from base import *
 from config import *
@@ -89,7 +86,7 @@ innerB = [['B1'], ['B2']]
 innerD = [['D1'], ['D2']]
 innerC = [['C1', 'C2']]
 outer = [['A', innerB],
-         [innerC, innerD]]
+         ['C', 'D']]
 
 cmap1 = colors['Darjeeling1']
 
@@ -100,13 +97,20 @@ c4 = "#CC78BC"
 c5 = "#ECE133"
 c6 = "#D55E00"
 
-fig, axd = plt.subplot_mosaic(outer, sharex=False, figsize=(15, 10), layout='tight')
+fig, axd = plt.subplot_mosaic(outer, 
+                              sharex=False, 
+                              figsize=(15, 10), 
+                              layout='tight',
+                              gridspec_kw={
+                                  'height_ratios': [1, .7],
+                                #   'width_ratios': [.3, .3, 1  , .5, .5]
+                                  })
 plt.rcParams.update({'font.size': 10, 'font.family': 'serif', 'font.serif': 'Avenir'})
 for ax in axd.values():
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     # ax.set_prop_cycle(cycler('color', colors['Darjeeling1']))
-    if ax not in [axd['A'], axd['C1'], axd['C2']]:
+    if ax not in [axd['A'], axd['C']]:
         if lock == 'stim':
             ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, zorder=0, alpha=.1)
         else:
@@ -128,7 +132,7 @@ for start, end in contiguous_regions(sig):
     axd['A'].plot(times[start:end], decoding.mean(0)[start:end], alpha=1, zorder=15, color=c1)
 axd['A'].fill_between(times, decoding.mean(0) - sem, decoding.mean(0) + sem, alpha=0.2, zorder=10, facecolor='C7')    
 # Highlight significant regions
-axd['A'].fill_between(times, decoding.mean(0) - sem, decoding.mean(0) + sem, where=sig, alpha=0.2, zorder=15, facecolor=c1, label='Significance - corrected')    
+axd['A'].fill_between(times, decoding.mean(0) - sem, decoding.mean(0) + sem, where=sig, alpha=0.2, zorder=15, facecolor=c1, label='Significance')    
 axd['A'].fill_between(times, decoding.mean(0) - sem, chance, where=sig, alpha=0.1, zorder=15, facecolor=c1)
 # axd['A'].fill_between(times, decoding.mean(0) - sem, decoding.mean(0) + sem, alpha=0.2)
 # axd['A'].fill_between(times, decoding.mean(0) - sem, .25, where=sig, alpha=0.3, facecolor="#F2AD00", capstyle='round', label='Significance - corrected')
@@ -136,6 +140,7 @@ axd['A'].set_ylabel('Accuracy (%)', fontsize=11)
 axd['A'].legend(loc='upper left', frameon=False)
 axd['A'].set_xlabel('Time (s)', fontsize=11)
 axd['A'].set_title(f'Sensor space decoding', style='italic', fontsize=13)
+
 ### B1 ### Similarity index
 axd['B1'].axhline(0, color='grey', alpha=0.5)
 axd['B1'].plot(times, diff.mean(0), alpha=1, label='Random - Pattern', zorder=10)
@@ -149,7 +154,7 @@ for start, end in contiguous_regions(sig):
     axd['B1'].plot(times[start:end], diff.mean(0)[start:end], alpha=1, zorder=10, color=c2)
 axd['B1'].fill_between(times, diff.mean(0) - sem, diff.mean(0) + sem, alpha=0.2, zorder=5, facecolor='C7')    
 # Highlight significant regions
-axd['B1'].fill_between(times, diff.mean(0) - sem, diff.mean(0) + sem, where=sig, alpha=0.3, zorder=5, facecolor=c2, label='Significance - corrected')
+axd['B1'].fill_between(times, diff.mean(0) - sem, diff.mean(0) + sem, where=sig, alpha=0.3, zorder=5, facecolor=c2, label='Significance')
 axd['B1'].fill_between(times, diff.mean(0) - sem, 0, where=sig, alpha=0.2, zorder=5, facecolor=c2)
 # axd['B1'].fill_between(times, diff.mean(0) - sem, diff.mean(0) + sem, alpha=0.2, zorder=5)
 # axd["B1"].fill_between(times, 0, diff.mean(0) - sem, where=sig, alpha=0.3, label='Significance - corrected', facecolor="#F2AD00")
@@ -158,6 +163,7 @@ axd['B1'].set_ylabel('Similarity index', fontsize=11)
 axd['B1'].yaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter('%.2f'))
 axd['B1'].set_xticklabels([])
 axd['B1'].set_title(f'Similarity index', style='italic', fontsize=13)
+
 ### B2 ### cvMD
 sem_high = np.std(high, axis=0) / np.sqrt(len(subjects))
 sem_low = np.std(low, axis=0) / np.sqrt(len(subjects))
@@ -174,7 +180,7 @@ for start, end in contiguous_regions(sig):
     axd['B2'].plot(times[start:end], high.mean(0)[start:end], alpha=1, zorder=10, color=c3)
 axd['B2'].fill_between(times, high.mean(0) - sem, high.mean(0) + sem, alpha=0.2, zorder=5, facecolor='C7')    
 # Highlight significant regions
-axd['B2'].fill_between(times, high.mean(0) - sem, high.mean(0) + sem, where=sig, alpha=0.3, zorder=5, facecolor=c3, label='Pattern significance - corrected')    
+axd['B2'].fill_between(times, high.mean(0) - sem, high.mean(0) + sem, where=sig, alpha=0.3, zorder=5, facecolor=c3, label='Pattern significance')    
 # Low
 # Main plot
 axd['B2'].plot(times, low.mean(0), alpha=1, zorder=10, color='C7')
@@ -183,119 +189,123 @@ for start, end in contiguous_regions(sig):
     axd['B2'].plot(times[start:end], low.mean(0)[start:end], alpha=1, zorder=10, color=c4)
 axd['B2'].fill_between(times, low.mean(0) - sem, low.mean(0) + sem, alpha=0.2, zorder=5, facecolor='C7')
 # Highlight significant regions
-axd['B2'].fill_between(times, low.mean(0) - sem, low.mean(0) + sem, where=sig, alpha=0.3, zorder=5, facecolor=c4, label='Random significance - corrected')    
+axd['B2'].fill_between(times, low.mean(0) - sem, low.mean(0) + sem, where=sig, alpha=0.3, zorder=5, facecolor=c4, label='Random significance')    
 axd['B2'].legend(frameon=False, loc='lower left')
 axd['B2'].set_ylabel('cvMD', fontsize=11)
 # axd['B2'].set_xticklabels([])
 axd['B2'].set_title(f'cvMD within random and pattern elements', style='italic', fontsize=13)
-### D1 ### Within subject block correlation
-axd['D1'].axhline(0, color='grey', alpha=0.5)
-rhos = np.array([[spear([0, 1, 2, 3, 4], diff_sess[sub, :, itime])[0] for itime in range(len(times))] for sub in range(len(subjects))])
-sem = np.std(rhos, axis=0) / np.sqrt(len(subjects))
-# axd['D1'].plot(times, rhos.mean(0))
-p_values_unc = ttest_1samp(rhos, axis=0, popmean=0)[1]
-sig_unc = p_values_unc < 0.05
-p_values = decod_stats(rhos, -1)
-sig = p_values < .05
-# Main plot
-axd['D1'].plot(times, rhos.mean(0), alpha=1, zorder=10, color='C7')
-# Plot significant regions separately
-for start, end in contiguous_regions(sig):
-    axd['D1'].plot(times[start:end], rhos.mean(0)[start:end], alpha=1, zorder=10, color=c5)
-axd['D1'].fill_between(times, rhos.mean(0) - sem, rhos.mean(0) + sem, alpha=0.2, zorder=5, facecolor='C7')    
-# Highlight significant regions
-axd['D1'].fill_between(times, rhos.mean(0) - sem, rhos.mean(0) + sem, where=sig, alpha=0.2, zorder=5, facecolor=c5, label='Significance - corrected')
-axd['D1'].fill_between(times, rhos.mean(0) - sem, 0, where=sig, alpha=0.1, zorder=5, facecolor=c5)
-# axd['D1'].fill_between(times, rhos.mean(0) - sem, rhos.mean(0) + sem, alpha=0.2)
-axd['D1'].fill_between(times, 0, rhos.mean(0) - sem, where=sig_unc, alpha=.3, label='Significance - uncorrected', facecolor="#7294D4")
-# axd['D1'].fill_between(times, 0, rhos.mean(0) - sem, where=sig, alpha=.3, facecolor="#F2AD00", label='Significance - corrected')
-axd['D1'].set_ylabel("Spearman's rho", fontsize=11)
-axd['D1'].set_xticklabels([])
-axd['D1'].legend(frameon=False, loc="lower right")
-axd['D1'].set_title(f'Similarity x Blocks correlation', style='italic', fontsize=13)
+
+# ### D1 ### Within subject block correlation
+# axd['D1'].axhline(0, color='grey', alpha=0.5)
+# rhos = np.array([[spear([0, 1, 2, 3, 4], diff_sess[sub, :, itime])[0] for itime in range(len(times))] for sub in range(len(subjects))])
+# sem = np.std(rhos, axis=0) / np.sqrt(len(subjects))
+# # axd['D1'].plot(times, rhos.mean(0))
+# p_values_unc = ttest_1samp(rhos, axis=0, popmean=0)[1]
+# sig_unc = p_values_unc < 0.05
+# p_values = decod_stats(rhos, -1)
+# sig = p_values < .05
+# # Main plot
+# axd['D1'].plot(times, rhos.mean(0), alpha=1, zorder=10, color='C7')
+# # Plot significant regions separately
+# for start, end in contiguous_regions(sig):
+#     axd['D1'].plot(times[start:end], rhos.mean(0)[start:end], alpha=1, zorder=10, color=c5)
+# axd['D1'].fill_between(times, rhos.mean(0) - sem, rhos.mean(0) + sem, alpha=0.2, zorder=5, facecolor='C7')    
+# # Highlight significant regions
+# axd['D1'].fill_between(times, rhos.mean(0) - sem, rhos.mean(0) + sem, where=sig, alpha=0.2, zorder=5, facecolor=c5, label='Significance - corrected')
+# axd['D1'].fill_between(times, rhos.mean(0) - sem, 0, where=sig, alpha=0.1, zorder=5, facecolor=c5)
+# # axd['D1'].fill_between(times, rhos.mean(0) - sem, rhos.mean(0) + sem, alpha=0.2)
+# axd['D1'].fill_between(times, 0, rhos.mean(0) - sem, where=sig_unc, alpha=.3, label='Significance - uncorrected', facecolor="#7294D4")
+# # axd['D1'].fill_between(times, 0, rhos.mean(0) - sem, where=sig, alpha=.3, facecolor="#F2AD00", label='Significance - corrected')
+# axd['D1'].set_ylabel("Spearman's rho", fontsize=11)
+# axd['D1'].set_xticklabels([])
+# axd['D1'].legend(frameon=False, loc="lower right")
+# axd['D1'].set_title(f'Similarity x Blocks correlation', style='italic', fontsize=13)
 
 ### D2 ### Within subject learning index correlation
-axd['D2'].axhline(0, color="grey", alpha=0.5)
+diff_sess = zscore(diff_sess, axis=1)
+axd['D'].axhline(0, color="grey", alpha=0.5)
 all_rhos = np.array([[spear(learn_index_df.iloc[sub, :], diff_sess[sub, :, t])[0] for t in range(len(times))] for sub in range(len(subjects))])
 sem = np.std(all_rhos, axis=0) / np.sqrt(len(subjects))
-# axd['D2'].plot(times, all_rhos.mean(0))
+# axd['D'].plot(times, all_rhos.mean(0))
 p_values_unc = ttest_1samp(all_rhos, axis=0, popmean=0)[1]
 sig_unc = p_values_unc < 0.05
 p_values = decod_stats(all_rhos, -1)
 sig = p_values < 0.05
 # Main plot
-axd['D2'].plot(times, all_rhos.mean(0), alpha=1, zorder=10, color='C7')
+axd['D'].plot(times, all_rhos.mean(0), alpha=1, zorder=10, color='C7')
 # Plot significant regions separately
 for start, end in contiguous_regions(sig):
-    axd['D2'].plot(times[start:end], all_rhos.mean(0)[start:end], alpha=1, zorder=10, color=c6)
-axd['D2'].fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, alpha=0.2, zorder=5, facecolor='C7')    
+    axd['D'].plot(times[start:end], all_rhos.mean(0)[start:end], alpha=1, zorder=10, color=c6)
+axd['D'].fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, alpha=0.2, zorder=5, facecolor='C7')    
 # Highlight significant regions
-axd['D2'].fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, where=sig, alpha=0.2, zorder=5, facecolor=c6, label='Significance - corrected')
-axd['D2'].fill_between(times, all_rhos.mean(0) - sem, 0, where=sig, alpha=0.1, zorder=5, facecolor=c6)
-# axd['D2'].fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, alpha=0.2)
-# axd['D2'].fill_between(times, all_rhos.mean(0) - sem, 0, where=sig_unc, alpha=.3, label='Significance - uncorrected', facecolor="#7294D4")
-# axd['D2'].fill_between(times, all_rhos.mean(0) - sem, 0, where=sig, alpha=.4, facecolor="#F2AD00", label='Significance - corrected')
-axd['D2'].set_ylabel("Spearman's rho", fontsize=11)
-axd['D2'].set_xlabel('Time (s)', fontsize=11)
-axd['D2'].legend(frameon=False, loc="lower right")
-axd['D2'].set_title(f'Similarity x Learning correlation', style='italic', fontsize=13)
-### C1 ### Blocks fit
+axd['D'].fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, where=sig, alpha=0.2, zorder=5, facecolor=c6, label='Significance')
+axd['D'].fill_between(times, all_rhos.mean(0) - sem, 0, where=sig, alpha=0.1, zorder=5, facecolor=c6)
+# axd['D'].fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, alpha=0.2)
+# axd['D'].fill_between(times, all_rhos.mean(0) - sem, 0, where=sig_unc, alpha=.3, label='Significance - uncorrected', facecolor="#7294D4")
+# axd['D'].fill_between(times, all_rhos.mean(0) - sem, 0, where=sig, alpha=.4, facecolor="#F2AD00", label='Significance - corrected')
+axd['D'].set_ylabel("Spearman's rho", fontsize=11)
+axd['D'].set_xlabel('Time (s)', fontsize=11)
+axd['D'].legend(frameon=False, loc="lower right")
+axd['D'].set_title(f'Similarity x Learning correlation', style='italic', fontsize=13)
+
+# ### C1 ### Blocks fit
 cmap = plt.cm.get_cmap('tab20', len(subjects))
 idx_rsa = np.where((times >= 0.3) & (times <= 0.5))[0]
 mdiff = diff_sess[:, :, idx_rsa].mean(2)
-sess = np.array([[0, 1, 2, 3, 4] for _ in range(len(subjects))])
-slopes, intercepts = [], []
-for sub, subject in enumerate(subjects):
-    # Linear fit
-    slope, intercept = np.polyfit(sess[sub][1:], mdiff[sub][1:], 1)
-    axd['C1'].plot(
-        sess[sub], 
-        slope * sess[sub] + intercept, 
-        alpha=0.6, 
-        # label=f'{subject} Fit', 
-        color=cmap(sub))
-    # Scatter points for raw data
-    axd['C1'].scatter(
-        sess[sub], 
-        mdiff[sub], 
-        alpha=0.6, 
-        # label=f'{subject} Data', 
-        color=cmap(sub), 
-        marker='o')
-    slopes.append(slope)
-    intercepts.append(intercept)
-# Mean fit line
-mean_slope, mean_intercept = np.mean(slopes), np.mean(intercepts)
-axd['C1'].plot(
-    sess[sub], 
-    mean_slope * sess[sub] + mean_intercept, 
-    color='black', 
-    lw=4, 
-    label='Mean fit')
-# Labels, legend, and grid for C1
-axd['C1'].set_xlabel('Session', fontsize=11)
+# sess = np.array([[0, 1, 2, 3, 4] for _ in range(len(subjects))])
+# slopes, intercepts = [], []
+# for sub, subject in enumerate(subjects):
+#     # Linear fit
+#     slope, intercept = np.polyfit(sess[sub][1:], mdiff[sub][1:], 1)
+#     axd['C1'].plot(
+#         sess[sub], 
+#         slope * sess[sub] + intercept, 
+#         alpha=0.6, 
+#         # label=f'{subject} Fit', 
+#         color=cmap(sub))
+#     # Scatter points for raw data
+#     axd['C1'].scatter(
+#         sess[sub], 
+#         mdiff[sub], 
+#         alpha=0.6, 
+#         # label=f'{subject} Data', 
+#         color=cmap(sub), 
+#         marker='o')
+#     slopes.append(slope)
+#     intercepts.append(intercept)
+# # Mean fit line
+# mean_slope, mean_intercept = np.mean(slopes), np.mean(intercepts)
+# axd['C1'].plot(
+#     sess[sub], 
+#     mean_slope * sess[sub] + mean_intercept, 
+#     color='black', 
+#     lw=4, 
+#     label='Mean fit')
+# # Labels, legend, and grid for C1
+# axd['C1'].set_xlabel('Session', fontsize=11)
+# # axd['C1'].set_xticks([0, 1, 2, 3, 4])
 # axd['C1'].set_xticks([0, 1, 2, 3, 4])
-axd['C1'].set_xticks([0, 1, 2, 3, 4])
-axd['C1'].set_xticklabels(["Practice", "1", "2", "3", "4"])
-# axd['C1'].legend(frameon=False, fontsize=10, loc='upper left', ncol=2)
-# axd['C1'].grid(True, linestyle='--', alpha=0.7)
-# axd['C1'].set_yticklabels([])'
-axd['C1'].set_ylabel('Similarity Index', fontsize=11)
-axd['C1'].legend(frameon=False)
-axd['C1'].set_title(f'Similarity x Blocks fit', style='italic', fontsize=13)
+# axd['C1'].set_xticklabels(["Practice", "1", "2", "3", "4"])
+# # axd['C1'].legend(frameon=False, fontsize=10, loc='upper left', ncol=2)
+# # axd['C1'].grid(True, linestyle='--', alpha=0.7)
+# # axd['C1'].set_yticklabels([])'
+# axd['C1'].set_ylabel('Similarity Index', fontsize=11)
+# axd['C1'].legend(frameon=False)
+# axd['C1'].set_title(f'Similarity x Blocks fit', style='italic', fontsize=13)
+
 ### C2 ### Learning index fit
 slopes, intercepts = [], []
 for sub, subject in enumerate(subjects):
     # Linear fit
     slope, intercept = np.polyfit(learn_index_df.iloc[sub][1:], mdiff[sub][1:], 1)
-    axd['C2'].plot(
+    axd['C'].plot(
         learn_index_df.iloc[sub], 
         slope * learn_index_df.iloc[sub] + intercept, 
         alpha=0.6, 
-        # label=f'{subject} Fit', 
+        label=f'Subject {sub+1} fit', 
         color=cmap(sub))
     # Scatter points for raw data
-    axd['C2'].scatter(
+    axd['C'].scatter(
         learn_index_df.iloc[sub], 
         mdiff[sub], 
         alpha=0.6, 
@@ -306,19 +316,20 @@ for sub, subject in enumerate(subjects):
     intercepts.append(intercept)
 # Mean fit line
 mean_slope, mean_intercept = np.mean(slopes), np.mean(intercepts)
-axd['C2'].plot(
+axd['C'].plot(
     learn_index_df.iloc[sub], 
     mean_slope * learn_index_df.iloc[sub] + mean_intercept, 
     color='black', 
     lw=4, 
     label='Mean fit')
 # Labels, legend, and grid for C2
-# axd['C2'].legend(frameon=False, fontsize=10, loc='upper left', ncol=2)
-# axd['C2'].grid(True, linestyle='--', alpha=0.7)
-axd['C2'].legend(frameon=False)
-axd['C2'].sharey(axd['C1'])
-axd['C2'].set_xlabel('Learning Index', fontsize=11)
-axd['C2'].set_title(f'Similarity x Learning fit', style='italic', fontsize=13)
+# axd['C'].legend(frameon=False, fontsize=10, loc='upper left', ncol=2)
+# axd['C'].grid(True, linestyle='--', alpha=0.7)
+axd['C'].legend(frameon=False, ncol=4)
+# axd['C'].sharey(axd['C1'])
+axd['C'].set_xlabel('Learning Index', fontsize=11)
+axd['C'].set_ylabel('Similarity Index', fontsize=11)
+axd['C'].set_title(f'Similarity x Learning fit', style='italic', fontsize=13)
 
 plt.savefig(figures_dir /  f"{lock}-rsa.pdf", transparent=True)
 plt.close()

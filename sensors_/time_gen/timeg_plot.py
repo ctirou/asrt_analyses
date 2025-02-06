@@ -106,10 +106,8 @@ if not op.exists(res_dir / "corr" / "rhos_learn.npy"):
     pval = gat_stats(all_rhos, -1)
     np.save(res_dir / "corr" / "pval_learn-pval.npy", pval)    
     
-
-cmap = "viridis"
 cmap1 = "RdBu_r"
-cmap2 = mcolors.LinearSegmentedColormap.from_list("Zissou1", colors["Zissou1"])
+cmap2 = "viridis"
 
 innerA = [['A1'], ['A2']]
 innerC = [['C1'], ['C2']]
@@ -200,7 +198,7 @@ im = axd['C1'].imshow(
     rhos.mean(0),
     interpolation="lanczos",
     origin="lower",
-    cmap=cmap2,
+    cmap=cmap1,
     extent=times[[0, -1, 0, -1]],
     aspect=0.5,
     vmin=-0.25,
@@ -225,7 +223,7 @@ im = axd['C2'].imshow(
     rhos.mean(0),
     interpolation="lanczos",
     origin="lower",
-    cmap=cmap2,
+    cmap=cmap1,
     extent=times[[0, -1, 0, -1]],
     aspect=0.5,
     vmin=-0.25,
