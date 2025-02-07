@@ -4,7 +4,7 @@ from config import *
 import os.path as op
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.stats import ttest_1samp, spearmanr, zscore
+from scipy.stats import ttest_1samp, spearmanr, zscore, linregress
 import numba
 import pandas as pd
 from joblib import Parallel, delayed
@@ -19,13 +19,13 @@ lock = 'stim'
 n_parcels = 200
 n_networks = 7
 networks = schaefer_7[:-2] if n_networks == 7 else schaefer_17[:-2]
-# networks = networks + ['Hippocampus', 'Thalamus']
+networks = networks + ['Hippocampus', 'Thalamus']
 figures_dir = FIGURES_DIR / "time_gen" / "source" / lock
 ensure_dir(figures_dir)
 overwrite = False
 
 names = pd.read_csv(FREESURFER_DIR / 'Schaefer2018' / f'{n_networks}NetworksOrderedNames.csv', header=0)[' Network Name'].tolist()[:-2]
-# names = names + ['Hippocampus', 'Thalamus']
+names = names + ['Hippocampus', 'Thalamus']
 times = np.linspace(-1.5, 1.5, 305)
 chance = .25
 threshold = .05
@@ -78,7 +78,7 @@ cmap2 = 'PRGn_r'
 cmap3 = 'magma'
 
 ### plot pattern for all networks ###
-fig, axes = plt.subplots(5, 1, figsize=(6, 12), sharex=True, sharey=True, layout='tight')
+fig, axes = plt.subplots(7, 1, figsize=(6, 12), sharex=True, sharey=True, layout='tight')
 fig.suptitle("Pattern", fontsize=14)
 for i, (network, name) in enumerate(zip(networks, names)):
     im = axes[i].imshow(
@@ -103,10 +103,10 @@ for i, (network, name) in enumerate(zip(networks, names)):
     sig = pval < threshold
     axes[i].contour(xx, yy, sig, colors='Gray', levels=[0],
                         linestyles='solid', linewidths=1)
-fig.savefig(figures_dir / f"{analysis}_pattern.pdf", transparent=True)
+fig.savefig(figures_dir / f"pattern.pdf", transparent=True)
 
 ### plot random for all networks ###
-fig, axes = plt.subplots(5, 1, figsize=(6, 12), sharex=True, layout='tight')
+fig, axes = plt.subplots(7, 1, figsize=(6, 12), sharex=True, layout='tight')
 fig.suptitle("Random", fontsize=14)
 for i, (network, name) in enumerate(zip(networks, names)):
     im = axes[i].imshow(
@@ -131,10 +131,10 @@ for i, (network, name) in enumerate(zip(networks, names)):
     sig = pval < threshold
     axes[i].contour(xx, yy, sig, colors='Gray', levels=[0],
                         linestyles='solid', linewidths=1)
-fig.savefig(figures_dir / f"{analysis}_random.pdf", transparent=True)
+fig.savefig(figures_dir / f"random.pdf", transparent=True)
 
 ### plot contrast for all networks ###
-fig, axes = plt.subplots(5, 1, figsize=(6, 12), sharex=True, layout='tight')
+fig, axes = plt.subplots(7, 1, figsize=(6, 12), sharex=True, layout='tight')
 fig.suptitle("Contrast = Pattern – Random", fontsize=14)
 for i, (network, name) in enumerate(zip(networks, names)):
     all_contrast = all_patterns[network] - all_randoms[network]
@@ -160,10 +160,10 @@ for i, (network, name) in enumerate(zip(networks, names)):
     sig = pval < threshold
     axes[i].contour(xx, yy, sig, colors='Gray', levels=[0],
                         linestyles='solid', linewidths=1)
-fig.savefig(figures_dir / f"{analysis}_contrast.pdf", transparent=True)
+fig.savefig(figures_dir / f"contrast.pdf", transparent=True)
 
 ### plot diagonal for all networks ###
-fig, axes = plt.subplots(5, 1, figsize=(6, 12), sharex=True, layout='tight')
+fig, axes = plt.subplots(7, 1, figsize=(6, 12), sharex=True, layout='tight')
 fig.suptitle("Contrast diagonal", fontsize=14)
 for i, (network, name) in enumerate(zip(networks, names)):
     axes[i].plot(times, all_diags[network].mean(0))
@@ -174,36 +174,36 @@ for i, (network, name) in enumerate(zip(networks, names)):
     axes[i].set_ylabel("difference")
     axes[i].set_title(f"${name}$", fontsize=10)
     axes[i].axvspan(0, 0.2, color='gray', alpha=0.1)
-fig.savefig(figures_dir / f"{analysis}_diagonal.pdf", transparent=True)
+fig.savefig(figures_dir / f"diagonals.pdf", transparent=True)
 
-### plot blocks x time gen correlation for all networks ###
-fig, axes = plt.subplots(7, 1, figsize=(6, 12), sharex=True, layout='tight')
-fig.suptitle("blocks x time gen correlation", fontsize=14)
-for i, (network, name) in enumerate(zip(networks, names)):
-    rhos = np.load(res_dir / network / "corr" / "rhos_blocks.npy")
-    pval = np.load(res_dir / network / "corr" / "pval_blocks-pval.npy")
-    sig = pval < threshold
-    im = axes[i].imshow(
-        rhos.mean(0),
-        interpolation="lanczos",
-        origin="lower",
-        cmap=cmap,
-        extent=times[[0, -1, 0, -1]],
-        aspect=0.5,
-        vmin=-.2,
-        vmax=.2)
-    if network == networks[-1]:
-        axes[i].set_xlabel("Testing Time (s)")
-    axes[i].set_ylabel("Training Time (s)")
-    axes[i].set_title(f"{name}", style='italic')
-    axes[i].axvline(0, color="k")
-    axes[i].axhline(0, color="k")
-    xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
-    axes[i].contour(xx, yy, sig, colors='Gray', levels=[0],
-                        linestyles='solid', linewidths=1)
-    cbar = plt.colorbar(im, ax=axes[i])
-    cbar.set_label("accuracy")
-# fig.savefig(figures_dir / "blocks_corr.pdf", transparent=True)
+# ### plot blocks x time gen correlation for all networks ###
+# fig, axes = plt.subplots(7, 1, figsize=(6, 12), sharex=True, layout='tight')
+# fig.suptitle("blocks x time gen correlation", fontsize=14)
+# for i, (network, name) in enumerate(zip(networks, names)):
+#     rhos = np.load(res_dir / network / "corr" / "rhos_blocks.npy")
+#     pval = np.load(res_dir / network / "corr" / "pval_blocks-pval.npy")
+#     sig = pval < threshold
+#     im = axes[i].imshow(
+#         rhos.mean(0),
+#         interpolation="lanczos",
+#         origin="lower",
+#         cmap=cmap,
+#         extent=times[[0, -1, 0, -1]],
+#         aspect=0.5,
+#         vmin=-.2,
+#         vmax=.2)
+#     if network == networks[-1]:
+#         axes[i].set_xlabel("Testing Time (s)")
+#     axes[i].set_ylabel("Training Time (s)")
+#     axes[i].set_title(f"{name}", style='italic')
+#     axes[i].axvline(0, color="k")
+#     axes[i].axhline(0, color="k")
+#     xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
+#     axes[i].contour(xx, yy, sig, colors='Gray', levels=[0],
+#                         linestyles='solid', linewidths=1)
+#     cbar = plt.colorbar(im, ax=axes[i])
+#     cbar.set_label("accuracy")
+# # fig.savefig(figures_dir / "blocks_corr.pdf", transparent=True)
 
 ### plot learn df x time gen correlation for all networks ###
 fig, axes = plt.subplots(7, 1, figsize=(6, 12), sharex=True, layout='tight')
@@ -216,7 +216,7 @@ for i, (network, name) in enumerate(zip(networks, names)):
         rhos.mean(0),
         interpolation="lanczos",
         origin="lower",
-        cmap=cmap,
+        cmap=cmap1,
         extent=times[[0, -1, 0, -1]],
         aspect=0.5,
         vmin=-.2,
@@ -234,7 +234,6 @@ for i, (network, name) in enumerate(zip(networks, names)):
     cbar.set_label("accuracy")
 fig.savefig(figures_dir / "learn_corr.pdf", transparent=True)
 
-# ensure_dir(figures_dir / "per_session")
 # ### plot session by session ###
 # for network, name in zip(networks, names):
 #     contrasts = patterns[network] - randoms[network]
@@ -262,67 +261,63 @@ fig.savefig(figures_dir / "learn_corr.pdf", transparent=True)
 #     fig.savefig(figures_dir / "per_session" / f"{network}.pdf", transparent=True)
 #     fig.close()
 
-### mean effect ###
-mean_net = []
+### Mean effect ###
 mean_diag = []
 mean_net_sess = []
 mean_diag_sess = []
-filter = np.where((times < 0) & (times > -0.5))[0]
-filt = np.where((times >= .2) & (times <= 0.7))[0]
-for net in networks:
-    sess1, sess2 = [], []
+filt = np.where((times >= 0.2) & (times <= 0.7))[0]
+mean_net = []
+filter_time = np.where((times >= -0.5) & (times < 0))[0]  # Correct filtering condition
+for i, net in enumerate(networks):
     contrast = all_patterns[net] - all_randoms[net]
-    mean_net.append(contrast[:, filter, filter].mean())
-    mean_diag.append(all_diags[net][:, filt].mean())
+    # Compute mean net effect
+    mean_net.append(contrast[:, filter_time][:, :, filter_time].mean())
+    # Mean diagonal for the specific time window with absolute values
+    mean_diag.append((all_diags[net][:, filt].mean()))
+    sess1, sess2 = [], []
     for sub in range(len(subjects)):
-        sess1.append(contrast[sub, filter, filter].mean())
+        # Mean for session 1 and 2 per subject
+        sess1.append(contrast[sub, filter_time][:, filter_time].mean())
         sess2.append(all_diags[net][sub, filt].mean())
     mean_net_sess.append(np.array(sess1))
     mean_diag_sess.append(np.array(sess2))
 mean_net_sess = np.array(mean_net_sess)
 mean_diag_sess = np.array(mean_diag_sess)
 
-from scipy.stats import ttest_1samp
-pvals = []
-tvals = []
-for i in range(mean_net_sess.shape[0]):
-    t, p = ttest_1samp(mean_net_sess[i], 0)
-    pvals.append(p)
-    tvals.append(t)
-pvals = np.array(pvals)
-sig = pvals < 0.05
+sem_net = np.std(mean_net_sess, axis=1) / np.sqrt(len(mean_net_sess[0]))  # SEM for mean_net
+sem_diag = np.std(mean_diag_sess, axis=1) / np.sqrt(len(mean_diag_sess[0]))  # SEM for mean_diag
 
-fig, ax = plt.subplots(1, 1, figsize=(7, 8), layout='tight')
-cmap = sns.color_palette("colorblind")
-plt.rcParams.update({'font.size': 12, 'font.family': 'serif', 'font.serif': 'Avenir'})
-ax.bar(range(len(networks)), mean_net, label=names, color=cmap)
-ax.set_xticks(range(len(networks)))
-ax.set_xticklabels(names, rotation=45, ha='right')
-# ax.set_xlabel('Networks')
-ax.set_ylabel('Mean effect')
-ax.axhline(0, color='black', linestyle='-', linewidth=1)
-# ax.legend(frameon=False)
-ax.set_title('Mean prediction effect per network and region', fontsize=16)
+### Plot mean effect ### 
+alpha = 0.05
+color_diag = '#0072B2'  # Blue
+color_net = '#E69F00'  # Orange
+# Perform statistical tests for mean_net (one-sample t-test against 0)
+mean_net_significance = [ttest_1samp(data, 0)[1] < alpha for data in mean_net_sess]
+fig, ax = plt.subplots(figsize=(10, 7))
+ax.grid(axis='y', linestyle='--', alpha=0.3)
+x = np.arange(len(networks))
+spacing = 0.35
+rects2 = ax.bar(x + spacing/2, mean_net, spacing, label='Prediction effect', color=color_net, edgecolor='black')
+rects1 = ax.bar(x - spacing/2, mean_diag, spacing, label='(Random - Pattern) contrast diagonal', color=color_diag, edgecolor='black')
+# ax.errorbar(x - spacing/2, mean_diag, yerr=sem_net, fmt='none', color='black', capsize=5)
+# ax.errorbar(x + spacing/2, mean_net, yerr=sem_diag, fmt='none', color='black', capsize=5)
+# Annotate significant mean_net bars with an asterisk
+for i, rect in enumerate(rects2):
+    if mean_net_significance[i]:
+        ax.annotate('*',
+                    xy=(rect.get_x() + rect.get_width() / 2, rect.get_height()),
+                    xytext=(0, 3),
+                    textcoords="offset points",
+                    ha='center', va='bottom',
+                    fontsize=20, color='black')
+ax.set_ylabel('Mean effect / diagonal')
+ax.set_title('Mean contrast and prediction effects by network', pad=20, fontsize=16)
+ax.set_xticks(x)
+ax.set_xticklabels(names, rotation=45, ha='right', fontsize=12)
+ax.axhline(0, color='grey', linewidth=2)
+ax.legend(frameon=False)
 ax.spines['top'].set_visible(False)
 ax.spines['right'].set_visible(False)
-for i, s in enumerate(sig):
-    if s:
-        ax.text(i, mean_net[i], '*', ha='center', va='bottom', fontsize=14, color='black')
-ax.text(3, 0.004, f'{analysis}', ha='left', va='top', fontsize=14, color='black')
-fig.savefig(figures_dir / f"{analysis}_mean_effect.pdf", transparent=True)
-
-# fig, ax = plt.subplots(1, 1, figsize=(7, 8), layout='tight')
-# cmap = sns.color_palette("colorblind")
-# plt.rcParams.update({'font.size': 12, 'font.family': 'serif', 'font.serif': 'Avenir'})
-# # ax.bar(range(len(networks)), mean_net, label=names, color=cmap)
-# ax.bar(range(len(networks)), mean_diag, label=names, color=cmap)
-# ax.set_xticks(range(len(networks)))
-# ax.set_xticklabels(names, rotation=45, ha='right')
-# # ax.set_xlabel('Networks')
-# ax.set_ylabel('Mean effect')
-# ax.axhline(0, color='black', linestyle='-', linewidth=1)
-# # ax.legend(frameon=False)
-# ax.set_title('Mean prediction effect per network and region', fontsize=16)
-# ax.spines['top'].set_visible(False)
-# ax.spines['right'].set_visible(False)
-
+fig.tight_layout()
+fig.savefig(figures_dir / f"mean_effect.pdf", transparent=True)
+plt.show()

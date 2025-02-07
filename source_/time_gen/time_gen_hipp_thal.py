@@ -16,7 +16,7 @@ import sys
 
 # stim disp = 500 ms
 # RSI = 750 ms in task
-data_path = TIMEG_DATA_DIR
+data_path = TIMEG_DATA_DIR / 'gen44'
 subjects, subjects_dir = SUBJS, FREESURFER_DIR
 folds = 10
 solver = 'lbfgs'
@@ -26,9 +26,10 @@ is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
 lock = 'stim'
 jobs = -1
-overwrite = True
+overwrite = False
 
-res_path = data_path / 'results' / 'source'
+analysis = "tg_rdm_emp"
+res_path = data_path / 'results' / 'source' / analysis
 ensure_dir(res_path)
 
 def process_subject(subject, lock, jobs):
@@ -49,24 +50,36 @@ def process_subject(subject, lock, jobs):
             res_dir = res_path / lock / region / trial_type
             ensure_dir(res_dir)
             
+            tmin = -1.7
+            tmax = -1.5
+    
             for epoch_num in [0, 1, 2, 3, 4]:
                 # read behav
                 behav = pd.read_pickle(op.join(data_path, 'behav', f'{subject}-{epoch_num}.pkl'))
                 # read epoch
                 epoch_fname = op.join(data_path, lock, f"{subject}-{epoch_num}-epo.fif")
                 epoch = mne.read_epochs(epoch_fname, verbose=verbose, preload=True)
+                
+                times = epoch.times
+                win = np.where((times >= -1.5) & (times <= 1.5))[0]
+                    
                 # compute data covariance matrix on evoked data
-                data_cov = mne.compute_covariance(epoch, tmin=epoch.times[0], tmax=epoch.times[-1], method="empirical", rank="info", verbose=verbose)
-                # read noise cov computed on resting state
-                noise_cov = mne.read_cov(data_path / 'noise_cov_emp' / f"{subject}-cov.fif", verbose=verbose)
+                # data_cov = mne.compute_covariance(epoch, tmin=epoch.times[0], tmax=epoch.times[-1], method="empirical", rank="info", verbose=verbose)
+                data_cov = mne.compute_covariance(epoch, tmin=-1.5, tmax=1.5, method="empirical", rank="info", verbose=verbose)
+                # read noise cov computed on (n-1) random trial
+                filter = behav.trialtypes == 1
+                noise_epoch = epoch[filter]
+                noise_cov = mne.compute_covariance(noise_epoch, tmin=tmin, tmax=tmax, method="empirical", rank="info", verbose=verbose)
+                # noise_cov = mne.read_cov(data_path / 'noise_cov_emp' / f"{subject}-cov.fif", verbose=verbose)
+                # noise_cov = mne.read_cov(data_path / 'noise_cov_shrunk' / f"{subject}-cov.fif", verbose=verbose)
                 # conpute rank
                 rank = mne.compute_rank(data_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)
                 # compute forward solution
-                fwd_fname = data_path / "fwd" / lock / f"{subject}-hipp-thal-{epoch_num}-fwd.fif"
+                fwd_fname = RESULTS_DIR / "fwd" / lock / f"{subject}-hipp-thal-{epoch_num}-fwd.fif"
                 fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
                 # compute source estimates
                 filters = make_lcmv(epoch.info, fwd, data_cov=data_cov, noise_cov=noise_cov, reg=.05,
-                                pick_ori=None, rank=rank, reduce_rank=True, verbose=verbose)
+                                pick_ori=None, rank=rank, reduce_rank=False, verbose=verbose)
                 stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
                 
                 # get data from volume source space
@@ -84,15 +97,15 @@ def process_subject(subject, lock, jobs):
                 if not os.path.exists(res_dir / f"{subject}-{epoch_num}-scores.npy") or overwrite:
                     if trial_type == 'pattern':    
                         pattern = behav.trialtypes == 1
-                        X = stcs_data[pattern]
+                        X = stcs_data[pattern][:, :, win]
                         y = behav.positions[pattern]
                     elif trial_type == 'random':
                         random = behav.trialtypes == 2
-                        X = stcs_data[random]
+                        X = stcs_data[random][:, :, win]
                         y = behav.positions[random]
                     else:
-                        X = stcs_data
-                        y = behav.positions
+                        X = stcs_data[:, :, win]
+                        y = behav.positions    
                     y = y.reset_index(drop=True)            
                     assert X.shape[0] == y.shape[0]        
                     scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=verbose)
@@ -125,14 +138,14 @@ def process_subject(subject, lock, jobs):
             if not os.path.exists(res_dir / f"{subject}-all-scores.npy") or overwrite:
                 if trial_type == 'pattern':    
                     pattern = behav_df.trialtypes == 1
-                    X = stcs_data[pattern]
+                    X = stcs_data[pattern][:, :, win]
                     y = behav_df.positions[pattern]
                 elif trial_type == 'random':
                     random = behav_df.trialtypes == 2
-                    X = stcs_data[random]
+                    X = stcs_data[random][:, :, win]
                     y = behav_df.positions[random]
                 else:
-                    X = stcs_data
+                    X = stcs_data[:, :, win]
                     y = behav_df.positions
                 y = y.reset_index(drop=True)            
                 assert X.shape[0] == y.shape[0]
