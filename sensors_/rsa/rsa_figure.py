@@ -83,8 +83,6 @@ chance = 25
 threshold = 0.05
 
 innerB = [['B1'], ['B2']]
-innerD = [['D1'], ['D2']]
-innerC = [['C1', 'C2']]
 outer = [['A', innerB],
          ['C', 'D']]
 
