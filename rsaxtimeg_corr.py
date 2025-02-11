@@ -77,21 +77,47 @@ slopes, intercepts = [], []
 plt.rcParams.update({'font.size': 10, 'font.family': 'serif', 'font.serif': 'Arial'})
 
 fig, ax = plt.subplots(1, 1, figsize=(10, 7))
+# Plot for individual subjects
 for sub, subject in enumerate(subjects):
     slope, intercept = np.polyfit(timeg[sub], rsa[sub], 1)
     ax.scatter(timeg[sub], rsa[sub], alpha=0.3)
     ax.plot(timeg[sub], slope * timeg[sub] + intercept, alpha=0.6, label=f"Subject {sub+1}")
     slopes.append(slope)
     intercepts.append(intercept)
-ax.plot(timeg[sub], np.mean(slopes) * timeg[sub] + np.mean(intercepts), color='black', lw=4, label='Mean fit')
+# Plot the mean fit line over the full range of timeg
+timeg_range = np.linspace(timeg.min(), timeg.max(), 100)
+mean_slope = np.mean(slopes)
+mean_intercept = np.mean(intercepts)
+ax.plot(timeg_range, mean_slope * timeg_range + mean_intercept, color='black', lw=4, label='Mean fit')
 ax.set_xlabel('Time generalization', fontsize=12)
 ax.set_ylabel('Similarity index', fontsize=12)
-ax.legend(frameon=False, ncol=2)
+ax.legend(frameon=False, ncol=1)
 ax.spines['top'].set_visible(False)
 ax.spines['right'].set_visible(False)
-# fig.tight_layout()
 fig.suptitle('Correlation between RSA and time generalization - sensor space', fontsize=14)
 fig.savefig(figures_dir / "RSA" / f"timeg_corr-{lock}-sensor.pdf", transparent=True)
+plt.close()
+
+learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices.csv', sep="\t", index_col=0)
+fig, ax = plt.subplots(1, 1, figsize=(10, 7))
+# Plot for individual subjects
+for sub, subject in enumerate(subjects):
+    slope, intercept = np.polyfit(timeg[sub], learn_index_df.iloc[sub], 1)
+    ax.scatter(timeg[sub], learn_index_df.iloc[sub], alpha=0.3)
+    ax.plot(timeg[sub], slope * timeg[sub] + intercept, alpha=0.6, label=f"Subject {sub+1}")
+    slopes.append(slope)
+    intercepts.append(intercept)
+# Plot the mean fit line over the full range of timeg
+timeg_range = np.linspace(timeg.min(), timeg.max(), 100)
+mean_slope = np.mean(slopes)
+mean_intercept = np.mean(intercepts)
+ax.plot(timeg_range, mean_slope * timeg_range + mean_intercept, color='black', lw=4, label='Mean fit')
+ax.set_xlabel('Time generalization', fontsize=12)
+ax.set_ylabel('Learning index', fontsize=12)
+ax.legend(frameon=False, ncol=1)
+ax.spines['top'].set_visible(False)
+ax.spines['right'].set_visible(False)
+fig.suptitle('Correlation between RSA and time generalization - sensor space', fontsize=14)
 
 ### Source space ###
 
@@ -101,8 +127,7 @@ res_dir = TIMEG_DATA_DIR / analysis / lock
 networks = schaefer_7[:-2] + ['Hippocampus', 'Thalamus']
 
 src_pat, src_rand = {}, {}
-for network in networks:
-    print(f"Processing {network}...")
+for network in tqdm(networks):
     if not network in src_pat:
         src_pat[network], src_rand[network] = [], []
     patpat, randrand = [], []
@@ -116,7 +141,7 @@ for network in networks:
     src_pat[network] = np.array(patpat)
     src_rand[network] = np.array(randrand)
 
-rsa = diff_sess.copy()[:, :, idx_rsa].mean(2)
+# rsa = diff_sess.copy()[:, :, idx_rsa].mean(2)
 
 fig, axes = plt.subplots(1, 7, sharey=True, figsize=(20, 5), layout='tight')
 for i, network in enumerate(networks):
@@ -136,13 +161,15 @@ for i, network in enumerate(networks):
         axes[i].plot(timeg[sub], slope * timeg[sub] + intercept, alpha=0.6, label=f"Subject {sub+1}")
         slopes.append(slope)
         intercepts.append(intercept)
-    
-    axes[i].plot(timeg[sub], np.mean(slopes) * timeg[sub] + np.mean(intercepts), color='black', lw=4, label='Mean fit')
+
+    timeg_range = np.linspace(timeg.min(), timeg.max(), 100)
+
+    axes[i].plot(timeg_range, np.mean(slopes) * timeg_range + np.mean(intercepts), color='black', lw=4, label='Mean fit')
     axes[i].set_xlabel('Time generalization', fontsize=12)
     # axes[i].legend(frameon=False, ncol=2)
     axes[i].spines['top'].set_visible(False)
     axes[i].spines['right'].set_visible(False)
-    axes[i].set_title(network)
+    axes[i].set_title(network_names[i])
     if i == 0:
         axes[i].set_ylabel('Similarity index', fontsize=12)
 fig.savefig(figures_dir / "RSA" / f"timeg_corr-{lock}-source.pdf", transparent=True)
@@ -150,8 +177,7 @@ plt.close()
 
 all_highs, all_lows = {}, {}
 diff_sess = {}
-for network in networks:
-    print(f"Processing {network}...")
+for network in tqdm(networks):
     if not network in diff_sess:
         all_highs[network] = []
         all_lows[network] = []
@@ -192,14 +218,49 @@ for i, network in enumerate(networks):
         axes[i].plot(timeg[sub], slope * timeg[sub] + intercept, alpha=0.6, label=f"Subject {sub+1}")
         slopes.append(slope)
         intercepts.append(intercept)
+    timeg_range = np.linspace(timeg.min(), timeg.max(), 100)
     
-    axes[i].plot(timeg[sub], np.mean(slopes) * timeg[sub] + np.mean(intercepts), color='black', lw=4, label='Mean fit')
+    axes[i].plot(timeg_range, np.mean(slopes) * timeg_range + np.mean(intercepts), color='black', lw=4, label='Mean fit')
     axes[i].set_xlabel('Time generalization', fontsize=12)
     # axes[i].legend(frameon=False, ncol=2)
     axes[i].spines['top'].set_visible(False)
     axes[i].spines['right'].set_visible(False)
-    axes[i].set_title(network)
+    axes[i].set_title(network_names[i])
     if i == 0:
         axes[i].set_ylabel('Similarity index', fontsize=12)
 fig.savefig(figures_dir / "RSA" / f"timeg_corr-{lock}-source_2.pdf", transparent=True)
+plt.close()
+
+learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices.csv', sep="\t", index_col=0)
+
+fig, axes = plt.subplots(1, 7, sharey=True, figsize=(20, 5), layout='tight')
+for i, network in enumerate(networks):
+    contrasts = src_pat[network] - src_rand[network]
+    timeg = []
+    for sub in range(len(subjects)):
+        tg = []
+        for j in range(5):
+            tg.append(contrasts[sub, j, idx_timeg][:, idx_timeg].mean())
+        timeg.append(np.array(tg))
+    timeg = np.array(timeg)
+    
+    slopes, intercepts = [], []
+    for sub, subject in enumerate(subjects):
+        slope, intercept = np.polyfit(timeg[sub], learn_index_df.iloc[sub], 1)
+        axes[i].scatter(timeg[sub], learn_index_df.iloc[sub], alpha=0.3)
+        axes[i].plot(timeg[sub], slope * timeg[sub] + intercept, alpha=0.6, label=f"Subject {sub+1}")
+        slopes.append(slope)
+        intercepts.append(intercept)
+
+    timeg_range = np.linspace(timeg.min(), timeg.max(), 100)
+
+    axes[i].plot(timeg_range, np.mean(slopes) * timeg_range + np.mean(intercepts), color='black', lw=4, label='Mean fit')
+    axes[i].set_xlabel('Time generalization', fontsize=12)
+    # axes[i].legend(frameon=False, ncol=2)
+    axes[i].spines['top'].set_visible(False)
+    axes[i].spines['right'].set_visible(False)
+    axes[i].set_title(network_names[i])
+    if i == 0:
+        axes[i].set_ylabel('Learning index', fontsize=12)
+fig.savefig(figures_dir / "RSA" / f"timeg_corr-{lock}-source_learning.pdf", transparent=True)
 plt.close()
