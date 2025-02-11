@@ -103,7 +103,7 @@ fig, axd = plt.subplot_mosaic(outer,
                                   'height_ratios': [1, .7],
                                 #   'width_ratios': [.3, .3, 1  , .5, .5]
                                   })
-plt.rcParams.update({'font.size': 10, 'font.family': 'serif', 'font.serif': 'Avenir'})
+plt.rcParams.update({'font.size': 10, 'font.family': 'serif', 'font.serif': 'Arial'})
 for ax in axd.values():
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
@@ -300,7 +300,7 @@ for sub, subject in enumerate(subjects):
         learn_index_df.iloc[sub], 
         slope * learn_index_df.iloc[sub] + intercept, 
         alpha=0.6, 
-        label=f'Subject {sub+1} fit', 
+        label=f'Subject {sub+1}', 
         color=cmap(sub))
     # Scatter points for raw data
     axd['C'].scatter(

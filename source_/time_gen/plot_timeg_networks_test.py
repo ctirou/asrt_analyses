@@ -214,7 +214,7 @@ design = [[[['a1'], ['a2']], 'b', 'c'],
           [[['t1'], ['t2']], 'u', 'v'],
           [[['x1'], ['x2']], 'y', 'z']]
 
-fig, axes = plt.subplot_mosaic(design, figsize=(12, 12), sharey=False, sharex=True, layout='tight')
+fig, axes = plt.subplot_mosaic(design, figsize=(8, 13), sharey=False, sharex=True, layout='tight')
 plt.rcParams.update({'font.size': 10, 'font.family': 'serif', 'font.serif': 'Arial'})
 ### Pattern ###
 for network, name, i in zip(networks, names, ['a1', 'd1', 'h1', 'l1', 'p1', 't1', 'x1']):
@@ -230,16 +230,14 @@ for network, name, i in zip(networks, names, ['a1', 'd1', 'h1', 'l1', 'p1', 't1'
     # axes[i].set_ylabel("Training Time (s)")
     axes[i].axvline(0, color="k", alpha=.5)
     axes[i].axhline(0, color="k", alpha=.5)
-    if network == networks[-1]:
-        axes[i].set_xlabel("Testing Time (s)")
     xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
     pval = np.load(res_dir / network / "pval" / "all_pattern-pval.npy")
     sig = pval < threshold
     axes[i].contour(xx, yy, sig, colors='Gray', levels=[0],
                         linestyles='solid', linewidths=1)
-    if i == 'a1':
-        cbar = plt.colorbar(im, ax=axes[i], location='top', orientation='horizontal')
-        cbar.set_label("Accuracy")
+    # if i == 'a1':
+    #     cbar = plt.colorbar(im, ax=axes[i], location='top', orientation='horizontal', ticks=[0.2, 0.25, 0.3])
+    #     cbar.set_label("Accuracy")
 ### Random ###
 for network, name, i in zip(networks, names, ['a2', 'd2', 'h2', 'l2', 'p2', 't2', 'x2']):
     im = axes[i].imshow(
@@ -284,7 +282,7 @@ for network, name, i in zip(networks, names, ['b', 'e', 'i', 'm', 'q', 'u', 'y']
                         linestyles='solid', linewidths=1)
     if i == 'b':
         # cbar = plt.colorbar(im, ax=axes[i], location='top', orientation='horizontal', ticks=[0, 0.5])
-        cbar = plt.colorbar(im, ax=axes[i], location='top', orientation='horizontal')
+        cbar = plt.colorbar(im, ax=axes[i], location='top', orientation='horizontal', ticks=[-0.01, 0, 0.01])
         cbar.set_label("Difference in accuracy")
 ### Learn index corr ###
 for network, name, i in zip(networks, names, ['c', 'f', 'j', 'n', 'r', 'v', 'z']):
@@ -298,8 +296,8 @@ for network, name, i in zip(networks, names, ['c', 'f', 'j', 'n', 'r', 'v', 'z']
         cmap=cmap,
         extent=times[[0, -1, 0, -1]],
         aspect=0.5,
-        vmin=-.2,
-        vmax=.2)
+        vmin=-.05,
+        vmax=.05)
     if network == networks[-1]:
         axes[i].set_xlabel("Testing Time (s)")
     # axes[i].set_ylabel("Training Time (s)")
@@ -309,35 +307,38 @@ for network, name, i in zip(networks, names, ['c', 'f', 'j', 'n', 'r', 'v', 'z']
     axes[i].contour(xx, yy, sig, colors='Gray', levels=[0],
                         linestyles='solid', linewidths=1)
     if i == 'c':
-        cbar = plt.colorbar(im, ax=axes[i], location='top', orientation='horizontal')
-        cbar.set_label("Spearmann's rho")
+        cbar = plt.colorbar(im, ax=axes[i], location='top', orientation='horizontal', ticks=[-0.05, 0, 0.05])
+        cbar.set_label("Spearman's rho")
+fig.savefig(figures_dir / "timeg.pdf", transparent=True)
+plt.close()
 
-# ### plot session by session ###
-# for network, name in zip(networks, names):
-#     contrasts = patterns[network] - randoms[network]
-#     fig, axes = plt.subplots(1, 5, sharey=True, figsize=(25, 3), layout='tight')
-#     fig.suptitle(f"{name}", fontsize=14)
-#     for i in range(5):
-#         im = axes[i].imshow(
-#             contrasts[:, i].mean(0),
-#             interpolation="lanczos",
-#             origin="lower",
-#             cmap="RdBu_r",
-#             extent=times[[0, -1, 0, -1]],
-#             aspect=0.5,
-#             vmin=-0.01,
-#             vmax=0.01)
-#         axes[i].set_xlabel("Testing Time (s)")
-#         axes[i].set_title(f"Session {i}", fontsize=10)
-#         axes[i].axvline(0, color="k", alpha=.5)
-#         axes[i].axhline(0, color="k", alpha=.5)
-#         if i == 0:
-#             axes[i].set_ylabel("Training Time (s)")
-#         # if i == 4:
-#         #     cbar = plt.colorbar(im, ax=axes[i])
-#         #     cbar.set_label("accuracy")
-#     fig.savefig(figures_dir / "per_session" / f"{network}.pdf", transparent=True)
-#     fig.close()
+### plot session by session ###
+for network, name in zip(networks, names):
+    contrasts = patterns[network] - randoms[network]
+    fig, axes = plt.subplots(1, 5, sharey=True, figsize=(25, 3), layout='tight')
+    fig.suptitle(f"{name}", fontsize=14)
+    for i in range(5):
+        im = axes[i].imshow(
+            # randoms[network][:, i].mean(0),
+            contrasts[:, i].mean(0),
+            interpolation="lanczos",
+            origin="lower",
+            cmap="RdBu_r",
+            extent=times[[0, -1, 0, -1]],
+            aspect=0.5,
+            vmin=-0.05,
+            vmax=0.05)
+        axes[i].set_xlabel("Testing Time (s)")
+        axes[i].set_title(f"Session {i}", fontsize=10)
+        axes[i].axvline(0, color="k", alpha=.5)
+        axes[i].axhline(0, color="k", alpha=.5)
+        if i == 0:
+            axes[i].set_ylabel("Training Time (s)")
+        if i == 4:
+            cbar = plt.colorbar(im, ax=axes[i])
+            cbar.set_label("accuracy")
+    fig.savefig(figures_dir / "per_session" / f"{network}.pdf", transparent=True)
+    fig.close()
 
 ### Mean effect ###
 mean_diag = []
@@ -387,7 +388,6 @@ for i, rect in enumerate(rects2):
                     ha='center', va='bottom',
                     fontsize=20, color='black')
 ax.set_ylabel('Mean effect / diagonal')
-ax.set_title('Mean contrast and prediction effects by network', pad=20, fontsize=16)
 ax.set_xticks(x)
 ax.set_xticklabels(names, rotation=45, ha='right', fontsize=12)
 ax.axhline(0, color='grey', linewidth=2)
@@ -395,5 +395,6 @@ ax.legend(frameon=False)
 ax.spines['top'].set_visible(False)
 ax.spines['right'].set_visible(False)
 fig.tight_layout()
+fig.suptitle('Mean contrast and prediction effects by network', pad=20, fontsize=16)
 fig.savefig(figures_dir / f"mean_effect.pdf", transparent=True)
 plt.show()

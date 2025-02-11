@@ -253,3 +253,5 @@ cud_colors = [
     '#0072B2', '#E69F00', '#009E73', '#D55E00', 
     '#CC79A7', '#F0E442', '#56B4E9', '#D45F91'
 ]
+
+network_names = [' Visual', 'Somatomotor', 'Dorsal Attention', 'Salience / Ventral Attention', 'Limbic', 'Hippocampus', 'Thalamus']
