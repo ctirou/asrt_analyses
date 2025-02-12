@@ -117,7 +117,7 @@ ax.set_ylabel('Learning index', fontsize=12)
 ax.legend(frameon=False, ncol=1)
 ax.spines['top'].set_visible(False)
 ax.spines['right'].set_visible(False)
-fig.suptitle('Correlation between RSA and time generalization - sensor space', fontsize=14)
+fig.suptitle('Correlation between RSA and learning index - sensor space', fontsize=14)
 
 ### Source space ###
 
