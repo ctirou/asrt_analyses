@@ -110,8 +110,9 @@ cmap4 = "cividis"
 
 idx = np.where(times <= 3)[0]
 
-fig, axs = plt.subplots(2, 1, sharex=True, layout='constrained', figsize=(7, 6))
 plt.rcParams.update({'font.size': 12, 'font.family': 'serif', 'font.serif': 'Arial'})
+
+fig, axs = plt.subplots(2, 1, sharex=True, layout='constrained', figsize=(7, 6))
 norm = colors.Normalize(vmin=0.15, vmax=0.35)
 images = []
 for ax, data, title in zip(axs.flat, [all_patterns, all_randoms], ["Pattern", "Random"]):
@@ -123,8 +124,8 @@ for ax, data, title in zip(axs.flat, [all_patterns, all_randoms], ["Pattern", "R
                             extent=times[idx][[0, -1, 0, -1]],
                             aspect=0.5))
     ax.set_ylabel("Training time (s)", fontsize=13)
-    ax.set_xticks(np.arange(-1, 3, 1))
-    ax.set_yticks(np.arange(-1, 3, 1))
+    ax.set_xticks(np.arange(-1, 3, .5))
+    ax.set_yticks(np.arange(-1, 3, .5))
     ax.set_title(title, fontsize=16)
     ax.axvline(0, color="k")
     ax.axhline(0, color="k")
@@ -141,64 +142,53 @@ fig.savefig(figure_dir / "pattern_random.pdf", transparent=True)
 plt.close()
 
 ### plot contrast ###
-fig, axd = plt.subplots(1, 1, figsize=(13, 6), sharex=True, layout='constrained')
-plt.rcParams.update({'font.size': 12, 'font.family': 'serif', 'font.serif': 'Arial'})
 contrasts = all_patterns - all_randoms
-im = axd.imshow(
-    contrasts[:, idx][:, :, idx].mean(0),
-    interpolation="lanczos",
-    origin="lower",
-    cmap=cmap1,
-    extent=times[idx][[0, -1, 0, -1]],
-    aspect=0.5,
-    vmin=-0.1,
-    vmax=0.1)
-axd.set_xlabel("Testing time (s)", fontsize=12)
-axd.set_ylabel("Training time (s)", fontsize=12)
-axd.set_title("Contrast = pattern - random", fontsize=16)
-axd.set_xticks(np.arange(-1, 3, 0.5))
-axd.set_yticks(np.arange(-1, 3, 0.5))
-axd.axhline(0, color="k") 
-axd.axvline(0, color="k")
-xx, yy = np.meshgrid(times[idx], times[idx], copy=False, indexing='xy')
-pval = np.load(res_dir / "pval" / "all_contrast-pval.npy")
-sig = pval < threshold
-axd.contour(xx, yy, sig[idx][:, idx], colors='black', levels=[0],
-                    linestyles='--', linewidths=1, alpha=.5)
-cbar = plt.colorbar(im, ax=axd, orientation='vertical', fraction=.1, ticks=[-0.1, 0.1])
-cbar.set_label("Difference in accuracy", fontstyle='italic', fontsize=13, rotation=270)
-fig.savefig(figure_dir / "contrast.pdf", transparent=True)
+pval_cont = np.load(res_dir / "pval" / "all_contrast-pval.npy")
+rhos = np.load(res_dir / "corr" / "rhos_learn.npy")
+pval_rhos = np.load(res_dir / "corr" / "pval_learn-pval.npy")
+# plt.rcParams.update({'font.size': 12, 'font.family': 'serif', 'font.serif': 'Arial'})
+
+# diag = np.array([np.diag(coco) for coco in rhos])
+# plt.plot(times, diag.mean(0))
+# plt.axhline(0)
+# pval = decod_stats(diag, -1)
+# sig = pval < threshold
+# plt.fill_between(times, diag.mean(0), 0, where=sig, alpha=0.5)
+
+fig, axs = plt.subplots(2, 1, figsize=(7, 6), sharex=True, layout='constrained')
+# norm = colors.Normalize(vmin=-0.1, vmax=0.1)
+images = []
+for ax, data, title, pval, vmin, vmax in zip(axs.flat, [contrasts, rhos], ["Contrast", "Correlation between contrast and learning"], [pval_cont, pval_rhos], [-0.1, -0.5], [0.1, 0.5]):
+    im = ax.imshow(data[:, idx][:, :, idx].mean(0), 
+                            # norm=norm,
+                            vmin=vmin,
+                            vmax=vmax,
+                            interpolation="lanczos",
+                            origin="lower",
+                            cmap=cmap1,
+                            extent=times[idx][[0, -1, 0, -1]],
+                            aspect=0.5)
+    ax.set_ylabel("Training time (s)", fontsize=13)
+    ax.set_xticks(np.arange(-1, 3, .5))
+    ax.set_yticks(np.arange(-1, 3, .5))
+    ax.set_title(title, fontsize=16)
+    ax.axvline(0, color="k")
+    ax.axhline(0, color="k")
+    xx, yy = np.meshgrid(times[idx], times[idx], copy=False, indexing='xy')
+    sig = pval < threshold
+    ax.contour(xx, yy, sig[idx][:, idx], colors='black', levels=[0],
+                        linestyles='--', linewidths=1, alpha=.5)
+    if ax == axs.flat[-1]:
+        ax.set_xlabel("Testing time (s)", fontsize=13)
+        label = "Spearman's\nrho"
+    else:
+        label = "Difference in\naccuracy"
+
+    cbar = fig.colorbar(im, ax=ax, orientation='vertical', fraction=.1, ticks=[vmin, vmax])
+    cbar.set_label(label, fontstyle='italic', rotation=270, fontsize=13)
+fig.savefig(figure_dir / "contrast_corr.pdf", transparent=True)
 plt.close()
 
-# plot learn df x time gen correlation
-fig, axd = plt.subplots(1, 1, figsize=(13, 6), sharex=True, layout='constrained')
-rhos = np.load(res_dir / "corr" / "rhos_learn.npy")
-pval = np.load(res_dir / "corr" / "pval_learn-pval.npy")
-sig = pval < threshold
-im = axd.imshow(
-    rhos[:, idx][:, :, idx].mean(0),
-    interpolation="lanczos",
-    origin="lower",
-    cmap=cmap4,
-    extent=times[idx][[0, -1, 0, -1]],
-    aspect=0.5,
-    vmin=-0.5,
-    vmax=0.5)
-axd.set_xlabel("Testing time (s)", fontsize=12)
-axd.set_ylabel("Training time (s)", fontsize=12)
-axd.set_title("Learning index and time generalization correlation", fontsize=16)
-axd.set_xticks(np.arange(-1, 3, 0.5))
-axd.set_yticks(np.arange(-1, 3, 0.5))
-axd.axhline(0, color="k") 
-axd.axvline(0, color="k")
-xx, yy = np.meshgrid(times[idx], times[idx], copy=False, indexing='xy')
-sig = pval < threshold
-axd.contour(xx, yy, sig[idx][:, idx], colors='black', levels=[0],
-                    linestyles='--', linewidths=1, alpha=.5)
-cbar = plt.colorbar(im, ax=axd, orientation='vertical', fraction=.1, ticks=[-0.5, 0.5])
-cbar.set_label("Spearman's rho", fontstyle='italic', fontsize=13, rotation=270)
-fig.savefig(figure_dir / "corr.pdf", transparent=True)
-plt.close()
 
 ### plot learning index x timeg correlation ###
 idx_timeg = np.where((times >= -0.5) & (times < 0))[0]
@@ -212,7 +202,7 @@ for sub in range(len(subjects)):
 timeg = np.array(timeg)
 slopes, intercepts = [], []
 
-fig, ax = plt.subplots(1, 1, figsize=(10, 6))
+fig, ax = plt.subplots(1, 1, figsize=(7, 6))
 # Plot for individual subjects
 for sub, subject in enumerate(subjects):
     slope, intercept = np.polyfit(timeg[sub], learn_index_df.iloc[sub], 1)
@@ -225,8 +215,9 @@ timeg_range = np.linspace(timeg.min(), timeg.max(), 100)
 mean_slope = np.mean(slopes)
 mean_intercept = np.mean(intercepts)
 ax.plot(timeg_range, mean_slope * timeg_range + mean_intercept, color='black', lw=4, label='Mean fit')
-ax.set_xlabel('Average pre-stimulus time generalization', fontsize=12)
-ax.set_ylabel('Learning index', fontsize=12)
+fig.suptitle('Correlation between mean predictive activity and learning', fontsize=16, y=0.95)
+ax.set_xlabel('Average pre-stimulus time generalization', fontsize=13)
+ax.set_ylabel('Learning index', fontsize=13)
 # ax.legend(frameon=False, ncol=2)
 ax.spines['top'].set_visible(False)
 ax.spines['right'].set_visible(False)
@@ -235,13 +226,14 @@ learn_index_flat = learn_index_df.to_numpy().flatten()
 r, pval = spear(timeg_flat, learn_index_flat)
 # Add text with r and pval to the plot
 textstr = f'Spearman $r$ = {r:.2f}\n$p$ = {pval:.2e}'
-props = dict(boxstyle='round', facecolor='white', alpha=0.5)
-ax.text(0.95, 0.05, textstr, transform=ax.transAxes, fontsize=12,
-    verticalalignment='bottom', horizontalalignment='right', bbox=props)
-fig.suptitle('Correlation between mean predictive activity and learning', fontsize=14)
+props = dict(boxstyle='round', facecolor='#7294D4', alpha=0.5)
+ax.text(0.05, 0.95, textstr, transform=ax.transAxes, fontsize=13,
+    verticalalignment='top', horizontalalignment='left', bbox=props)
 # Adjust the legend to be outside the plot
 box = ax.get_position()
 ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
 ax.legend(loc='center left', frameon=False, bbox_to_anchor=(1, 0.5), ncol=1)
+# fig.suptitle('Correlation between mean predictive activity and learning', fontsize=14)
+
 fig.savefig(figure_dir / "learning_index_timeg_corr.pdf", transparent=True)
 plt.close()
