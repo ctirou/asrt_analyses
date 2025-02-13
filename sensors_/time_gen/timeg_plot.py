@@ -1,5 +1,5 @@
 import os
-from base import ensure_dir, gat_stats, decod_stats
+from base import *
 from config import *
 import os.path as op
 import matplotlib.pyplot as plt
@@ -137,7 +137,7 @@ for ax, data, title in zip(axs.flat, [all_patterns, all_randoms], ["Pattern", "R
     if title == "Random":
         ax.set_xlabel("Testing time (s)", fontsize=13)
 cbar = fig.colorbar(images[0], ax=axs, orientation='vertical', fraction=.1, ticks=[0.15, 0.35])
-cbar.set_label("$Accuracy$", rotation=270, fontsize=13)
+cbar.set_label("Accuracy", rotation=270, fontsize=13)
 fig.savefig(figure_dir / "pattern_random.pdf", transparent=True)
 plt.close()
 
@@ -185,10 +185,9 @@ for ax, data, title, pval, vmin, vmax in zip(axs.flat, [contrasts, rhos], ["Cont
         label = "Difference in\naccuracy"
 
     cbar = fig.colorbar(im, ax=ax, orientation='vertical', fraction=.1, ticks=[vmin, vmax])
-    cbar.set_label(label, fontstyle='italic', rotation=270, fontsize=13)
+    cbar.set_label(label, rotation=270, fontsize=13)
 fig.savefig(figure_dir / "contrast_corr.pdf", transparent=True)
 plt.close()
-
 
 ### plot learning index x timeg correlation ###
 idx_timeg = np.where((times >= -0.5) & (times < 0))[0]
@@ -202,38 +201,83 @@ for sub in range(len(subjects)):
 timeg = np.array(timeg)
 slopes, intercepts = [], []
 
-fig, ax = plt.subplots(1, 1, figsize=(7, 6))
+# fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True, figsize=(7, 6), layout='constrained')
+fig, ax1 = plt.subplots(1, 1, figsize=(7, 6), layout='constrained')
 # Plot for individual subjects
 for sub, subject in enumerate(subjects):
     slope, intercept = np.polyfit(timeg[sub], learn_index_df.iloc[sub], 1)
-    ax.scatter(timeg[sub], learn_index_df.iloc[sub], alpha=0.3, label=f"Subject {sub+1}")
-    ax.plot(timeg[sub], slope * timeg[sub] + intercept, alpha=0.6)
+    ax1.scatter(timeg[sub], learn_index_df.iloc[sub], alpha=0.3)
+    ax1.plot(timeg[sub], slope * timeg[sub] + intercept, alpha=0.6)
     slopes.append(slope)
     intercepts.append(intercept)
 # Plot the mean fit line over the full range of timeg
 timeg_range = np.linspace(timeg.min(), timeg.max(), 100)
 mean_slope = np.mean(slopes)
 mean_intercept = np.mean(intercepts)
-ax.plot(timeg_range, mean_slope * timeg_range + mean_intercept, color='black', lw=4, label='Mean fit')
-fig.suptitle('Correlation between mean predictive activity and learning', fontsize=16, y=0.95)
-ax.set_xlabel('Average pre-stimulus time generalization', fontsize=13)
-ax.set_ylabel('Learning index', fontsize=13)
-# ax.legend(frameon=False, ncol=2)
-ax.spines['top'].set_visible(False)
-ax.spines['right'].set_visible(False)
+ax1.plot(timeg_range, mean_slope * timeg_range + mean_intercept, color='black', lw=4, label='Mean fit\nacross participants')
+ax1.set_title('Correlation between mean predictive activity\nand learning', fontsize=16)
+# fig.suptitle('Correlation between mean predictive activity\nand learning', fontsize=16, y=0.95)
+ax1.set_xlabel('Average pre-stimulus time generalization', fontsize=13)
+ax1.set_ylabel('Learning index', fontsize=13)
+ax1.spines['top'].set_visible(False)
+ax1.spines['right'].set_visible(False)
 timeg_flat = timeg.flatten()
 learn_index_flat = learn_index_df.to_numpy().flatten()
 r, pval = spear(timeg_flat, learn_index_flat)
-# Add text with r and pval to the plot
 textstr = f'Spearman $r$ = {r:.2f}\n$p$ = {pval:.2e}'
-props = dict(boxstyle='round', facecolor='#7294D4', alpha=0.5)
-ax.text(0.05, 0.95, textstr, transform=ax.transAxes, fontsize=13,
-    verticalalignment='top', horizontalalignment='left', bbox=props)
 # Adjust the legend to be outside the plot
-box = ax.get_position()
-ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-ax.legend(loc='center left', frameon=False, bbox_to_anchor=(1, 0.5), ncol=1)
-# fig.suptitle('Correlation between mean predictive activity and learning', fontsize=14)
+ax1.legend(frameon=False, title=textstr, loc="lower right")
+fig.savefig(figure_dir / "learn_corr.pdf", transparent=True)
+plt.close()
 
-fig.savefig(figure_dir / "learning_index_timeg_corr.pdf", transparent=True)
+all_highs, all_lows = [], []
+for subject in tqdm(subjects):
+    res_path = RESULTS_DIR / 'RSA' / 'sensors' / lock / "cv_rdm" / subject
+    ensure_dir(res_path)
+    # RSA stuff
+    behav_dir = op.join(RAW_DATA_DIR, "%s/behav_data/" % (subject)) 
+    sequence = get_sequence(behav_dir)
+    high, low = get_all_high_low(res_path, sequence, "pat_high_rdm_high", cv=True)    
+    all_highs.append(high)    
+    all_lows.append(low)
+all_highs = np.array(all_highs)
+all_lows = np.array(all_lows)
+diff_sess = list()   
+for i in range(5):
+    rev_low = all_lows[:, :, i, :].mean(1) - all_lows[:, :, 0, :].mean(axis=1)
+    rev_high = all_highs[:, :, i, :].mean(1) - all_highs[:, :, 0, :].mean(axis=1)
+    diff_sess.append(rev_low - rev_high)
+diff_sess = np.array(diff_sess).swapaxes(0, 1)
+# correlation between rsa and time generalization
+times_rsa = np.linspace(-0.2, 0.6, 82)
+idx_rsa = np.where((times_rsa >= .3) & (times_rsa <= .5))[0]
+idx_timeg = np.where((times >= -0.5) & (times < 0))[0]
+rsa = diff_sess.copy()[:, :, idx_rsa].mean(2)
+slopes, intercepts = [], []
+
+fig, ax2 = plt.subplots(1, 1, figsize=(7, 6), layout='constrained')
+# Plot for individual subjects
+for sub, subject in enumerate(subjects):
+    slope, intercept = np.polyfit(timeg[sub], rsa[sub], 1)
+    ax2.scatter(timeg[sub], rsa[sub], alpha=0.3)
+    ax2.plot(timeg[sub], slope * timeg[sub] + intercept, alpha=0.6)
+    slopes.append(slope)
+    intercepts.append(intercept)
+# Plot the mean fit line over the full range of timeg
+timeg_range = np.linspace(timeg.min(), timeg.max(), 100)
+mean_slope = np.mean(slopes)
+mean_intercept = np.mean(intercepts)
+ax2.plot(timeg_range, mean_slope * timeg_range + mean_intercept, color='black', lw=4, label='Mean fit\nacross participants')
+ax2.set_xlabel('Average pre-stimulus time generalization', fontsize=13)
+ax2.set_ylabel('Similarity index', fontsize=13)
+ax2.spines['top'].set_visible(False)
+ax2.spines['right'].set_visible(False)
+r, pval = spear(timeg.flatten(), rsa.flatten())
+leg_title = f'Spearman $r$ = {r:.2f}\n$p$ = {pval:.2e}'
+ax2.legend(frameon=False, title=leg_title, loc="lower right")
+# ax2.set_title("Correlation between mean predictive activity and mean representational similarity", fontsize=16)
+# fig.suptitle("Correlation between mean predictive activity\nand mean representational similarity", y=0.95, fontsize=16)
+ax2.set_title("Correlation between mean predictive activity\nand mean representational similarity", fontsize=16)
+fig.savefig(figure_dir / "rsa_corr.pdf", transparent=True)
+# fig.savefig(figure_dir / "combined_corr.pdf", transparent=True)
 plt.close()
