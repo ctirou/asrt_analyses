@@ -113,7 +113,7 @@ idx = np.where(times <= 3)[0]
 plt.rcParams.update({'font.size': 12, 'font.family': 'serif', 'font.serif': 'Arial'})
 
 fig, axs = plt.subplots(2, 1, sharex=True, layout='constrained', figsize=(7, 6))
-norm = colors.Normalize(vmin=0.15, vmax=0.35)
+norm = colors.Normalize(vmin=0.18, vmax=0.32)
 images = []
 for ax, data, title in zip(axs.flat, [all_patterns, all_randoms], ["Pattern", "Random"]):
     images.append(ax.imshow(data[:, idx][:, :, idx].mean(0), 
@@ -136,8 +136,9 @@ for ax, data, title in zip(axs.flat, [all_patterns, all_randoms], ["Pattern", "R
                         linestyles='--', linewidths=1, alpha=.5)
     if title == "Random":
         ax.set_xlabel("Testing time (s)", fontsize=13)
-cbar = fig.colorbar(images[0], ax=axs, orientation='vertical', fraction=.1, ticks=[0.15, 0.35])
-cbar.set_label("Accuracy", rotation=270, fontsize=13)
+cbar = fig.colorbar(images[0], ax=axs, orientation='vertical', fraction=.1, ticks=[0.18, 0.32])
+cbar.set_label("\nAccuracy", rotation=270, fontsize=13)
+
 fig.savefig(figure_dir / "pattern_random.pdf", transparent=True)
 plt.close()
 
@@ -281,3 +282,17 @@ ax2.set_title("Correlation between mean predictive activity\nand mean representa
 fig.savefig(figure_dir / "rsa_corr.pdf", transparent=True)
 # fig.savefig(figure_dir / "combined_corr.pdf", transparent=True)
 plt.close()
+
+all_rhos = []
+for sub in range(len(subjects)):
+    r, p = spear(timeg[sub], rsa[sub])
+    all_rhos.append(r)
+    
+pval = ttest_1samp(all_rhos, 0)[1]
+
+all_rhos = []
+for sub in range(len(subjects)):
+    r, p = spear(timeg[sub], learn_index_df.iloc[sub])
+    all_rhos.append(r)
+    
+pval = ttest_1samp(all_rhos, 0)[1]
