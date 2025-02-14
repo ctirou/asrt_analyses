@@ -200,6 +200,11 @@ for sub in range(len(subjects)):
         tg.append(contrasts[sub, i, idx_timeg][:, idx_timeg].mean())
     timeg.append(np.array(tg))
 timeg = np.array(timeg)
+rhos = []
+for sub in range(len(subjects)):
+    r, _ = spear(timeg[sub], learn_index_df.iloc[sub])
+    rhos.append(r)    
+pval = ttest_1samp(rhos, 0)[1]
 slopes, intercepts = [], []
 
 # fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True, figsize=(7, 6), layout='constrained')
@@ -223,9 +228,7 @@ ax1.set_ylabel('Learning index', fontsize=13)
 ax1.spines['top'].set_visible(False)
 ax1.spines['right'].set_visible(False)
 timeg_flat = timeg.flatten()
-learn_index_flat = learn_index_df.to_numpy().flatten()
-r, pval = spear(timeg_flat, learn_index_flat)
-textstr = f'Spearman $r$ = {r:.2f}\n$p$ = {pval:.2e}'
+textstr = f'$p$ = {pval:.2e}'
 # Adjust the legend to be outside the plot
 ax1.legend(frameon=False, title=textstr, loc="lower right")
 fig.savefig(figure_dir / "learn_corr.pdf", transparent=True)
@@ -255,6 +258,11 @@ idx_rsa = np.where((times_rsa >= .3) & (times_rsa <= .5))[0]
 idx_timeg = np.where((times >= -0.5) & (times < 0))[0]
 rsa = diff_sess.copy()[:, :, idx_rsa].mean(2)
 slopes, intercepts = [], []
+rhos = []
+for sub in range(len(subjects)):
+    r, p = spear(timeg[sub], rsa[sub])
+    rhos.append(r)    
+pval = ttest_1samp(rhos, 0)[1]
 
 fig, ax2 = plt.subplots(1, 1, figsize=(7, 6), layout='constrained')
 # Plot for individual subjects
@@ -273,8 +281,7 @@ ax2.set_xlabel('Average pre-stimulus time generalization', fontsize=13)
 ax2.set_ylabel('Similarity index', fontsize=13)
 ax2.spines['top'].set_visible(False)
 ax2.spines['right'].set_visible(False)
-r, pval = spear(timeg.flatten(), rsa.flatten())
-leg_title = f'Spearman $r$ = {r:.2f}\n$p$ = {pval:.2e}'
+leg_title = f'$p$ = {pval:.2e}'
 ax2.legend(frameon=False, title=leg_title, loc="lower right")
 # ax2.set_title("Correlation between mean predictive activity and mean representational similarity", fontsize=16)
 # fig.suptitle("Correlation between mean predictive activity\nand mean representational similarity", y=0.95, fontsize=16)
@@ -282,17 +289,3 @@ ax2.set_title("Correlation between mean predictive activity\nand mean representa
 fig.savefig(figure_dir / "rsa_corr.pdf", transparent=True)
 # fig.savefig(figure_dir / "combined_corr.pdf", transparent=True)
 plt.close()
-
-all_rhos = []
-for sub in range(len(subjects)):
-    r, p = spear(timeg[sub], rsa[sub])
-    all_rhos.append(r)
-    
-pval = ttest_1samp(all_rhos, 0)[1]
-
-all_rhos = []
-for sub in range(len(subjects)):
-    r, p = spear(timeg[sub], learn_index_df.iloc[sub])
-    all_rhos.append(r)
-    
-pval = ttest_1samp(all_rhos, 0)[1]
