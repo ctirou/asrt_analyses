@@ -91,16 +91,24 @@ for i, network in enumerate(networks):
     timeg_range = np.linspace(timeg.min(), timeg.max(), 100)
     
     axes[i].plot(timeg_range, np.mean(slopes) * timeg_range + np.mean(intercepts), color='black', lw=4, label='Mean fit')
-    axes[i].set_xlabel('Time generalization', fontsize=12)
+    axes[i].set_xlabel('Mean Time generalization', fontsize=12)
     # axes[i].legend(frameon=False, ncol=2)
     axes[i].spines['top'].set_visible(False)
     axes[i].spines['right'].set_visible(False)
     axes[i].set_title(network_names[i])
     if i == 0:
         axes[i].set_ylabel('Similarity index', fontsize=12)
-    r, pval = spear(timeg.flatten(), rsa.flatten())
-    axes[i].set_title(f"{network_names[i]}\nR={r:.2f}, p={pval:.2f}")
-fig.suptitle("Correlation between mean predictive activity and mean representational similarity", fontsize=16)
+    rhos = []
+    for sub in range(len(subjects)):
+        r, p = spear(timeg[sub], rsa[sub])
+        rhos.append(r)        
+    pval = ttest_1samp(rhos, 0)[1]
+    axes[i].set_title(f"{network_names[i]}")
+    
+    axes[i].text(0.05, 0.95, f"$p=${pval:.2f}", transform=axes[i].transAxes, fontsize=12, verticalalignment='top')
+    
+fig.suptitle("Correlation between mean predictive activity and mean representational similarity", fontweight='bold',  fontsize=16)
+
 fig.savefig(figures_dir / f"rsa_corr.pdf", transparent=True)
 plt.close()
 
@@ -127,7 +135,7 @@ for i, network in enumerate(networks):
     timeg_range = np.linspace(timeg.min(), timeg.max(), 100)
 
     axes[i].plot(timeg_range, np.mean(slopes) * timeg_range + np.mean(intercepts), color='black', lw=4, label='Mean fit')
-    axes[i].set_xlabel('Time generalization', fontsize=12)
+    # axes[i].set_xlabel('Mean time generalization', fontsize=12)
     # axes[i].legend(frameon=False, ncol=2)
     axes[i].spines['top'].set_visible(False)
     axes[i].spines['right'].set_visible(False)
@@ -135,8 +143,17 @@ for i, network in enumerate(networks):
     if i == 0:
         axes[i].set_ylabel('Learning index', fontsize=12)
     learn_index_flat = learn_index_df.to_numpy().flatten()
-    r, pval = spear(timeg.flatten(), learn_index_flat)
-    axes[i].set_title(f"{network_names[i]}\nR={r:.2f}, p={pval:.2f}")
-fig.suptitle("Correlation between mean predictive activity and learning", fontsize=16)
+
+    rhos = []
+    for sub in range(len(subjects)):
+        r, p = spear(timeg[sub], rsa[sub])
+        rhos.append(r)        
+    pval = ttest_1samp(rhos, 0)[1]
+    axes[i].set_title(f"{network_names[i]}")
+    
+    axes[i].text(0.05, 0.95, f"$p=${pval:.2f}", transform=axes[i].transAxes, fontsize=12, verticalalignment='top')
+
+fig.suptitle("Correlation between mean predictive activity and learning", fontweight='bold', fontsize=16)
+
 fig.savefig(figures_dir / f"learn_corr.pdf", transparent=True)
 plt.close()

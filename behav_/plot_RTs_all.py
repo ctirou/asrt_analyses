@@ -165,7 +165,7 @@ fig.savefig(figures_dir / 'behav' / 'learning_index_all.pdf', transparent=True)
 
 # Combined RT and learning index
 fig, ax = plt.subplots(1, 1, figsize=(6, 6), layout="tight")
-plt.rcParams.update({'font.family': 'serif', 'font.serif': 'Avenir'})
+plt.rcParams.update({'font.family': 'serif', 'font.serif': 'Arial'})
 ax.autoscale()
 # Scatter plot individual subject values
 for subject in subjects:

@@ -105,6 +105,7 @@ if not op.exists(res_dir / "corr" / "rhos_learn.npy"):
     
 cmap1 = "RdBu_r"
 cmap2 = "magma_r"
+cmap2 = "coolwarm"
 cmap3 = "viridis"
 cmap4 = "cividis"
 
@@ -120,7 +121,7 @@ for ax, data, title in zip(axs.flat, [all_patterns, all_randoms], ["Pattern", "R
                             norm=norm,
                             interpolation="lanczos",
                             origin="lower",
-                            cmap=cmap1,
+                            cmap=cmap2,
                             extent=times[idx][[0, -1, 0, -1]],
                             aspect=0.5))
     ax.set_ylabel("Training time (s)", fontsize=13)
@@ -159,14 +160,16 @@ pval_rhos = np.load(res_dir / "corr" / "pval_learn-pval.npy")
 fig, axs = plt.subplots(2, 1, figsize=(7, 6), sharex=True, layout='constrained')
 # norm = colors.Normalize(vmin=-0.1, vmax=0.1)
 images = []
-for ax, data, title, pval, vmin, vmax in zip(axs.flat, [contrasts, rhos], ["Contrast", "Correlation between contrast and learning"], [pval_cont, pval_rhos], [-0.1, -0.5], [0.1, 0.5]):
+for ax, data, title, pval, vmin, vmax in zip(axs.flat, [contrasts, rhos], ["Contrast", "Correlation between contrast and learning"], [pval_cont, pval_rhos], [-0.07, -0.4], [0.07, 0.4]):
+    cmap = 'coolwarm' if title == "Contrast" else "BrBG_r"
+        
     im = ax.imshow(data[:, idx][:, :, idx].mean(0), 
                             # norm=norm,
                             vmin=vmin,
                             vmax=vmax,
                             interpolation="lanczos",
                             origin="lower",
-                            cmap=cmap1,
+                            cmap=cmap,
                             extent=times[idx][[0, -1, 0, -1]],
                             aspect=0.5)
     ax.set_ylabel("Training time (s)", fontsize=13)
@@ -187,7 +190,7 @@ for ax, data, title, pval, vmin, vmax in zip(axs.flat, [contrasts, rhos], ["Cont
 
     cbar = fig.colorbar(im, ax=ax, orientation='vertical', fraction=.1, ticks=[vmin, vmax])
     cbar.set_label(label, rotation=270, fontsize=13)
-fig.savefig(figure_dir / "contrast_corr.pdf", transparent=True)
+fig.savefig(figure_dir / "contrast_corr2.pdf", transparent=True)
 plt.close()
 
 ### plot learning index x timeg correlation ###
