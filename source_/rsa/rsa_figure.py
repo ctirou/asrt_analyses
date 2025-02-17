@@ -79,7 +79,8 @@ design = [['br11', 'br12', 'A', 'B', 'C'],
           ['br51', 'br52', 'M', 'N', 'O'],
           ['br61', 'br62', 'P', 'Q', 'R'], 
           ['br71', 'br72', 'S', 'T', 'U']]
-plt.rcParams.update({'font.size': 10, 'font.family': 'serif', 'font.serif': 'Avenir'})
+
+plt.rcParams.update({'font.size': 10, 'font.family': 'serif', 'font.serif': 'Arial'})
 cmap = plt.cm.get_cmap('tab20', len(label_names))
 cmap = sns.color_palette("colorblind", as_cmap=True)
 
@@ -91,7 +92,7 @@ def plot_onset(ax):
     else:
         ax.axvline(0, color='black', label='Button press')
         
-def plot_with_br_title(fig, axd, design, title, row_idx, fontsize=12):
+def plot_with_br_title(fig, axd, design, title, row_idx, fontsize=14):
     """Add a central title for a specific row of 'br' plots."""
     # Extract only "br" subplot positions for the specific row
     br_axes = [axd[key] for key in design[row_idx] if "br" in key]
@@ -99,19 +100,26 @@ def plot_with_br_title(fig, axd, design, title, row_idx, fontsize=12):
     x_center = sum([ax.get_position().x0 + ax.get_position().x1 for ax in br_axes]) / (2 * len(br_axes))
     y_top = max([ax.get_position().y1 for ax in br_axes])
     # Place the title above the selected plots for the given row
-    fig.text(x_center, y_top, title, ha='center', va='top', fontsize=fontsize)
-    
+    fig.text(x_center, y_top, title, ha='center', va='top', fontsize=fontsize, fontweight='bold')
+
+def crop_images(screenshot):
+    nonwhite_pix = (screenshot != 255).any(-1)
+    nonwhite_row = nonwhite_pix.any(1)
+    nonwhite_col = nonwhite_pix.any(0)
+    cropped_screenshot = screenshot[nonwhite_row][:, nonwhite_col]
+    return cropped_screenshot
+
 fig, axd = plt.subplot_mosaic(
     design, 
     sharex=False, 
-    figsize=(13, 15), 
+    figsize=(13, 16), 
     layout='tight',
     gridspec_kw={
         # 'height_ratios': [1, 0.5, 1, 0.5, 1, 0.5, 1],  # Adjust heights
-        'width_ratios': [.3, .3, 1, .5, .5]  # Adjust widths if needed
+        'width_ratios': [.5, .4, .5, .5, .5]  # Adjust widths if needed
     })
 ### Plot brain ###
-brain_kwargs = dict(hemi='both', background="white", cortex="low_contrast", surf='inflated', subjects_dir=subjects_dir)
+brain_kwargs = dict(hemi='both', background="white", cortex="low_contrast", surf='inflated', subjects_dir=subjects_dir, size=(800, 400))
 for i, (label, name, sideA, sideB) in enumerate(zip(label_names, names_corrected, ['br11', 'br21', 'br31', 'br41', 'br51', 'br61', 'br71'], ['br12', 'br22', 'br32', 'br42', 'br52', 'br62', 'br72'])):
     # Initialize Brain object
     # Add labels
@@ -126,19 +134,24 @@ for i, (label, name, sideA, sideB) in enumerate(zip(label_names, names_corrected
         labels = ['Left-Hippocampus', 'Right-Hippocampus'] if label == 'Hippocampus' else ['Left-Thalamus-Proper', 'Right-Thalamus-Proper']
         brain.add_volume_labels(aseg='aseg', labels=labels, colors=cmap[i], alpha=.85, legend=False)
     # Capture snapshots for the desired views
-    brain.show_view('lateral')
-    lateral_img = brain.screenshot()
-    brain.show_view('caudal')
-    caudal_img = brain.screenshot()
+    brain.show_view('lateral', distance="auto")
+    lateral_img = brain.screenshot('rgb')
+    brain.show_view('caudal', distance="auto")
+    caudal_img = brain.screenshot('rgb')
     brain.close()
+    
+    lateral_img, caudal_img = crop_images(lateral_img), crop_images(caudal_img)
+    
     # Display images side by side using Matplotlib
     axd[sideA].imshow(lateral_img)
     axd[sideA].axis('off')
     # axd[sideA].set_title(net_name, fontsize=14)
     # Call the function to set the br-specific title
+    net_name = " "
     plot_with_br_title(fig, axd, design, net_name, row_idx=i)
     axd[sideB].imshow(caudal_img)
     axd[sideB].axis('off')
+    # break
 
 ### Plot decoding ###
 for i, (label, name, j) in enumerate(zip(label_names, names_corrected, ['A', 'D', 'G', 'J', 'M', 'P', 'S'])):
@@ -163,7 +176,7 @@ for i, (label, name, j) in enumerate(zip(label_names, names_corrected, ['A', 'D'
     axd[j].xaxis.set_major_formatter(FuncFormatter(lambda x, pos: f'{x:.1f}'))
     axd[j].xaxis.set_major_locator(plt.MultipleLocator(0.2))
     if j == 'A':
-        axd[j].set_title('Decoding', style='italic')
+        axd[j].set_title('Time course decoding')
     if j == 'S':
         axd[j].set_xlabel('Time (s)', fontsize=11)
 ### Plot similarity index ###    
@@ -193,53 +206,7 @@ for i, (label, name, j) in enumerate(zip(label_names, names_corrected, ['B', 'E'
     if j == 'T':
         axd[j].set_xlabel('Time (s)', fontsize=11)
     if j == 'B':
-        axd[j].set_title(f'Similarity index', style='italic')
-### Plot cvMD ###
-# for i, (label, name, j) in enumerate(zip(label_names, names_corrected, ['B2', 'E2', 'H2', 'K2', 'N2', 'Q2', 'T2'])):
-#     high = all_highs[label][:, :, 1:, :].mean((1, 2)) - all_highs[label][:, :, 0, :].mean(1)
-#     low = all_lows[label][:, :, 1:, :].mean((1, 2)) - all_lows[label][:, :, 0, :].mean(axis=1)
-#     diff = low - high
-#     sem_high = np.std(high, axis=0) / np.sqrt(len(subjects))
-#     sem_low = np.std(low, axis=0) / np.sqrt(len(subjects))
-#     axd[j].plot(times, high.mean(0), label='Pattern', color=cmap[i], alpha=1)
-#     axd[j].plot(times, low.mean(0), label='Random', color='C7', alpha=1)
-#     axd[j].fill_between(times, high.mean(0) - sem_high, high.mean(0) + sem_high, alpha=0.2, color=cmap[i])
-#     axd[j].fill_between(times, low.mean(0) - sem_low, low.mean(0) + sem_low, alpha=0.2, color='C7')
-    # sig = p_values < 0.05
-    # axd[j].fill_between(times, high.mean(0) + sem_high, low.mean(0) - sem_low, where=sig, alpha=0.3, label='Significance - corrected', facecolor="#F2AD00")
-    # p_values_unc = ttest_1samp(diff, axis=0, popmean=0)[1]
-    # sig_unc = p_values_unc < 0.05
-    # axd[j].fill_between(times, high.mean(0) + sem_high, low.mean(0) - sem_low, where=sig_unc, alpha=.3, label='Significance - uncorrected', facecolor="#7294D4")
-    # axd[j].legend(frameon=False)
-    # axd[j].set_ylabel('cvMD', fontsize=11)
-    # axd[j].set_xticklabels([])
-    # axd[j].set_title(f'cvMD', style='italic', fontsize=11)
-### Plot subject x session correlation ###
-# for i, (label, name, j) in enumerate(zip(label_names, names_corrected, ['C1', 'F1', 'I1', 'L1', 'O1', 'R1', 'U1'])):
-#     axd[j].axhline(0, color='grey', alpha=0.5)
-#     rhos = np.array([[spear([0, 1, 2, 3, 4], diff_sess[label][sub, :, itime])[0] for itime in range(len(times))] for sub in range(len(subjects))])
-#     sem = np.std(rhos, axis=0) / np.sqrt(len(subjects))
-    # axd[j].plot(times, rhos.mean(0), color=cmap[i])
-    # p_values_unc = ttest_1samp(rhos, axis=0, popmean=0)[1]
-    # sig_unc = p_values_unc < 0.05
-    # p_values = decod_stats(rhos, -1)
-    # sig = p_values < .05
-    # # Main plot
-    # axd[j].plot(times, rhos.mean(0), alpha=1, label='Random - Pattern', zorder=10, color='C7')
-    # Plot significant regions separately
-    # for start, end in contiguous_regions(sig):
-        # axd[j].plot(times[start:end], rhos.mean(0)[start:end], alpha=1, zorder=10, color=cmap[i])
-    # sem = np.std(rhos, axis=0) / np.sqrt(len(subjects))
-    # axd[j].fill_between(times, rhos.mean(0) - sem, rhos.mean(0) + sem, alpha=0.2, zorder=5, facecolor='C7')
-    # Highlight significant regions
-    # axd[j].fill_between(times, rhos.mean(0) - sem, rhos.mean(0) + sem, where=sig, alpha=0.5, zorder=5, color=cmap[i])
-    # axd[j].fill_between(times, rhos.mean(0) - sem, rhos.mean(0) + sem, color=cmap[i], alpha=0.2)
-    # axd[j].fill_between(times, 0, rhos.mean(0) - sem, where=sig_unc, alpha=.3, label='Significance - uncorrected', facecolor="#7294D4")
-    # axd[j].fill_between(times, 0, rhos.mean(0) - sem, where=sig, alpha=.3, facecolor="#F2AD00", label='Significance - corrected')
-    # axd[j].set_ylabel("Rho", fontsize=11)
-    # axd[j].set_xticklabels([])
-    # axd[j].legend(frameon=False, loc="lower right")
-    # axd[j].set_title(f'Subject x session correlation', style='italic', fontsize=13)
+        axd[j].set_title(f'Average similarity index time course')
 ### Plot subject x learning index correlation ###
 for i, (label, name, j) in enumerate(zip(label_names, names_corrected, ['C', 'F', 'I', 'L', 'O', 'R', 'U'])):
     plot_onset(axd[j])
@@ -274,8 +241,9 @@ for i, (label, name, j) in enumerate(zip(label_names, names_corrected, ['C', 'F'
         axd[j].set_xlabel('Time (s)', fontsize=11)
     # axd[j].legend(frameon=False, loc="lower right")
     if j == 'C':
-        axd[j].set_title(f'Similarity x Learning corr.', style='italic')
-fig.savefig(figures_dir / f"{lock}-rsa.pdf", transparent=True)
+        axd[j].set_title(f'Similarity and learning correlation')
+        
+fig.savefig(figures_dir / f"{lock}-rsa-tight-no-title.pdf", transparent=True)
 plt.close()
 
 

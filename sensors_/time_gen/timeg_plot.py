@@ -116,18 +116,18 @@ plt.rcParams.update({'font.size': 12, 'font.family': 'serif', 'font.serif': 'Ari
 fig, axs = plt.subplots(2, 1, sharex=True, layout='constrained', figsize=(7, 6))
 norm = colors.Normalize(vmin=0.18, vmax=0.32)
 images = []
-for ax, data, title in zip(axs.flat, [all_patterns, all_randoms], ["Pattern", "Random"]):
+for ax, data, title in zip(axs.flat, [all_patterns, all_randoms], ["pattern", "random"]):
     images.append(ax.imshow(data[:, idx][:, :, idx].mean(0), 
                             norm=norm,
                             interpolation="lanczos",
                             origin="lower",
-                            cmap=cmap2,
+                            cmap=cmap1,
                             extent=times[idx][[0, -1, 0, -1]],
                             aspect=0.5))
     ax.set_ylabel("Training time (s)", fontsize=13)
     ax.set_xticks(np.arange(-1, 3, .5))
     ax.set_yticks(np.arange(-1, 3, .5))
-    ax.set_title(title, fontsize=16)
+    ax.set_title(f"Time generaralization in {title} trials", fontsize=16)
     ax.axvline(0, color="k")
     ax.axhline(0, color="k")
     xx, yy = np.meshgrid(times[idx], times[idx], copy=False, indexing='xy')
@@ -135,7 +135,7 @@ for ax, data, title in zip(axs.flat, [all_patterns, all_randoms], ["Pattern", "R
     sig = pval < threshold
     ax.contour(xx, yy, sig[idx][:, idx], colors='black', levels=[0],
                         linestyles='--', linewidths=1, alpha=.5)
-    if title == "Random":
+    if title == "random":
         ax.set_xlabel("Testing time (s)", fontsize=13)
 cbar = fig.colorbar(images[0], ax=axs, orientation='vertical', fraction=.1, ticks=[0.18, 0.32])
 cbar.set_label("\nAccuracy", rotation=270, fontsize=13)
@@ -160,8 +160,8 @@ pval_rhos = np.load(res_dir / "corr" / "pval_learn-pval.npy")
 fig, axs = plt.subplots(2, 1, figsize=(7, 6), sharex=True, layout='constrained')
 # norm = colors.Normalize(vmin=-0.1, vmax=0.1)
 images = []
-for ax, data, title, pval, vmin, vmax in zip(axs.flat, [contrasts, rhos], ["Contrast", "Correlation between contrast and learning"], [pval_cont, pval_rhos], [-0.07, -0.4], [0.07, 0.4]):
-    cmap = 'coolwarm' if title == "Contrast" else "BrBG_r"
+for ax, data, title, pval, vmin, vmax in zip(axs.flat, [contrasts, rhos], ["Contrast of pattern and random", "Correlation between contrast and learning"], [pval_cont, pval_rhos], [-0.07, -0.4], [0.07, 0.4]):
+    cmap = 'coolwarm' if ax == axs.flat[0] else "BrBG_r"
         
     im = ax.imshow(data[:, idx][:, :, idx].mean(0), 
                             # norm=norm,
@@ -188,8 +188,12 @@ for ax, data, title, pval, vmin, vmax in zip(axs.flat, [contrasts, rhos], ["Cont
     else:
         label = "Difference in\naccuracy"
 
+    # Draw an empty rectangle centered on -0.25
+    rect = plt.Rectangle([-0.75, -0.75], 0.72, 0.68, fill=False, edgecolor='black', linestyle='--', lw=1.5)
+    ax.add_patch(rect)
     cbar = fig.colorbar(im, ax=ax, orientation='vertical', fraction=.1, ticks=[vmin, vmax])
     cbar.set_label(label, rotation=270, fontsize=13)
+    
 fig.savefig(figure_dir / "contrast_corr2.pdf", transparent=True)
 plt.close()
 

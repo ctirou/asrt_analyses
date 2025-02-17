@@ -140,7 +140,7 @@ axd['A'].fill_between(times, decoding.mean(0) - sem, chance, where=sig, alpha=0.
 axd['A'].set_ylabel('Accuracy (%)', fontsize=11)
 axd['A'].legend(loc='upper left', frameon=False)
 axd['A'].set_xlabel('Time (s)', fontsize=11)
-axd['A'].set_title(f'Decoding', fontsize=13)
+axd['A'].set_title(f'Time course decoding', fontsize=13)
 
 ### B1 ### Similarity index
 axd['B1'].axhline(0, color='grey', alpha=0.5)
@@ -253,7 +253,7 @@ for sub in range(len(subjects)):
     r, p = spear(mdiff[sub], learn_index_df.iloc[sub])
     rhos.append(r)
 pval = ttest_1samp(rhos, 0)[1]
-axd['C'].legend(frameon=False, title=f"$p=${pval:.2f}", loc='upper left')
+axd['C'].legend(frameon=False, title=f"$p=${pval:.3f}", loc='upper left')
 
 plt.savefig(figures_dir /  f"{lock}-rsa.pdf", transparent=True)
 plt.close()
