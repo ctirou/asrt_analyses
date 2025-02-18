@@ -108,6 +108,11 @@ color2 = "#DD614A"
 color3 = "#1982C4"
 color4 = "#FFB300"  # New contrasting color
 
+color1 = "#5B9BD5"
+color2 = "#61CBF5"
+color3 = "#A6CAEC"
+color4 = "black"  # New contrasting color
+
 fig, ax = plt.subplots(1, 1, figsize=(8, 5))
 # Plot individual subject values
 for subject in subjects:
@@ -197,13 +202,13 @@ axlow.autoscale()
 learning_indices_mean = learn_index_df.mean(axis=0)
 learning_indices_stderr = learn_index_df.sem(axis=0)
 bar_width = 0.5  # Adjust the width of the bars
-axlow.bar(sessions, learning_indices_mean, yerr=learning_indices_stderr, alpha=0.7, capsize=5, color="#7294D4", width=bar_width)
+axlow.bar(sessions, learning_indices_mean, yerr=learning_indices_stderr, alpha=0.7, capsize=5, color="#029E73", width=bar_width)
 axlow.set_ylabel("Learning Index", fontsize=12)
 axlow.spines['top'].set_visible(False)
 axlow.spines['right'].set_visible(False)
 axlow.set_xticklabels(['Practice', '1', '2', '3', '4'])
 axlow.set_xlabel("Session", fontsize=12)
 axlow.set_ylim(bottom=0)  # Set the lower limit of the y-axis to 0 to reduce the height
-fig.savefig(figures_dir / 'behav' / 'combined.pdf', transparent=True)
-
+fig.savefig(figures_dir / 'behav' / 'combined_2.pdf', transparent=True)
+plt.close()
 
