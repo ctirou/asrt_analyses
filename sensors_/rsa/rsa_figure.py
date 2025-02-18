@@ -24,8 +24,8 @@ figures_dir = FIGURES_DIR / "RSA" / "sensors"
 ensure_dir(figures_dir)
 
 all_highs, all_lows = [], []
-decoding, pca_decod, no_pca_decod, max_power  = [], [], [], []
 patterns, randoms = [], []
+all_decoding = {}
 
 for subject in tqdm(subjects):
     
@@ -39,27 +39,14 @@ for subject in tqdm(subjects):
     all_highs.append(high)
     all_lows.append(low)
     # Decoding stuff
-    res_path = RESULTS_DIR / 'decoding' / 'sensors' / lock / 'pattern'
-    decoding.append(np.load(res_path / f"{subject}-all-scores.npy"))
-    res_path = RESULTS_DIR / 'decoding' / 'source' / lock / 'pattern' / 'all'
-    pca_decod.append(np.load(res_path / f"{subject}-scores.npy"))
-    res_path = RESULTS_DIR / 'decoding' / 'source' / lock / 'pattern' / 'all-nopca'
-    no_pca_decod.append(np.load(res_path / f"{subject}-scores.npy"))
-    # res_path = RESULTS_DIR / 'decoding' / 'source' / lock / 'pattern' / 'max-power'
-    # max_power.append(np.load(res_path / f"{subject}-scores.npy"))
-    # # Time generalization stuff    
-    # pat, rand = [], []
-    # timeg_path = TIMEG_DATA_DIR / 'results' / 'sensors' / lock
-    # for i in range(5):
-    #     pat.append(np.load(timeg_path / f"{subject}-epoch{i}-pattern-scores.npy"))
-    #     rand.append(np.load(timeg_path / f"{subject}-epoch{i}-random-scores.npy"))
-    # patterns.append(np.array(pat))
-    # randoms.append(np.array(rand))
-    
-decoding = np.array(decoding) * 100
-pca_decod = np.array(pca_decod)
-no_pca_decod = np.array(no_pca_decod)
-max_power = np.array(max_power)
+    for trial_type in ['all', 'pattern', 'random']:
+        res_path = RESULTS_DIR / 'decoding' / 'sensors' / lock / trial_type
+        if not trial_type in all_decoding:
+            all_decoding[trial_type] = []
+        all_decoding[trial_type].append(np.load(res_path / f"{subject}-all-scores.npy"))
+
+for trial_type in ['all', 'pattern', 'random']:
+    all_decoding[trial_type] = np.array(all_decoding[trial_type]) * 100    
 
 patterns = np.array(patterns)
 randoms = np.array(randoms)
@@ -85,6 +72,9 @@ threshold = 0.05
 innerB = [['B1'], ['B2']]
 innerD = [['D1'], ['D2']]
 innerC = [['C1', 'C2']]
+
+innerA = [['A1'], ['A2']]
+
 outer = [['A', innerB],
          ['C', 'D']]
 
@@ -122,21 +112,20 @@ if lock == 'stim':
 else:
     axd['A'].axvline(0, color='black', label='Button press')
 axd['A'].axhline(chance, color='grey', label='Chance level', alpha=0.5)
-p_values = decod_stats(decoding - chance, -1)
-sig = p_values < 0.05
-sem = np.std(decoding, axis=0) / np.sqrt(len(subjects))
-# axd['A'].plot(times, decoding.mean(0), alpha=1)
-# Main plot
-axd['A'].plot(times, decoding.mean(0), alpha=1, zorder=10, color='C7')
-# Plot significant regions separately
-for start, end in contiguous_regions(sig):
-    axd['A'].plot(times[start:end], decoding.mean(0)[start:end], alpha=1, zorder=15, color=c1)
-axd['A'].fill_between(times, decoding.mean(0) - sem, decoding.mean(0) + sem, alpha=0.2, zorder=10, facecolor='C7')    
-# Highlight significant regions
-axd['A'].fill_between(times, decoding.mean(0) - sem, decoding.mean(0) + sem, where=sig, alpha=0.2, zorder=15, facecolor=c1, label='Significance')    
-axd['A'].fill_between(times, decoding.mean(0) - sem, chance, where=sig, alpha=0.1, zorder=15, facecolor=c1)
-# axd['A'].fill_between(times, decoding.mean(0) - sem, decoding.mean(0) + sem, alpha=0.2)
-# axd['A'].fill_between(times, decoding.mean(0) - sem, .25, where=sig, alpha=0.3, facecolor="#F2AD00", capstyle='round', label='Significance - corrected')
+for trial_type, color in zip(['pattern', 'random'], [c3, c4]):
+    decoding = all_decoding[trial_type]
+    p_values = decod_stats(decoding - chance, -1)
+    sig = p_values < 0.05
+    sem = np.std(decoding, axis=0) / np.sqrt(len(subjects))
+    # Main plot
+    axd['A'].plot(times, decoding.mean(0), alpha=1, zorder=10, color='C7')
+    # Plot significant regions separately
+    for start, end in contiguous_regions(sig):
+        axd['A'].plot(times[start:end], decoding.mean(0)[start:end], alpha=1, zorder=15, color=color)
+    axd['A'].fill_between(times, decoding.mean(0) - sem, decoding.mean(0) + sem, alpha=0.2, zorder=10, facecolor='C7')    
+    # Highlight significant regions
+    axd['A'].fill_between(times, decoding.mean(0) - sem, decoding.mean(0) + sem, where=sig, alpha=0.2, zorder=15, facecolor=color, label=f'{trial_type.capitalize()} significance')    
+    axd['A'].fill_between(times, decoding.mean(0) - sem, chance, where=sig, alpha=0.1, zorder=15, facecolor=color)
 axd['A'].set_ylabel('Accuracy (%)', fontsize=11)
 axd['A'].legend(loc='upper left', frameon=False)
 axd['A'].set_xlabel('Time (s)', fontsize=11)
@@ -162,7 +151,7 @@ axd['B2'].fill_between(times, diff.mean(0) - sem, 0, where=sig, alpha=0.2, zorde
 axd['B2'].legend(frameon=False)
 axd['B2'].set_ylabel('Similarity index', fontsize=11)
 axd['B2'].yaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter('%.2f'))
-axd['B2'].set_xticklabels([])
+# axd['B2'].set_xticklabels([])
 axd['B2'].set_title(f'Average similarity index time course', fontsize=13)
 axd['B2'].set_xlabel('Time (s)', fontsize=11)
 
@@ -194,7 +183,7 @@ axd['B1'].fill_between(times, low.mean(0) - sem, low.mean(0) + sem, alpha=0.2, z
 axd['B1'].fill_between(times, low.mean(0) - sem, low.mean(0) + sem, where=sig, alpha=0.3, zorder=5, facecolor=c4, label='Random significance')    
 axd['B1'].legend(frameon=False, loc='lower left')
 axd['B1'].set_ylabel('cvMD', fontsize=11)
-# axd['B2'].set_xticklabels([])
+axd['B1'].set_xticklabels([])
 axd['B1'].set_title(f'Cross-validated Mahalanobis distance within random and pattern elements', fontsize=13)
 
 
@@ -255,5 +244,5 @@ for sub in range(len(subjects)):
 pval = ttest_1samp(rhos, 0)[1]
 axd['C'].legend(frameon=False, title=f"$p=${pval:.3f}", loc='upper left')
 
-plt.savefig(figures_dir /  f"{lock}-rsa.pdf", transparent=True)
+plt.savefig(figures_dir /  f"{lock}-rsa2.pdf", transparent=True)
 plt.close()
