@@ -143,29 +143,30 @@ axd['A'].set_xlabel('Time (s)', fontsize=11)
 axd['A'].set_title(f'Time course decoding', fontsize=13)
 
 ### B1 ### Similarity index
-axd['B1'].axhline(0, color='grey', alpha=0.5)
-axd['B1'].plot(times, diff.mean(0), alpha=1, label='Random - Pattern', zorder=10)
+axd['B2'].axhline(0, color='grey', alpha=0.5)
+axd['B2'].plot(times, diff.mean(0), alpha=1, label='Random - Pattern', zorder=10)
 p_values = decod_stats(diff, -1)
 sig = p_values < 0.05
 sem = np.std(diff, axis=0) / np.sqrt(len(subjects))
 # Main plot
-axd['B1'].plot(times, diff.mean(0), alpha=1, zorder=10, color='C7')
+axd['B2'].plot(times, diff.mean(0), alpha=1, zorder=10, color='C7')
 # Plot significant regions separately
 for start, end in contiguous_regions(sig):
-    axd['B1'].plot(times[start:end], diff.mean(0)[start:end], alpha=1, zorder=10, color=c2)
-axd['B1'].fill_between(times, diff.mean(0) - sem, diff.mean(0) + sem, alpha=0.2, zorder=5, facecolor='C7')    
+    axd['B2'].plot(times[start:end], diff.mean(0)[start:end], alpha=1, zorder=10, color=c2)
+axd['B2'].fill_between(times, diff.mean(0) - sem, diff.mean(0) + sem, alpha=0.2, zorder=5, facecolor='C7')    
 # Highlight significant regions
-axd['B1'].fill_between(times, diff.mean(0) - sem, diff.mean(0) + sem, where=sig, alpha=0.3, zorder=5, facecolor=c2, label='Significance')
-axd['B1'].fill_between(times, diff.mean(0) - sem, 0, where=sig, alpha=0.2, zorder=5, facecolor=c2)
+axd['B2'].fill_between(times, diff.mean(0) - sem, diff.mean(0) + sem, where=sig, alpha=0.3, zorder=5, facecolor=c2, label='Significance')
+axd['B2'].fill_between(times, diff.mean(0) - sem, 0, where=sig, alpha=0.2, zorder=5, facecolor=c2)
 # axd['B1'].fill_between(times, diff.mean(0) - sem, diff.mean(0) + sem, alpha=0.2, zorder=5)
 # axd["B1"].fill_between(times, 0, diff.mean(0) - sem, where=sig, alpha=0.3, label='Significance - corrected', facecolor="#F2AD00")
-axd['B1'].legend(frameon=False)
-axd['B1'].set_ylabel('Similarity index', fontsize=11)
-axd['B1'].yaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter('%.2f'))
-axd['B1'].set_xticklabels([])
-axd['B1'].set_title(f'Average similarity index time course', fontsize=13)
+axd['B2'].legend(frameon=False)
+axd['B2'].set_ylabel('Similarity index', fontsize=11)
+axd['B2'].yaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter('%.2f'))
+axd['B2'].set_xticklabels([])
+axd['B2'].set_title(f'Average similarity index time course', fontsize=13)
+axd['B2'].set_xlabel('Time (s)', fontsize=11)
 
-### B2 ### cvMD
+### B1 ### cvMD
 sem_high = np.std(high, axis=0) / np.sqrt(len(subjects))
 sem_low = np.std(low, axis=0) / np.sqrt(len(subjects))
 # axd['B2'].plot(times, high.mean(0), label='Pattern', color="c3", alpha=1)
@@ -175,27 +176,26 @@ sem_low = np.std(low, axis=0) / np.sqrt(len(subjects))
 # axd['B2'].fill_between(times, high.mean(0) + sem_high, low.mean(0) - sem_low, where=sig, alpha=0.3, facecolor="#F2AD00", label='Significance - corrected')
 # High
 # Main plot
-axd['B2'].plot(times, high.mean(0), alpha=1, zorder=10, color='C7')
+axd['B1'].plot(times, high.mean(0), alpha=1, zorder=10, color='C7')
 # Plot significant regions separately
 for start, end in contiguous_regions(sig):
-    axd['B2'].plot(times[start:end], high.mean(0)[start:end], alpha=1, zorder=10, color=c3)
-axd['B2'].fill_between(times, high.mean(0) - sem, high.mean(0) + sem, alpha=0.2, zorder=5, facecolor='C7')    
+    axd['B1'].plot(times[start:end], high.mean(0)[start:end], alpha=1, zorder=10, color=c3)
+axd['B1'].fill_between(times, high.mean(0) - sem, high.mean(0) + sem, alpha=0.2, zorder=5, facecolor='C7')    
 # Highlight significant regions
-axd['B2'].fill_between(times, high.mean(0) - sem, high.mean(0) + sem, where=sig, alpha=0.3, zorder=5, facecolor=c3, label='Pattern significance')    
+axd['B1'].fill_between(times, high.mean(0) - sem, high.mean(0) + sem, where=sig, alpha=0.3, zorder=5, facecolor=c3, label='Pattern significance')    
 # Low
 # Main plot
-axd['B2'].plot(times, low.mean(0), alpha=1, zorder=10, color='C7')
+axd['B1'].plot(times, low.mean(0), alpha=1, zorder=10, color='C7')
 # Plot significant regions separately
 for start, end in contiguous_regions(sig):
-    axd['B2'].plot(times[start:end], low.mean(0)[start:end], alpha=1, zorder=10, color=c4)
-axd['B2'].fill_between(times, low.mean(0) - sem, low.mean(0) + sem, alpha=0.2, zorder=5, facecolor='C7')
+    axd['B1'].plot(times[start:end], low.mean(0)[start:end], alpha=1, zorder=10, color=c4)
+axd['B1'].fill_between(times, low.mean(0) - sem, low.mean(0) + sem, alpha=0.2, zorder=5, facecolor='C7')
 # Highlight significant regions
-axd['B2'].fill_between(times, low.mean(0) - sem, low.mean(0) + sem, where=sig, alpha=0.3, zorder=5, facecolor=c4, label='Random significance')    
-axd['B2'].legend(frameon=False, loc='lower left')
-axd['B2'].set_ylabel('cvMD', fontsize=11)
+axd['B1'].fill_between(times, low.mean(0) - sem, low.mean(0) + sem, where=sig, alpha=0.3, zorder=5, facecolor=c4, label='Random significance')    
+axd['B1'].legend(frameon=False, loc='lower left')
+axd['B1'].set_ylabel('cvMD', fontsize=11)
 # axd['B2'].set_xticklabels([])
-axd['B2'].set_title(f'Cross-validated Mahalanobis distance within random and pattern elements', fontsize=13)
-axd['B2'].set_xlabel('Time (s)', fontsize=11)
+axd['B1'].set_title(f'Cross-validated Mahalanobis distance within random and pattern elements', fontsize=13)
 
 
 ### D2 ### Within subject learning index correlation
