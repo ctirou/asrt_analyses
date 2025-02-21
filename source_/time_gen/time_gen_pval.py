@@ -18,16 +18,14 @@ lock = 'stim'
 # network and custom label_names
 n_parcels = 200
 n_networks = 7
-networks = schaefer_7[:-2] if n_networks == 7 else schaefer_17[:-2]
-networks = networks + ['Hippocampus', 'Thalamus']
+networks = NETWORKS
 res_dir = data_path / 'results' / 'source' / lock
 res_dir = data_path / analysis / lock
 figures_dir = FIGURES_DIR / "time_gen" / "source" / lock
 ensure_dir(figures_dir)
 overwrite = False
 
-names = pd.read_csv(FREESURFER_DIR / 'Schaefer2018' / f'{n_networks}NetworksOrderedNames.csv', header=0)[' Network Name'].tolist()[:-2]
-names += ['Hippocampus', 'Thalamus']
+names = NETWORK_NAMES
 times = np.linspace(-1.5, 1.5, 305)
 chance = .25
 threshold = .05

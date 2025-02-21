@@ -223,7 +223,9 @@ NEW_LABELS2 = ['corpus_callosum',
               'temporal_lobe',
               'ventricular_and_brainstem']
 
-schaefer_7 = ['Vis', 'SomMot', 'DorsAttn', 'SalVentAttn', 'Limbic', 'Cont', 'Default']
+NETWORKS = ['Vis', 'SomMot', 'DorsAttn', 'SalVentAttn', 'Limbic', 'Cont', 'Default', 'Hippocampus', 'Thalamus']
+# NETWORK_NAMES = [' Visual', 'Somatomotor', 'Dorsal\nAttention', 'Salience /\nVentral\nAttention', 'Limbic', 'Control', 'Default', 'Hippocampus', 'Thalamus']
+NETWORK_NAMES = [' Visual', 'Somatomotor', 'Dorsal\nAttention', 'Ventral\nAttention', 'Limbic', 'Control', 'Default', 'Hippocampus', 'Thalamus']
 
 schaefer_17 = ['VisCent', 'VisPeri', 'SomMotA', 'SomMotB', 'DorsAttnA', 'DorsAttnB', 'SalVentAttnA', 'SalVentAttnB',
                'LimbicA', 'LimbicB', 'ContA', 'ContB', 'ContC', 'DefaultA', 'DefaultB', 'DefaultC', 'TempPar']
@@ -247,11 +249,9 @@ colors = {"BottleRocket1":["#A42820", "#5F5647", "#9B110E", "#3F5151", "#4E2A1E"
           "IsleofDogs1":["#9986A5", "#79402E", "#CCBA72", "#0F0D0E", "#D9D0D3", "#8D8680"],
           "IsleofDogs2":["#EAD3BF", "#AA9486", "#B6854D", "#39312F", "#1C1718"]}
 
-colorblind_cmap = ['#0173B2','#DE8F05','#029E73','#D55E00','#CC78BC','#CA9161','#FBAFE4','#949494','#ECE133','#56B4E9']
+colorblind_cmap = ['#0173B2','#DE8F05','#029E73','#D55E00','#CC78BC','#CA9161','#FBAFE4','#ECE133','#56B4E9']
 
 cud_colors = [
     '#0072B2', '#E69F00', '#009E73', '#D55E00', 
     '#CC79A7', '#F0E442', '#56B4E9', '#D45F91'
 ]
-
-network_names = [' Visual', 'Somatomotor', 'Dorsal Attention', 'Salience / Ventral Attention', 'Limbic', 'Hippocampus', 'Thalamus']

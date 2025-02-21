@@ -61,7 +61,7 @@ def process_subject(subject, epoch_num, lock):
     del epoch, epoch_fname, behav_fname, fwd, data_cov, noise_cov, rank, info, filters
     gc.collect()
 
-    for network in networks[:-2]:
+    for network in networks[-2:]:
         
         res_dir = RESULTS_DIR / "RSA" / 'source' / network / lock / 'rdm' / subject
         ensure_dir(res_dir)
