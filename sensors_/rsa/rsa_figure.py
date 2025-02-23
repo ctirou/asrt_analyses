@@ -129,13 +129,13 @@ for trial_type, color in zip(['pattern', 'random'], [c3, c4]):
 axd['A'].set_ylabel('Accuracy (%)', fontsize=11)
 axd['A'].legend(loc='upper left', frameon=False)
 axd['A'].set_xlabel('Time (s)', fontsize=11)
-axd['A'].set_title(f'Time course decoding', fontsize=13)
+axd['A'].set_title(f'Decoding time course of trial types', fontsize=13)
 
 ### B1 ### cvMD
 sem_high = np.std(high, axis=0) / np.sqrt(len(subjects))
 sem_low = np.std(low, axis=0) / np.sqrt(len(subjects))
 # High
-axd['B1'].plot(times, high.mean(0), alpha=1, zorder=10, color=c3, label='Pattern')
+axd['B1'].plot(times, high.mean(0), alpha=1, zorder=10, color=c3, label='High')
 # Plot significant regions separately
 # for start, end in contiguous_regions(sig):
 #     axd['B1'].plot(times[start:end], high.mean(0)[start:end], alpha=1, zorder=10, color=c3)
@@ -143,7 +143,7 @@ axd['B1'].fill_between(times, high.mean(0) - sem_high, high.mean(0) + sem_high, 
 # Highlight significant regions
 # axd['B1'].fill_between(times, high.mean(0) - sem, high.mean(0) + sem, where=sig, alpha=0.3, zorder=5, facecolor=c3)    
 # Low
-axd['B1'].plot(times, low.mean(0), alpha=1, zorder=10, color=c4, label='Random high')
+axd['B1'].plot(times, low.mean(0), alpha=1, zorder=10, color=c4, label='Low')
 # Plot significant regions separately
 # for start, end in contiguous_regions(sig):
 #     axd['B1'].plot(times[start:end], low.mean(0)[start:end], alpha=1, zorder=10, color=c4)
@@ -153,7 +153,7 @@ axd['B1'].fill_between(times, low.mean(0) - sem_low, low.mean(0) + sem_low, alph
 axd['B1'].legend(frameon=False, loc='lower left')
 axd['B1'].set_ylabel('cvMD', fontsize=11)
 axd['B1'].set_xticklabels([])
-axd['B1'].set_title(f'Cross-validated Mahalanobis distance within pattern and random high pairs', fontsize=13)
+axd['B1'].set_title(f'Cross-validated Mahalanobis distance within pairs', fontsize=13)
 
 # Plot for subplot B2
 axd['B2'].axhline(0, color='grey', alpha=0.5)
@@ -172,7 +172,7 @@ axd['B2'].legend(frameon=False, loc="upper left")
 axd['B2'].set_ylabel('Similarity index', fontsize=11)
 axd['B2'].yaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter('%.2f'))
 axd['B2'].set_xlabel('Time (s)', fontsize=11)
-axd['B2'].set_title(f'Average similarity index time course', fontsize=13)
+axd['B2'].set_title(f'Similarity index time course', fontsize=13)
 
 # Plot for subplot D
 diff_sess = zscore(diff_sess, axis=1)
@@ -192,7 +192,7 @@ axd['D'].fill_between(times, all_rhos.mean(0) - sem, 0, where=sig, alpha=0.1, zo
 axd['D'].set_ylabel("Spearman's rho", fontsize=11)
 axd['D'].set_xlabel('Time (s)', fontsize=11)
 axd['D'].legend(frameon=False, loc="lower right")
-axd['D'].set_title(f'Correlation between similarity index and learning time course', fontsize=13)
+axd['D'].set_title(f'Correlation time course between similarity index and learning', fontsize=13)
 
 cmap = plt.cm.get_cmap('tab20', len(subjects))
 idx_rsa = np.where((times >= 0.3) & (times <= 0.5))[0]
@@ -211,11 +211,11 @@ for sub, subject in enumerate(subjects):
 rangee = np.linspace(mdiff.min(), mdiff.max(), 100)
 mean_slope = np.mean(slopes)
 mean_intercept = np.mean(intercepts)
-axd['C'].plot(rangee, mean_slope * rangee + mean_intercept, color='black', lw=4, label='Mean fit\nacross participants')
+axd['C'].plot(rangee, mean_slope * rangee + mean_intercept, color='black', lw=4, label='Mean fit')
 
 axd['C'].set_xlabel('Mean similarity index', fontsize=11)
 axd['C'].set_ylabel('Learning index', fontsize=11)
-axd['C'].set_title(f'Fit between mean representational similarity effect and learning', fontsize=13)
+axd['C'].set_title(f'Representational change effect and learning fit', fontsize=13)
 
 rhos = []
 for sub in range(len(subjects)):

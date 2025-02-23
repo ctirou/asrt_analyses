@@ -160,7 +160,7 @@ pval_rhos = np.load(res_dir / "corr" / "pval_learn-pval.npy")
 fig, axs = plt.subplots(2, 1, figsize=(7, 6), sharex=True, layout='constrained')
 # norm = colors.Normalize(vmin=-0.1, vmax=0.1)
 images = []
-for ax, data, title, pval, vmin, vmax in zip(axs.flat, [contrasts, rhos], ["Contrast of pattern and random", "Correlation between contrast and learning"], [pval_cont, pval_rhos], [-0.07, -0.4], [0.07, 0.4]):
+for ax, data, title, pval, vmin, vmax in zip(axs.flat, [contrasts, rhos], ["Contrast (Pattern - Random)", "Contrast and learning correlation"], [pval_cont, pval_rhos], [-0.07, -0.4], [0.07, 0.4]):
     cmap = 'coolwarm' if ax == axs.flat[0] else "BrBG_r"
         
     im = ax.imshow(data[:, idx][:, :, idx].mean(0), 
@@ -227,8 +227,8 @@ for sub, subject in enumerate(subjects):
 timeg_range = np.linspace(timeg.min(), timeg.max(), 100)
 mean_slope = np.mean(slopes)
 mean_intercept = np.mean(intercepts)
-ax1.plot(timeg_range, mean_slope * timeg_range + mean_intercept, color='black', lw=4, label='Mean fit\nacross participants')
-ax1.set_title('Correlation between mean predictive activity\nand learning', fontsize=16)
+ax1.plot(timeg_range, mean_slope * timeg_range + mean_intercept, color='black', lw=4, label='Mean fit')
+ax1.set_title('Predictive activity and learning fit', fontsize=16)
 # fig.suptitle('Correlation between mean predictive activity\nand learning', fontsize=16, y=0.95)
 ax1.set_xlabel('Average pre-stimulus time generalization', fontsize=13)
 ax1.set_ylabel('Learning index', fontsize=13)
@@ -283,7 +283,7 @@ for sub, subject in enumerate(subjects):
 timeg_range = np.linspace(timeg.min(), timeg.max(), 100)
 mean_slope = np.mean(slopes)
 mean_intercept = np.mean(intercepts)
-ax2.plot(timeg_range, mean_slope * timeg_range + mean_intercept, color='black', lw=4, label='Mean fit\nacross participants')
+ax2.plot(timeg_range, mean_slope * timeg_range + mean_intercept, color='black', lw=4, label='Mean fit')
 ax2.set_xlabel('Average pre-stimulus time generalization', fontsize=13)
 ax2.set_ylabel('Similarity index', fontsize=13)
 ax2.spines['top'].set_visible(False)
@@ -292,7 +292,7 @@ leg_title = f'$p$ = {pval:.2e}'
 ax2.legend(frameon=False, title=leg_title, loc="lower right")
 # ax2.set_title("Correlation between mean predictive activity and mean representational similarity", fontsize=16)
 # fig.suptitle("Correlation between mean predictive activity\nand mean representational similarity", y=0.95, fontsize=16)
-ax2.set_title("Correlation between mean predictive activity\nand mean representational similarity", fontsize=16)
+ax2.set_title("Predictive activity and representational similarity fit", fontsize=16)
 fig.savefig(figure_dir / "rsa_corr.pdf", transparent=True)
 # fig.savefig(figure_dir / "combined_corr.pdf", transparent=True)
 plt.close()

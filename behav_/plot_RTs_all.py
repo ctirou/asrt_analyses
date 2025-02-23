@@ -176,21 +176,21 @@ ax.autoscale()
 for subject in subjects:
     for i in range(5):
         ax.scatter(str(i), subdict[subject][i]["all"], color=color4, marker=".", alpha=0.3)
-        ax.scatter(str(i), subdict[subject][i]["random_low"], color=color3, marker=".", alpha=0.2)    
+        # ax.scatter(str(i), subdict[subject][i]["random_low"], color=color3, marker=".", alpha=0.2)    
         if i > 0:
             ax.scatter(str(i), subdict[subject][i]["pattern"], color=color1, marker=".", alpha=0.3)
             ax.scatter(str(i), subdict[subject][i]["random_high"], color=color2, marker=".", alpha=0.2)
 ax.plot(sessions, mean_all, '-o', color=color4, label="All", markersize=7, alpha=1)
-ax.plot(sessions[1:], mean_pattern, '-o', color=color1, label="Pattern", markersize=7, alpha=1)
-ax.plot(sessions[1:], mean_random_high, '-o', color=color2, label="Random high", markersize=7, alpha=.9)
-ax.plot(sessions, mean_random_low, '-o', color=color3, label="Random low", markersize=7, alpha=.9)
+ax.plot(sessions[1:], mean_pattern, '-o', color=color1, label="High", markersize=7, alpha=1)
+ax.plot(sessions[1:], mean_random_high, '-o', color=color2, label="Low", markersize=7, alpha=.9)
+# ax.plot(sessions, mean_random_low, '-o', color=color3, label="Random low", markersize=7, alpha=.9)
 # # Add asterisks above all mean random values
 # for i, mean_r in enumerate(mean_random):
 #     ax.annotate('*', (sessions[i], mean_r + 20), ha='center', color='black', fontsize=14)
 # ax.legend(loc='lower left', frameon=False)
 # ax1.legend(loc='center left', bbox_to_anchor=(1, 0.5), frameon=False, title="Trial types")
-ax.legend(loc='lower left', frameon=False, title="Trial types")
-ax.set_ylabel("Reaction Time (ms)", fontsize=12)
+ax.legend(loc='lower left', frameon=False, title="n = 11")
+ax.set_ylabel("Reaction time (ms)", fontsize=12)
 ax.spines['top'].set_visible(False)
 ax.spines['right'].set_visible(False)
 ax.xaxis.set_tick_params(labelbottom=False)  # Hide x-axis tick labels
@@ -203,7 +203,7 @@ learning_indices_mean = learn_index_df.mean(axis=0)
 learning_indices_stderr = learn_index_df.sem(axis=0)
 bar_width = 0.5  # Adjust the width of the bars
 axlow.bar(sessions, learning_indices_mean, yerr=learning_indices_stderr, alpha=0.7, capsize=5, color="#029E73", width=bar_width)
-axlow.set_ylabel("Learning Index", fontsize=12)
+axlow.set_ylabel("Learning index", fontsize=12)
 axlow.spines['top'].set_visible(False)
 axlow.spines['right'].set_visible(False)
 axlow.set_xticklabels(['Practice', '1', '2', '3', '4'])
