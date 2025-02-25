@@ -9,7 +9,8 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 path_data = DATA_DIR
 figures_dir = FIGURES_DIR
 
-subjects = SUBJS
+# subjects = SUBJS
+subjects = ['sub01', 'sub02', 'sub03', 'sub04', 'sub06', 'sub07', 'sub08', 'sub09', 'sub10', 'sub12', 'sub13', 'sub14', 'sub15']
 
 pattern_RT = {
     'Epoch_0': list(),
@@ -90,8 +91,8 @@ for subject in tqdm(subjects):
 
 # Save learning indices to CSV
 learn_index_df = pd.DataFrame.from_dict(learn_index_dict, orient='index')
-if not op.exists(figures_dir / 'behav' / 'learning_indices.csv'):
-    learn_index_df.to_csv(figures_dir / 'behav' / 'learning_indices.csv', sep='\t')
+if not op.exists(figures_dir / 'behav' / 'learning_indices2.csv'):
+    learn_index_df.to_csv(figures_dir / 'behav' / 'learning_indices2.csv', sep='\t')
 
 # Calculate means and standard errors
 mean_all = [np.mean(subdict[subject][i]["all"]) for i in range(5)]
@@ -153,7 +154,7 @@ ax.spines['right'].set_visible(False)
 # ax.set_xticks([0, 1, 2, 3, 4])
 ax.set_xticklabels(['Practice', '1', '2', '3', '4'])
 plt.tight_layout()
-fig.savefig(figures_dir / 'behav' / 'mean_RT.pdf', transparent=True)
+# fig.savefig(figures_dir / 'behav' / 'mean_RT.pdf', transparent=True)
 
 # Plot learning index as a histogram
 fig, ax = plt.subplots(1, 1, figsize=(8, 5))
@@ -185,11 +186,9 @@ ax.plot(sessions[1:], mean_pattern, '-o', color=color1, label="High", markersize
 ax.plot(sessions[1:], mean_random_high, '-o', color=color2, label="Low", markersize=7, alpha=.9)
 # ax.plot(sessions, mean_random_low, '-o', color=color3, label="Random low", markersize=7, alpha=.9)
 # # Add asterisks above all mean random values
-# for i, mean_r in enumerate(mean_random):
+# for i, mean_r in enumerate(mean_random_high):
 #     ax.annotate('*', (sessions[i], mean_r + 20), ha='center', color='black', fontsize=14)
-# ax.legend(loc='lower left', frameon=False)
-# ax1.legend(loc='center left', bbox_to_anchor=(1, 0.5), frameon=False, title="Trial types")
-ax.legend(loc='lower left', frameon=False, title="n = 11")
+ax.legend(loc='lower left', frameon=False, title=f"n = {n}")
 ax.set_ylabel("Reaction time (ms)", fontsize=12)
 ax.spines['top'].set_visible(False)
 ax.spines['right'].set_visible(False)
@@ -209,6 +208,6 @@ axlow.spines['right'].set_visible(False)
 axlow.set_xticklabels(['Practice', '1', '2', '3', '4'])
 axlow.set_xlabel("Session", fontsize=12)
 axlow.set_ylim(bottom=0)  # Set the lower limit of the y-axis to 0 to reduce the height
-fig.savefig(figures_dir / 'behav' / 'combined_2.pdf', transparent=True)
+fig.savefig(figures_dir / 'behav' / 'combined_3.pdf', transparent=True)
 plt.close()
 

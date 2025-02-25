@@ -29,8 +29,8 @@ verbose = True
 
 def process_subject(subject, jobs):
     # set-up the classifier and cv structure
-    # clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
-    clf = make_pipeline(StandardScaler(), LogisticRegressionCV(max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
+    # clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42, n_jobs=jobs))
+    clf = make_pipeline(StandardScaler(), LogisticRegressionCV(max_iter=100000, solver=solver, class_weight="balanced", random_state=42, n_jobs=jobs))
     clf = SlidingEstimator(clf, scoring=scoring, n_jobs=jobs, verbose=verbose)
     cv = StratifiedKFold(folds, shuffle=True, random_state=42)
     
@@ -71,7 +71,7 @@ def process_subject(subject, jobs):
             del epoch, behav
             gc.collect()
 
-            scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=verbose)
+            scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=verbose, n_jobs=jobs)
             np.save(res_path / f"{subject}-all-scores.npy", scores.mean(0))
                 
             del X, y, scores
@@ -86,5 +86,6 @@ if is_cluster:
         print("Error: SLURM_ARRAY_TASK_ID is not set correctly or is out of bounds.")
         sys.exit(1)
 else:
-    for subject in subjects:
+    # for subject in subjects:
+    for subject in ['sub03', 'sub06']:
         process_subject(subject, jobs=-1)

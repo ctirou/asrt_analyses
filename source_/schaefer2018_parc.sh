@@ -6,6 +6,9 @@ source $FREESURFER_HOME/SetUpFreeSurfer.sh
 
 # Single subject
 # recon-all -s sub01 -i sub01.nii -all -qcache
+# to be sure be on 
+# mne watershed_bem -s fsaverage2 --overwrite
+# mne make_scalp_surfaces -s fsaverage2 --force --overwrite
 
 ls *.nii | parallel jobs 15 recon-all -s {.} -i {} -all -qcache
 
@@ -15,10 +18,12 @@ export FREESURFER_HOME="/Applications/freesurfer/7.3.2"
 export SUBJECTS_DIR="/Users/coum/Desktop/asrt/freesurfer"
 source $FREESURFER_HOME/SetUpFreeSurfer.sh
 
-n_parcels=1000
-n_networks=17
+n_parcels=200
+n_networks=7
 
-subjects=("sub01" "sub02" "sub04" "sub07" "sub08" "sub09" "sub10" "sub12" "sub13" "sub14" "sub15")
+# subjects=("sub01" "sub02" "sub04" "sub07" "sub08" "sub09" "sub10" "sub12" "sub13" "sub14" "sub15")
+
+subject="fsaverage2"
 
 for subject in "${subjects[@]}"; do
     echo "### Processing $subject... ###"

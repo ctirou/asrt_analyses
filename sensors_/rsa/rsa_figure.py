@@ -9,10 +9,11 @@ from base import *
 from config import *
 
 data_path = DATA_DIR
-subjects, epochs_list = SUBJS, EPOCHS
+subjects = SUBJS
 metric = 'mahalanobis'
 
-data = 'cv'
+subjects = ['sub01', 'sub02', 'sub03', 'sub04', 'sub06', 'sub07', 'sub08', 'sub09', 'sub10', 'sub12', 'sub13', 'sub14', 'sub15']
+
 analysis = 'pat_high_rdm_high'
 lock = 'stim'
 
@@ -29,7 +30,7 @@ all_decoding = {}
 
 for subject in tqdm(subjects):
     
-    res_path = RESULTS_DIR / 'RSA' / 'sensors' / lock / f"{data}_rdm" / subject
+    res_path = RESULTS_DIR / 'RSA' / 'sensors' / lock / f"cv_rdm" / subject
     ensure_dir(res_path)
         
     # RSA stuff
@@ -65,7 +66,7 @@ for i in range(5):
     diff_sess.append(rev_low - rev_high)
 diff_sess = np.array(diff_sess).swapaxes(0, 1)
 
-learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices.csv', sep="\t", index_col=0)
+learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices2.csv', sep="\t", index_col=0)
 chance = 25
 threshold = 0.05
 
@@ -129,7 +130,7 @@ for trial_type, color in zip(['pattern', 'random'], [c3, c4]):
 axd['A'].set_ylabel('Accuracy (%)', fontsize=11)
 axd['A'].legend(loc='upper left', frameon=False)
 axd['A'].set_xlabel('Time (s)', fontsize=11)
-axd['A'].set_title(f'Decoding time course of trial types', fontsize=13)
+axd['A'].set_title(f'Trial type decoding time course', fontsize=13)
 
 ### B1 ### cvMD
 sem_high = np.std(high, axis=0) / np.sqrt(len(subjects))
@@ -192,7 +193,7 @@ axd['D'].fill_between(times, all_rhos.mean(0) - sem, 0, where=sig, alpha=0.1, zo
 axd['D'].set_ylabel("Spearman's rho", fontsize=11)
 axd['D'].set_xlabel('Time (s)', fontsize=11)
 axd['D'].legend(frameon=False, loc="lower right")
-axd['D'].set_title(f'Correlation time course between similarity index and learning', fontsize=13)
+axd['D'].set_title(f'Similarity index and learning correlation time course', fontsize=13)
 
 cmap = plt.cm.get_cmap('tab20', len(subjects))
 idx_rsa = np.where((times >= 0.3) & (times <= 0.5))[0]

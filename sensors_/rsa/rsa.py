@@ -6,49 +6,48 @@ import pandas as pd
 from base import *
 from config import *
 import sys
+from joblib import Parallel, delayed
 
 lock = 'stim'
 overwrite = True
 verbose = True
 
 data_path = DATA_DIR
-subjects, epochs_list = SUBJS, EPOCHS
+subjects = SUBJS
+subjects = ['sub03', 'sub06']
 metric = 'mahalanobis'
 
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
-def process_subject(subject, verbose):
+def process_subject(subject, epoch_num, verbose):
     
     res_path = RESULTS_DIR / 'RSA' / 'sensors' / lock / "rdm" / subject
     ensure_dir(res_path)
+    # read behav                    
+    behav_fname = op.join(data_path, "behav/%s-%s.pkl" % (subject, epoch_num))
+    behav = pd.read_pickle(behav_fname)
+    # read epochs
+    epoch_fname = op.join(data_path, "%s/%s-%s-epo.fif" % (lock, subject, epoch_num))
+    epoch = mne.read_epochs(epoch_fname, verbose=verbose)
+    data = epoch.get_data(picks='mag', copy=True)
     
-    # loop across sessions
-    for epoch_num in [0, 1, 2, 3, 4]:
-                    
-        behav_fname = op.join(data_path, "behav/%s-%s.pkl" % (subject, epoch_num))
-        behav = pd.read_pickle(behav_fname)
-        # read epochs
-        epoch_fname = op.join(data_path, "%s/%s-%s-epo.fif" % (lock, subject, epoch_num))
-        epoch = mne.read_epochs(epoch_fname, verbose=verbose)
-        data = epoch.get_data(picks='mag', copy=True)
-        
-        if not op.exists(res_path / f"pat-{epoch_num}.npy") or overwrite:
-            epoch_pat = data[np.where(behav["trialtypes"]==1)]
-            behav_pat = behav[behav["trialtypes"]==1]
-            assert len(epoch_pat) == len(behav_pat)
-            rdm_pat = get_rdm(epoch_pat, behav_pat)
-            np.save(res_path / f"pat-{epoch_num}.npy", rdm_pat)
-        else:
-            rdm_pat = np.load(res_path / f"pat-{epoch_num}.npy")
-        
-        if not op.exists(res_path / f"rand-{epoch_num}.npy") or overwrite:
-            epoch_rand = data[np.where(behav["trialtypes"]==2)]
-            behav_rand = behav[behav["trialtypes"]==2]
-            assert len(epoch_rand) == len(behav_rand)
-            rdm_rand = get_rdm(epoch_rand, behav_rand)
-            np.save(res_path / f"rand-{epoch_num}.npy", rdm_rand)
-        else:
-            rdm_rand = np.load(res_path / f"rand-{epoch_num}.npy")
+    if not op.exists(res_path / f"pat-{epoch_num}.npy") or overwrite:
+        epoch_pat = data[np.where(behav["trialtypes"]==1)]
+        behav_pat = behav[behav["trialtypes"]==1]
+        assert len(epoch_pat) == len(behav_pat)
+        rdm_pat = get_rdm(epoch_pat, behav_pat)
+        np.save(res_path / f"pat-{epoch_num}.npy", rdm_pat)
+    else:
+        rdm_pat = np.load(res_path / f"pat-{epoch_num}.npy")
+    
+    if not op.exists(res_path / f"rand-{epoch_num}.npy") or overwrite:
+        epoch_rand = data[np.where(behav["trialtypes"]==2)]
+        behav_rand = behav[behav["trialtypes"]==2]
+        assert len(epoch_rand) == len(behav_rand)
+        rdm_rand = get_rdm(epoch_rand, behav_rand)
+        np.save(res_path / f"rand-{epoch_num}.npy", rdm_rand)
+    else:
+        rdm_rand = np.load(res_path / f"rand-{epoch_num}.npy")
             
 if is_cluster:
     # Check that SLURM_ARRAY_TASK_ID is available and use it to get the subject
@@ -59,6 +58,5 @@ if is_cluster:
     except (IndexError, ValueError) as e:
         print("Error: SLURM_ARRAY_TASK_ID is not set correctly or is out of bounds.")
         sys.exit(1)
-else:
-    for subject in subjects:
-        process_subject(subject, verbose)
+else:        
+    Parallel(-1)(delayed(process_subject)(subject, epoch_num, verbose=True) for subject in subjects for epoch_num in range(5))

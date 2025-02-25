@@ -70,6 +70,7 @@ for network in tqdm(networks):
         rev_high = all_highs[network][:, :, i, :].mean(1) - all_highs[network][:, :, 0, :].mean(axis=1)
         diff_sess[network].append(rev_low - rev_high)
     diff_sess[network] = np.array(diff_sess[network]).swapaxes(0, 1)
+learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices.csv', sep="\t", index_col=0)
 
 fig, axes = plt.subplots(1, 9, sharey=True, figsize=(20, 5), layout='tight')
 for i, network in enumerate(networks):
@@ -113,7 +114,6 @@ fig.suptitle("Correlation between mean predictive activity and mean representati
 fig.savefig(figures_dir / f"rsa_corr.pdf", transparent=True)
 plt.close()
 
-learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices.csv', sep="\t", index_col=0)
 
 fig, axes = plt.subplots(1, 9, sharey=True, figsize=(20, 5), layout='tight')
 for i, network in enumerate(networks):
@@ -193,7 +193,7 @@ for i, network in enumerate(networks):
 
     rhos = []
     for sub in range(len(subjects)):
-        r, p = spear(timeg[sub], rsa[sub])
+        r, p = spear(timeg[sub], learn_index_df.iloc[sub])
         rhos.append(r)        
     pval = ttest_1samp(rhos, 0)[1]
     axes[0, i].set_title(f"{network_names[i]}")
@@ -238,4 +238,84 @@ fig.suptitle("Correlation between mean predictive activity and learning (top) an
 # fig.text(0.5, 0.02, 'Average pre-stimulus time generalization contrast', ha='center', fontsize=12)
 
 fig.savefig(figures_dir / f"combined_corr.pdf", transparent=True)
+plt.close()
+
+networks = ['SomMot', 'DorsAttn', 'SalVentAttn', 'Default']
+network_names = ['Somatomotor', 'Dorsal Attention', 'Ventral Attention', 'Default']
+fig, axes = plt.subplots(2, 4, sharey=False, sharex=True, figsize=(10, 7), layout='tight')
+for i, network in enumerate(networks):
+    contrasts = src_pat[network] - src_rand[network]
+    timeg = []
+    for sub in range(len(subjects)):
+        tg = []
+        for j in range(5):
+            tg.append(contrasts[sub, j, idx_timeg][:, idx_timeg].mean())
+        timeg.append(np.array(tg))
+    timeg = np.array(timeg)
+    slopes, intercepts = [], []
+    for sub, subject in enumerate(subjects):
+        slope, intercept = np.polyfit(timeg[sub], learn_index_df.iloc[sub], 1)
+        axes[0, i].scatter(timeg[sub], learn_index_df.iloc[sub], alpha=0.3)
+        axes[0, i].plot(timeg[sub], slope * timeg[sub] + intercept, alpha=0.6, label=f"Subject {sub+1}")
+        slopes.append(slope)
+        intercepts.append(intercept)
+
+    timeg_range = np.linspace(timeg.min(), timeg.max(), 100)
+
+    axes[0, i].plot(timeg_range, np.mean(slopes) * timeg_range + np.mean(intercepts), color='black', lw=4, label='Mean fit')
+    # axes[i].set_xlabel('Mean time generalization', fontsize=12)
+    # axes[i].legend(frameon=False, ncol=2)
+    axes[0, i].spines['top'].set_visible(False)
+    axes[0, i].spines['right'].set_visible(False)
+    axes[0, i].set_title(network_names[i])
+    if i == 0:
+        axes[0, i].set_ylabel('Learning index', fontsize=12)
+    learn_index_flat = learn_index_df.to_numpy().flatten()
+    rhos = []
+    for sub in range(len(subjects)):
+        r, p = spear(timeg[sub], learn_index_df.iloc[sub])
+        rhos.append(r)        
+    pval = ttest_1samp(rhos, 0)[1]
+    axes[0, i].set_title(f"{network_names[i]}")
+    axes[0, i].text(0.05, 0.05, f"$p=${pval:.2f}", transform=axes[0, i].transAxes, fontsize=12, verticalalignment='bottom')
+
+
+    rsa = diff_sess[network].copy()[:, :, idx_rsa].mean(2)
+    slopes, intercepts = [], []
+    for sub, subject in enumerate(subjects):
+        slope, intercept = np.polyfit(timeg[sub], rsa[sub], 1)
+        axes[1, i].scatter(timeg[sub], rsa[sub], alpha=0.3)
+        axes[1, i].plot(timeg[sub], slope * timeg[sub] + intercept, alpha=0.6, label=f"Subject {sub+1}")
+        slopes.append(slope)
+        intercepts.append(intercept)
+    
+    axes[1, i].plot(timeg_range, np.mean(slopes) * timeg_range + np.mean(intercepts), color='black', lw=4, label='Mean fit')
+    axes[1, i].set_xlabel('Mean pre-stim. contrast', fontsize=12)
+    # axes[i].legend(frameon=False, ncol=2)
+    axes[1, i].spines['top'].set_visible(False)
+    axes[1, i].spines['right'].set_visible(False)
+    if i == 0:
+        axes[1, i].set_ylabel('Similarity index', fontsize=12)
+    rhos = []
+    for sub in range(len(subjects)):
+        r, p = spear(timeg[sub], rsa[sub])
+        rhos.append(r)        
+    pval = ttest_1samp(rhos, 0)[1]
+    
+    axes[1, i].text(0.05, 0.05, f"$p=${pval:.2f}", transform=axes[1, i].transAxes, fontsize=12, verticalalignment='bottom')
+
+    for ax in axes[0, :]:
+        ax.get_shared_y_axes().join(ax, axes[0, 0])
+    for ax in axes[1, :]:
+        ax.get_shared_y_axes().join(ax, axes[1, 0])
+        
+    if i != 0:
+        axes[0, i].set_yticklabels([])
+        axes[1, i].set_yticklabels([])
+
+fig.suptitle("Correlation between mean predictive activity and learning (top)\nand similarity index (bottom)", fontweight='bold', fontsize=16)
+
+# fig.text(0.5, 0.02, 'Average pre-stimulus time generalization contrast', ha='center', fontsize=12)
+
+fig.savefig(figures_dir / f"combined_corr_best.pdf", transparent=True)
 plt.close()
