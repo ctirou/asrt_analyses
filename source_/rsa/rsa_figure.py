@@ -127,7 +127,6 @@ cmap = plt.cm.get_cmap('tab20', len(network_names))
 cmap = sns.color_palette("colorblind", as_cmap=True)
 cmap = ['#0173B2','#DE8F05','#029E73','#D55E00','#CC78BC','#CA9161','#FBAFE4','#ECE133','#56B4E9']
 
-
 fig, axd = plt.subplot_mosaic(
     design, 
     sharex=False, 
@@ -240,6 +239,7 @@ for i, (label, name, j) in enumerate(zip(networks, network_names, ['B', 'E', 'H'
         axd[j].set_xlabel('Time (s)', fontsize=11)
     if j == 'B':
         axd[j].set_title(f'Similarity index')
+
 ### Plot subject x learning index correlation ###
 for i, (label, name, j) in enumerate(zip(networks, network_names, ['C', 'F', 'I', 'L', 'O', 'R', 'U', 'X', 'AA'])):
     plot_onset(axd[j])
@@ -274,7 +274,7 @@ for i, (label, name, j) in enumerate(zip(networks, network_names, ['C', 'F', 'I'
         axd[j].set_xlabel('Time (s)', fontsize=11)
     # axd[j].legend(frameon=False, loc="lower right")
     if j == 'C':
-        axd[j].set_title('Sim. & learning corr.')
+        axd[j].set_title('Similarity\n& learning correlation')
         
 fig.savefig(figures_dir / f"{lock}-rsa-tight-no-title-2.pdf", transparent=True)
 plt.close()

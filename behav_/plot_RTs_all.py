@@ -182,8 +182,8 @@ for subject in subjects:
             ax.scatter(str(i), subdict[subject][i]["pattern"], color=color1, marker=".", alpha=0.3)
             ax.scatter(str(i), subdict[subject][i]["random_high"], color=color2, marker=".", alpha=0.2)
 ax.plot(sessions, mean_all, '-o', color=color4, label="All", markersize=7, alpha=1)
-ax.plot(sessions[1:], mean_pattern, '-o', color=color1, label="High", markersize=7, alpha=1)
-ax.plot(sessions[1:], mean_random_high, '-o', color=color2, label="Low", markersize=7, alpha=.9)
+ax.plot(sessions[1:], mean_pattern, '-o', color=color1, label="Pattern pair", markersize=7, alpha=1)
+ax.plot(sessions[1:], mean_random_high, '-o', color=color2, label="Random pair", markersize=7, alpha=.9)
 # ax.plot(sessions, mean_random_low, '-o', color=color3, label="Random low", markersize=7, alpha=.9)
 # # Add asterisks above all mean random values
 # for i, mean_r in enumerate(mean_random_high):
@@ -210,4 +210,3 @@ axlow.set_xlabel("Session", fontsize=12)
 axlow.set_ylim(bottom=0)  # Set the lower limit of the y-axis to 0 to reduce the height
 fig.savefig(figures_dir / 'behav' / 'combined_3.pdf', transparent=True)
 plt.close()
-

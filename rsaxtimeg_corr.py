@@ -240,8 +240,8 @@ fig.suptitle("Correlation between mean predictive activity and learning (top) an
 fig.savefig(figures_dir / f"combined_corr.pdf", transparent=True)
 plt.close()
 
-networks = ['SomMot', 'DorsAttn', 'SalVentAttn', 'Default']
-network_names = ['Somatomotor', 'Dorsal Attention', 'Ventral Attention', 'Default']
+networks = ['SomMot', 'DorsAttn', 'SalVentAttn', 'Cont']
+network_names = ['Somatomotor', 'Dorsal Attention', 'Ventral Attention', 'Control']
 fig, axes = plt.subplots(2, 4, sharey=False, sharex=True, figsize=(10, 7), layout='tight')
 for i, network in enumerate(networks):
     contrasts = src_pat[network] - src_rand[network]
@@ -277,7 +277,7 @@ for i, network in enumerate(networks):
         rhos.append(r)        
     pval = ttest_1samp(rhos, 0)[1]
     axes[0, i].set_title(f"{network_names[i]}")
-    axes[0, i].text(0.05, 0.05, f"$p=${pval:.2f}", transform=axes[0, i].transAxes, fontsize=12, verticalalignment='bottom')
+    axes[0, i].text(0.05, 0.95, f"$p=${pval:.2f}", transform=axes[0, i].transAxes, fontsize=12, verticalalignment='top')
 
 
     rsa = diff_sess[network].copy()[:, :, idx_rsa].mean(2)
@@ -302,7 +302,7 @@ for i, network in enumerate(networks):
         rhos.append(r)        
     pval = ttest_1samp(rhos, 0)[1]
     
-    axes[1, i].text(0.05, 0.05, f"$p=${pval:.2f}", transform=axes[1, i].transAxes, fontsize=12, verticalalignment='bottom')
+    axes[1, i].text(0.05, 0.95, f"$p=${pval:.2f}", transform=axes[1, i].transAxes, fontsize=12, verticalalignment='top')
 
     for ax in axes[0, :]:
         ax.get_shared_y_axes().join(ax, axes[0, 0])
@@ -313,7 +313,7 @@ for i, network in enumerate(networks):
         axes[0, i].set_yticklabels([])
         axes[1, i].set_yticklabels([])
 
-fig.suptitle("Correlation between mean predictive activity and learning (top)\nand similarity index (bottom)", fontweight='bold', fontsize=16)
+fig.suptitle("Correlation between mean predictive activity and learning (top)\nand mean representational change effect (bottom)", fontweight='bold', fontsize=16)
 
 # fig.text(0.5, 0.02, 'Average pre-stimulus time generalization contrast', ha='center', fontsize=12)
 

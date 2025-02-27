@@ -14,6 +14,7 @@ path_data = DATA_DIR
 figures = RESULTS_DIR
 
 subjects = SUBJS
+# subjects = ['sub01', 'sub02', 'sub03', 'sub04', 'sub06', 'sub07', 'sub08', 'sub09', 'sub10', 'sub12', 'sub13', 'sub14', 'sub15']
 
 blocks = ['1','2','3','4']
 columns = blocks.copy()
@@ -32,7 +33,8 @@ for subject in subjects:
         behav_df.reset_index(inplace=True)      
         aRT.append(behav_df['RTs'].mean())
         pRT.append(behav_df['RTs'][np.where(behav_df['triplets'] == 30)[0]].mean())
-        rRT.append(behav_df['RTs'][np.where((behav_df['triplets'] == 32) | (behav_df['triplets'] == 34))[0]].mean())
+        # rRT.append(behav_df['RTs'][np.where((behav_df['triplets'] == 32) | (behav_df['triplets'] == 34))[0]].mean())
+        rRT.append(behav_df['RTs'][np.where((behav_df['triplets'] == 32))[0]].mean())
     all_RT.append(np.array(aRT))
     pat_RT.append(np.array(pRT))
     rand_RT.append(np.array(rRT))

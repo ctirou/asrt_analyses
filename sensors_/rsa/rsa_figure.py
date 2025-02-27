@@ -95,7 +95,7 @@ fig, axd = plt.subplot_mosaic(outer,
                               figsize=(15, 10), 
                               layout='tight',
                               gridspec_kw={
-                                  'height_ratios': [1, .7],
+                                  'height_ratios': [1, .5],
                                 #   'width_ratios': [.3, .3, 1  , .5, .5]
                                   })
 for ax in axd.values():
@@ -109,66 +109,70 @@ for ax in axd.values():
             ax.axvline(0, color='black')
 ### A ### Decoding
 if lock == 'stim':
-        axd['A'].axvspan(0, 0.2, facecolor='grey', edgecolor=None, zorder=0, alpha=.1, label='Stimulus onset')
+        axd['A'].axvspan(0, 0.2, facecolor='grey', edgecolor=None, zorder=0, alpha=.1)
 else:
     axd['A'].axvline(0, color='black', label='Button press')
 # Plot for subplot A
-axd['A'].axhline(chance, color='grey', label='Chance level', alpha=0.5)
-for trial_type, color in zip(['pattern', 'random'], [c3, c4]):
+axd['A'].axhline(chance, color='grey', alpha=0.5)
+for trial_type, color in zip(['pattern', 'random'], ["#FFD966", "#FF718B"]):
     decoding = all_decoding[trial_type]
     p_values = decod_stats(decoding - chance, -1)
     sig = p_values < 0.05
     sem = np.std(decoding, axis=0) / np.sqrt(len(subjects))
     # Plot the entire line in the default color
-    axd['A'].plot(times, decoding.mean(0), alpha=1, zorder=10, color='C7')
+    axd['A'].plot(times, decoding.mean(0), alpha=1, color=color, label=f'{trial_type.capitalize()}')
     # Fill the entire area with a semi-transparent color
-    axd['A'].fill_between(times, decoding.mean(0) - sem, decoding.mean(0) + sem, alpha=0.2, zorder=5, facecolor='C7')
+    axd['A'].fill_between(times, decoding.mean(0) - sem, decoding.mean(0) + sem, alpha=0.2, facecolor=color)
     # Overlay significant regions with the specified color
-    axd['A'].fill_between(times, decoding.mean(0) - sem, decoding.mean(0) + sem, where=sig, alpha=0.3, zorder=10, facecolor=color, label=f'{trial_type.capitalize()} significance')
+    # axd['A'].fill_between(times, decoding.mean(0) - sem, decoding.mean(0) + sem, where=sig, alpha=0.3, zorder=10, facecolor=color, label=f'{trial_type.capitalize()}')
     # Highlight significant regions
-    axd['A'].fill_between(times, decoding.mean(0) - sem, chance, where=sig, alpha=0.1, zorder=15, facecolor=color)
+    axd['A'].fill_between(times, decoding.mean(0) - sem, chance, where=sig, alpha=0.1, facecolor=color)
+    # break
+
+axd['A'].text(0.1, 48, '$Stimulus$', fontsize=11, ha='center')
+axd['A'].text(0.6, 24.5, '$Chance$', fontsize=11, ha='center', va='top')
 axd['A'].set_ylabel('Accuracy (%)', fontsize=11)
 axd['A'].legend(loc='upper left', frameon=False)
 axd['A'].set_xlabel('Time (s)', fontsize=11)
-axd['A'].set_title(f'Trial type decoding time course', fontsize=13)
+axd['A'].set_title(f'Decoding performance of stimuli', fontsize=13)
 
 ### B1 ### cvMD
 sem_high = np.std(high, axis=0) / np.sqrt(len(subjects))
 sem_low = np.std(low, axis=0) / np.sqrt(len(subjects))
 # High
-axd['B1'].plot(times, high.mean(0), alpha=1, zorder=10, color=c3, label='High')
+axd['B1'].plot(times, high.mean(0), alpha=1, zorder=10, color="#00B0F0", label='Pattern')
 # Plot significant regions separately
 # for start, end in contiguous_regions(sig):
 #     axd['B1'].plot(times[start:end], high.mean(0)[start:end], alpha=1, zorder=10, color=c3)
-axd['B1'].fill_between(times, high.mean(0) - sem_high, high.mean(0) + sem_high, alpha=0.2, zorder=5, facecolor=c3)    
+axd['B1'].fill_between(times, high.mean(0) - sem_high, high.mean(0) + sem_high, alpha=0.2, zorder=5, facecolor="#00B0F0")    
 # Highlight significant regions
 # axd['B1'].fill_between(times, high.mean(0) - sem, high.mean(0) + sem, where=sig, alpha=0.3, zorder=5, facecolor=c3)    
 # Low
-axd['B1'].plot(times, low.mean(0), alpha=1, zorder=10, color=c4, label='Low')
+axd['B1'].plot(times, low.mean(0), alpha=1, zorder=10, color="#61CBF5", label='Random')
 # Plot significant regions separately
 # for start, end in contiguous_regions(sig):
 #     axd['B1'].plot(times[start:end], low.mean(0)[start:end], alpha=1, zorder=10, color=c4)
-axd['B1'].fill_between(times, low.mean(0) - sem_low, low.mean(0) + sem_low, alpha=0.2, zorder=5, facecolor=c4)
+axd['B1'].fill_between(times, low.mean(0) - sem_low, low.mean(0) + sem_low, alpha=0.1, zorder=5, facecolor="#61CBF5")
 # Highlight significant regions
 # axd['B1'].fill_between(times, low.mean(0) - sem, low.mean(0) + sem, where=sig, alpha=0.3, zorder=5, facecolor=c4)    
 axd['B1'].legend(frameon=False, loc='lower left')
 axd['B1'].set_ylabel('cvMD', fontsize=11)
 axd['B1'].set_xticklabels([])
-axd['B1'].set_title(f'Cross-validated Mahalanobis distance within pairs', fontsize=13)
+axd['B1'].set_title(f'Mahalanobis distance within pairs', fontsize=13)
 
-# Plot for subplot B2
+### B2 ### Similarity index
 axd['B2'].axhline(0, color='grey', alpha=0.5)
 p_values = decod_stats(diff, -1)
 sig = p_values < 0.05
 sem = np.std(diff, axis=0) / np.sqrt(len(subjects))
 # Plot the entire line in the default color
-axd['B2'].plot(times, diff.mean(0), alpha=1, zorder=10, color='C7')
+axd['B2'].plot(times, diff.mean(0), alpha=1, zorder=10, color=c2)
 # Fill the entire area with a semi-transparent color
-axd['B2'].fill_between(times, diff.mean(0) - sem, diff.mean(0) + sem, alpha=0.2, zorder=5, facecolor='C7')
+axd['B2'].fill_between(times, diff.mean(0) - sem, diff.mean(0) + sem, alpha=0.2, zorder=5, facecolor=c2)
 # Overlay significant regions with the specified color
-axd['B2'].fill_between(times, diff.mean(0) - sem, diff.mean(0) + sem, where=sig, alpha=0.3, zorder=10, facecolor=c2, label='Significance')
+axd['B2'].fill_between(times, diff.mean(0) - sem, 0, where=sig, alpha=0.1, zorder=10, facecolor=c2, label='Significance')
 # Highlight significant regions
-axd['B2'].fill_between(times, diff.mean(0) - sem, 0, where=sig, alpha=0.2, zorder=5, facecolor=c2)
+# axd['B2'].fill_between(times, diff.mean(0) - sem, 0, where=sig, alpha=0.2, zorder=5, facecolor=c2)
 axd['B2'].legend(frameon=False, loc="upper left")
 axd['B2'].set_ylabel('Similarity index', fontsize=11)
 axd['B2'].yaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter('%.2f'))
@@ -183,13 +187,13 @@ sem = np.std(all_rhos, axis=0) / np.sqrt(len(subjects))
 p_values = decod_stats(all_rhos, -1)
 sig = p_values < 0.05
 # Plot the entire line in the default color
-axd['D'].plot(times, all_rhos.mean(0), alpha=1, zorder=10, color='C7')
+axd['D'].plot(times, all_rhos.mean(0), alpha=1, zorder=10, color=c6)
 # Fill the entire area with a semi-transparent color
-axd['D'].fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, alpha=0.2, zorder=5, facecolor='C7')
+axd['D'].fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, alpha=0.2, zorder=5, facecolor=c6)
 # Overlay significant regions with the specified color
-axd['D'].fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, where=sig, alpha=0.2, zorder=10, facecolor=c6, label='Significance')
+# axd['D'].fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, where=sig, alpha=0.2, zorder=10, facecolor=c6, label='Significance')
 # Highlight significant regions
-axd['D'].fill_between(times, all_rhos.mean(0) - sem, 0, where=sig, alpha=0.1, zorder=5, facecolor=c6)
+axd['D'].fill_between(times, all_rhos.mean(0) - sem, 0, where=sig, alpha=0.1, zorder=5, facecolor=c6, label='Significance')
 axd['D'].set_ylabel("Spearman's rho", fontsize=11)
 axd['D'].set_xlabel('Time (s)', fontsize=11)
 axd['D'].legend(frameon=False, loc="lower right")
@@ -216,7 +220,7 @@ axd['C'].plot(rangee, mean_slope * rangee + mean_intercept, color='black', lw=4,
 
 axd['C'].set_xlabel('Mean similarity index', fontsize=11)
 axd['C'].set_ylabel('Learning index', fontsize=11)
-axd['C'].set_title(f'Representational change effect and learning fit', fontsize=13)
+axd['C'].set_title(f'Similarity index and learning fit', fontsize=13)
 
 rhos = []
 for sub in range(len(subjects)):
@@ -225,5 +229,5 @@ for sub in range(len(subjects)):
 pval = ttest_1samp(rhos, 0)[1]
 axd['C'].legend(frameon=False, title=f"$p=${pval:.3f}", loc='upper left')
 
-plt.savefig(figures_dir /  f"{lock}-rsa2.pdf", transparent=True)
+plt.savefig(figures_dir /  f"{lock}-rsa3.pdf", transparent=True)
 plt.close()

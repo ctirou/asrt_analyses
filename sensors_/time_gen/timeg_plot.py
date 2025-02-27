@@ -145,8 +145,8 @@ pval_rhos = np.load(res_dir / "corr" / "pval_learn-pval.npy")
 fig, axs = plt.subplots(2, 1, figsize=(7, 6), sharex=True, layout='constrained')
 # norm = colors.Normalize(vmin=-0.1, vmax=0.1)
 images = []
-for ax, data, title, pval, vmin, vmax in zip(axs.flat, [contrasts, rhos], ["Contrast (Pattern - Random)", "Contrast and learning correlation"], [pval_cont, pval_rhos], [-0.07, -0.35], [0.07, 0.35]):
-    cmap = 'coolwarm' if ax == axs.flat[0] else "BrBG_r"
+for ax, data, title, pval, vmin, vmax in zip(axs.flat, [contrasts, rhos], ["Contrast (Pattern - Random)", "Contrast and learning correlation"], [pval_cont, pval_rhos], [-0.05, -0.2], [0.05, 0.2]):
+    cmap = 'coolwarm' if ax == axs.flat[0] else "BrBG"
         
     im = ax.imshow(data[:, idx][:, :, idx].mean(0), 
                             # norm=norm,
@@ -200,7 +200,7 @@ pval = ttest_1samp(rhos, 0)[1]
 slopes, intercepts = [], []
 
 # fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True, figsize=(7, 6), layout='constrained')
-fig, ax1 = plt.subplots(1, 1, figsize=(7, 6), layout='constrained')
+fig, ax1 = plt.subplots(1, 1, figsize=(7, 3), layout='constrained')
 # Plot for individual subjects
 for sub, subject in enumerate(subjects):
     slope, intercept = np.polyfit(timeg[sub], learn_index_df.iloc[sub], 1)
@@ -215,7 +215,7 @@ mean_intercept = np.mean(intercepts)
 ax1.plot(timeg_range, mean_slope * timeg_range + mean_intercept, color='black', lw=4, label='Mean fit')
 ax1.set_title('Predictive activity and learning fit', fontsize=16)
 # fig.suptitle('Correlation between mean predictive activity\nand learning', fontsize=16, y=0.95)
-ax1.set_xlabel('Average pre-stimulus time generalization', fontsize=13)
+ax1.set_xlabel('Average pre-stimulus contrast', fontsize=13)
 ax1.set_ylabel('Learning index', fontsize=13)
 ax1.spines['top'].set_visible(False)
 ax1.spines['right'].set_visible(False)
@@ -224,6 +224,7 @@ textstr = "$p$ < 0.001" if pval < 0.001 else f'$p$ = {pval:.2e}'
 # Adjust the legend to be outside the plot
 ax1.legend(frameon=False, title=textstr, loc="lower right")
 fig.savefig(figure_dir / "learn_corr.pdf", transparent=True)
+# fig.savefig(figure_dir / "learn_corr2.pdf", transparent=True)
 plt.close()
 
 all_highs, all_lows = [], []
@@ -244,6 +245,7 @@ for i in range(5):
     rev_high = all_highs[:, :, i, :].mean(1) - all_highs[:, :, 0, :].mean(axis=1)
     diff_sess.append(rev_low - rev_high)
 diff_sess = np.array(diff_sess).swapaxes(0, 1)
+
 # correlation between rsa and time generalization
 times_rsa = np.linspace(-0.2, 0.6, 82)
 idx_rsa = np.where((times_rsa >= .3) & (times_rsa <= .5))[0]
@@ -256,7 +258,7 @@ for sub in range(len(subjects)):
     rhos.append(r)    
 pval = ttest_1samp(rhos, 0)[1]
 
-fig, ax2 = plt.subplots(1, 1, figsize=(7, 6), layout='constrained')
+fig, ax2 = plt.subplots(1, 1, figsize=(6, 3), layout='constrained')
 # Plot for individual subjects
 for sub, subject in enumerate(subjects):
     slope, intercept = np.polyfit(timeg[sub], rsa[sub], 1)
@@ -269,7 +271,7 @@ timeg_range = np.linspace(timeg.min(), timeg.max(), 100)
 mean_slope = np.mean(slopes)
 mean_intercept = np.mean(intercepts)
 ax2.plot(timeg_range, mean_slope * timeg_range + mean_intercept, color='black', lw=4, label='Mean fit')
-ax2.set_xlabel('Average pre-stimulus time generalization', fontsize=13)
+ax2.set_xlabel('Average pre-stimulus contrast', fontsize=13)
 ax2.set_ylabel('Similarity index', fontsize=13)
 ax2.spines['top'].set_visible(False)
 ax2.spines['right'].set_visible(False)
@@ -277,7 +279,7 @@ textstr = "$p$ < 0.001" if pval < 0.001 else f'$p$ = {pval:.2e}'
 ax2.legend(frameon=False, title=textstr, loc="lower right")
 # ax2.set_title("Correlation between mean predictive activity and mean representational similarity", fontsize=16)
 # fig.suptitle("Correlation between mean predictive activity\nand mean representational similarity", y=0.95, fontsize=16)
-ax2.set_title("Predictive activity and representational similarity fit", fontsize=16)
+ax2.set_title("Predictive activity and representational change fit", fontsize=16)
 fig.savefig(figure_dir / "rsa_corr.pdf", transparent=True)
 # fig.savefig(figure_dir / "combined_corr.pdf", transparent=True)
 plt.close()
