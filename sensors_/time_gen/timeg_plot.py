@@ -145,7 +145,8 @@ pval_rhos = np.load(res_dir / "corr" / "pval_learn-pval.npy")
 fig, axs = plt.subplots(2, 1, figsize=(7, 6), sharex=True, layout='constrained')
 # norm = colors.Normalize(vmin=-0.1, vmax=0.1)
 images = []
-for ax, data, title, pval, vmin, vmax in zip(axs.flat, [contrasts, rhos], ["Contrast (Pattern - Random)", "Contrast and learning correlation"], [pval_cont, pval_rhos], [-0.05, -0.2], [0.05, 0.2]):
+for ax, data, title, pval, vmin, vmax in zip(axs.flat, [contrasts, rhos], \
+    ["Contrast (Pattern - Random)", "Contrast and learning correlation"], [pval_cont, pval_rhos], [-0.05, -0.2], [0.05, 0.2]):
     cmap = 'coolwarm' if ax == axs.flat[0] else "BrBG"
         
     im = ax.imshow(data[:, idx][:, :, idx].mean(0), 
@@ -172,13 +173,12 @@ for ax, data, title, pval, vmin, vmax in zip(axs.flat, [contrasts, rhos], ["Cont
         label = "Spearman's\nrho"
     else:
         label = "Difference in\naccuracy"
-
     # Draw an empty rectangle centered on -0.25
-    rect = plt.Rectangle([-0.75, -0.75], 0.72, 0.68, fill=False, edgecolor='black', linestyle='--', lw=1.5)
+    rectcolor = 'black' if ax == axs.flat[0] else 'red'
+    rect = plt.Rectangle([-0.75, -0.75], 0.72, 0.68, fill=False, edgecolor=rectcolor, linestyle='-', lw=2)
     ax.add_patch(rect)
     cbar = fig.colorbar(im, ax=ax, orientation='vertical', fraction=.1, ticks=[vmin, vmax])
-    cbar.set_label(label, rotation=270, fontsize=13)
-    
+    cbar.set_label(label, rotation=270, fontsize=13)        
 fig.savefig(figure_dir / "contrast_corr2.pdf", transparent=True)
 plt.close()
 
