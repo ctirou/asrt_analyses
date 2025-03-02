@@ -82,11 +82,15 @@ outer = [['A', innerB],
 cmap1 = colors['Darjeeling1']
 
 c1 = "#0173B2"
-c2 = "#029E73"
-c3 = "#CA9161"
+c2 = "#5BBCD6"
+c3 = "#029E73"
 c4 = "#CC78BC"
 c5 = "#ECE133"
-c6 = "#D55E00"
+c6 = "#029E73"
+
+cpat = "#FFD966"
+cpat = "#FAD510"
+crdm = "#FF718B"
 
 plt.rcParams.update({'font.size': 12, 'font.family': 'serif', 'font.serif': 'Arial'})
 
@@ -94,10 +98,7 @@ fig, axd = plt.subplot_mosaic(outer,
                               sharex=False, 
                               figsize=(15, 10), 
                               layout='tight',
-                              gridspec_kw={
-                                  'height_ratios': [1, .5],
-                                #   'width_ratios': [.3, .3, 1  , .5, .5]
-                                  })
+                              gridspec_kw={'height_ratios': [1, .5]})
 for ax in axd.values():
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
@@ -114,7 +115,7 @@ else:
     axd['A'].axvline(0, color='black', label='Button press')
 # Plot for subplot A
 axd['A'].axhline(chance, color='grey', alpha=0.5)
-for trial_type, color in zip(['pattern', 'random'], ["#FFD966", "#FF718B"]):
+for trial_type, color in zip(['pattern', 'random'], [cpat, crdm]):
     decoding = all_decoding[trial_type]
     p_values = decod_stats(decoding - chance, -1)
     sig = p_values < 0.05
@@ -128,9 +129,9 @@ for trial_type, color in zip(['pattern', 'random'], ["#FFD966", "#FF718B"]):
     # Highlight significant regions
     axd['A'].fill_between(times, decoding.mean(0) - sem, chance, where=sig, alpha=0.1, facecolor=color)
     # break
-
-axd['A'].text(0.1, 48, '$Stimulus$', fontsize=11, ha='center')
-axd['A'].text(0.6, 24.5, '$Chance$', fontsize=11, ha='center', va='top')
+axd['A'].text(np.mean(times[sig]), 26, '*', fontsize=20, ha='center', va='center', color='black', weight='bold')
+axd['A'].text(0.1, 48.5, '$Stimulus$', fontsize=11, ha='center')
+axd['A'].text(0.6, 26, '$Chance$', fontsize=11, ha='center', va='top')
 axd['A'].set_ylabel('Accuracy (%)', fontsize=11)
 axd['A'].legend(loc='upper left', frameon=False)
 axd['A'].set_xlabel('Time (s)', fontsize=11)
@@ -140,19 +141,19 @@ axd['A'].set_title(f'Decoding performance of stimuli', fontsize=13)
 sem_high = np.std(high, axis=0) / np.sqrt(len(subjects))
 sem_low = np.std(low, axis=0) / np.sqrt(len(subjects))
 # High
-axd['B1'].plot(times, high.mean(0), alpha=1, zorder=10, color="#00B0F0", label='Pattern')
+axd['B1'].plot(times, high.mean(0), alpha=1, zorder=10, color=cpat, label='Pattern')
 # Plot significant regions separately
 # for start, end in contiguous_regions(sig):
 #     axd['B1'].plot(times[start:end], high.mean(0)[start:end], alpha=1, zorder=10, color=c3)
-axd['B1'].fill_between(times, high.mean(0) - sem_high, high.mean(0) + sem_high, alpha=0.2, zorder=5, facecolor="#00B0F0")    
+axd['B1'].fill_between(times, high.mean(0) - sem_high, high.mean(0) + sem_high, alpha=0.2, zorder=5, facecolor=cpat)    
 # Highlight significant regions
 # axd['B1'].fill_between(times, high.mean(0) - sem, high.mean(0) + sem, where=sig, alpha=0.3, zorder=5, facecolor=c3)    
 # Low
-axd['B1'].plot(times, low.mean(0), alpha=1, zorder=10, color="#61CBF5", label='Random')
+axd['B1'].plot(times, low.mean(0), alpha=1, zorder=10, color=crdm, label='Random')
 # Plot significant regions separately
 # for start, end in contiguous_regions(sig):
 #     axd['B1'].plot(times[start:end], low.mean(0)[start:end], alpha=1, zorder=10, color=c4)
-axd['B1'].fill_between(times, low.mean(0) - sem_low, low.mean(0) + sem_low, alpha=0.1, zorder=5, facecolor="#61CBF5")
+axd['B1'].fill_between(times, low.mean(0) - sem_low, low.mean(0) + sem_low, alpha=0.1, zorder=5, facecolor=crdm)
 # Highlight significant regions
 # axd['B1'].fill_between(times, low.mean(0) - sem, low.mean(0) + sem, where=sig, alpha=0.3, zorder=5, facecolor=c4)    
 axd['B1'].legend(frameon=False, loc='lower left')
@@ -170,10 +171,11 @@ axd['B2'].plot(times, diff.mean(0), alpha=1, zorder=10, color=c2)
 # Fill the entire area with a semi-transparent color
 axd['B2'].fill_between(times, diff.mean(0) - sem, diff.mean(0) + sem, alpha=0.2, zorder=5, facecolor=c2)
 # Overlay significant regions with the specified color
-axd['B2'].fill_between(times, diff.mean(0) - sem, 0, where=sig, alpha=0.1, zorder=10, facecolor=c2, label='Significance')
+axd['B2'].fill_between(times, diff.mean(0) - sem, 0, where=sig, alpha=0.1, zorder=10, facecolor=c2)
 # Highlight significant regions
 # axd['B2'].fill_between(times, diff.mean(0) - sem, 0, where=sig, alpha=0.2, zorder=5, facecolor=c2)
-axd['B2'].legend(frameon=False, loc="upper left")
+# axd['B2'].legend(frameon=False, loc="upper left")
+axd['B2'].text(np.mean(times[sig]), 0.05, '*', fontsize=20, ha='center', va='center', color='black', weight='bold')
 axd['B2'].set_ylabel('Similarity index', fontsize=11)
 axd['B2'].yaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter('%.2f'))
 axd['B2'].set_xlabel('Time (s)', fontsize=11)
@@ -193,10 +195,11 @@ axd['D'].fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, alp
 # Overlay significant regions with the specified color
 # axd['D'].fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, where=sig, alpha=0.2, zorder=10, facecolor=c6, label='Significance')
 # Highlight significant regions
-axd['D'].fill_between(times, all_rhos.mean(0) - sem, 0, where=sig, alpha=0.1, zorder=5, facecolor=c6, label='Significance')
+axd['D'].fill_between(times, all_rhos.mean(0) - sem, 0, where=sig, alpha=0.1, zorder=5, facecolor=c6)
 axd['D'].set_ylabel("Spearman's rho", fontsize=11)
 axd['D'].set_xlabel('Time (s)', fontsize=11)
-axd['D'].legend(frameon=False, loc="lower right")
+axd['D'].text(np.mean(times[sig]), 0.05, '*', fontsize=20, ha='center', va='center', color='black', weight='bold')
+# axd['D'].legend(frameon=False, loc="lower right")
 axd['D'].set_title(f'Similarity index and learning correlation time course', fontsize=13)
 
 cmap = plt.cm.get_cmap('tab20', len(subjects))
