@@ -138,7 +138,8 @@ fig, axd = plt.subplot_mosaic(
     })
 ### Plot brain ###
 brain_kwargs = dict(hemi='both', background="white", cortex="low_contrast", surf='inflated', subjects_dir=subjects_dir, size=(800, 400))
-for i, (label, name, sideA, sideB) in enumerate(zip(networks, network_names, ['br11', 'br21', 'br31', 'br41', 'br51', 'br61', 'br71', 'br81', 'br91'], ['br12', 'br22', 'br32', 'br42', 'br52', 'br62', 'br72', 'br82', 'br92'])):
+for i, (label, name, sideA, sideB) in enumerate(zip(networks, network_names, \
+    ['br11', 'br21', 'br31', 'br41', 'br51', 'br61', 'br71', 'br81', 'br91'], ['br12', 'br22', 'br32', 'br42', 'br52', 'br62', 'br72', 'br82', 'br92'])):
     # Initialize Brain object
     # Add labels
     if label in networks[:-2]:
@@ -175,7 +176,8 @@ for i, (label, name, sideA, sideB) in enumerate(zip(networks, network_names, ['b
     axd[sideB].axis('off')
 
 ### Plot decoding ###
-for i, (label, name, j, k) in enumerate(zip(networks, network_names, ['A1', 'D1', 'G1', 'J1', 'M1', 'P1', 'S1', 'V1', 'Y1'], ['A2', 'D2', 'G2', 'J2', 'M2', 'P2', 'S2', 'V2', 'Y2'])):
+for i, (label, name, j, k) in enumerate(zip(networks, network_names,  \
+    ['A1', 'D1', 'G1', 'J1', 'M1', 'P1', 'S1', 'V1', 'Y1'], ['A2', 'D2', 'G2', 'J2', 'M2', 'P2', 'S2', 'V2', 'Y2'])):
     for l, data in zip([j, k], [pattern, random]):
         plot_onset(axd[l])
         score = data[label] * 100
@@ -210,6 +212,7 @@ for i, (label, name, j, k) in enumerate(zip(networks, network_names, ['A1', 'D1'
             # axd[l].figure.subplots_adjust(hspace=0)
         axd[l].yaxis.set_major_formatter(FuncFormatter(lambda x, pos: f'{int(x)}'))
         axd[l].yaxis.set_major_locator(plt.MaxNLocator(nbins=2, prune='both'))
+        axd[l].set_ylim(23, 43)
         
 ### Plot similarity index ###    
 for i, (label, name, j) in enumerate(zip(networks, network_names, ['B', 'E', 'H', 'K', 'N', 'Q', 'T', 'W', 'Z'])):
@@ -239,6 +242,7 @@ for i, (label, name, j) in enumerate(zip(networks, network_names, ['B', 'E', 'H'
         axd[j].set_xlabel('Time (s)', fontsize=11)
     if j == 'B':
         axd[j].set_title(f'Similarity index')
+    axd[j].set_ylim(-.5, 2.5)
 
 ### Plot subject x learning index correlation ###
 for i, (label, name, j) in enumerate(zip(networks, network_names, ['C', 'F', 'I', 'L', 'O', 'R', 'U', 'X', 'AA'])):
@@ -265,7 +269,7 @@ for i, (label, name, j) in enumerate(zip(networks, network_names, ['C', 'F', 'I'
     # axd[j].fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, color=cmap[i], alpha=0.2)
     # axd[j].fill_between(times, all_rhos.mean(0) - sem, 0, where=sig_unc, alpha=.3, label='Significance - uncorrected', facecolor="#7294D4")
     axd[j].fill_between(times, all_rhos.mean(0) - sem, 0, where=sig, alpha=.4, facecolor="#F2AD00", label='Significance - corrected')
-    axd[j].set_ylabel("Spearman's rho", fontsize=11)
+    axd[j].set_ylabel("Rho", fontsize=11)
     axd[j].yaxis.set_major_formatter(FormatStrFormatter('%.1f'))
     axd[j].fill_between(times, all_rhos.mean(0) - sem, 0, where=sig, alpha=0.3, zorder=5, facecolor=cmap[i])
     axd[j].xaxis.set_major_formatter(FuncFormatter(lambda x, pos: f'{x:.1f}'))
@@ -274,9 +278,11 @@ for i, (label, name, j) in enumerate(zip(networks, network_names, ['C', 'F', 'I'
         axd[j].set_xlabel('Time (s)', fontsize=11)
     # axd[j].legend(frameon=False, loc="lower right")
     if j == 'C':
-        axd[j].set_title('Similarity\n& learning correlation')
-        
-fig.savefig(figures_dir / f"{lock}-rsa-tight-no-title-2.pdf", transparent=True)
+        axd[j].set_title('Similarity index\n& learning correlation')
+    axd[j].set_ylim(-.5, .5)
+    axd[j].set_yticks([-.5, 0, .5])
+    
+fig.savefig(figures_dir / f"{lock}-rsa.pdf", transparent=True)
 plt.close()
 
 
