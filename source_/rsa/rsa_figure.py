@@ -202,14 +202,16 @@ for i, (label, name, j, k) in enumerate(zip(networks, network_names,  \
         if l == 'A1':
             axd[l].set_title('Decoding')
             ymax = axd[l].get_ylim()[1]
-            axd[l].text(times[0], ymax - 0.2 * ymax, 'Pattern', fontsize=9, ha='left', weight='normal', style='italic')
-        elif l == 'A2':
-            axd[l].text(times[0], ymax - 0.2 * ymax, 'Random', fontsize=9, ha='left', weight='normal', style='italic')
+        # elif l == 'A2':
         elif l == 'Y2':
             axd[l].set_xlabel('Time (s)', fontsize=11)
         if l == j:
             axd[l].set_xticklabels([])
             # axd[l].figure.subplots_adjust(hspace=0)
+        if '1' in l:
+            axd[l].text(times[0], ymax - 0.2 * ymax, 'Pattern', fontsize=9, ha='left', weight='normal', style='italic')
+        else:
+            axd[l].text(times[0], ymax - 0.2 * ymax, 'Random', fontsize=9, ha='left', weight='normal', style='italic')
         axd[l].yaxis.set_major_formatter(FuncFormatter(lambda x, pos: f'{int(x)}'))
         axd[l].yaxis.set_major_locator(plt.MaxNLocator(nbins=2, prune='both'))
         axd[l].set_ylim(23, 43)
