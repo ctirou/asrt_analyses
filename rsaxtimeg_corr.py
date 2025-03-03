@@ -240,8 +240,8 @@ fig.suptitle("Correlation between mean predictive activity and learning (top) an
 fig.savefig(figures_dir / f"combined_corr.pdf", transparent=True)
 plt.close()
 
-networks = ['SomMot', 'DorsAttn', 'SalVentAttn', 'Cont']
-network_names = ['Somatomotor', 'Dorsal Attention', 'Ventral Attention', 'Control']
+networks = ['SomMot', 'DorsAttn', 'Cont', 'Default']
+network_names = ['Somatomotor', 'Dorsal Attention', 'Control', 'Default']
 fig, axes = plt.subplots(2, 4, sharey=False, sharex=True, figsize=(10, 7), layout='tight')
 for i, network in enumerate(networks):
     contrasts = src_pat[network] - src_rand[network]
@@ -249,7 +249,8 @@ for i, network in enumerate(networks):
     for sub in range(len(subjects)):
         tg = []
         for j in range(5):
-            tg.append(contrasts[sub, j, idx_timeg][:, idx_timeg].mean())
+            # tg.append(contrasts[sub, j, idx_timeg][:, idx_timeg].mean())
+            tg.append(np.diag(contrasts[sub, j, idx_timeg][:, idx_timeg]).mean())
         timeg.append(np.array(tg))
     timeg = np.array(timeg)
     slopes, intercepts = [], []
@@ -278,7 +279,6 @@ for i, network in enumerate(networks):
     pval = ttest_1samp(rhos, 0)[1]
     axes[0, i].set_title(f"{network_names[i]}")
     axes[0, i].text(0.05, 0.95, f"$p=${pval:.2f}", transform=axes[0, i].transAxes, fontsize=12, verticalalignment='top')
-
 
     rsa = diff_sess[network].copy()[:, :, idx_rsa].mean(2)
     slopes, intercepts = [], []
@@ -317,5 +317,5 @@ fig.suptitle("Correlation between mean predictive activity and learning (top)\na
 
 # fig.text(0.5, 0.02, 'Average pre-stimulus time generalization contrast', ha='center', fontsize=12)
 
-fig.savefig(figures_dir / f"combined_corr_best.pdf", transparent=True)
+fig.savefig(figures_dir / f"combined_corr_best-2.pdf", transparent=True)
 plt.close()
