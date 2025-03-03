@@ -206,46 +206,41 @@ for i, (network, name) in enumerate(zip(networks, names)):
 fig.savefig(figures_dir / "learn_corr.pdf", transparent=True)
 
 ### Mean effect ###
-mean_diag = []
-mean_net_sess = []
-mean_diag_sess = []
-filt = np.where((times >= 0.2) & (times <= 0.6))[0]
-mean_net = []
+mean_pred_sess = []
+mean_percep_sess = []
+filt = np.where((times >= 0.05) & (times <= 0.55))[0]
 filter_time = np.where((times >= -0.5) & (times < 0))[0]  # Correct filtering condition
 for i, net in enumerate(networks):
     contrast = all_patterns[net] - all_randoms[net]
-    # Compute mean net effect
-    mean_net.append(contrast[:, filter_time][:, :, filter_time].mean())
-    # Mean diagonal for the specific time window with absolute values
-    mean_diag.append((all_diags[net][:, filt].mean()))
-    sess1, sess2 = [], []
+    pred, perc = [], []
     for sub in range(len(subjects)):
-        # Mean for session 1 and 2 per subject
-        sess1.append(contrast[sub, filter_time][:, filter_time].mean())
-        sess2.append(all_diags[net][sub, filt].mean())
-    mean_net_sess.append(np.array(sess1))
-    mean_diag_sess.append(np.array(sess2))
-mean_net_sess = np.array(mean_net_sess)
-mean_diag_sess = np.array(mean_diag_sess)
-sem_net = np.std(mean_net_sess, axis=1) / np.sqrt(len(mean_net_sess[0]))  # SEM for mean_net
-sem_diag = np.std(mean_diag_sess, axis=1) / np.sqrt(len(mean_diag_sess[0]))  # SEM for mean_diag
+        pred.append(np.diag(contrast[sub,])[filter_time])
+        perc.append((all_diags[net][sub, filt]))
+    mean_pred_sess.append(np.array(pred))
+    mean_percep_sess.append(np.array(perc))
+    
+mean_pred_sess = np.array(mean_pred_sess)
+mean_percep_sess = np.array(mean_percep_sess)
+sem_net = np.std(mean_pred_sess, axis=1) / np.sqrt(len(mean_pred_sess[0]))  # SEM for mean_pred
+sem_diag = np.std(mean_percep_sess, axis=1) / np.sqrt(len(mean_percep_sess[0]))  # SEM for mean_percep
+
 ### Plot mean effect ### 
 alpha = 0.05
 color_diag = '#0072B2'  # Blue
 color_net = '#E69F00'  # Orange
-# Perform statistical tests for mean_net (one-sample t-test against 0)
-mean_net_significance = [ttest_1samp(data, 0)[1] < alpha for data in mean_net_sess]
+# Perform statistical tests for mean_pred (one-sample t-test against 0)
+mean_pred_significance = [ttest_1samp(data.mean(-1), 0)[1] < alpha for data in mean_pred_sess]
 fig, ax = plt.subplots(figsize=(10, 7))
 ax.grid(axis='y', linestyle='--', alpha=0.3)
 x = np.arange(len(networks))
 spacing = 0.35
-rects2 = ax.bar(x + spacing/2, mean_net, spacing, label='Prediction effect', color=color_net, edgecolor='black')
-rects1 = ax.bar(x - spacing/2, mean_diag, spacing, label='(Random - Pattern) contrast diagonal', color=color_diag, edgecolor='black')
-# ax.errorbar(x - spacing/2, mean_diag, yerr=sem_net, fmt='none', color='black', capsize=5)
-# ax.errorbar(x + spacing/2, mean_net, yerr=sem_diag, fmt='none', color='black', capsize=5)
-# Annotate significant mean_net bars with an asterisk
+rects2 = ax.bar(x + spacing/2, mean_pred_sess.mean((1, 2)), spacing, label='Prediction effect', color=color_net, edgecolor='black')
+rects1 = ax.bar(x - spacing/2, mean_percep_sess.mean((1, 2)), spacing, label='(Random - Pattern) contrast diagonal', color=color_diag, edgecolor='black')
+# ax.errorbar(x - spacing/2, mean_percep, yerr=sem_net, fmt='none', color='black', capsize=5)
+# ax.errorbar(x + spacing/2, mean_pred, yerr=sem_diag, fmt='none', color='black', capsize=5)
+# Annotate significant mean_pred bars with an asterisk
 for i, rect in enumerate(rects2):
-    if mean_net_significance[i]:
+    if mean_pred_significance[i]:
         ax.annotate('*',
                     xy=(rect.get_x() + rect.get_width() / 2, rect.get_height()),
                     xytext=(0, 3),
@@ -281,19 +276,19 @@ design = [['br11', 'br12', 'a1', 'a2', 'a3'],
           ['br71', 'br72', 'g1', 'g2', 'g3'],
           ['br81', 'br82', 'h1', 'h2', 'h3'],
           ['br91', 'br92', 'i1', 'i2', 'i3'],
-          [None, None, 'j', 'j', 'j']]
+          ['l', 'l', 'j', 'j', 'j']]
 vmin, vmax = 0.23, 0.27
 
 fig, axes = plt.subplot_mosaic(design, figsize=(12, 16), sharey=False, sharex=False, layout="constrained",
-                                   gridspec_kw={'height_ratios': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1.5],
-                                                'width_ratios': [.2, .2, .5, .5, .5]})
-
+                               gridspec_kw={'height_ratios': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1.5],
+                                            'width_ratios': [.2, .2, .5, .5, .5]})
 plt.rcParams.update({'font.size': 10, 'font.family': 'serif', 'font.serif': 'Arial'})
 # fig.suptitle("Comparison of Pattern, Random, and Contrast Accuracy Over Time", fontsize=14, fontweight='bold')
 ### Plot brain ###
 cmap = ['#0173B2','#DE8F05','#029E73','#D55E00','#CC78BC','#CA9161','#FBAFE4','#ECE133','#56B4E9']
 brain_kwargs = dict(hemi='both', background="white", cortex="low_contrast", surf='inflated', subjects_dir=subjects_dir, size=(800, 400))
-for i, (label, sideA, sideB) in enumerate(zip(networks, ['br11', 'br21', 'br31', 'br41', 'br51', 'br61', 'br71', 'br81', 'br91'], ['br12', 'br22', 'br32', 'br42', 'br52', 'br62', 'br72', 'br82', 'br92'])):
+for i, (label, sideA, sideB) in enumerate(zip(networks, \
+    ['br11', 'br21', 'br31', 'br41', 'br51', 'br61', 'br71', 'br81', 'br91'], ['br12', 'br22', 'br32', 'br42', 'br52', 'br62', 'br72', 'br82', 'br92'])):
     # Initialize Brain object
     # Add labels
     if label in networks[:-2]:
@@ -419,7 +414,7 @@ for network, contrast_idx in zip(networks, ['a3', 'b3', 'c3', 'd3', 'e3', 'f3', 
 mean_diag = []
 mean_net_sess = []
 mean_diag_sess = []
-filt = np.where((times >= 0) & (times <= 0.6))[0]
+filt = np.where((times >= 0.05) & (times <= 0.55))[0]
 mean_net = []
 filter_time = np.where((times >= -0.5) & (times < 0))[0]  # Correct filtering condition
 for i, net in enumerate(networks):
@@ -431,17 +426,18 @@ for i, net in enumerate(networks):
     sess1, sess2 = [], []
     for sub in range(len(subjects)):
         # Mean for session 1 and 2 per subject
-        sess1.append(contrast[sub, filter_time][:, filter_time].mean())
+        # sess1.append(contrast[sub, filter_time][:, filter_time].mean())
+        sess1.append(np.diag(contrast[sub, filter_time][:, filter_time]))
         sess2.append(all_diags[net][sub, filt].mean())
     mean_net_sess.append(np.array(sess1))
     mean_diag_sess.append(np.array(sess2))
-mean_net_sess = np.array(mean_net_sess)
+mean_net_sess = np.array(mean_net_sess).mean(-1)
 mean_diag_sess = np.array(mean_diag_sess)
 sem_net = np.std(mean_net_sess, axis=1) / np.sqrt(len(mean_net_sess[1]))  # SEM for mean_net
 sem_diag = np.std(mean_diag_sess, axis=1) / np.sqrt(len(mean_diag_sess[1]))  # SEM for mean_diag
+
 ### Plot mean effect ### 
 alpha = 0.05
-
 c1 = '#FF0000'  # Blue
 c2 = '#5BBCD6'  # Orange
 # Perform statistical tests for mean_net (one-sample t-test against 0)
@@ -450,7 +446,7 @@ mean_net_significance = [ttest_1samp(data, 0)[1] < alpha for data in mean_net_se
 # axes['d'].grid(axis='y', linestyle='--', alpha=0.3)
 x = np.arange(len(networks))
 spacing = 0.35
-rects1 = axes['j'].bar(x + spacing/2, mean_net, spacing, label='Prediction', facecolor=c1, alpha=.8, edgecolor=None)
+rects1 = axes['j'].bar(x + spacing/2, mean_net, spacing, label='Pre-activation', facecolor=c1, alpha=.8, edgecolor=None)
 rects2 = axes['j'].bar(x - spacing/2, mean_diag, spacing, label='Perception', facecolor=c2, alpha=.8, edgecolor=None)
 # axes['d'].errorbar(x - spacing/2, mean_diag, yerr=sem_net, fmt='none', color='black', capsize=5)
 # axes['d'].errorbar(x + spacing/2, mean_net, yerr=sem_diag, fmt='none', color='black', capsize=5)
@@ -470,16 +466,29 @@ axes['j'].set_xticks(x)
 axes['j'].set_xticklabels(names, rotation=45, ha='right')
 axes['j'].axhline(0, color='grey', linewidth=2)
 axes['j'].set_title('Predictive coding during pre-stimulus period and perception', fontsize=12, pad=-20)
-axes['j'].set_ylabel('Mean effect')
-axes['j'].set_yticks([-0.01, 0, 0.01])
+axes['j'].set_ylabel('Mean effect', labelpad=-20)
+axes['j'].set_yticks([-0.01, 0.01])
 axes['j'].legend(frameon=False, loc='upper left', fontsize=9)
 axes['j'].spines['top'].set_visible(False)
 axes['j'].spines['right'].set_visible(False)
 
-# Hide all None areas
-for key, ax in axes.items():
-    if key is None:
-        ax.set_visible(False)
+# example plot
+axes['l'].axhline(0, color='k', alpha=.5)
+axes['l'].axvline(0, color='k', alpha=.5)
+axes['l'].set_xlim(times[0], times[-1])
+axes['l'].set_ylim(times[0], times[-1])
+axes['l'].set_yticks([-1, 0, 1])
+axes['l'].plot(times[filter_time], times[filter_time], color=c1, lw=3, label='Pre-activation')
+axes['l'].plot(times[filt], times[filt], color=c2, lw=3, label='Perception')
+axes['l'].set_xlabel("Testing time (s)")
+axes['l'].set_ylabel("Training time (s)")
+axes['l'].legend(loc='lower right', fontsize=9)
+axes['l'].set_aspect(0.5)
 
-fig.savefig(figures_dir / f"pattern_random_contrast-3.pdf", transparent=True)
+# # Hide all None areas
+# for key, ax in axes.items():
+#     if key is None:
+#         ax.set_visible(False)
+
+fig.savefig(figures_dir / f"pattern_random_contrast-5.pdf", transparent=True)
 plt.close()
