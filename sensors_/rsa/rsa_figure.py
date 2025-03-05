@@ -129,7 +129,7 @@ for trial_type, color in zip(['pattern', 'random'], [cpat, crdm]):
     # Highlight significant regions
     axd['A'].fill_between(times, decoding.mean(0) - sem, chance, where=sig, alpha=0.1, facecolor=color)
     # break
-axd['A'].text(np.mean(times[sig]), 26, '*', fontsize=20, ha='center', va='center', color='black', weight='bold')
+axd['A'].text(np.mean(times[sig]), 26, '*', fontsize=25, ha='center', va='center', color='black', weight='bold')
 axd['A'].text(0.1, 48.5, '$Stimulus$', fontsize=11, ha='center')
 axd['A'].text(0.6, 26, '$Chance$', fontsize=11, ha='center', va='top')
 axd['A'].set_ylabel('Accuracy (%)', fontsize=11)
@@ -165,6 +165,8 @@ axd['B1'].set_title(f'Mahalanobis distance within pairs', fontsize=13)
 axd['B2'].axhline(0, color='grey', alpha=0.5)
 p_values = decod_stats(diff, -1)
 sig = p_values < 0.05
+idx_rsa = np.where(sig)[0] # to compute mean later
+np.save(figures_dir / 'sig_rsa.npy', idx_rsa)
 sem = np.std(diff, axis=0) / np.sqrt(len(subjects))
 # Plot the entire line in the default color
 axd['B2'].plot(times, diff.mean(0), alpha=1, zorder=10, color=c2)
@@ -175,7 +177,7 @@ axd['B2'].fill_between(times, diff.mean(0) - sem, 0, where=sig, alpha=0.1, zorde
 # Highlight significant regions
 # axd['B2'].fill_between(times, diff.mean(0) - sem, 0, where=sig, alpha=0.2, zorder=5, facecolor=c2)
 # axd['B2'].legend(frameon=False, loc="upper left")
-axd['B2'].text(np.mean(times[sig]), 0.05, '*', fontsize=20, ha='center', va='center', color='black', weight='bold')
+axd['B2'].text(np.mean(times[sig]), 0.1, '*', fontsize=25, ha='center', va='center', color=c2, weight='bold')
 axd['B2'].set_ylabel('Similarity index', fontsize=11)
 axd['B2'].yaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter('%.2f'))
 axd['B2'].set_xlabel('Time (s)', fontsize=11)
@@ -198,13 +200,14 @@ axd['D'].fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, alp
 axd['D'].fill_between(times, all_rhos.mean(0) - sem, 0, where=sig, alpha=0.1, zorder=5, facecolor=c6)
 axd['D'].set_ylabel("Spearman's rho", fontsize=11)
 axd['D'].set_xlabel('Time (s)', fontsize=11)
-axd['D'].text(np.mean(times[sig]), 0.05, '*', fontsize=20, ha='center', va='center', color='black', weight='bold')
+axd['D'].text(np.mean(times[sig]), 0.1, '*', fontsize=25, ha='center', va='center', color=c6, weight='bold')
 # axd['D'].legend(frameon=False, loc="lower right")
 axd['D'].set_title(f'Similarity index and learning correlation time course', fontsize=13)
 
 cmap = plt.cm.get_cmap('tab20', len(subjects))
-idx_rsa = np.where((times >= 0.3) & (times <= 0.5))[0]
+# idx_rsa = np.where((times >= 0.3) & (times <= 0.5))[0]
 mdiff = diff_sess[:, :, idx_rsa].mean(2)
+np.save(figures_dir / "mean_rsa.npy", mdiff)
 
 ### C2 ### Learning index fit
 slopes, intercepts = [], []
@@ -230,7 +233,8 @@ for sub in range(len(subjects)):
     r, p = spear(mdiff[sub], learn_index_df.iloc[sub])
     rhos.append(r)
 pval = ttest_1samp(rhos, 0)[1]
-axd['C'].legend(frameon=False, title=f"$p=${pval:.3f}", loc='upper left')
+ptext = f"p = {pval:.3f}" if pval > 0.001 else "p < 0.001"
+axd['C'].legend(frameon=False, title=ptext, loc='upper left')
 
 plt.savefig(figures_dir /  f"{lock}-rsa3.pdf", transparent=True)
 plt.close()
