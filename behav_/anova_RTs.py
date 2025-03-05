@@ -31,7 +31,7 @@ for subject in subjects:
         fname_behav = op.join(path_data, 'behav', f'{subject}-{i}.pkl')
         behav_df = pd.read_pickle(fname_behav)
         behav_df.reset_index(inplace=True)      
-        aRT.append(behav_df['RTs'].mean())
+        aRT.append(behav_df['RTs'][np.where(behav_df['RTs'].isin([30, 32, 34]))[0]].mean())
         pRT.append(behav_df['RTs'][np.where(behav_df['triplets'] == 30)[0]].mean())
         # rRT.append(behav_df['RTs'][np.where((behav_df['triplets'] == 32) | (behav_df['triplets'] == 34))[0]].mean())
         rRT.append(behav_df['RTs'][np.where((behav_df['triplets'] == 32))[0]].mean())
