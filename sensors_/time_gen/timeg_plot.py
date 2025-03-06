@@ -87,7 +87,25 @@ if not op.exists(res_dir / "corr" / "rhos_learn.npy") or overwrite:
     np.save(res_dir / "corr" / "rhos_learn.npy", all_rhos)
     pval = gat_stats(all_rhos, -1)
     np.save(res_dir / "corr" / "pval_learn-pval.npy", pval)
-    
+
+mean_rsa = np.load("/Users/coum/MEGAsync/figures/RSA/sensors/mean_rsa.npy")
+if not op.exists(res_dir / "corr" / "rhos_rsa.npy") or overwrite:
+    contrasts = patterns - randoms
+    contrasts = zscore(contrasts, axis=-1)  # je sais pas si zscore avant correlation pour la RSA mais c'est mieux je pense
+    all_rhos = []
+    for sub in range(len(subjects)):
+        rhos= np.empty((times.shape[0], times.shape[0]))
+        vector = mean_rsa[sub]
+        contrast = contrasts[sub]
+        results = Parallel(n_jobs=-1)(delayed(compute_spearman)(t, g, vector, contrast) for t in range(len(times)) for g in range(len(times)))
+        for idx, (t, g) in enumerate([(t, g) for t in range(len(times)) for g in range(len(times))]):
+            rhos[t, g] = results[idx]
+        all_rhos.append(rhos)
+    all_rhos = np.array(all_rhos)
+    np.save(res_dir / "corr" / "rhos_rsa.npy", all_rhos)
+    pval = gat_stats(all_rhos, -1)
+    np.save(res_dir / "corr" / "pval_rsa-pval.npy", pval)
+
 cmap1 = "RdBu_r"
 cmap2 = "magma_r"
 cmap2 = "coolwarm"
@@ -182,6 +200,44 @@ for ax, data, title, pval, vmin, vmax in zip(axs.flat, [contrasts, rhos], \
 fig.savefig(figure_dir / "contrast_corr2.pdf", transparent=True)
 plt.close()
 
+vmin, vmax = -0.2, 0.2
+all_rhos = np.load(res_dir / "corr" / "rhos_rsa.npy")
+pval = np.load(res_dir / "corr" / "pval_rsa-pval.npy")
+sig = pval < threshold
+
+fig, ax = plt.subplots(1, 1, figsize=(7, 6), sharex=True, layout='constrained')
+cmap = "BrBG"
+im = ax.imshow(all_rhos[:, idx][:, :, idx].mean(0), 
+                        # norm=norm,
+                        vmin=vmin,
+                        vmax=vmax,
+                        interpolation="lanczos",
+                        origin="lower",
+                        cmap=cmap,
+                        extent=times[idx][[0, -1, 0, -1]],
+                        aspect=0.5)
+ax.set_ylabel("Training time (s)", fontsize=13)
+ax.set_xticks(np.arange(-1, 3, .5))
+ax.set_yticks(np.arange(-1, 3, .5))
+ax.set_title("timeg x mean rep. change corr.", fontsize=16)
+ax.axvline(0, color="k")
+ax.axhline(0, color="k")
+xx, yy = np.meshgrid(times[idx], times[idx], copy=False, indexing='xy')
+sig = pval < threshold
+ax.contour(xx, yy, sig[idx][:, idx], colors='black', levels=[0],
+                    linestyles='--', linewidths=1, alpha=.5)
+ax.set_xlabel("Testing time (s)", fontsize=13)
+label = "Spearman's\nrho"
+# Draw an empty rectangle centered on -0.25
+# rectcolor = 'black' if ax == axs.flat[0] else 'red'
+# rect = plt.Rectangle([-0.75, -0.75], 0.72, 0.68, fill=False, edgecolor=rectcolor, linestyle='-', lw=2)
+# ax.add_patch(rect)
+cbar = fig.colorbar(im, ax=ax, orientation='vertical', fraction=.1, ticks=[vmin, vmax])
+cbar.set_label(label, rotation=270, fontsize=13)
+
+fig.savefig(figure_dir / "timegxrsa_corr.pdf", transparent=True)
+plt.close()
+
 ### plot learning index x timeg correlation ###
 idx_timeg = np.where((times >= -0.5) & (times < 0))[0]
 contrasts = patterns - randoms
@@ -189,7 +245,8 @@ timeg = []
 for sub in range(len(subjects)):
     tg = []
     for i in range(5):
-        tg.append(contrasts[sub, i, idx_timeg][:, idx_timeg].mean())
+        # tg.append(contrasts[sub, i, idx_timeg][:, idx_timeg].mean())
+        tg.append(np.diag(contrasts[sub, i][idx_timeg]).mean())
     timeg.append(np.array(tg))
 timeg = np.array(timeg)
 rhos = []
@@ -241,18 +298,20 @@ all_highs = np.array(all_highs)
 all_lows = np.array(all_lows)
 diff_sess = list()   
 for i in range(5):
-    rev_low = all_lows[:, :, i, :].mean(1) - all_lows[:, :, 0, :].mean(axis=1)
     rev_high = all_highs[:, :, i, :].mean(1) - all_highs[:, :, 0, :].mean(axis=1)
+    rev_low = all_lows[:, :, i, :].mean(1) - all_lows[:, :, 0, :].mean(axis=1)
     diff_sess.append(rev_low - rev_high)
 diff_sess = np.array(diff_sess).swapaxes(0, 1)
 
 # correlation between rsa and time generalization
 times_rsa = np.linspace(-0.2, 0.6, 82)
 idx_rsa = np.where((times_rsa >= .3) & (times_rsa <= .5))[0]
+idx_rsa = np.load("/Users/coum/MEGAsync/figures/RSA/sensors/sig_rsa.npy")
 idx_timeg = np.where((times >= -0.5) & (times < 0))[0]
 rsa = diff_sess.copy()[:, :, idx_rsa].mean(2)
 slopes, intercepts = [], []
 rhos = []
+# rsa = mean_rsa.copy()
 for sub in range(len(subjects)):
     r, p = spear(timeg[sub], rsa[sub])
     rhos.append(r)    

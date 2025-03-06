@@ -82,7 +82,7 @@ outer = [['A', innerB],
 cmap1 = colors['Darjeeling1']
 
 c1 = "#0173B2"
-c2 = "#5BBCD6"
+c2 = "#3B9AB2"
 c3 = "#029E73"
 c4 = "#CC78BC"
 c5 = "#ECE133"
@@ -129,7 +129,9 @@ for trial_type, color in zip(['pattern', 'random'], [cpat, crdm]):
     # Highlight significant regions
     axd['A'].fill_between(times, decoding.mean(0) - sem, chance, where=sig, alpha=0.1, facecolor=color)
     # break
-axd['A'].text(np.mean(times[sig]), 26, '*', fontsize=25, ha='center', va='center', color='black', weight='bold')
+
+axd['A'].text(np.mean(times[sig]), 27, '*', fontsize=25, ha='center', va='center', color=cpat, weight='bold')
+axd['A'].text(np.mean(times[sig]), 26, '*', fontsize=25, ha='center', va='center', color=crdm, weight='bold')
 axd['A'].text(0.1, 48.5, '$Stimulus$', fontsize=11, ha='center')
 axd['A'].text(0.6, 26, '$Chance$', fontsize=11, ha='center', va='top')
 axd['A'].set_ylabel('Accuracy (%)', fontsize=11)

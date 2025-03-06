@@ -24,6 +24,7 @@ timesg = np.linspace(-1.5, 1.5, 305)
 
 # correlation between rsa and time generalization
 idx_rsa = np.where((times >= .3) & (times <= .5))[0]
+idx_rsa = np.load("/Users/coum/MEGAsync/figures/RSA/sensors/sig_rsa.npy")
 idx_timeg = np.where((timesg >= -0.5) & (timesg < 0))[0]
 
 analysis = "tg_rdm_emp"

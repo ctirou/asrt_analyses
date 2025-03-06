@@ -107,9 +107,6 @@ ax.plot(sessions, mean_all, '-o', color=color4, label="All", markersize=7, alpha
 ax.plot(sessions[1:], mean_pattern, '-o', color=color1, label="Pattern pair", markersize=7, alpha=1)
 ax.plot(sessions[1:], mean_random_high, '-o', color=color2, label="Random pair", markersize=7, alpha=.9)
 # ax.plot(sessions, mean_random_low, '-o', color=color3, label="Random low", markersize=7, alpha=.9)
-# # Add asterisks above all mean random values
-# for i, mean_r in enumerate(mean_random_high):
-#     ax.annotate('*', (sessions[i], mean_r + 20), ha='center', color='black', fontsize=14)
 ax.legend(loc='lower left', frameon=False, title=f"n = {n}")
 ax.set_ylabel("Reaction time (ms)", fontsize=12)
 ax.spines['top'].set_visible(False)
@@ -129,6 +126,12 @@ axlow.spines['top'].set_visible(False)
 axlow.spines['right'].set_visible(False)
 axlow.set_xticklabels(['Practice', '1', '2', '3', '4'])
 axlow.set_xlabel("Session", fontsize=12)
-axlow.set_ylim(bottom=0)  # Set the lower limit of the y-axis to 0 to reduce the height
-fig.savefig(figures_dir / 'behav' / 'combined_3.pdf', transparent=True)
+# Add asterisks above all mean random values
+for i, (mean_li, std_li) in enumerate(zip(learning_indices_mean, learning_indices_stderr)):
+    if i != 0:
+        axlow.annotate('*', (sessions[i], mean_li + std_li + 0.005), ha='center', color='black', fontweight='bold', fontsize=14)
+# axlow.set_ylim(bottom=0)  # Set the lower limit of the y-axis to 0 to reduce the height
+axlow.set_ylim(0, 0.3)  # Set the lower limit of the y-axis to 0 to reduce the height
+
+fig.savefig(figures_dir / 'behav' / 'combined_4.pdf', transparent=True)
 plt.close()
