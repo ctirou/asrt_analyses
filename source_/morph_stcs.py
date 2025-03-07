@@ -175,33 +175,38 @@ plt.legend()
 plt.show()
 
 from joblib import Parallel, delayed
-def rsa_subject(subject, lock, epoch_num, network, verbose):
+from sklearn.decomposition import PCA
+from mne.decoding import UnsupervisedSpatialFilter
+pca = UnsupervisedSpatialFilter(PCA(1000), average=False)
+
+def rsa_subject(subject, lock, epoch_num, network):
+        
+    label_path = RESULTS_DIR / 'networks_200_7' / 'fsaverage2'
+    lh_label, rh_label = mne.read_label(label_path / f'{network}-lh.label'), mne.read_label(label_path / f'{network}-rh.label')        
     
-    label_path = RESULTS_DIR / 'networks_200_7' / subject
-    
+    # for epoch_num in range(5):
     # read behav
     behav_fname = data_path / "behav" / f"{subject}-{epoch_num}.pkl"
     behav = pd.read_pickle(behav_fname).reset_index()
             
-    lh_label, rh_label = mne.read_label(label_path / f'{network}-lh.label'), mne.read_label(label_path / f'{network}-rh.label')        
-    
     fname_stcs = RESULTS_DIR / 'stc' / lock / f"{subject}-morphed-stcs-{epoch_num}.npy"
-    data = np.load(fname_stcs, allow_pickle=True)
-    morphed_stcs_data = np.array([stc.in_label(lh_label + rh_label).data for stc in data])
+    stcs_data = np.load(fname_stcs, allow_pickle=True)
+    morphed_stcs_data = np.array([stc.in_label(lh_label + rh_label).data for stc in stcs_data])
+    
+    data = pca.fit_transform(morphed_stcs_data)
 
     res_dir = RESULTS_DIR / 'RSA' / 'source' / network / lock / 'morphed_rdm' / subject
     ensure_dir(res_dir)
     
     pattern = behav.trialtypes == 1
-    X_pat = morphed_stcs_data[pattern]
+    X_pat = data[pattern]
     y_pat = behav.positions[pattern].reset_index(drop=True)
     assert X_pat.shape[0] == y_pat.shape[0]
     rdm_pat = cv_mahalanobis(X_pat, y_pat)
     np.save(res_dir / f"pat-{epoch_num}.npy", rdm_pat)
 
-        
     random = behav.trialtypes == 2
-    X_rand = morphed_stcs_data[random]
+    X_rand = data[random]
     y_rand = behav.positions[random].reset_index(drop=True)
     assert X_rand.shape[0] == y_rand.shape[0]
     rdm_rand = cv_mahalanobis(X_rand, y_rand)
@@ -211,4 +216,9 @@ subjects = SUBJS
 networks = NETWORKS[:-2]
 
 for network in networks:
-    Parallel(-1)(delayed(rsa_subject)(subject, lock, epoch_num, network, verbose) for subject in subjects for epoch_num in range(5))
+    for subject in subjects:
+        print("Processing", subject, network)        
+        Parallel(-1)(delayed(rsa_subject)(subject, lock, epoch_num, network) for epoch_num in range(5))
+        source = RESULTS_DIR / 'RSA' / 'source' / network / lock / 'morphed_rdm'
+        destination = "/Users/coum/MEGAsync/"
+        rsync_files(source, destination, "-av")

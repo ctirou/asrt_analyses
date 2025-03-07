@@ -24,11 +24,14 @@ overwrite = False
 
 def process_subject(subject, epoch_num, lock):
     
+    print("Processing", subject, epoch_num, '!!!')
+    
     # network and custom label_names
     n_parcels = 200
     n_networks = 7
     # networks = (NEW_LABELS + schaefer_7) if n_networks == 7 else (NEW_LABELS + schaefer_17)
-    networks = schaefer_7 if n_networks == 7 else schaefer_17
+    # networks = schaefer_7 if n_networks == 7 else schaefer_17
+    networks = NETWORKS[:-2]
     label_path = RESULTS_DIR / f'networks_{n_parcels}_{n_networks}' / subject
     
     # read stim epoch
