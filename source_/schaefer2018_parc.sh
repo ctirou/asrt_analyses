@@ -5,10 +5,10 @@ export SUBJECTS_DIR="/Users/coum/Desktop/asrt/freesurfer"
 source $FREESURFER_HOME/SetUpFreeSurfer.sh
 
 # Single subject
-# recon-all -s sub01 -i sub01.nii -all -qcache
+recon-all -s sub01 -i sub01.nii -all -qcache
 # to be sure be on 
-# mne watershed_bem -s fsaverage2 --overwrite
-# mne make_scalp_surfaces -s fsaverage2 --force --overwrite
+mne watershed_bem -s fsaverage2 --overwrite
+mne make_scalp_surfaces -s fsaverage2 --force --overwrite
 
 ls *.nii | parallel jobs 15 recon-all -s {.} -i {} -all -qcache
 

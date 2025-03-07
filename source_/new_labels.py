@@ -132,7 +132,8 @@ for subject in subjects:
     n_parcels = "200"
     parc = f"Schaefer2018_{n_parcels}Parcels_{n_networks}Networks"
     hemi = "both"
-    network_names = schaefer_7 if n_networks == "7" else schaefer_17    
+    # network_names = schaefer_7 if n_networks == "7" else schaefer_17    
+    network_names = NETWORKS
     
     res_path = data_path / 'results' / f"networks_{n_parcels}_{n_networks}"
     ensure_dir(res_path / subject)
