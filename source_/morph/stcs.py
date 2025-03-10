@@ -42,8 +42,9 @@ for subject in SUBJS:
         fwd_fname = RESULTS_DIR / "fwd" / lock / f"{subject}-{epoch_num}-fwd.fif"
         fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
         # compute source estimates
-        filters = make_lcmv(epoch.info, fwd, data_cov=data_cov, noise_cov=noise_cov,
-                        pick_ori=None, rank=rank, reduce_rank=True, reg=0.05, verbose=verbose)
+        filters = make_lcmv(epoch.info, fwd, data_cov, reg=0.05, noise_cov=noise_cov,
+                            pick_ori="max-power", weight_norm="unit-noise-gain",
+                            rank=rank, verbose=verbose)
         stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
         morph = mne.compute_source_morph(
             fwd['src'], # src_to=fwd["src"] needs to be passed, bc vertices were likely excluded during forward computation
@@ -53,13 +54,14 @@ for subject in SUBJS:
             verbose=verbose
         )
 
-        ensure_dir(RESULTS_DIR / 'stc' / lock)
+        res_dir = RESULTS_DIR / 'power_stc' / lock
+        ensure_dir(res_dir)
         morphed_stcs = [morph.apply(stc) for stc in stcs]
         morphed_stcs = np.array(morphed_stcs)
-        np.save(RESULTS_DIR / 'stc' / lock / f"{subject}-morphed-stcs-{epoch_num}.npy", morphed_stcs)
+        np.save(res_dir / f"{subject}-morphed-stcs-{epoch_num}.npy", morphed_stcs)
 
-        stcs = np.array(stcs)
-        np.save(RESULTS_DIR / 'stc' / lock / f"{subject}-stcs-{epoch_num}.npy", stcs)
+        # stcs = np.array(stcs)
+        # np.save(RESULTS_DIR / 'stc' / lock / f"{subject}-stcs-{epoch_num}.npy", stcs)
 
     epo_dir = data_path / lock
     epo_fnames = [epo_dir / f'{f}' for f in sorted(os.listdir(epo_dir)) if '.fif' in f and subject in f and not f.startswith('.')]
@@ -100,8 +102,8 @@ for subject in SUBJS:
     morphed_stcs = np.array(morphed_stcs)
     np.save(RESULTS_DIR / 'stc' / lock / f"{subject}-morphed-stcs.npy", morphed_stcs)
 
-    stcs = np.array(stcs)
-    np.save(RESULTS_DIR / 'stc' / lock / f"{subject}-stcs.npy", stcs)
+    # stcs = np.array(stcs)
+    # np.save(RESULTS_DIR / 'stc' / lock / f"{subject}-stcs.npy", stcs)
 
 # define classifier
 clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver='lbfgs', class_weight="balanced", random_state=42))
@@ -173,52 +175,3 @@ plt.fill_between(times, all_morphed_scores.mean(0), 0.25, where=sigm, alpha=.5)
 plt.axhline(.25, color='k', linestyle='--')
 plt.legend()
 plt.show()
-
-from joblib import Parallel, delayed
-from sklearn.decomposition import PCA
-from mne.decoding import UnsupervisedSpatialFilter
-pca = UnsupervisedSpatialFilter(PCA(1000), average=False)
-
-def rsa_subject(subject, lock, epoch_num, network):
-        
-    label_path = RESULTS_DIR / 'networks_200_7' / 'fsaverage2'
-    lh_label, rh_label = mne.read_label(label_path / f'{network}-lh.label'), mne.read_label(label_path / f'{network}-rh.label')        
-    
-    # for epoch_num in range(5):
-    # read behav
-    behav_fname = data_path / "behav" / f"{subject}-{epoch_num}.pkl"
-    behav = pd.read_pickle(behav_fname).reset_index()
-            
-    fname_stcs = RESULTS_DIR / 'stc' / lock / f"{subject}-morphed-stcs-{epoch_num}.npy"
-    stcs_data = np.load(fname_stcs, allow_pickle=True)
-    morphed_stcs_data = np.array([stc.in_label(lh_label + rh_label).data for stc in stcs_data])
-    
-    data = pca.fit_transform(morphed_stcs_data)
-
-    res_dir = RESULTS_DIR / 'RSA' / 'source' / network / lock / 'morphed_rdm' / subject
-    ensure_dir(res_dir)
-    
-    pattern = behav.trialtypes == 1
-    X_pat = data[pattern]
-    y_pat = behav.positions[pattern].reset_index(drop=True)
-    assert X_pat.shape[0] == y_pat.shape[0]
-    rdm_pat = cv_mahalanobis(X_pat, y_pat)
-    np.save(res_dir / f"pat-{epoch_num}.npy", rdm_pat)
-
-    random = behav.trialtypes == 2
-    X_rand = data[random]
-    y_rand = behav.positions[random].reset_index(drop=True)
-    assert X_rand.shape[0] == y_rand.shape[0]
-    rdm_rand = cv_mahalanobis(X_rand, y_rand)
-    np.save(res_dir / f"rand-{epoch_num}.npy", rdm_rand)
-
-subjects = SUBJS
-networks = NETWORKS[:-2]
-
-for network in networks:
-    for subject in subjects:
-        print("Processing", subject, network)        
-        Parallel(-1)(delayed(rsa_subject)(subject, lock, epoch_num, network) for epoch_num in range(5))
-        source = RESULTS_DIR / 'RSA' / 'source' / network / lock / 'morphed_rdm'
-        destination = "/Users/coum/MEGAsync/"
-        rsync_files(source, destination, "-av")

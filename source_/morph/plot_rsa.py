@@ -42,10 +42,10 @@ for network in networks:
     
     for subject in subjects:        
         # RSA stuff
-        behav_dir = op.join(RAW_DATA_DIR, "%s/behav_data/" % (subject))
+        behav_dir = op.join(HOME / 'raw_behavs' / subject)
         sequence = get_sequence(behav_dir)
-        home = Path("/Users/coum/MEGAsync/RSA")
-        res_path = home / 'source' / network / lock / 'morphed_rdm' / subject
+        # home = Path("/Users/coum/MEGAsync/RSA")
+        res_path = RESULTS_DIR / 'RSA' / 'source' / network / lock / 'morphed_rdm' / subject
         high, low = get_all_high_low(res_path, sequence, analysis, cv=True)    
         all_highs[network].append(high)    
         all_lows[network].append(low)
@@ -66,7 +66,7 @@ cmap = ['#0173B2','#DE8F05','#029E73','#D55E00','#CC78BC','#CA9161','#FBAFE4','#
 fig, axes = plt.subplots(2, 4, figsize=(12, 4), sharex=True, sharey=True, layout='tight')
 for i, (ax, label, name) in enumerate(zip(axes.flat, networks, NETWORK_NAMES)):
     ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
-    ax.axvspan(0.28, 0.51, facecolor='red', edgecolor=None, alpha=.1)
+    ax.axvspan(0.28, 0.51, facecolor='green', edgecolor=None, alpha=.1)
     ax.axhline(0, color='grey', alpha=.5)
     high = all_highs[label][:, :, 1:, :].mean((1, 2)) - all_highs[label][:, :, 0, :].mean(1)
     low = all_lows[label][:, :, 1:, :].mean((1, 2)) - all_lows[label][:, :, 0, :].mean(axis=1)

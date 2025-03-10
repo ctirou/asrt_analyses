@@ -4,14 +4,17 @@ import pandas as pd
 import mne
 from base import *
 from config import *
-from mne.decoding import SlidingEstimator, cross_val_multiscore
-from sklearn.pipeline import make_pipeline
 from mne.beamformer import make_lcmv, apply_lcmv_epochs
+from mne.decoding import SlidingEstimator, cross_val_multiscore, UnsupervisedSpatialFilter
+from sklearn.pipeline import make_pipeline
+from sklearn.decomposition import PCA
 from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 import gc
 import sys
+from joblib import Parallel, delayed
+
 
 # params
 subjects = SUBJS
@@ -28,86 +31,70 @@ scoring = "accuracy"
 folds = 10
 
 verbose = True
-overwrite = True
+overwrite = False
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
 def process_subject(subject, lock, trial_type, jobs):
     # define classifier
     clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
     clf = SlidingEstimator(clf, scoring=scoring, n_jobs=jobs, verbose=verbose)
-    cv = StratifiedKFold(folds, shuffle=True, random_state=42)  
+    cv = StratifiedKFold(folds, shuffle=True, random_state=42)
+    pca = UnsupervisedSpatialFilter(PCA(1000), average=False)
     # define networks labels path
-    n_parcels = 200
-    n_networks = 7
     networks = NETWORKS[:-2]
-    label_path = RESULTS_DIR / f'networks_{n_parcels}_{n_networks}' / subject
+    label_path = RESULTS_DIR / 'networks_200_7' / 'fsaverage2'
     
     for network in networks:
         all_behavs = list()
         all_stcs = list()
         # define results path
-        res_dir = RESULTS_DIR / "RSA" / "source" / network / lock / "scores" / trial_type
+        res_dir = RESULTS_DIR / "RSA" / "source" / network / lock / "power_morphed_scores" / trial_type
         ensure_dir(res_dir)
-
+        
+        lh_label, rh_label = mne.read_label(label_path / f'{network}-lh.label'), mne.read_label(label_path / f'{network}-rh.label')
+        
         for epoch_num in [0, 1, 2, 3, 4]:
             # read behav
             behav = pd.read_pickle(op.join(data_path, 'behav', f'{subject}-{epoch_num}.pkl'))
-            # read epoch
-            epoch_fname = op.join(data_path, lock, f"{subject}-{epoch_num}-epo.fif")
-            epoch = mne.read_epochs(epoch_fname, verbose=verbose, preload=True)
-            if lock == 'button': 
-                epoch_bsl_fname = data_path / 'bsl' / f'{subject}-{epoch_num}-epo.fif'
-                epoch_bsl = mne.read_epochs(epoch_bsl_fname, verbose=verbose, preload=True)
-                # compute noise covariance
-                noise_cov = mne.compute_covariance(epoch_bsl, method="empirical", rank="info", verbose=verbose)
-            else:
-                noise_cov = mne.compute_covariance(epoch, tmin=-.2, tmax=0, method="empirical", rank="info", verbose=verbose)
-            # compute data covariance matrix on evoked data
-            data_cov = mne.compute_covariance(epoch, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
-            # conpute rank
-            rank = mne.compute_rank(data_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)
-            # read forward solution
-            fwd_fname = RESULTS_DIR / "fwd" / lock / f"{subject}-{epoch_num}-fwd.fif"
-            fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
-            # compute source estimates
-            filters = make_lcmv(epoch.info, fwd, data_cov=data_cov, noise_cov=noise_cov,
-                            pick_ori=None, rank=rank, reduce_rank=True, reg=0.05, verbose=verbose)
-            stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
+            fname_stcs = RESULTS_DIR / 'power_stc' / lock / f"{subject}-morphed-stcs-{epoch_num}.npy"
+            stcs_data = np.load(fname_stcs, allow_pickle=True)
             
-            del noise_cov, data_cov, fwd, filters
-            gc.collect()
+            morphed_stcs_data = np.array([stc.in_label(lh_label + rh_label).data for stc in stcs_data])
+            data = pca.fit_transform(morphed_stcs_data)
 
+            all_stcs.extend(stcs_data)
+
+            del stcs_data
+            gc.collect()
+        
             print("Processing", subject, epoch_num, trial_type, network)
             
-            lh_label, rh_label = mne.read_label(label_path / f'{network}-lh.label'), mne.read_label(label_path / f'{network}-rh.label')
-            stcs_data = np.array([stc.in_label(lh_label + rh_label).data for stc in stcs])
-            assert len(stcs_data) == len(behav)
+            assert len(morphed_stcs_data) == len(behav)
             
             if not os.path.exists(res_dir / f"{subject}-{epoch_num}-scores.npy") or overwrite:
                 if trial_type == 'pattern':
                     pattern = behav.trialtypes == 1
-                    X = stcs_data[pattern]
+                    X = data[pattern]
                     y = behav.positions[pattern]
                 elif trial_type == 'random':
                     random = behav.trialtypes == 2
-                    X = stcs_data[random]
+                    X = data[random]
                     y = behav.positions[random]
                 else:
-                    X = stcs_data
+                    X = data
                     y = behav.positions    
                 y = y.reset_index(drop=True)            
                 assert X.shape[0] == y.shape[0]
                 scores = cross_val_multiscore(clf, X, y, cv=cv)   
                 np.save(op.join(res_dir, f"{subject}-{epoch_num}-scores.npy"), scores.mean(0))
                 
-                del stcs_data, X, y, scores
+                del X, y, scores
                 gc.collect()
         
             # append epochs
             all_behavs.append(behav)
-            all_stcs.extend(stcs)
             
-            del epoch, behav, stcs
+            del data, behav
             if trial_type == 'button':
                 del epoch_bsl
             gc.collect()
@@ -118,28 +105,26 @@ def process_subject(subject, lock, trial_type, jobs):
         
         print("Processing", subject, 'all', trial_type, network)
         
-        lh_label = mne.read_label(label_path / f'{network}-lh.label')
-        rh_label = mne.read_label(label_path / f'{network}-rh.label')
-        stcs_data = [stc.in_label(lh_label + rh_label).data for stc in all_stcs]
-        stcs_data = np.array(stcs_data)
+        morphed_stcs_data = np.array([stc.in_label(lh_label + rh_label).data for stc in all_stcs])
+        data = pca.fit_transform(morphed_stcs_data, average=False)
         behav_data = behav_df.reset_index(drop=True)
         assert len(stcs_data) == len(behav_data)
         
         if not op.exists(res_dir / f"{subject}-all-scores.npy") or overwrite:
             if trial_type == 'pattern':
                 pattern = behav_data.trialtypes == 1
-                X = stcs_data[pattern]
+                X = data[pattern]
                 y = behav_data.positions[pattern]
             elif trial_type == 'random':
                 random = behav_data.trialtypes == 2
-                X = stcs_data[random]
+                X = data[random]
                 y = behav_data.positions[random]
             else:
-                X = stcs_data
+                X = data
                 y = behav_data.positions
             y = y.reset_index(drop=True)
             assert X.shape[0] == y.shape[0]
-            del stcs_data, behav_data
+            del data, behav_data
             gc.collect()
             scores = cross_val_multiscore(clf, X, y, cv=cv)
             np.save(op.join(res_dir, f"{subject}-all-scores.npy"), scores.mean(0))
@@ -162,5 +147,6 @@ if is_cluster:
         print("Error: SLURM_ARRAY_TASK_ID is not set correctly or is out of bounds.")
         sys.exit(1)
 else:
-    for subject in subjects:
-        process_subject(subject, lock, trial_type, jobs=-1)
+    lock = 'stim'
+    trial_type = 'pattern'
+    Parallel(-1)(delayed(process_subject)(subject, lock, trial_type, jobs=-1) for subject in subjects)
