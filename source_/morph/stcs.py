@@ -21,6 +21,9 @@ data_path = DATA_DIR
 lock = 'stim'
 verbose = True
 
+res_dir = RESULTS_DIR / 'power_stc' / lock
+ensure_dir(res_dir)
+
 for subject in SUBJS:
     
     fname_src = RESULTS_DIR / 'src' / f'{subject}-src.fif'
@@ -33,7 +36,6 @@ for subject in SUBJS:
         # read epoch
         epoch_fname = op.join(data_path, lock, f"{subject}-{epoch_num}-epo.fif")
         epoch = mne.read_epochs(epoch_fname, verbose=verbose, preload=True)
-        
         data_cov = mne.compute_covariance(epoch, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
         noise_cov = mne.compute_covariance(epoch, tmin=-.2, tmax=0, method="empirical", rank="info", verbose=verbose)
         # conpute rank
@@ -51,11 +53,8 @@ for subject in SUBJS:
             subject_from=subject,
             subject_to='fsaverage2',
             subjects_dir=subjects_dir,
-            verbose=verbose
-        )
+            verbose=verbose)
 
-        res_dir = RESULTS_DIR / 'power_stc' / lock
-        ensure_dir(res_dir)
         morphed_stcs = [morph.apply(stc) for stc in stcs]
         morphed_stcs = np.array(morphed_stcs)
         np.save(res_dir / f"{subject}-morphed-stcs-{epoch_num}.npy", morphed_stcs)

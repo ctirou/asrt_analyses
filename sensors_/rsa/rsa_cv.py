@@ -37,8 +37,6 @@ def process_subject(subject, lock, epoch_num, verbose):
         assert len(X_pat) == len(y_pat)
         rdm_pat = cv_mahalanobis(X_pat, y_pat)
         np.save(res_path / f"pat-{epoch_num}.npy", rdm_pat)
-    else:
-        rdm_pat = np.load(res_path / f"pat-{epoch_num}.npy")
     
     if not op.exists(res_path / f"rand-{epoch_num}.npy") or overwrite:
         X_rand = data[np.where(behav["trialtypes"]==2)]
@@ -46,9 +44,6 @@ def process_subject(subject, lock, epoch_num, verbose):
         assert len(X_rand) == len(y_rand)
         rdm_rand = cv_mahalanobis(X_rand, y_rand)
         np.save(res_path / f"rand-{epoch_num}.npy", rdm_rand)
-    else:
-        rdm_rand = np.load(res_path / f"rand-{epoch_num}.npy")
-            
             
 if is_cluster:
     # Check that SLURM_ARRAY_TASK_ID is available and use it to get the subject
