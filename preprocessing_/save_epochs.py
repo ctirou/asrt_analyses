@@ -10,15 +10,18 @@ from base import ensure_dir
 from config import *
 import gc
 import sys
+from joblib import Parallel, delayed
 
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
 subjects = SUBJS
+# subjects = ['sub03', 'sub06']
 mode_ICA = True
-generalizing = True
+generalizing = False
 filtering = True
 overwrite = True
 verbose = True
+rdm_bsling = True
         
 def int_to_unicode(array):
         return ''.join([str(chr(int(ii))) for ii in array]) # permet de convertir int en unicode (pour editops)
@@ -27,8 +30,13 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
         # Set path
         data_path = RAW_DATA_DIR
         if generalizing:
-                res_path = TIMEG_DATA_DIR
-                tmin,tmax = -1.5, 1.5 
+                res_path = TIMEG_DATA_DIR / 'gen44'
+                ensure_dir(res_path)
+                tmin, tmax = -4, 4
+        elif rdm_bsling and not generalizing:
+                res_path = TIMEG_DATA_DIR / 'rdm_bsling'
+                ensure_dir(res_path)
+                tmin, tmax = -4, 4
         else:
                 res_path = DATA_DIR
                 tmin, tmax = -0.2, 0.6
@@ -73,15 +81,15 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                         # Fit the ica on the filtered raw
                         ica.fit(filt_raw, reject=reject)
                         # Find the bad components based on the VEOG, HEOG and hearbeat
-                        veog_indices, veog_scores = ica.find_bads_eog(filt_raw, ch_name='VEOG')
-                        heog_indices, heog_scores = ica.find_bads_eog(filt_raw, ch_name='HEOG')
-                        hbeat_indices, hbeat_scores = ica.find_bads_ecg(filt_raw, ch_name='ECG 001')
+                        veog_indices, _ = ica.find_bads_eog(filt_raw, ch_name='VEOG')
+                        heog_indices, _ = ica.find_bads_eog(filt_raw, ch_name='HEOG')
+                        hbeat_indices, _ = ica.find_bads_ecg(filt_raw, ch_name='ECG 001')
                         # Exclude bad components and apply it to the unfiltered raw
                         ica.exclude = np.unique(np.concatenate([veog_indices, heog_indices, hbeat_indices]))
                         # Filter raw
                         ica.apply(raw)
                 if filtering:
-                        raw.filter(0.1, 30, n_jobs=jobs) # test by 25
+                        raw.filter(0.1, 30, n_jobs=jobs)
                 # Select events of interest (only photodiode for good triplets and correct answers)
                 if subject == 'sub06' and meg_session == '6_EPOCH_4':
                         events = mne.find_events(raw, shortest_event=1, verbose=verbose)
@@ -184,7 +192,13 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                 if generalizing:
                         epochs_stim = mne.Epochs(raw, events_stim, tmin=tmin, tmax=tmax, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)
                         epochs_bsl = epochs_stim.copy().crop(-.2, 0)                   
-                        epochs_button = mne.Epochs(raw, events_button, tmin=tmin, tmax=tmax, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)                        
+                        epochs_button = mne.Epochs(raw, events_button, tmin=tmin, tmax=tmax, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)
+                elif rdm_bsling and not generalizing:
+                        epochs_stim = mne.Epochs(raw, events_stim, tmin=tmin, tmax=tmax, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)                   
+                        epochs_bsl = epochs_stim.copy().crop(-1.7, -1.5)      
+                        epochs_stim.apply_baseline((-1.7, -1.5))
+                        epochs_stim = epochs_stim.copy().crop(-0.2, 0.6)           
+                        epochs_button = mne.Epochs(raw, events_button, tmin=tmin, tmax=tmax, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)                    
                 else:
                         epochs_stim = mne.Epochs(raw, events_stim, tmin=tmin, tmax=tmax, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)                   
                         epochs_bsl = epochs_stim.copy().crop(-.2, 0)           
@@ -269,5 +283,4 @@ if is_cluster:
         sys.exit(1)
 else:
         jobs = -1
-        for subject in subjects:
-                process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs, verbose)
+        Parallel(-1)(delayed(process_subject)(subject, mode_ICA, generalizing, filtering, overwrite, jobs, verbose) for subject in subjects)

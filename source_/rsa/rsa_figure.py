@@ -54,21 +54,21 @@ for network in networks:
     
     for subject in subjects:        
         
-        # score = np.load(RESULTS_DIR / "RSA" / 'source' / network / lock / 'scores' / trial_type / f"{subject}-all-scores.npy")
+        # score = np.load(RESULTS_DIR / "RSA" / 'source' / network / lock / 'none_scores' / trial_type / f"{subject}-all-scores.npy")
         # decoding[network].append(score)
         
-        pat = np.load(RESULTS_DIR / "RSA" / 'source' / network / lock / 'scores' / "pattern" / f"{subject}-all-scores.npy")
+        pat = np.load(RESULTS_DIR / "RSA" / 'source' / network / lock / 'none_scores' / "pattern" / f"{subject}-all-scores.npy")
         pattern[network].append(pat)
-        rand = np.load(RESULTS_DIR / "RSA" / 'source' / network / lock / 'scores' / "random" / f"{subject}-all-scores.npy")
+        rand = np.load(RESULTS_DIR / "RSA" / 'source' / network / lock / 'none_scores' / "random" / f"{subject}-all-scores.npy")
         random[network].append(rand)
         
-        # RSA stuff
-        behav_dir = op.join(RAW_DATA_DIR, "%s/behav_data/" % (subject))
-        sequence = get_sequence(behav_dir)
-        res_path = RESULTS_DIR / "RSA" / 'source' / network / lock / 'rdm' / subject
-        high, low = get_all_high_low(res_path, sequence, analysis, cv=True)    
-        all_highs[network].append(high)    
-        all_lows[network].append(low)
+        # # RSA stuff
+        # behav_dir = op.join(HOME / "raw_behavs" / subject)
+        # sequence = get_sequence(behav_dir)
+        # res_path = RESULTS_DIR / "RSA" / 'source' / network / lock / 'power_morphed_rdm' / subject
+        # high, low = get_all_high_low(res_path, sequence, analysis, cv=True)    
+        # all_highs[network].append(high)    
+        # all_lows[network].append(low)
     
     # decoding[network] = np.array(decoding[network])
     pattern[network] = np.array(pattern[network])
@@ -217,7 +217,8 @@ for i, (label, name, j, k) in enumerate(zip(networks, network_names,  \
         axd[l].set_ylim(23, 43)
         
 ### Plot similarity index ###    
-for i, (label, name, j) in enumerate(zip(networks, network_names, ['B', 'E', 'H', 'K', 'N', 'Q', 'T', 'W', 'Z'])):
+# for i, (label, name, j) in enumerate(zip(networks, network_names, ['B', 'E', 'H', 'K', 'N', 'Q', 'T', 'W', 'Z'])):
+for i, (label, name, j) in enumerate(zip(networks[:-2], network_names[:-2], ['B', 'E', 'H', 'K', 'N', 'Q', 'T'])):
     plot_onset(axd[j])
     axd[j].axhline(0, color='grey', alpha=.5)
     high = all_highs[label][:, :, 1:, :].mean((1, 2)) - all_highs[label][:, :, 0, :].mean(1)
@@ -283,7 +284,8 @@ for i, (label, name, j) in enumerate(zip(networks, network_names, ['C', 'F', 'I'
         axd[j].set_title('Similarity index\n& learning correlation')
     axd[j].set_ylim(-.5, .5)
     axd[j].set_yticks([-.5, 0, .5])
-    
+
+fig.savefig(figures_dir / f"{lock}-test-rsa.pdf", transparent=True)
 fig.savefig(figures_dir / f"{lock}-rsa.pdf", transparent=True)
 plt.close()
 

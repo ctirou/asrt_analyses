@@ -56,7 +56,8 @@ def process_subject(subject, lock, trial_type, network, jobs):
     for epoch_num in [0, 1, 2, 3, 4]:
         # read behav
         behav = pd.read_pickle(op.join(data_path, 'behav', f'{subject}-{epoch_num}.pkl'))
-        fname_stcs = RESULTS_DIR / 'power_stc' / lock / f"{subject}-morphed-stcs-{epoch_num}.npy"
+        # fname_stcs = RESULTS_DIR / 'morphed_power_stc' / lock / f"{subject}-morphed-stcs-{epoch_num}.npy"
+        fname_stcs = RESULTS_DIR / 'power_stc' / lock / f"{subject}-{epoch_num}.npy"
         stcs_data = np.load(fname_stcs, allow_pickle=True)
         
         # Check if imaginary components are present
@@ -75,40 +76,40 @@ def process_subject(subject, lock, trial_type, network, jobs):
 
         all_stcs.extend(stcs_data)
 
-        del stcs_data
-        gc.collect()
+        # del stcs_data
+        # gc.collect()
 
-        print("Processing", subject, epoch_num, trial_type, network)
+        # print("Processing", subject, epoch_num, trial_type, network)
         
-        assert len(morphed_stcs_data) == len(behav)
+        # assert len(morphed_stcs_data) == len(behav)
         
-        if not os.path.exists(res_dir / f"{subject}-{epoch_num}-scores.npy") or overwrite:
-            if trial_type == 'pattern':
-                pattern = behav.trialtypes == 1
-                X = data[pattern]
-                y = behav.positions[pattern]
-            elif trial_type == 'random':
-                random = behav.trialtypes == 2
-                X = data[random]
-                y = behav.positions[random]
-            else:
-                X = data
-                y = behav.positions    
-            y = y.reset_index(drop=True)            
-            assert X.shape[0] == y.shape[0]
-            scores = cross_val_multiscore(clf, X, y, cv=cv)   
-            np.save(op.join(res_dir, f"{subject}-{epoch_num}-scores.npy"), scores.mean(0))
+        # if not os.path.exists(res_dir / f"{subject}-{epoch_num}-scores.npy") or overwrite:
+        #     if trial_type == 'pattern':
+        #         pattern = behav.trialtypes == 1
+        #         X = data[pattern]
+        #         y = behav.positions[pattern]
+        #     elif trial_type == 'random':
+        #         random = behav.trialtypes == 2
+        #         X = data[random]
+        #         y = behav.positions[random]
+        #     else:
+        #         X = data
+        #         y = behav.positions    
+        #     y = y.reset_index(drop=True)            
+        #     assert X.shape[0] == y.shape[0]
+        #     scores = cross_val_multiscore(clf, X, y, cv=cv, n_jobs=jobs)   
+        #     np.save(op.join(res_dir, f"{subject}-{epoch_num}-scores.npy"), scores.mean(0))
             
-            del X, y, scores
-            gc.collect()
+        #     del X, y, scores
+        #     gc.collect()
     
         # append epochs
         all_behavs.append(behav)
         
-        del data, behav
-        if trial_type == 'button':
-            del epoch_bsl
-        gc.collect()
+        # del data, behav
+        # if trial_type == 'button':
+        #     del epoch_bsl
+        # gc.collect()
 
     behav_df = pd.concat(all_behavs)
     del all_behavs
@@ -138,7 +139,7 @@ def process_subject(subject, lock, trial_type, network, jobs):
         assert X.shape[0] == y.shape[0]
         del data, behav_data
         gc.collect()
-        scores = cross_val_multiscore(clf, X, y, cv=cv)
+        scores = cross_val_multiscore(clf, X, y, cv=cv, n_jobs=jobs)
         np.save(op.join(res_dir, f"{subject}-all-scores.npy"), scores.mean(0))
         del X, y, scores
         gc.collect()
@@ -161,6 +162,8 @@ if is_cluster:
 else:
     lock = 'stim'
     trial_type = 'pattern'
-    for subject in subjects:
-        # process_subject(subject, lock, trial_type, jobs=-1)
-        Parallel(-1)(delayed(process_subject)(subject, lock, trial_type, networks[0], jobs=-1) for trial_type in ['pattern', 'random'])
+    for network in networks[1:]:
+        for subject in subjects:
+            for trial_type in ['pattern', 'random']:
+                process_subject(subject, lock, trial_type, network, jobs=-1)
+        # Parallel(-1)(delayed(process_subject)(subject, lock, trial_type, networks[0], jobs=-1) for trial_type in ['pattern', 'random'])

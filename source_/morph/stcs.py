@@ -19,45 +19,44 @@ fname_fs_src = RESULTS_DIR / "src" / "fsaverage2-src.fif"
 data_path = DATA_DIR
 # subject = 'sub01'
 lock = 'stim'
-verbose = True
+verbose = 'error'
 
-res_dir = RESULTS_DIR / 'power_stc' / lock
+res_dir = RESULTS_DIR / 'vector_svd_stcs' / lock
 ensure_dir(res_dir)
 
 for subject in SUBJS:
     
-    fname_src = RESULTS_DIR / 'src' / f'{subject}-src.fif'
-    # fname_fwd = RESULTS_DIR / 'fwd' / lock / f'{subject}-all-fwd.fif'
-    # fwd = mne.read_forward_solution(fname_fwd, verbose=verbose)
-
     for epoch_num in [0, 1, 2, 3, 4]:
-        # read behav
-        behav = pd.read_pickle(op.join(data_path, 'behav', f'{subject}-{epoch_num}.pkl'))
-        # read epoch
-        epoch_fname = op.join(data_path, lock, f"{subject}-{epoch_num}-epo.fif")
-        epoch = mne.read_epochs(epoch_fname, verbose=verbose, preload=True)
-        data_cov = mne.compute_covariance(epoch, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
-        noise_cov = mne.compute_covariance(epoch, tmin=-.2, tmax=0, method="empirical", rank="info", verbose=verbose)
-        # conpute rank
-        rank = mne.compute_rank(data_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)
-        # read forward solution
-        fwd_fname = RESULTS_DIR / "fwd" / lock / f"{subject}-{epoch_num}-fwd.fif"
-        fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
-        # compute source estimates
-        filters = make_lcmv(epoch.info, fwd, data_cov, reg=0.05, noise_cov=noise_cov,
-                            pick_ori="max-power", weight_norm="unit-noise-gain",
-                            rank=rank, verbose=verbose)
-        stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
+        print(f"Processing {subject} epoch {epoch_num}")
+        
+        if not op.exists(res_dir / f"{subject}-{epoch_num}.npy"):
+            # read behav
+            behav = pd.read_pickle(op.join(data_path, 'behav', f'{subject}-{epoch_num}.pkl'))
+            # read epoch
+            epoch_fname = op.join(data_path, lock, f"{subject}-{epoch_num}-epo.fif")
+            epoch = mne.read_epochs(epoch_fname, verbose=verbose, preload=True)
+            data_cov = mne.compute_covariance(epoch, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
+            noise_cov = mne.compute_covariance(epoch, tmin=-.2, tmax=0, method="empirical", rank="info", verbose=verbose)
+            # conpute rank
+            rank = mne.compute_rank(data_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)
+            # read forward solution
+            fwd_fname = RESULTS_DIR / "fwd" / lock / f"{subject}-{epoch_num}-fwd.fif"
+            fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
+            # compute source estimates
+            filters = make_lcmv(epoch.info, fwd, data_cov, reg=0.05, noise_cov=noise_cov,
+                                pick_ori='vector', weight_norm="unit-noise-gain",
+                                rank=rank, reduce_rank=True, verbose=verbose)
+            stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
+            np.save(res_dir / f"{subject}-{epoch_num}.npy", stcs)
+        
         morph = mne.compute_source_morph(
             fwd['src'], # src_to=fwd["src"] needs to be passed, bc vertices were likely excluded during forward computation
             subject_from=subject,
             subject_to='fsaverage2',
             subjects_dir=subjects_dir,
             verbose=verbose)
-
         morphed_stcs = [morph.apply(stc) for stc in stcs]
         morphed_stcs = np.array(morphed_stcs)
-        np.save(res_dir / f"{subject}-morphed-stcs-{epoch_num}.npy", morphed_stcs)
 
         # stcs = np.array(stcs)
         # np.save(RESULTS_DIR / 'stc' / lock / f"{subject}-stcs-{epoch_num}.npy", stcs)
@@ -84,9 +83,6 @@ for subject in SUBJS:
     filters = make_lcmv(epoch.info, fwd, data_cov=data_cov, noise_cov=noise_cov,
                     pick_ori=None, rank=rank, reduce_rank=True, reg=0.05, verbose=verbose)
     stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
-
-    src_fs = mne.read_source_spaces(fname_fs_src)
-    src = mne.read_source_spaces(fname_src)
 
     morph = mne.compute_source_morph(
         fwd['src'], # src_to=fwd["src"] needs to be passed, bc vertices were likely excluded during forward computation

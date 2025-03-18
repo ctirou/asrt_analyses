@@ -17,7 +17,7 @@ import sys
 subjects = SUBJS
 analysis = 'RSA'
 lock = 'stim'
-trial_type = 'all' # "all", "pattern", or "random"
+# trial_type = 'all' # "all", "pattern", or "random"
 data_path = DATA_DIR
 subjects_dir = FREESURFER_DIR
 parc = 'aparc'
@@ -31,7 +31,7 @@ verbose = True
 overwrite = True
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
-def process_subject(subject, lock, trial_type, jobs):
+def process_subject(subject, lock, jobs):
     # define classifier
     clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
     clf = SlidingEstimator(clf, scoring=scoring, n_jobs=jobs, verbose=verbose)
@@ -46,7 +46,7 @@ def process_subject(subject, lock, trial_type, jobs):
         all_behavs = list()
         all_stcs = list()
         # define results path
-        res_dir = RESULTS_DIR / "RSA" / "source" / network / lock / "scores" / trial_type
+        res_dir = RESULTS_DIR / "RSA" / "source" / network / lock / "power_scores"
         ensure_dir(res_dir)
 
         for epoch_num in [0, 1, 2, 3, 4]:
@@ -74,49 +74,47 @@ def process_subject(subject, lock, trial_type, jobs):
                             pick_ori=None, rank=rank, reduce_rank=True, reg=0.05, verbose=verbose)
             stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
             
-            del noise_cov, data_cov, fwd, filters
-            gc.collect()
+            # del noise_cov, data_cov, fwd, filters
+            # gc.collect()
 
-            print("Processing", subject, epoch_num, trial_type, network)
+            # print("Processing", subject, epoch_num, trial_type, network)
             
-            lh_label, rh_label = mne.read_label(label_path / f'{network}-lh.label'), mne.read_label(label_path / f'{network}-rh.label')
-            stcs_data = np.array([stc.in_label(lh_label + rh_label).data for stc in stcs])
-            assert len(stcs_data) == len(behav)
+            # lh_label, rh_label = mne.read_label(label_path / f'{network}-lh.label'), mne.read_label(label_path / f'{network}-rh.label')
+            # stcs_data = np.array([stc.in_label(lh_label + rh_label).data for stc in stcs])
+            # assert len(stcs_data) == len(behav)
             
-            if not os.path.exists(res_dir / f"{subject}-{epoch_num}-scores.npy") or overwrite:
-                if trial_type == 'pattern':
-                    pattern = behav.trialtypes == 1
-                    X = stcs_data[pattern]
-                    y = behav.positions[pattern]
-                elif trial_type == 'random':
-                    random = behav.trialtypes == 2
-                    X = stcs_data[random]
-                    y = behav.positions[random]
-                else:
-                    X = stcs_data
-                    y = behav.positions    
-                y = y.reset_index(drop=True)            
-                assert X.shape[0] == y.shape[0]
-                scores = cross_val_multiscore(clf, X, y, cv=cv)   
-                np.save(op.join(res_dir, f"{subject}-{epoch_num}-scores.npy"), scores.mean(0))
+            # if not os.path.exists(res_dir / f"{subject}-{epoch_num}-scores.npy") or overwrite:
+            #     if trial_type == 'pattern':
+            #         pattern = behav.trialtypes == 1
+            #         X = stcs_data[pattern]
+            #         y = behav.positions[pattern]
+            #     elif trial_type == 'random':
+            #         random = behav.trialtypes == 2
+            #         X = stcs_data[random]
+            #         y = behav.positions[random]
+            #     else:
+            #         X = stcs_data
+            #         y = behav.positions    
+            #     y = y.reset_index(drop=True)            
+            #     assert X.shape[0] == y.shape[0]
+            #     scores = cross_val_multiscore(clf, X, y, cv=cv)   
+            #     np.save(op.join(res_dir, f"{subject}-{epoch_num}-scores.npy"), scores.mean(0))
                 
-                del stcs_data, X, y, scores
-                gc.collect()
+            #     del stcs_data, X, y, scores
+            #     gc.collect()
         
             # append epochs
             all_behavs.append(behav)
             all_stcs.extend(stcs)
             
-            del epoch, behav, stcs
-            if trial_type == 'button':
-                del epoch_bsl
-            gc.collect()
+            # del epoch, behav, stcs
+            # if trial_type == 'button':
+            #     del epoch_bsl
+            # gc.collect()
     
         behav_df = pd.concat(all_behavs)
         del all_behavs
         gc.collect()
-        
-        print("Processing", subject, 'all', trial_type, network)
         
         lh_label = mne.read_label(label_path / f'{network}-lh.label')
         rh_label = mne.read_label(label_path / f'{network}-rh.label')
@@ -125,26 +123,30 @@ def process_subject(subject, lock, trial_type, jobs):
         behav_data = behav_df.reset_index(drop=True)
         assert len(stcs_data) == len(behav_data)
         
-        if not op.exists(res_dir / f"{subject}-all-scores.npy") or overwrite:
-            if trial_type == 'pattern':
-                pattern = behav_data.trialtypes == 1
-                X = stcs_data[pattern]
-                y = behav_data.positions[pattern]
-            elif trial_type == 'random':
-                random = behav_data.trialtypes == 2
-                X = stcs_data[random]
-                y = behav_data.positions[random]
-            else:
-                X = stcs_data
-                y = behav_data.positions
-            y = y.reset_index(drop=True)
-            assert X.shape[0] == y.shape[0]
-            del stcs_data, behav_data
-            gc.collect()
-            scores = cross_val_multiscore(clf, X, y, cv=cv)
-            np.save(op.join(res_dir, f"{subject}-all-scores.npy"), scores.mean(0))
-            del X, y, scores
-            gc.collect()
+        for trial_type in ['pattern', 'random']:
+            
+            print("Processing", subject, 'all', trial_type, network)
+            
+            if not op.exists(res_dir / trial_type / f"{subject}-all-scores.npy") or overwrite:
+                if trial_type == 'pattern':
+                    pattern = behav_data.trialtypes == 1
+                    X = stcs_data[pattern]
+                    y = behav_data.positions[pattern]
+                elif trial_type == 'random':
+                    random = behav_data.trialtypes == 2
+                    X = stcs_data[random]
+                    y = behav_data.positions[random]
+                else:
+                    X = stcs_data
+                    y = behav_data.positions
+                y = y.reset_index(drop=True)
+                assert X.shape[0] == y.shape[0]
+                del stcs_data, behav_data
+                gc.collect()
+                scores = cross_val_multiscore(clf, X, y, cv=cv, n_jobs=jobs)
+                np.save(op.join(res_dir, f"{subject}-all-scores.npy"), scores.mean(0))
+                del X, y, scores
+                gc.collect()
         
         del behav_df, all_stcs
         gc.collect()
@@ -163,4 +165,4 @@ if is_cluster:
         sys.exit(1)
 else:
     for subject in subjects:
-        process_subject(subject, lock, trial_type, jobs=-1)
+        process_subject(subject, lock, jobs=-1)

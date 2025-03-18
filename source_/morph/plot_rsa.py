@@ -92,8 +92,8 @@ for i, (ax, label, name) in enumerate(zip(axes.flat, networks, NETWORK_NAMES)):
     ax.set_title(name)
     ax.set_ylim(-.5, 2)
     # ax.axhline(0.51, color='grey', alpha=.5)
-plt.show()
-fig.savefig(figures_dir / f"similarity_morphed.pdf", transparent=True)
+# plt.show()
+fig.savefig(figures_dir / f"similarity_morphed-none.pdf", transparent=True)
 plt.close(fig)
 
 learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices.csv', sep="\t", index_col=0)
@@ -101,17 +101,18 @@ learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices.csv', sep
 ### Plot similarity index x learning index corr ###
 fig, axes = plt.subplots(2, 4, figsize=(12, 5), sharex=True, sharey=True, layout='tight')
 for i, (ax, label, name) in enumerate(zip(axes.flat, networks, NETWORK_NAMES)):
+    ax.axvspan(0.28, 0.51, facecolor='green', edgecolor=None, alpha=.1)
     ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
     ax.axhline(0, color='grey', alpha=.5)
     all_rhos = np.array([[spear(learn_index_df.iloc[sub, :], diff_sess[label][sub, :, t])[0] for t in range(len(times))] for sub in range(len(subjects))])
     sem = np.std(all_rhos, axis=0) / np.sqrt(len(subjects))
     # axd[j].plot(times, all_rhos.mean(0), color=cmap[i])
-    # p_values_unc = ttest_1samp(all_rhos, axis=0, popmean=0)[1]
-    # sig_unc = p_values_unc < 0.05
+    p_values_unc = ttest_1samp(all_rhos, axis=0, popmean=0)[1]
+    sig_unc = p_values_unc < 0.05
     p_values = decod_stats(all_rhos, -1)
     sig = p_values < 0.05
     # Main plot
-    ax.plot(times, all_rhos.mean(0), alpha=1, label='Random - Pattern', zorder=10, color='C7')
+    ax.plot(times, all_rhos.mean(0), alpha=1, zorder=10, color='C7')
     # Plot significant regions separately
     for start, end in contiguous_regions(sig):
         ax.plot(times[start:end], all_rhos.mean(0)[start:end], alpha=1, zorder=10, color=cmap[i])
@@ -122,12 +123,13 @@ for i, (ax, label, name) in enumerate(zip(axes.flat, networks, NETWORK_NAMES)):
     # axd[j].fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, color=cmap[i], alpha=0.2)
     # ax.fill_between(times, 0, all_rhos.mean(0) - sem, where=sig_unc, alpha=.3, label='Significance - uncorrected', facecolor="#7294D4")    
     # axd[j].fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, color=cmap[i], alpha=0.2)
-    # axd[j].fill_between(times, all_rhos.mean(0) - sem, 0, where=sig_unc, alpha=.3, label='Significance - uncorrected', facecolor="#7294D4")
-    ax.fill_between(times, all_rhos.mean(0) - sem, 0, where=sig, alpha=.4, facecolor="#F2AD00", label='Significance - corrected')
+    ax.fill_between(times, all_rhos.mean(0) - sem, 0, where=sig_unc, alpha=.3, label='uncorrected', facecolor="#7294D4")
+    ax.fill_between(times, all_rhos.mean(0) - sem, 0, where=sig, alpha=.4, facecolor="#F2AD00", label='corrected')
     # ax.set_ylabel("Rho", fontsize=11)
     ax.set_title(name)
     # ax.set_ylim(-.5, .5)
     # ax.set_yticks([-.5, 0, .5])
+    ax.legend()
 plt.show()
-fig.savefig(figures_dir / f"similarity_morphed_x_learning.pdf", transparent=True)
+fig.savefig(figures_dir / f"corr_learning_morphed-power.pdf", transparent=True)
 plt.close(fig)

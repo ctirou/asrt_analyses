@@ -532,7 +532,7 @@ def get_all_high_low(res_path, sequence, analysis, cv=False):
                 low.append(pat_sim)
     return np.array(high), np.array(low)
 
-def new_get_all_high_low(res_path, sequence, analysis):
+def new_get_all_high_low(res_path, sequence):
     import numpy as np
     # create lists of possible combinations between stimuli
     one_twos_pat = list()
@@ -671,7 +671,6 @@ def new_get_all_high_low(res_path, sequence, analysis):
     pairs_in_sequence.append(str(sequence[3]) + str(sequence[0]))
     pairs = ['12', '13', '14', '23', '24', '34']
     rev_pairs = ['21', '31', '41', '32', '42', '43']
-    high, low = [], []
     
     dhigh, dlow = {}, {}
     for i in range(5):
@@ -682,10 +681,12 @@ def new_get_all_high_low(res_path, sequence, analysis):
                 dhigh[i].append(pat_sim[i])
                 dlow[i].append(rand_sim[i])
         
+        # dhigh[i] = np.array(dhigh[i]).mean(0)
+        # dlow[i] = np.array(dlow[i]).mean(0)
+
         dhigh[i] = np.array(dhigh[i])
         dlow[i] = np.array(dlow[i])
-
-
+        
     return dhigh, dlow
 
 
@@ -714,15 +715,15 @@ def cv_mahalanobis(X, y, n_splits=10):
 
     Parameters:
         X: ndarray of shape (n_trials, n_channels, n_times)
-           Multivariate time-series data.
+        Multivariate time-series data.
         y: ndarray of shape (n_trials,)
-           Condition labels for each trial.
+        Condition labels for each trial.
         n_splits: int
-           Number of cross-validation folds.
+        Number of cross-validation folds.
 
     Returns:
         distances: ndarray of shape (n_times, n_conditions, n_conditions)
-           Cross-validated Mahalanobis distances between conditions at each time point.
+        Cross-validated Mahalanobis distances between conditions at each time point.
     """
     import numpy as np
     from sklearn.model_selection import StratifiedKFold
@@ -770,6 +771,91 @@ def cv_mahalanobis(X, y, n_splits=10):
 
     return distances
 
+
+def loocv_mahalanobis(X, y):
+    """
+    Compute LOOCV Mahalanobis distances between conditions for each time point.
+
+    Parameters:
+        X: ndarray of shape (n_trials, n_channels, n_times)
+           Multivariate time-series data.
+        y: ndarray of shape (n_trials,)
+           Condition labels for each trial.
+
+    Returns:
+        distances: ndarray of shape (n_times, n_conditions, n_conditions)
+           LOOCV Mahalanobis distances between conditions at each time point.
+    """
+    import numpy as np
+    from sklearn.covariance import LedoitWolf
+    from sklearn.model_selection import LeaveOneOut
+    from scipy.linalg import inv
+    from tqdm.auto import tqdm
+    
+    n_trials, n_channels, n_times = X.shape
+    conditions = np.unique(y)
+    n_conditions = len(conditions)
+
+    # Initialize array to store distances
+    distances = np.zeros((n_times, n_conditions, n_conditions))
+    loo = LeaveOneOut()
+
+    for time_idx in tqdm(range(n_times)):
+        X_time = X[:, :, time_idx]  # Data at this time point
+        cv_distances = np.zeros((n_conditions, n_conditions, n_trials))
+
+        for fold_idx, (train_idx, test_idx) in enumerate(loo.split(X, y)):
+            X_train, X_test = X_time[train_idx], X_time[test_idx]
+            y_train, y_test = y[train_idx], y[test_idx]
+
+            # Compute the mean and covariance for each condition in training data
+            means = {cond: X_train[y_train == cond].mean(axis=0) for cond in conditions}
+            residuals = X_train - np.array([means[cond] for cond in y_train])
+
+            # Regularized covariance estimation
+            lw = LedoitWolf(assume_centered=True)
+            cov = lw.fit(residuals)
+            cov_inv = inv(cov.covariance_)
+
+            # Compute Mahalanobis distances for each pair of conditions
+            for i, cond1 in enumerate(conditions):
+                for j, cond2 in enumerate(conditions):
+                    diff_mean = means[cond1] - means[cond2]
+                    cv_distances[i, j, fold_idx] = np.sqrt(diff_mean.T @ cov_inv @ diff_mean)
+
+        # Average distances across LOOCV iterations
+        distances[time_idx] = cv_distances.mean(axis=2)
+
+    return distances
+
+def interpolate_rdm_nan(rdm):
+    """Interpolate nan values in a RDM matrix by computing the mean of previous and subsequent block.
+
+    Args:
+        rdm: ndarray of shape (n_blocks, n_times, n_conditions, n_conditions)
+        LOOCV Mahalanobis distances between conditions at each time point.
+        
+    Returns:
+        rdm: ndarray of shape (n_blocks, n_times, n_conditions, n_conditions)
+        LOOCV Mahalanobis distances between conditions at each time point.
+        present_nan: bool
+        True if nan values were present in the RDM, False otherwise
+    """
+    present_nan = False
+    n_blocks, n_times, n_conditions, _ = rdm.shape
+    for i in range(n_blocks):
+        for j in range(n_times):
+            if np.isnan(np.sum(rdm[i, j])):
+                present_nan = True
+                if i == 0:
+                    rdm[i, j] = rdm[i + 1, j]
+                elif i == n_blocks - 1:
+                    rdm[i, j] = rdm[i - 1, j]
+                else:
+                    rdm[i, j] = (rdm[i - 1, j] + rdm[i + 1, j]) / 2
+    return rdm, present_nan
+
+
 def remove_common_vertex(base_label, target_label):
     """Remove common vertices between two labels"""
     import numpy as np
@@ -806,3 +892,13 @@ def contiguous_regions(condition):
         ends = np.r_[ends, condition.size]
 
     return zip(starts, ends)
+
+def svd(vector_data):
+    # Initialize an array for storing the dominant orientation time series
+    dominant_data = np.zeros((vector_data.shape[0], vector_data.shape[1], vector_data.shape[-1]))  # (294, 8196, 82)
+    for trial in range(vector_data.shape[0]):  # Loop over trials
+        for source in range(vector_data.shape[1]):  # Loop over sources
+            u, s, vh = np.linalg.svd(vector_data[trial, source, :, :], full_matrices=False)  # SVD over orientation axis (3)
+            dominant_time_series = vh[0, :] * s[0]  # First right singular vector weighted by singular value
+            dominant_data[trial, source, :] = dominant_time_series  # Store in new array
+    return dominant_data
