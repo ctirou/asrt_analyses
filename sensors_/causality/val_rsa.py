@@ -12,7 +12,7 @@ overwrite = False
 verbose = 'error'
 
 data_path = DATA_DIR
-subjects = SUBJS
+subjects = SUBJS + ['sub03', 'sub06']
 lock = 'stim'
 
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
@@ -83,7 +83,7 @@ else:
     Parallel(-1)(delayed(process_subject)(subject, epoch_num, verbose) for subject in subjects for epoch_num in range(5))
 
 
-# plot it
+# Plot it
 from tqdm.auto import tqdm
 all_highs, all_lows = {}, {}
 times = np.linspace(-0.2, 0.6, 82)

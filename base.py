@@ -532,8 +532,17 @@ def get_all_high_low(res_path, sequence, analysis, cv=False):
                 low.append(pat_sim)
     return np.array(high), np.array(low)
 
-def new_get_all_high_low(res_path, sequence):
+def get_all_high_low_blocks(res_path, sequence):
     import numpy as np
+    # create list of possible pairs
+    pairs_in_sequence = list()
+    pairs_in_sequence.append(str(sequence[0]) + str(sequence[1]))
+    pairs_in_sequence.append(str(sequence[1]) + str(sequence[2]))
+    pairs_in_sequence.append(str(sequence[2]) + str(sequence[3]))
+    pairs_in_sequence.append(str(sequence[3]) + str(sequence[0]))
+    pairs = ['12', '13', '14', '23', '24', '34']
+    rev_pairs = ['21', '31', '41', '32', '42', '43']
+    
     # create lists of possible combinations between stimuli
     one_twos_pat = list()
     one_threes_pat = list()
@@ -549,145 +558,107 @@ def new_get_all_high_low(res_path, sequence):
     two_fours_rand = list() 
     three_fours_rand = list()
     
-    # loop across sessions
-    for epoch_num in [0, 1, 2, 3, 4]:
-        
-        blocks = range(1, 4) if epoch_num == 0 else range(1 + 5 * (epoch_num - 1), 6 + 5 * (epoch_num - 1))        
-        
-        pat12, rand12 = list(), list()
-        pat13, rand13 = list(), list()
-        pat14, rand14 = list(), list()
-        pat23, rand23 = list(), list()
-        pat24, rand24 = list(), list()
-        pat34, rand34 = list(), list()
-        
-        for block in blocks:
-            
-            rdm_rand = np.load(res_path / f"rand-{epoch_num}-{block}.npy")
-            rdm_pat = np.load(res_path / f"pat-{epoch_num}-{block}.npy")
-            
-            one_two_pat = list()
-            one_three_pat = list()
-            one_four_pat = list() 
-            two_three_pat = list()
-            two_four_pat = list()
-            three_four_pat = list()
-
-            one_two_rand = list()
-            one_three_rand = list()
-            one_four_rand = list() 
-            two_three_rand = list()
-            two_four_rand = list()
-            three_four_rand = list()
-
-            for itime in range(rdm_pat.shape[0]):
-                one_two_pat.append(rdm_pat[itime, 0, 1])
-                one_three_pat.append(rdm_pat[itime, 0, 2])
-                one_four_pat.append(rdm_pat[itime, 0, 3])
-                two_three_pat.append(rdm_pat[itime, 1, 2])
-                two_four_pat.append(rdm_pat[itime, 1, 3])
-                three_four_pat.append(rdm_pat[itime, 2, 3])
-
-                one_two_rand.append(rdm_rand[itime, 0, 1])
-                one_three_rand.append(rdm_rand[itime, 0, 2])
-                one_four_rand.append(rdm_rand[itime, 0, 3])
-                two_three_rand.append(rdm_rand[itime, 1, 2])
-                two_four_rand.append(rdm_rand[itime, 1, 3])
-                three_four_rand.append(rdm_rand[itime, 2, 3])
-
-            one_two_pat = np.array(one_two_pat)
-            one_three_pat = np.array(one_three_pat)
-            one_four_pat = np.array(one_four_pat) 
-            two_three_pat = np.array(two_three_pat)
-            two_four_pat = np.array(two_four_pat) 
-            three_four_pat = np.array(three_four_pat)
-
-            one_two_rand = np.array(one_two_rand)
-            one_three_rand = np.array(one_three_rand)
-            one_four_rand = np.array(one_four_rand) 
-            two_three_rand = np.array(two_three_rand)
-            two_four_rand = np.array(two_four_rand) 
-            three_four_rand = np.array(three_four_rand)
-
-            pat12.append(one_two_pat)
-            pat13.append(one_three_pat)
-            pat14.append(one_four_pat) 
-            pat23.append(two_three_pat)
-            pat24.append(two_four_pat) 
-            pat34.append(three_four_pat)
-            
-            rand12.append(one_two_rand)
-            rand13.append(one_three_rand)
-            rand14.append(one_four_rand) 
-            rand23.append(two_three_rand)
-            rand24.append(two_four_rand) 
-            rand34.append(three_four_rand)
-            
-        pat12, rand12 = np.array(pat12), np.array(rand12)
-        pat13, rand13 = np.array(pat13), np.array(rand13)
-        pat14, rand14 = np.array(pat14), np.array(rand14)
-        pat23, rand23 = np.array(pat23), np.array(rand23)
-        pat24, rand24 = np.array(pat24), np.array(rand24)
-        pat34, rand34 = np.array(pat34), np.array(rand34)
-            
-        one_twos_pat.append(pat12)
-        one_threes_pat.append(pat13)
-        one_fours_pat.append(pat14)
-        two_threes_pat.append(pat23)
-        two_fours_pat.append(pat24)
-        three_fours_pat.append(pat34)
-        
-        one_twos_rand.append(rand12)
-        one_threes_rand.append(rand13)
-        one_fours_rand.append(rand14)
-        two_threes_rand.append(rand23)
-        two_fours_rand.append(rand24)
-        three_fours_rand.append(rand34)
-            
-    # one_twos_pat = np.array(one_twos_pat)
-    # one_threes_pat = np.array(one_threes_pat)  
-    # one_fours_pat = np.array(one_fours_pat)   
-    # two_threes_pat = np.array(two_threes_pat)  
-    # two_fours_pat = np.array(two_fours_pat)
-    # three_fours_pat = np.array(three_fours_pat)
-
-    # one_twos_rand = np.array(one_twos_rand)
-    # one_threes_rand = np.array(one_threes_rand)  
-    # one_fours_rand = np.array(one_fours_rand)   
-    # two_threes_rand = np.array(two_threes_rand)  
-    # two_fours_rand = np.array(two_fours_rand)   
-    # three_fours_rand = np.array(three_fours_rand)
+    blocks = np.arange(23)
+    pat_blocks = np.zeros((23, 4, 82))
+    rand_blocks = np.zeros((23, 4, 82))
     
-    patterns = [one_twos_pat, one_threes_pat, one_fours_pat,
-                    two_threes_pat, two_fours_pat, three_fours_pat]
-    randoms = [one_twos_rand, one_threes_rand, one_fours_rand,
-                    two_threes_rand, two_fours_rand, three_fours_rand]
+    for block in blocks:
     
-    # create list of possible pairs
-    pairs_in_sequence = list()
-    pairs_in_sequence.append(str(sequence[0]) + str(sequence[1]))
-    pairs_in_sequence.append(str(sequence[1]) + str(sequence[2]))
-    pairs_in_sequence.append(str(sequence[2]) + str(sequence[3]))
-    pairs_in_sequence.append(str(sequence[3]) + str(sequence[0]))
-    pairs = ['12', '13', '14', '23', '24', '34']
-    rev_pairs = ['21', '31', '41', '32', '42', '43']
-    
-    dhigh, dlow = {}, {}
-    for i in range(5):
-        dhigh[i], dlow[i] = [], []
-    
-        for pair, rev_pair, pat_sim, rand_sim in zip(pairs, rev_pairs, patterns, randoms):
-            if ((pair in pairs_in_sequence) or (rev_pair in pairs_in_sequence)):
-                dhigh[i].append(pat_sim[i])
-                dlow[i].append(rand_sim[i])
-        
-        # dhigh[i] = np.array(dhigh[i]).mean(0)
-        # dlow[i] = np.array(dlow[i]).mean(0)
+        # loop across sessions
+        for epoch_num in [0, 1, 2, 3, 4]:
+                    
+            rdm_pattern = np.load(res_path / f"pat-{epoch_num}.npy")
+            rdm_random = np.load(res_path / f"rand-{epoch_num}.npy")
+            
+            blocky = range(3) if epoch_num == 0 else range(5)
+            
+            for iblock in blocky:
+                
+                rdm_pat = rdm_pattern[iblock]
+                rdm_rand = rdm_random[iblock]
+                
+                one_two_pat = list()
+                one_three_pat = list()
+                one_four_pat = list() 
+                two_three_pat = list()
+                two_four_pat = list()
+                three_four_pat = list()
 
-        dhigh[i] = np.array(dhigh[i])
-        dlow[i] = np.array(dlow[i])
+                one_two_rand = list()
+                one_three_rand = list()
+                one_four_rand = list() 
+                two_three_rand = list()
+                two_four_rand = list()
+                three_four_rand = list()
+
+                for itime in range(rdm_pat.shape[0]):
+                    one_two_pat.append(rdm_pat[itime, 0, 1])
+                    one_three_pat.append(rdm_pat[itime, 0, 2])
+                    one_four_pat.append(rdm_pat[itime, 0, 3])
+                    two_three_pat.append(rdm_pat[itime, 1, 2])
+                    two_four_pat.append(rdm_pat[itime, 1, 3])
+                    three_four_pat.append(rdm_pat[itime, 2, 3])
+
+                    one_two_rand.append(rdm_rand[itime, 0, 1])
+                    one_three_rand.append(rdm_rand[itime, 0, 2])
+                    one_four_rand.append(rdm_rand[itime, 0, 3])
+                    two_three_rand.append(rdm_rand[itime, 1, 2])
+                    two_four_rand.append(rdm_rand[itime, 1, 3])
+                    three_four_rand.append(rdm_rand[itime, 2, 3])
+
+                one_two_pat = np.array(one_two_pat)
+                one_three_pat = np.array(one_three_pat)
+                one_four_pat = np.array(one_four_pat) 
+                two_three_pat = np.array(two_three_pat)
+                two_four_pat = np.array(two_four_pat) 
+                three_four_pat = np.array(three_four_pat)
+
+                one_two_rand = np.array(one_two_rand)
+                one_three_rand = np.array(one_three_rand)
+                one_four_rand = np.array(one_four_rand) 
+                two_three_rand = np.array(two_three_rand)
+                two_four_rand = np.array(two_four_rand) 
+                three_four_rand = np.array(three_four_rand)
+
+                one_twos_pat.append(one_two_pat)
+                one_threes_pat.append(one_three_pat)
+                one_fours_pat.append(one_four_pat) 
+                two_threes_pat.append(two_three_pat)
+                two_fours_pat.append(two_four_pat) 
+                three_fours_pat.append(three_four_pat)
+
+                one_twos_rand.append(one_two_rand)
+                one_threes_rand.append(one_three_rand)
+                one_fours_rand.append(one_four_rand) 
+                two_threes_rand.append(two_three_rand)
+                two_fours_rand.append(two_four_rand) 
+                three_fours_rand.append(three_four_rand)
+                                
+            one_twos_pat = np.array(one_twos_pat)
+            one_threes_pat = np.array(one_threes_pat)  
+            one_fours_pat = np.array(one_fours_pat)   
+            two_threes_pat = np.array(two_threes_pat)  
+            two_fours_pat = np.array(two_fours_pat)
+            three_fours_pat = np.array(three_fours_pat)
+
+            one_twos_rand = np.array(one_twos_rand)
+            one_threes_rand = np.array(one_threes_rand)  
+            one_fours_rand = np.array(one_fours_rand)   
+            two_threes_rand = np.array(two_threes_rand)  
+            two_fours_rand = np.array(two_fours_rand)   
+            three_fours_rand = np.array(three_fours_rand)
         
-    return dhigh, dlow
+            patterns = [one_twos_pat, one_threes_pat, one_fours_pat,
+                            two_threes_pat, two_fours_pat, three_fours_pat]
+            randoms = [one_twos_rand, one_threes_rand, one_fours_rand,
+                            two_threes_rand, two_fours_rand, three_fours_rand]
+            
+            for pair, rev_pair, pat_sim, rand_sim in zip(pairs, rev_pairs, patterns, randoms):
+                if ((pair in pairs_in_sequence) or (rev_pair in pairs_in_sequence)):                    
+                    pat_blocks[block] = pat_sim
+                    rand_blocks[block] = rand_sim                
+
+    return pat_blocks, rand_blocks
 
 
 def get_cm(clf, cv, X, y, times):
