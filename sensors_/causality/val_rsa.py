@@ -82,64 +82,57 @@ if is_cluster:
 else:
     Parallel(-1)(delayed(process_subject)(subject, epoch_num, verbose) for subject in subjects for epoch_num in range(5))
 
-
 # Plot it
 from tqdm.auto import tqdm
-all_highs, all_lows = {}, {}
 times = np.linspace(-0.2, 0.6, 82)
 win = np.where((times >= 0.28) & (times <= 0.51))[0]
 
-liste = ['01', '02', '03'] + [str(j) for j in range(1, 21)]
-for i in liste:
-    all_highs[i] = []
-    all_lows[i] = []
-
+pattern, random = [], []
 for subject in tqdm(subjects):
-    res_path = RESULTS_DIR / 'RSA' / 'sensors' / lock / f"cv_rdm_blocks" / subject        
+    res_path = RESULTS_DIR / 'RSA' / 'sensors' / lock / "loocv_rdm_blocks" / subject        
     behav_dir = op.join(HOME / 'raw_behavs' / subject)
     sequence = get_sequence(behav_dir)
-    high, low = new_get_all_high_low(res_path, sequence)
+    pat, rand = get_all_high_low_blocks(res_path, sequence)
+    pattern.append(pat)
+    random.append(rand)
     
-    for i in range(1, 5):
-        if np.isnan(np.sum(high[i])):
-            print(subject, 'has a high nan in sess', i)
-        if np.isnan(np.sum(low[i])):
-            print(subject, 'has a low nan in sess', i)
-            
-                
-    for sess in range(5):
-        if sess == 0:
-            for block, blockin in zip(range(4), ['01','02','03']):
-                all_highs[blockin].append(high[sess][block, win].mean())
-                all_lows[blockin].append(low[sess][block, win].mean())
-        else:
-            for blockin, block in zip(range(1 + 5 * (sess - 1), 6 + 5 * (sess - 1)), range(5)):
-                all_highs[str(blockin)].append(high[sess][block, win].mean())
-                all_lows[str(blockin)].append(low[sess][block, win].mean())
+pattern = np.array(pattern).mean(1)
+random = np.array(random).mean(1)
 
-diff = []
-l_bsl, h_bsl = [], []
-for i in liste:
-    if i in ['01', '02', '03']:
-        diff.append(np.mean(all_lows[i]) - np.mean(all_highs[i]))
-        l_bsl.append(np.mean(all_lows[i]))
-        h_bsl.append(np.mean(all_highs[i]))
-    else:
-        l = all_lows[i] - np.nanmean(l_bsl)
-        h = all_highs[i] - np.nanmean(h_bsl)
-        diff.append(np.mean(l) - np.mean(h))
-diff = np.array(diff)
+m_pattern = pattern[:, :, win].mean(-1)
+m_random = random[:, :, win].mean(-1)
 
-all_highs = np.array(all_highs)
-all_lows = np.array(all_lows)
+prac_pat = m_pattern[:, :3].mean(-1)
+prac_rand = m_random[:, :3].mean(-1)
 
-high = all_highs[:, :, 1:, :].mean((1, 2)) - all_highs[:, :, 0, :].mean(axis=1)
-low = all_lows[:, :, 1:, :].mean((1, 2)) - all_lows[:, :, 0, :].mean(axis=1)
-diff = low - high
+sim_index = list()
+for subject in range(len(subjects)):
+    sub_sim = list()
+    for i in range(23):
+        diff = (m_random[subject, i] - prac_rand[subject]) - (m_pattern[subject, i] - prac_pat[subject])
+        sub_sim.append(diff)
+    sim_index.append(np.array(sub_sim))
+sim_index = np.array(sim_index)
 
-diff_sess = list()   
-for i in range(5):
-    rev_low = all_lows[:, :, i, :].mean(1) - all_lows[:, :, 0, :].mean(axis=1)
-    rev_high = all_highs[:, :, i, :].mean(1) - all_highs[:, :, 0, :].mean(axis=1)
-    diff_sess.append(rev_low - rev_high)
-diff_sess = np.array(diff_sess).swapaxes(0, 1)
+# Calculate peak for all participants
+# Then mean
+blocks = np.arange(24)
+peaks = list()
+for subject in range(len(subjects)):
+    peaks.append(blocks[np.argmax(sim_index[subject, 3:])])
+peaks = np.array(peaks)
+m_peak = peaks.mean()
+
+import matplotlib.pyplot as plt
+blocks = [i for i in range(1, 24)]
+fig, ax = plt.subplots(1, 1)
+ax.axhline(0, color='grey', linestyle='-', alpha=0.5)
+for i in range(sim_index.shape[0]):
+    ax.plot(blocks, sim_index[i], alpha=0.5, label=i+1)
+ax.set_xticks(range(1, 24))
+ax.plot(blocks, sim_index.mean(0), lw=3, label='RSA')
+# ax.set_xticklabels(["01", "02", "03"] + [str(i) for i in range(1, 21)])
+ax.set_xlabel('Block')
+ax.set_ylabel('Mean RSA effect')
+# ax.legend(title=f'peak = {m_peak}')
+ax.legend()
