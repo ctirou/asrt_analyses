@@ -4,11 +4,8 @@ from config import *
 import os.path as op
 import matplotlib.pyplot as plt
 import numpy as np
-from mne import read_epochs
-from scipy.stats import zscore, pearsonr, ttest_1samp, spearmanr as spear
+from scipy.stats import zscore, ttest_1samp, spearmanr as spear
 from tqdm.auto import tqdm
-from matplotlib.ticker import FormatStrFormatter
-import matplotlib.colors as mcolors
 import pandas as pd
 from joblib import Parallel, delayed
 from scipy.stats import zscore
@@ -289,7 +286,7 @@ for subject in tqdm(subjects):
     res_path = RESULTS_DIR / 'RSA' / 'sensors' / lock / "cv_rdm" / subject
     ensure_dir(res_path)
     # RSA stuff
-    behav_dir = op.join(RAW_DATA_DIR, "%s/behav_data/" % (subject)) 
+    behav_dir = op.join(HOME / 'raw_behavs' / subject)
     sequence = get_sequence(behav_dir)
     high, low = get_all_high_low(res_path, sequence, "pat_high_rdm_high", cv=True)    
     all_highs.append(high)    

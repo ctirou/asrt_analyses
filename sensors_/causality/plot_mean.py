@@ -2,6 +2,8 @@ import numpy as np
 from base import *
 from config import *
 from tqdm.auto import tqdm
+import matplotlib.pyplot as plt
+
 
 subjects = SUBJS + ['sub03', 'sub06']
 lock = 'stim'
@@ -43,21 +45,189 @@ peaks = list()
 for subject in range(len(subjects)):
     peaks.append(blocks[np.argmax(sim_index[subject])])
 peaks = np.array(peaks)
-m_peak = int(round(peaks.mean()))
+peak_rsa = int(round(peaks.mean()))
 # print('Peak:', m_peak)
 
 import matplotlib.pyplot as plt
 fig, ax = plt.subplots(1, 1, figsize=(15, 10))
 ax.axhline(0, color='grey', linestyle='-', alpha=0.5)
+ax.axvspan(3, 7, color='purple', alpha=0.1)
+ax.axvspan(8, 12, color='purple', alpha=0.1)
+ax.axvspan(13, 17, color='purple', alpha=0.1)
+ax.axvspan(18, 22, color='purple', alpha=0.1)
 for i in range(sim_index.shape[0]):
     ax.plot(blocks, sim_index[i], alpha=0.5)
 # ax.set_xticks(range(1, 24))
 ax.set_xticks(blocks)
-ax.plot(blocks, sim_index.mean(0), lw=3, label='RSA')
+ax.plot(blocks, sim_index.mean(0), lw=3, color='red', label='RSA')
 ax.set_xlabel('Block')
 ax.set_ylabel('Mean RSA effect')
-ax.axvspan(m_peak-0.05, m_peak+0.05, color='red', alpha=0.5, label='peak')
+ax.axvspan(peak_rsa-0.05, peak_rsa+0.05, color='red', alpha=0.5, label='peak')
 ax.axvspan(0, 2, color='grey', alpha=0.1, label='practice')
 ax.set_xticklabels(['01', '02', '03'] + [str(i) for i in range(1, 21)])
 ax.legend()
 plt.show()
+
+# load time gen data
+timeg_data_path = TIMEG_DATA_DIR / 'results' / 'sensors' / lock
+timesg = np.linspace(-1.5, 4, 559)
+
+pattern, random = [], []
+for subject in tqdm(subjects):
+    pat, rand = [], []
+    for epoch_num in range(5):
+        blocks = range(1, 4) if epoch_num == 0 else range(1 + 5 * (epoch_num - 1), 6 + 5 * (epoch_num - 1))
+        for block in blocks:
+            pat.append(np.load(timeg_data_path / 'loocv_pattern' /  f"{subject}-{epoch_num}-{block}.npy"))
+            rand.append(np.load(timeg_data_path / 'loocv_random' / f"{subject}-{epoch_num}-{block}.npy"))
+    pattern.append(np.array(pat))
+    random.append(np.array(rand))
+pattern, random = np.array(pattern), np.array(random)
+contrast = pattern - random
+
+import matplotlib.pyplot as plt
+plt.imshow(pattern.mean((0, 1)),
+           interpolation="lanczos",
+                            origin="lower",
+                            cmap='RdBu_r',
+                            extent=timesg[[0, -1, 0, -1]],
+                            aspect=0.5)
+plt.axhline(0, color='black', lw=1)
+plt.axvline(0, color='black', lw=1)
+plt.show()
+
+plt.imshow(random.mean((0, 1)),
+           interpolation="lanczos",
+                            origin="lower",
+                            cmap='RdBu_r',
+                            extent=timesg[[0, -1, 0, -1]],
+                            aspect=0.5)
+plt.axhline(0, color='black', lw=1)
+plt.axvline(0, color='black', lw=1)
+plt.show()
+
+plt.imshow(contrast.mean((0, 1)),
+           interpolation="lanczos",
+                            origin="lower",
+                            cmap='RdBu_r',
+                            extent=timesg[[0, -1, 0, -1]],
+                            aspect=0.5)
+plt.axhline(0, color='black', lw=1)
+plt.axvline(0, color='black', lw=1)
+plt.show()
+
+# mean box
+idx_timeg = np.where((timesg >= -0.5) & (timesg < 0))[0]
+means = []
+for sub in range(len(subjects)):
+    tg = []
+    for block in range(23):
+        data = contrast[sub, block, idx_timeg, :][:, idx_timeg]
+        tg.append(data.mean())
+    means.append(np.array(tg))
+means = np.array(means)
+
+# mean diag
+mean_diag = []
+for sub in range(len(subjects)):
+    tg = []
+    for block in range(23):
+        data = np.diag(contrast[sub, block])
+        tg.append(data[idx_timeg].mean())
+    mean_diag.append(np.array(tg))
+mean_diag = np.array(mean_diag)
+
+blocks = np.arange(23)
+peaks = list()
+for subject in range(len(subjects)):
+    peaks.append(blocks[np.argmax(means[subject])])
+peaks = np.array(peaks)
+peak_tg = int(round(peaks.mean()))
+
+from scipy.stats import zscore
+X_scaled = zscore(mean_diag, axis=1)
+y_scaled = zscore(sim_index, axis=1)
+
+fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 10))
+
+ax1.axhline(0, color='grey', linestyle='-', alpha=0.5)
+ax1.axvspan(0, 2, color='grey', alpha=0.1)
+ax1.axvspan(3, 7, color='purple', alpha=0.1)
+ax1.axvspan(8, 12, color='purple', alpha=0.1)
+ax1.axvspan(13, 17, color='purple', alpha=0.1)
+ax1.axvspan(18, 22, color='purple', alpha=0.1)
+for i in range(sim_index.shape[0]):
+    ax1.plot(blocks, sim_index[i], alpha=0.5)
+# ax.set_xticks(range(1, 24))
+ax1.set_xticks(blocks)
+ax1.plot(blocks, sim_index.mean(0), lw=3, color='red', label='Mean')
+ax1.set_ylabel('Mean RSA effect')
+ax1.axvspan(peak_rsa-0.05, peak_rsa+0.05, color='red', alpha=0.5, label='Mean peak')
+ax1.set_xticklabels(['01', '02', '03'] + [str(i) for i in range(1, 21)])
+ax1.legend()
+ax1.set_title('Representational change')
+
+ax2.axhline(0, color='grey', linestyle='-', alpha=0.5)
+ax2.axvspan(0, 2, color='grey', alpha=0.1)
+ax2.axvspan(3, 7, color='purple', alpha=0.1)
+ax2.axvspan(8, 12, color='purple', alpha=0.1)
+ax2.axvspan(13, 17, color='purple', alpha=0.1)
+ax2.axvspan(18, 22, color='purple', alpha=0.1)
+for i in range(mean_diag.shape[0]):
+    ax2.plot(blocks, mean_diag[i], alpha=0.5)
+# ax.set_xticks(range(1, 24))
+ax2.set_xticks(blocks)
+ax2.plot(blocks, mean_diag.mean(0), lw=3, color='blue', label='Mean')
+# ax.plot(blocks, sim_index.mean(0), lw=3, label='Representational change')
+ax2.set_xlabel('Block')
+ax2.set_ylabel('Mean predictive effect')
+ax2.axvspan(peak_tg-0.05, peak_tg+0.05, color='blue', alpha=0.5, label='Mean peak')
+ax2.set_xticklabels(['01', '02', '03'] + [str(i) for i in range(1, 21)])
+ax2.legend()
+ax2.set_title('Predictive coding')
+
+x = np.diff(mean_diag.mean(0))
+y = np.diff(sim_index.mean(0))
+
+from statsmodels.tsa.stattools import grangercausalitytests
+from statsmodels.tsa.api import VAR
+import pandas as pd
+
+AIC, BIC, HQIC = [], [], []
+for sub in range(len(subjects)):
+    print(f"\n##### Subject {sub} #####")
+    data = pd.DataFrame({'X': mean_diag[sub], 'Y': sim_index[sub]})
+    gc_res = grangercausalitytests(data, 6, verbose=True)
+    model = VAR(data)
+    lag_order = model.select_order(6)
+    AIC.append(lag_order.aic)
+    BIC.append(lag_order.bic)
+    HQIC.append(lag_order.hqic)
+print("AIC:", np.mean(AIC))
+print("BIC:", np.mean(BIC))
+print("HQIC:", np.mean(HQIC))
+
+
+# X : predictive coding
+# Y : representational change
+# Test if X causes Y or Y is influenced by X
+data = pd.DataFrame({'X': X_scaled.mean(0), 'Y': y_scaled.mean(0)})
+gc_res = grangercausalitytests(data, 6, verbose=True)
+
+data = pd.DataFrame({'X': means.mean(0), 'Y': y_scaled.mean(0)})
+gc_res = grangercausalitytests(data, 6, verbose=True)
+
+data = pd.DataFrame({'X': mean_diag.mean(0), 'Y': sim_index.mean(0)})
+gc_res = grangercausalitytests(data, 6, verbose=True)
+
+model = VAR(data)
+lag_order = model.select_order(6)
+print("Optimal Lag Order (AIC, BIC, HQIC):", lag_order.aic, lag_order.bic, lag_order.hqic)
+
+plt.plot([i for i in range(22)], x, label='x mean')
+plt.plot([i for i in range(22)], y, label='y mean')
+plt.legend()
+plt.show()
+
+cc = np.corrcoef(mean_diag.mean(0), sim_index.mean(0))[0, 1]
+print(cc)
