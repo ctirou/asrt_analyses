@@ -76,10 +76,21 @@ pattern, random = [], []
 for subject in tqdm(subjects):
     pat, rand = [], []
     for epoch_num in range(5):
-        blocks = range(1, 4) if epoch_num == 0 else range(1 + 5 * (epoch_num - 1), 6 + 5 * (epoch_num - 1))
+        blocks = range(1, 4) if epoch_num == 0 else range(1, 6)
         for block in blocks:
-            pat.append(np.load(timeg_data_path / 'loocv_pattern' /  f"{subject}-{epoch_num}-{block}.npy"))
-            rand.append(np.load(timeg_data_path / 'loocv_random' / f"{subject}-{epoch_num}-{block}.npy"))
+            pat.append(np.load(timeg_data_path / 'split_pattern' /  f"{subject}-{epoch_num}-{block}.npy"))
+            rand.append(np.load(timeg_data_path / 'split_random' / f"{subject}-{epoch_num}-{block}.npy"))
+    pattern.append(np.array(pat))
+    random.append(np.array(rand))
+pattern, random = np.array(pattern), np.array(random)
+contrast = pattern - random
+
+pattern, random = [], []
+for subject in tqdm(subjects):
+    pat, rand = [], []
+    for block in range(1, 24):
+        pat.append(np.load(timeg_data_path / 'split_all_pattern' /  f"{subject}-{block}.npy"))
+        rand.append(np.load(timeg_data_path / 'split_all_random' / f"{subject}-{block}.npy"))
     pattern.append(np.array(pat))
     random.append(np.array(rand))
 pattern, random = np.array(pattern), np.array(random)
@@ -115,6 +126,22 @@ plt.imshow(contrast.mean((0, 1)),
 plt.axhline(0, color='black', lw=1)
 plt.axvline(0, color='black', lw=1)
 plt.show()
+
+# pval = gat_stats(contrast.mean(1), -1)
+# sig = pval < 0.05
+plt.imshow(contrast.mean((0, 1)),
+           interpolation="lanczos",
+                            origin="lower",
+                            cmap='RdBu_r',
+                            extent=timesg[[0, -1, 0, -1]],
+                            aspect=0.5)
+plt.axhline(0, color='black', lw=1)
+plt.axvline(0, color='black', lw=1)
+# xx, yy = np.meshgrid(timesg, timesg, copy=False, indexing='xy')
+# plt.contour(xx, yy, sig, colors='black', levels=[0],
+#                     linestyles='--', linewidths=1, alpha=.5)
+plt.show()
+
 
 # mean box
 idx_timeg = np.where((timesg >= -0.5) & (timesg < 0))[0]
@@ -173,11 +200,11 @@ ax2.axvspan(3, 7, color='purple', alpha=0.1)
 ax2.axvspan(8, 12, color='purple', alpha=0.1)
 ax2.axvspan(13, 17, color='purple', alpha=0.1)
 ax2.axvspan(18, 22, color='purple', alpha=0.1)
-for i in range(mean_diag.shape[0]):
-    ax2.plot(blocks, mean_diag[i], alpha=0.5)
+for i in range(means.shape[0]):
+    ax2.plot(blocks, means[i], alpha=0.5)
 # ax.set_xticks(range(1, 24))
 ax2.set_xticks(blocks)
-ax2.plot(blocks, mean_diag.mean(0), lw=3, color='blue', label='Mean')
+ax2.plot(blocks, means.mean(0), lw=3, color='blue', label='Mean')
 # ax.plot(blocks, sim_index.mean(0), lw=3, label='Representational change')
 ax2.set_xlabel('Block')
 ax2.set_ylabel('Mean predictive effect')
@@ -186,13 +213,22 @@ ax2.set_xticklabels(['01', '02', '03'] + [str(i) for i in range(1, 21)])
 ax2.legend()
 ax2.set_title('Predictive coding')
 
-x = np.diff(mean_diag.mean(0))
-y = np.diff(sim_index.mean(0))
+x = np.array([np.diff(mean_diag[sub])[1:] for sub in range(len(subjects))])
+y = np.array([np.diff(sim_index[sub])[1:] for sub in range(len(subjects))])
+
+plt.plot([i for i in range(22)], x.mean(0), label='x mean')
+plt.plot([i for i in range(22)], y.mean(0), label='y mean')
+plt.legend()
+plt.show()
 
 from statsmodels.tsa.stattools import grangercausalitytests
 from statsmodels.tsa.api import VAR
 import pandas as pd
 
+# X : predictive coding
+# Y : representational change
+
+# X -> Y
 AIC, BIC, HQIC = [], [], []
 for sub in range(len(subjects)):
     print(f"\n##### Subject {sub} #####")
@@ -203,31 +239,25 @@ for sub in range(len(subjects)):
     AIC.append(lag_order.aic)
     BIC.append(lag_order.bic)
     HQIC.append(lag_order.hqic)
-print("AIC:", np.mean(AIC))
-print("BIC:", np.mean(BIC))
-print("HQIC:", np.mean(HQIC))
+print("\nMean AIC:", np.mean(AIC))
+print("Mean BIC:", np.mean(BIC))
+print("Mean HQIC:", np.mean(HQIC))
 
+print("\nMedian AIC:", np.median(AIC))
+print("Median BIC:", np.median(BIC))
+print("Median HQIC:", np.median(HQIC))
 
-# X : predictive coding
-# Y : representational change
-# Test if X causes Y or Y is influenced by X
-data = pd.DataFrame({'X': X_scaled.mean(0), 'Y': y_scaled.mean(0)})
-gc_res = grangercausalitytests(data, 6, verbose=True)
-
-data = pd.DataFrame({'X': means.mean(0), 'Y': y_scaled.mean(0)})
-gc_res = grangercausalitytests(data, 6, verbose=True)
-
-data = pd.DataFrame({'X': mean_diag.mean(0), 'Y': sim_index.mean(0)})
-gc_res = grangercausalitytests(data, 6, verbose=True)
-
-model = VAR(data)
-lag_order = model.select_order(6)
-print("Optimal Lag Order (AIC, BIC, HQIC):", lag_order.aic, lag_order.bic, lag_order.hqic)
-
-plt.plot([i for i in range(22)], x, label='x mean')
-plt.plot([i for i in range(22)], y, label='y mean')
-plt.legend()
-plt.show()
-
-cc = np.corrcoef(mean_diag.mean(0), sim_index.mean(0))[0, 1]
-print(cc)
+# Y -> X
+AIC, BIC, HQIC = [], [], []
+for sub in range(len(subjects)):
+    print(f"\n##### Subject {sub} #####")
+    data = pd.DataFrame({'X': sim_index[sub], 'Y': mean_diag[sub]})
+    gc_res = grangercausalitytests(data, [4], verbose=True)
+    model = VAR(data)
+    lag_order = model.select_order(6)
+    AIC.append(lag_order.aic)
+    BIC.append(lag_order.bic)
+    HQIC.append(lag_order.hqic)
+print("Mean AIC:", np.mean(AIC))
+print("Mean BIC:", np.mean(BIC))
+print("Mean HQIC:", np.mean(HQIC))

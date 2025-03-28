@@ -35,8 +35,12 @@ def process_subject(subject, lock, jobs):
     # skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 
     for trial_type in ['pattern', 'random']:
+        
+        all_Xtraining, all_Xtesting = [], []
+        all_ytraining, all_ytesting = [], []
+
         for epoch_num in [0, 1, 2, 3, 4]:
-            res_path = data_path / 'results' / 'sensors' / lock / f"split_{trial_type}"
+            res_path = data_path / 'results' / 'sensors' / lock / f"split_all_{trial_type}"
             ensure_dir(res_path)
             
             behav = pd.read_pickle(op.join(data_path, 'behav', f'{subject}-{epoch_num}.pkl'))
@@ -63,21 +67,38 @@ def process_subject(subject, lock, jobs):
                 Xtraining.append(X_train)
                 Xtesting.append(X_test)
                 ytraining.append(y_train)
-                ytesting.append(y_test)                
-
+                ytesting.append(y_test)
+                
+                all_Xtraining.append(X_train)
+                all_Xtesting.append(X_test)
+                all_ytesting.append(y_test)
+                all_ytraining.append(y_train)
+                
+        
             Xtraining = np.concatenate(Xtraining)
             ytraining = np.concatenate(ytraining)            
-            clf.fit(Xtraining, ytraining)
+            # clf.fit(Xtraining, ytraining)
             
-            for i in range(len(blocks)):
-                if not op.exists(res_path / f"{subject}-{epoch_num}-{i+1}.npy") or overwrite:
-                    ypred = clf.predict(Xtesting[i])
-                    print("Scoring...")
-                    acc_matrix = np.apply_along_axis(lambda x: acc(ytesting[i], x), 0, ypred)
-                    np.save(res_path / f"{subject}-{epoch_num}-{i+1}.npy", acc_matrix)
+            # for i in range(len(blocks)):
+            #     if not op.exists(res_path / f"{subject}-{epoch_num}-{i+1}.npy") or overwrite:
+            #         ypred = clf.predict(Xtesting[i])
+            #         print("Scoring...")
+            #         acc_matrix = np.apply_along_axis(lambda x: acc(ytesting[i], x), 0, ypred)
+            #         np.save(res_path / f"{subject}-{epoch_num}-{i+1}.npy", acc_matrix)
             
             del epoch_gen, behav
             gc.collect()
+            
+        all_Xtraining = np.concatenate(all_Xtraining)
+        all_ytraining = np.concatenate(all_ytraining)
+        clf.fit(all_Xtraining, all_ytraining)
+        
+        for block in range(23):
+            if not op.exists(res_path / f"{subject}-{block+1}.npy") or overwrite:
+                ypred = clf.predict(all_Xtesting[block])
+                print("Scoring...")
+                acc_matrix = np.apply_along_axis(lambda x: acc(all_ytesting[block], x), 0, ypred)
+                np.save(res_path / f"{subject}-{block+1}.npy", acc_matrix)
 
 if is_cluster:
     try:
@@ -90,6 +111,6 @@ if is_cluster:
         sys.exit(1)
 else:
     lock = 'stim'
-    jobs = -1
+    jobs = 15
     Parallel(-1)(delayed(process_subject)(subject, lock, jobs) for subject in subjects)
         
