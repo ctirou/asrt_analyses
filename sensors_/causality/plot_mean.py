@@ -3,7 +3,7 @@ from base import *
 from config import *
 from tqdm.auto import tqdm
 import matplotlib.pyplot as plt
-
+import pandas as pd
 
 subjects = SUBJS + ['sub03', 'sub06']
 lock = 'stim'
@@ -48,26 +48,6 @@ peaks = np.array(peaks)
 peak_rsa = int(round(peaks.mean()))
 # print('Peak:', m_peak)
 
-import matplotlib.pyplot as plt
-fig, ax = plt.subplots(1, 1, figsize=(15, 10))
-ax.axhline(0, color='grey', linestyle='-', alpha=0.5)
-ax.axvspan(3, 7, color='purple', alpha=0.1)
-ax.axvspan(8, 12, color='purple', alpha=0.1)
-ax.axvspan(13, 17, color='purple', alpha=0.1)
-ax.axvspan(18, 22, color='purple', alpha=0.1)
-for i in range(sim_index.shape[0]):
-    ax.plot(blocks, sim_index[i], alpha=0.5)
-# ax.set_xticks(range(1, 24))
-ax.set_xticks(blocks)
-ax.plot(blocks, sim_index.mean(0), lw=3, color='red', label='RSA')
-ax.set_xlabel('Block')
-ax.set_ylabel('Mean RSA effect')
-ax.axvspan(peak_rsa-0.05, peak_rsa+0.05, color='red', alpha=0.5, label='peak')
-ax.axvspan(0, 2, color='grey', alpha=0.1, label='practice')
-ax.set_xticklabels(['01', '02', '03'] + [str(i) for i in range(1, 21)])
-ax.legend()
-plt.show()
-
 # load time gen data
 timeg_data_path = TIMEG_DATA_DIR / 'results' / 'sensors' / lock
 timesg = np.linspace(-1.5, 4, 559)
@@ -95,6 +75,27 @@ for subject in tqdm(subjects):
     random.append(np.array(rand))
 pattern, random = np.array(pattern), np.array(random)
 contrast = pattern - random
+
+blocks = np.arange(23)
+import matplotlib.pyplot as plt
+fig, ax = plt.subplots(1, 1, figsize=(15, 10))
+ax.axhline(0, color='grey', linestyle='-', alpha=0.5)
+ax.axvspan(3, 7, color='purple', alpha=0.1)
+ax.axvspan(8, 12, color='purple', alpha=0.1)
+ax.axvspan(13, 17, color='purple', alpha=0.1)
+ax.axvspan(18, 22, color='purple', alpha=0.1)
+for i in range(sim_index.shape[0]):
+    ax.plot(blocks, sim_index[i], alpha=0.5)
+# ax.set_xticks(range(1, 24))
+ax.set_xticks(blocks)
+ax.plot(blocks, sim_index.mean(0), lw=3, color='red', label='RSA')
+ax.set_xlabel('Block')
+ax.set_ylabel('Mean RSA effect')
+ax.axvspan(peak_rsa-0.05, peak_rsa+0.05, color='red', alpha=0.5, label='peak')
+ax.axvspan(0, 2, color='grey', alpha=0.1, label='practice')
+ax.set_xticklabels(['01', '02', '03'] + [str(i) for i in range(1, 21)])
+ax.legend()
+plt.show()
 
 import matplotlib.pyplot as plt
 plt.imshow(pattern.mean((0, 1)),
@@ -141,7 +142,6 @@ plt.axvline(0, color='black', lw=1)
 # plt.contour(xx, yy, sig, colors='black', levels=[0],
 #                     linestyles='--', linewidths=1, alpha=.5)
 plt.show()
-
 
 # mean box
 idx_timeg = np.where((timesg >= -0.5) & (timesg < 0))[0]
@@ -212,6 +212,32 @@ ax2.axvspan(peak_tg-0.05, peak_tg+0.05, color='blue', alpha=0.5, label='Mean pea
 ax2.set_xticklabels(['01', '02', '03'] + [str(i) for i in range(1, 21)])
 ax2.legend()
 ax2.set_title('Predictive coding')
+
+data = pd.DataFrame({'X': mean_diag.mean(0), 'Y': sim_index.mean(0)})
+
+def check_stationarity(series):
+    """
+    Check if the series is stationary using the Augmented Dickey-Fuller test.
+    """
+    import numpy as np
+    from statsmodels.tsa.stattools import adfuller
+    new_series = np.zeros((series.shape[0], series.shape[1] - 1))
+    sig = []
+    for sub in range(series.shape[0]):
+        result = adfuller(series[sub])
+        if result[1] < 0.05:
+            sig.append(True)
+            new_series[sub, :] = series[sub, 1:]
+        else:
+            sig.append(False)
+            new_series[sub, :] = np.diff(series[sub, :])
+    return sig, new_series
+
+sig_tg, new_X = check_stationarity(mean_diag)
+sig_rsa, new_Y = check_stationarity(sim_index)
+
+sig_x, _ = check_stationarity(new_X)
+sig_y, _ = check_stationarity(new_Y)
 
 x = np.array([np.diff(mean_diag[sub])[1:] for sub in range(len(subjects))])
 y = np.array([np.diff(sim_index[sub])[1:] for sub in range(len(subjects))])

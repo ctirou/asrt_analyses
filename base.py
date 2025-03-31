@@ -857,6 +857,7 @@ def contiguous_regions(condition):
     return zip(starts, ends)
 
 def svd(vector_data):
+    print("Singular Value Decomposition in progress...")
     # Initialize an array for storing the dominant orientation time series
     dominant_data = np.zeros((vector_data.shape[0], vector_data.shape[1], vector_data.shape[-1]))  # (294, 8196, 82)
     for trial in range(vector_data.shape[0]):  # Loop over trials

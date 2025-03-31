@@ -10,12 +10,11 @@ from base import ensure_dir
 from config import *
 import gc
 import sys
-from joblib import Parallel, delayed
 
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
 subjects = SUBJS
-# subjects = ['sub03', 'sub06']
+subjects += ['sub03', 'sub06']
 mode_ICA = True
 generalizing = False
 filtering = True
@@ -37,6 +36,7 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                 res_path = TIMEG_DATA_DIR / 'rdm_bsling'
                 ensure_dir(res_path)
                 tmin, tmax = -4, 4
+                print("RDM_BSLING !!!!!!!!!")
         else:
                 res_path = DATA_DIR
                 tmin, tmax = -0.2, 0.6
@@ -195,9 +195,9 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                         epochs_button = mne.Epochs(raw, events_button, tmin=tmin, tmax=tmax, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)
                 elif rdm_bsling and not generalizing:
                         epochs_stim = mne.Epochs(raw, events_stim, tmin=tmin, tmax=tmax, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)                   
-                        epochs_bsl = epochs_stim.copy().crop(-1.7, -1.5)      
+                        epochs_bsl = epochs_stim.copy().crop(-1.7, -1.5)
                         epochs_stim.apply_baseline((-1.7, -1.5))
-                        epochs_stim = epochs_stim.copy().crop(-0.2, 0.6)           
+                        # epochs_stim = epochs_stim.copy().crop(-0.2, 0.6)           
                         epochs_button = mne.Epochs(raw, events_button, tmin=tmin, tmax=tmax, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)                    
                 else:
                         epochs_stim = mne.Epochs(raw, events_stim, tmin=tmin, tmax=tmax, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)                   
@@ -276,11 +276,12 @@ if is_cluster:
     try:
         subject_num = int(os.getenv("SLURM_ARRAY_TASK_ID"))
         subject = subjects[subject_num]
-        jobs = 10
+        jobs = 20
         process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs, verbose)
     except (IndexError, ValueError) as e:
         print("Error: SLURM_ARRAY_TASK_ID is not set correctly or is out of bounds.")
         sys.exit(1)
 else:
         jobs = -1
-        Parallel(-1)(delayed(process_subject)(subject, mode_ICA, generalizing, filtering, overwrite, jobs, verbose) for subject in subjects)
+        for subject in subjects:
+                process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs, verbose)
