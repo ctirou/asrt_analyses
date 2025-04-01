@@ -13,8 +13,6 @@ from sklearn.linear_model import LogisticRegression
 import gc
 import sys
 from joblib import Parallel, delayed
-from dn_power import process_subject_power
-
 
 # params
 subjects = SUBJS
@@ -156,13 +154,13 @@ def process_subject(subject, lock, jobs):
     
 if is_cluster:
     lock = str(sys.argv[1])
-    trial_type = str(sys.argv[2])
+    # trial_type = str(sys.argv[2])
     jobs = 20
     # Check that SLURM_ARRAY_TASK_ID is available and use it to get the subject
     try:
         subject_num = int(os.getenv("SLURM_ARRAY_TASK_ID"))
         subject = subjects[subject_num]
-        process_subject(subject, lock, trial_type, jobs)
+        process_subject(subject, lock, jobs)
     except (IndexError, ValueError) as e:
         print("Error: SLURM_ARRAY_TASK_ID is not set correctly or is out of bounds.")
         sys.exit(1)
@@ -171,5 +169,3 @@ else:
     # Parallel(-1)(delayed(process_subject)(subject, lock, jobs) for subject in subjects)
     for subject in subjects:
         process_subject(subject, lock, jobs)
-    for subject in subjects:
-        process_subject_power(subject, lock, jobs)

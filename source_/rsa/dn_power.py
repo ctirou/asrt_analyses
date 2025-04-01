@@ -31,7 +31,7 @@ verbose = True
 overwrite = True
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
-def process_subject_power(subject, lock, jobs):
+def process_subject(subject, lock, jobs):
     # define classifier
     clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
     clf = SlidingEstimator(clf, scoring=scoring, n_jobs=jobs, verbose=verbose)
@@ -159,7 +159,7 @@ if is_cluster:
     try:
         subject_num = int(os.getenv("SLURM_ARRAY_TASK_ID"))
         subject = subjects[subject_num]
-        process_subject_power(subject, lock, trial_type, jobs)
+        process_subject(subject, lock, trial_type, jobs)
     except (IndexError, ValueError) as e:
         print("Error: SLURM_ARRAY_TASK_ID is not set correctly or is out of bounds.")
         sys.exit(1)
@@ -167,4 +167,4 @@ else:
     jobs = -1
     # Parallel(-1)(delayed(process_subject)(subject, lock, jobs) for subject in subjects)
     for subject in subjects:
-        process_subject_power(subject, lock, jobs)
+        process_subject(subject, lock, jobs)

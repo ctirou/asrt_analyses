@@ -70,11 +70,7 @@ def process_subject(subject, epoch_num, lock):
         ensure_dir(res_dir)
 
         print("Processing", subject, epoch_num, network)
-        
-        hemi = 'lh' if 'left' in network else 'rh' if 'right' in network else 'both'
-        parc = f"Schaefer2018_{n_parcels}Parcels_{n_networks}Networks"
-        labels = mne.read_labels_from_annot(subject=subject, parc=parc, hemi=hemi, subjects_dir=subjects_dir, regexp=network, verbose=verbose, sort=True)
-        
+                
         lh_label, rh_label = mne.read_label(label_path / f'{network}-lh.label'), mne.read_label(label_path / f'{network}-rh.label')        
         stcs_data = np.array([stc.in_label(lh_label + rh_label).data for stc in stcs])
         
@@ -99,7 +95,7 @@ def process_subject(subject, epoch_num, lock):
             del X_rand, y_rand
             gc.collect()
         
-        del stcs_data, labels, lh_label, rh_label
+        del stcs_data, lh_label, rh_label
         gc.collect()
 
     del stcs

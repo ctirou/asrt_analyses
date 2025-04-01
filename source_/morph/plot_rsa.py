@@ -60,6 +60,7 @@ for network in networks:
     diff_sess[network] = np.array(diff_sess[network]).swapaxes(0, 1)
 
 threshold = 0.05
+chance = 0.25
 cmap = ['#0173B2','#DE8F05','#029E73','#D55E00','#CC78BC','#CA9161','#FBAFE4','#ECE133','#56B4E9']
 
 ### Plot similarity index ###
@@ -133,3 +134,68 @@ for i, (ax, label, name) in enumerate(zip(axes.flat, networks, NETWORK_NAMES)):
 plt.show()
 fig.savefig(figures_dir / f"corr_learning_morphed-power.pdf", transparent=True)
 plt.close(fig)
+
+### Plot decoding performance ###
+ori = "none"
+pattern, random = {}, {}
+for network in networks:
+    if not network in pattern:
+        pattern[network] = []
+        random[network] = []
+    for subject in subjects:
+        pat = np.load(RESULTS_DIR / 'RSA' / 'source' / network / lock / f'{ori}_scores' / 'pattern' / f"{subject}-all-scores.npy")
+        pattern[network].append(pat)
+        rand = np.load(RESULTS_DIR / 'RSA' / 'source' / network / lock / f'{ori}_scores' / 'random' / f"{subject}-all-scores.npy")
+        random[network].append(rand)
+    pattern[network] = np.array(pattern[network])
+    random[network] = np.array(random[network])    
+
+fig, axes = plt.subplots(2, 4, figsize=(12, 5), sharex=True, sharey=True, layout='tight')
+for i, (ax, label, name) in enumerate(zip(axes.flat, networks, NETWORK_NAMES)):
+    data = pattern[label]
+    ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
+    ax.axhline(.25, color='grey', alpha=.5)
+    # Get significant clusters
+    p_values = decod_stats(data - chance, -1)
+    sig = p_values < threshold
+    # Main plot
+    ax.plot(times, data.mean(0), alpha=1, zorder=10, color='C7')
+    # Plot significant regions separately
+    for start, end in contiguous_regions(sig):
+        ax.plot(times[start:end], data.mean(0)[start:end], alpha=1, zorder=10, color=cmap[i])
+    sem = np.std(data, axis=0) / np.sqrt(len(subjects))
+    ax.fill_between(times, data.mean(0) - sem, data.mean(0) + sem, alpha=0.2, zorder=5, facecolor='C7')
+    # Highlight significant regions
+    ax.fill_between(times, data.mean(0) - sem, data.mean(0) + sem, where=sig, alpha=0.5, zorder=5, color=cmap[i])    
+    ax.fill_between(times, data.mean(0) - sem, chance, where=sig, alpha=0.3, zorder=5, facecolor=cmap[i])    
+    ax.axhline(chance, color='grey', alpha=.5)
+    ax.set_ylabel('Acc. (%)', fontsize=11)
+    ax.set_ylim(0.2, 0.45)
+    ax.set_title(name)
+fig.suptitle("Pattern trials")
+fig.savefig(figures_dir / f"{ori}_pat-decoding.pdf", transparent=True)
+
+fig, axes = plt.subplots(2, 4, figsize=(12, 5), sharex=True, sharey=True, layout='tight')
+for i, (ax, label, name) in enumerate(zip(axes.flat, networks, NETWORK_NAMES)):
+    data = random[label]
+    ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
+    ax.axhline(.25, color='grey', alpha=.5)
+    # Get significant clusters
+    p_values = decod_stats(data - chance, -1)
+    sig = p_values < threshold
+    # Main plot
+    ax.plot(times, data.mean(0), alpha=1, zorder=10, color='C7')
+    # Plot significant regions separately
+    for start, end in contiguous_regions(sig):
+        ax.plot(times[start:end], data.mean(0)[start:end], alpha=1, zorder=10, color=cmap[i])
+    sem = np.std(data, axis=0) / np.sqrt(len(subjects))
+    ax.fill_between(times, data.mean(0) - sem, data.mean(0) + sem, alpha=0.2, zorder=5, facecolor='C7')
+    # Highlight significant regions
+    ax.fill_between(times, data.mean(0) - sem, data.mean(0) + sem, where=sig, alpha=0.5, zorder=5, color=cmap[i])    
+    ax.fill_between(times, data.mean(0) - sem, chance, where=sig, alpha=0.3, zorder=5, facecolor=cmap[i])    
+    ax.axhline(chance, color='grey', alpha=.5)
+    ax.set_ylabel('Acc. (%)', fontsize=11)
+    ax.set_ylim(0.2, 0.45)
+    ax.set_title(name)
+fig.suptitle("Random trials")
+fig.savefig(figures_dir / f"{ori}_rand-decoding.pdf", transparent=True)
