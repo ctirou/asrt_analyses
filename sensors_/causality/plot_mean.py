@@ -171,12 +171,7 @@ for subject in range(len(subjects)):
 peaks = np.array(peaks)
 peak_tg = int(round(peaks.mean()))
 
-from scipy.stats import zscore
-X_scaled = zscore(mean_diag, axis=1)
-y_scaled = zscore(sim_index, axis=1)
-
 fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 10))
-
 ax1.axhline(0, color='grey', linestyle='-', alpha=0.5)
 ax1.axvspan(0, 2, color='grey', alpha=0.1)
 ax1.axvspan(3, 7, color='purple', alpha=0.1)
@@ -215,37 +210,34 @@ ax2.set_title('Predictive coding')
 
 data = pd.DataFrame({'X': mean_diag.mean(0), 'Y': sim_index.mean(0)})
 
-def check_stationarity(series):
-    """
-    Check if the series is stationary using the Augmented Dickey-Fuller test.
-    """
-    import numpy as np
-    from statsmodels.tsa.stattools import adfuller
-    new_series = np.zeros((series.shape[0], series.shape[1] - 1))
-    sig = []
-    for sub in range(series.shape[0]):
-        result = adfuller(series[sub])
-        if result[1] < 0.05:
-            sig.append(True)
-            new_series[sub, :] = series[sub, 1:]
-        else:
-            sig.append(False)
-            new_series[sub, :] = np.diff(series[sub, :])
-    return sig, new_series
+X = mean_diag.copy()
+Y = sim_index.copy()
 
-sig_tg, new_X = check_stationarity(mean_diag)
-sig_rsa, new_Y = check_stationarity(sim_index)
+from scipy.stats import zscore
+# Apply z-score normalization to each subject individually
+X_norm = np.array([zscore(X[sub, :]) for sub in range(X.shape[0])])
+Y_norm = np.array([zscore(Y[sub, :]) for sub in range(Y.shape[0])])
+# Example usage
+stationary_flags, X_stationary, diffs_applied = ensure_stationarity(X_norm)
+_, Y_stationary, _ = ensure_stationarity(Y_norm)
 
-sig_x, _ = check_stationarity(new_X)
-sig_y, _ = check_stationarity(new_Y)
 
-x = np.array([np.diff(mean_diag[sub])[1:] for sub in range(len(subjects))])
-y = np.array([np.diff(sim_index[sub])[1:] for sub in range(len(subjects))])
 
-plt.plot([i for i in range(22)], x.mean(0), label='x mean')
-plt.plot([i for i in range(22)], y.mean(0), label='y mean')
-plt.legend()
-plt.show()
+# Example usage
+stationary_flags, X_stationary, diffs_applied = ensure_stationarity(mean_diag)
+_, Y_stationary, _ = ensure_stationarity(sim_index)
+# Print summary
+print(f"Subjects that remained non-stationary: {np.sum(~np.array(stationary_flags))} / {len(stationary_flags)}")
+print(f"Max differencing applied: {max(diffs_applied)}")
+
+x, y = X_stationary.copy(), Y_stationary.copy()
+bees = [i for i in range(21)]
+fig, ax = plt.subplots(1, 1)
+ax.plot(bees, x.mean(0), label='x: predictive coding')
+ax.plot(bees, y.mean(0), label='y: representational change')
+ax.set_xticklabels([str(i) for i in range(1, 22)])
+ax.set_xlabel('Block')
+ax.legend()
 
 from statsmodels.tsa.stattools import grangercausalitytests
 from statsmodels.tsa.api import VAR
@@ -258,10 +250,11 @@ import pandas as pd
 AIC, BIC, HQIC = [], [], []
 for sub in range(len(subjects)):
     print(f"\n##### Subject {sub} #####")
-    data = pd.DataFrame({'X': mean_diag[sub], 'Y': sim_index[sub]})
+    data = pd.DataFrame({'X': x[sub], 'Y': y[sub]})
     gc_res = grangercausalitytests(data, 6, verbose=True)
+    
     model = VAR(data)
-    lag_order = model.select_order(6)
+    lag_order = model.select_order(6) # Check this
     AIC.append(lag_order.aic)
     BIC.append(lag_order.bic)
     HQIC.append(lag_order.hqic)
@@ -278,7 +271,7 @@ AIC, BIC, HQIC = [], [], []
 for sub in range(len(subjects)):
     print(f"\n##### Subject {sub} #####")
     data = pd.DataFrame({'X': sim_index[sub], 'Y': mean_diag[sub]})
-    gc_res = grangercausalitytests(data, [4], verbose=True)
+    gc_res = grangercausalitytests(data, [6], verbose=True)
     model = VAR(data)
     lag_order = model.select_order(6)
     AIC.append(lag_order.aic)

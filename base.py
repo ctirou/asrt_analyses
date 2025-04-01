@@ -866,3 +866,72 @@ def svd(vector_data):
             dominant_time_series = vh[0, :] * s[0]  # First right singular vector weighted by singular value
             dominant_data[trial, source, :] = dominant_time_series  # Store in new array
     return dominant_data
+
+def check_stationarity(series):
+    """
+    Check if the series is stationary using the Augmented Dickey-Fuller test.
+    """
+    import numpy as np
+    from statsmodels.tsa.stattools import adfuller
+    new_series = np.zeros((series.shape[0], series.shape[1] - 1))
+    sig = []
+    for sub in range(series.shape[0]):
+        result = adfuller(series[sub])
+        if result[1] < 0.05:
+            sig.append(True)
+            new_series[sub, :] = series[sub, 1:]
+        else:
+            sig.append(False)
+            new_series[sub, :] = np.diff(series[sub, :])
+    return sig, new_series
+
+def ensure_stationarity(series, max_diff=2):
+    import numpy as np
+    from statsmodels.tsa.stattools import adfuller
+    """
+    Ensures that each subject's time series is stationary by applying up to max_diff levels of differencing.
+    
+    Args:
+        series (numpy array): Shape (n_subjects, n_timepoints).
+        max_diff (int): Maximum differencing order to apply (default = 2).
+    
+    Returns:
+        stationarity_flags (list): List of booleans indicating if each subject's series is stationary.
+        stationary_series (numpy array): Differenced series with max available timepoints.
+        applied_diffs (list): List of how many differences were applied per subject.
+    """
+    n_subjects, n_timepoints = series.shape
+    max_length = n_timepoints - 1  # Start with first-differencing max length
+    stationary_series = []
+
+    stationarity_flags = []
+    applied_diffs = []
+
+    for sub in range(n_subjects):
+        diff_count = 0
+        current_series = series[sub, :]
+
+        # Check stationarity and apply differencing if needed
+        while diff_count < max_diff:
+            adf_p = adfuller(current_series)[1]
+            if adf_p < 0.05:
+                stationarity_flags.append(True)
+                break  # Stop differencing if stationary
+            else:
+                current_series = np.diff(current_series)
+                diff_count += 1
+
+        # If still non-stationary after max_diff differencing
+        if adfuller(current_series)[1] >= 0.05:
+            stationarity_flags.append(False)
+            print(f"⚠️ Warning: Subject {sub} still non-stationary after {max_diff} differences.")
+
+        # Store the differenced data and track differencing steps
+        applied_diffs.append(diff_count)
+        max_length = min(max_length, len(current_series))  # Ensure equal timepoints
+        stationary_series.append(current_series)
+
+    # Convert list to array with equal-length time series
+    stationary_series = np.array([s[:max_length] for s in stationary_series])
+
+    return stationarity_flags, stationary_series, applied_diffs
