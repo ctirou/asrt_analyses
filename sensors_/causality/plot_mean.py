@@ -76,58 +76,6 @@ for subject in tqdm(subjects):
 pattern, random = np.array(pattern), np.array(random)
 contrast = pattern - random
 
-blocks = np.arange(23)
-import matplotlib.pyplot as plt
-fig, ax = plt.subplots(1, 1, figsize=(15, 10))
-ax.axhline(0, color='grey', linestyle='-', alpha=0.5)
-ax.axvspan(3, 7, color='purple', alpha=0.1)
-ax.axvspan(8, 12, color='purple', alpha=0.1)
-ax.axvspan(13, 17, color='purple', alpha=0.1)
-ax.axvspan(18, 22, color='purple', alpha=0.1)
-for i in range(sim_index.shape[0]):
-    ax.plot(blocks, sim_index[i], alpha=0.5)
-# ax.set_xticks(range(1, 24))
-ax.set_xticks(blocks)
-ax.plot(blocks, sim_index.mean(0), lw=3, color='red', label='RSA')
-ax.set_xlabel('Block')
-ax.set_ylabel('Mean RSA effect')
-ax.axvspan(peak_rsa-0.05, peak_rsa+0.05, color='red', alpha=0.5, label='peak')
-ax.axvspan(0, 2, color='grey', alpha=0.1, label='practice')
-ax.set_xticklabels(['01', '02', '03'] + [str(i) for i in range(1, 21)])
-ax.legend()
-plt.show()
-
-import matplotlib.pyplot as plt
-plt.imshow(pattern.mean((0, 1)),
-           interpolation="lanczos",
-                            origin="lower",
-                            cmap='RdBu_r',
-                            extent=timesg[[0, -1, 0, -1]],
-                            aspect=0.5)
-plt.axhline(0, color='black', lw=1)
-plt.axvline(0, color='black', lw=1)
-plt.show()
-
-plt.imshow(random.mean((0, 1)),
-           interpolation="lanczos",
-                            origin="lower",
-                            cmap='RdBu_r',
-                            extent=timesg[[0, -1, 0, -1]],
-                            aspect=0.5)
-plt.axhline(0, color='black', lw=1)
-plt.axvline(0, color='black', lw=1)
-plt.show()
-
-plt.imshow(contrast.mean((0, 1)),
-           interpolation="lanczos",
-                            origin="lower",
-                            cmap='RdBu_r',
-                            extent=timesg[[0, -1, 0, -1]],
-                            aspect=0.5)
-plt.axhline(0, color='black', lw=1)
-plt.axvline(0, color='black', lw=1)
-plt.show()
-
 # pval = gat_stats(contrast.mean(1), -1)
 # sig = pval < 0.05
 plt.imshow(contrast.mean((0, 1)),
@@ -143,17 +91,17 @@ plt.axvline(0, color='black', lw=1)
 #                     linestyles='--', linewidths=1, alpha=.5)
 plt.show()
 
-# mean box
-idx_timeg = np.where((timesg >= -0.5) & (timesg < 0))[0]
-means = []
-for sub in range(len(subjects)):
-    tg = []
-    for block in range(23):
-        data = contrast[sub, block, idx_timeg, :][:, idx_timeg]
-        tg.append(data.mean())
-    means.append(np.array(tg))
-means = np.array(means)
+# # mean box
+# means = []
+# for sub in range(len(subjects)):
+#     tg = []
+#     for block in range(23):
+#         data = contrast[sub, block, idx_timeg, :][:, idx_timeg]
+#         tg.append(data.mean())
+#     means.append(np.array(tg))
+# means = np.array(means)
 
+idx_timeg = np.where((timesg >= -0.5) & (timesg < 0))[0]
 # mean diag
 mean_diag = []
 for sub in range(len(subjects)):
@@ -167,116 +115,237 @@ mean_diag = np.array(mean_diag)
 blocks = np.arange(23)
 peaks = list()
 for subject in range(len(subjects)):
-    peaks.append(blocks[np.argmax(means[subject])])
+    peaks.append(blocks[np.argmax(mean_diag[subject])])
 peaks = np.array(peaks)
 peak_tg = int(round(peaks.mean()))
 
-fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 10))
-ax1.axhline(0, color='grey', linestyle='-', alpha=0.5)
-ax1.axvspan(0, 2, color='grey', alpha=0.1)
-ax1.axvspan(3, 7, color='purple', alpha=0.1)
-ax1.axvspan(8, 12, color='purple', alpha=0.1)
-ax1.axvspan(13, 17, color='purple', alpha=0.1)
-ax1.axvspan(18, 22, color='purple', alpha=0.1)
+cmap = plt.cm.get_cmap('tab20', len(subjects))
+fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(7, 9), sharex=True)
+for ax in fig.axes:
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.axhline(0, color='grey', linestyle='-', alpha=0.5)
+    # ax.axvspan(0, 2, color='grey', alpha=0.1)
+    ax.set_xticks(blocks)
+    ax.set_xticklabels(['01', '02', '03'] + [str(i) for i in range(1, 21)])
+    # ax.axvspan(3, 7, color='purple', alpha=0.1)
+    # ax.axvspan(8, 12, color='purple', alpha=0.1)s
+    # ax.axvspan(13, 17, color='purple', alpha=0.1)
+    # ax.axvspan(18, 22, color='purple', alpha=0.1)
+
 for i in range(sim_index.shape[0]):
-    ax1.plot(blocks, sim_index[i], alpha=0.5)
-# ax.set_xticks(range(1, 24))
-ax1.set_xticks(blocks)
-ax1.plot(blocks, sim_index.mean(0), lw=3, color='red', label='Mean')
+    ax1.plot(blocks, sim_index[i], alpha=0.5, color=cmap(i))
+ax1.plot(blocks, sim_index.mean(0), lw=3, color='#00A08A', label='Mean')
 ax1.set_ylabel('Mean RSA effect')
-ax1.axvspan(peak_rsa-0.05, peak_rsa+0.05, color='red', alpha=0.5, label='Mean peak')
-ax1.set_xticklabels(['01', '02', '03'] + [str(i) for i in range(1, 21)])
-ax1.legend()
+ax1.legend(frameon=False)
 ax1.set_title('Representational change')
 
-ax2.axhline(0, color='grey', linestyle='-', alpha=0.5)
-ax2.axvspan(0, 2, color='grey', alpha=0.1)
-ax2.axvspan(3, 7, color='purple', alpha=0.1)
-ax2.axvspan(8, 12, color='purple', alpha=0.1)
-ax2.axvspan(13, 17, color='purple', alpha=0.1)
-ax2.axvspan(18, 22, color='purple', alpha=0.1)
-for i in range(means.shape[0]):
-    ax2.plot(blocks, means[i], alpha=0.5)
-# ax.set_xticks(range(1, 24))
-ax2.set_xticks(blocks)
-ax2.plot(blocks, means.mean(0), lw=3, color='blue', label='Mean')
-# ax.plot(blocks, sim_index.mean(0), lw=3, label='Representational change')
+for i in range(mean_diag.shape[0]):
+    ax2.plot(blocks, mean_diag[i], alpha=0.5, color=cmap(i))
+ax2.plot(blocks, mean_diag.mean(0), lw=3, color='#FD6467', label='Mean')
 ax2.set_xlabel('Block')
 ax2.set_ylabel('Mean predictive effect')
-ax2.axvspan(peak_tg-0.05, peak_tg+0.05, color='blue', alpha=0.5, label='Mean peak')
-ax2.set_xticklabels(['01', '02', '03'] + [str(i) for i in range(1, 21)])
-ax2.legend()
+ax2.legend(frameon=False)
 ax2.set_title('Predictive coding')
+# fig.tight_layout()
 
-data = pd.DataFrame({'X': mean_diag.mean(0), 'Y': sim_index.mean(0)})
-
-X = mean_diag.copy()
-Y = sim_index.copy()
+X = mean_diag.copy() # Predictive coding
+Y = sim_index.copy() # Representational change
 
 from scipy.stats import zscore
 # Apply z-score normalization to each subject individually
 X_norm = np.array([zscore(X[sub, :]) for sub in range(X.shape[0])])
 Y_norm = np.array([zscore(Y[sub, :]) for sub in range(Y.shape[0])])
+
+fig, ax = plt.subplots(1, 1)
+ax.set_xticks([i for i in range(1, 24)])
+ax.axvspan(1, 3, color='grey', alpha=0.1)
+ax.plot([i for i in range(1, 24)], X_norm.mean(0), label='x: predictive coding')
+ax.plot([i for i in range(1, 24)], Y_norm.mean(0), label='y: representational change')
+ax.set_xlabel('Block')
+ax.set_xticklabels([str(i) for i in range(1, 24)])
+ax.legend()
+ax.set_title('Z-score normalization')
+
 # Example usage
-stationary_flags, X_stationary, diffs_applied = ensure_stationarity(X_norm)
-_, Y_stationary, _ = ensure_stationarity(Y_norm)
+stationary_flags, X_stationary, diffs_applied = ensure_stationarity(X_norm, max_diff=4)
+_, Y_stationary, _ = ensure_stationarity(Y_norm, max_diff=4)
 
-
-
-# Example usage
-stationary_flags, X_stationary, diffs_applied = ensure_stationarity(mean_diag)
-_, Y_stationary, _ = ensure_stationarity(sim_index)
-# Print summary
-print(f"Subjects that remained non-stationary: {np.sum(~np.array(stationary_flags))} / {len(stationary_flags)}")
-print(f"Max differencing applied: {max(diffs_applied)}")
+# # Example usage
+# stationary_flags, X_stationary, diffs_applied = ensure_stationarity(mean_diag)
+# _, Y_stationary, _ = ensure_stationarity(sim_index)
+# # Print summary
+# print(f"Subjects that remained non-stationary: {np.sum(~np.array(stationary_flags))} / {len(stationary_flags)}")
+# print(f"Max differencing applied: {max(diffs_applied)}")
 
 x, y = X_stationary.copy(), Y_stationary.copy()
-bees = [i for i in range(21)]
+try:
+    assert x.shape == y.shape, f"Shapes do not match: {x.shape} != {y.shape}"
+except AssertionError as e:
+    small = x.shape[1] if x.shape[1] < y.shape[1] else y.shape[1]
+    x = x[:, :small]
+    y = y[:, :small]
+assert x.shape == y.shape, f"Shapes do not match: {x.shape} != {y.shape}"
+
+bees = [i for i in range(x.shape[1])]
 fig, ax = plt.subplots(1, 1)
+ax.set_xticks(bees)
+ax.axvspan(0, 2, color='grey', alpha=0.1)
 ax.plot(bees, x.mean(0), label='x: predictive coding')
 ax.plot(bees, y.mean(0), label='y: representational change')
-ax.set_xticklabels([str(i) for i in range(1, 22)])
+ax.set_xticklabels(bees)
 ax.set_xlabel('Block')
 ax.legend()
+ax.set_title('Stationary data')
 
 from statsmodels.tsa.stattools import grangercausalitytests
 from statsmodels.tsa.api import VAR
 import pandas as pd
-
-# X : predictive coding
-# Y : representational change
 
 # X -> Y
 AIC, BIC, HQIC = [], [], []
 for sub in range(len(subjects)):
     print(f"\n##### Subject {sub} #####")
     data = pd.DataFrame({'X': x[sub], 'Y': y[sub]})
-    gc_res = grangercausalitytests(data, 6, verbose=True)
+    # gc_res = grangercausalitytests(data, 5, verbose=True)
     
     model = VAR(data)
-    lag_order = model.select_order(6) # Check this
+    lag_order = model.select_order(5) # Check this
+    
+    fitted_model = model.fit(maxlags=6)
+    print(fitted_model.summary())
+    
     AIC.append(lag_order.aic)
     BIC.append(lag_order.bic)
     HQIC.append(lag_order.hqic)
+
 print("\nMean AIC:", np.mean(AIC))
 print("Mean BIC:", np.mean(BIC))
 print("Mean HQIC:", np.mean(HQIC))
-
-print("\nMedian AIC:", np.median(AIC))
-print("Median BIC:", np.median(BIC))
-print("Median HQIC:", np.median(HQIC))
 
 # Y -> X
 AIC, BIC, HQIC = [], [], []
 for sub in range(len(subjects)):
     print(f"\n##### Subject {sub} #####")
-    data = pd.DataFrame({'X': sim_index[sub], 'Y': mean_diag[sub]})
-    gc_res = grangercausalitytests(data, [6], verbose=True)
+    data = pd.DataFrame({'X': y[sub], 'Y': x[sub]})
+    # gc_res = grangercausalitytests(data, [6], verbose=True)
     model = VAR(data)
-    lag_order = model.select_order(6)
+    lag_order = model.select_order(5)
     AIC.append(lag_order.aic)
     BIC.append(lag_order.bic)
     HQIC.append(lag_order.hqic)
-print("Mean AIC:", np.mean(AIC))
+
+print("\nMean AIC:", np.mean(AIC))
 print("Mean BIC:", np.mean(BIC))
 print("Mean HQIC:", np.mean(HQIC))
+
+### Cross-correlation
+from scipy.signal import correlate
+correlations = []
+for sub in range(len(subjects)):
+    corr = correlate(X_norm[sub], Y_norm[sub], mode='full')
+    correlations.append(corr)
+correlations = np.array(correlations)
+# Generate lag indices
+lags = np.arange(-len(X_norm.mean(0)) + 1, len(X_norm.mean(0)))
+fig, ax = plt.subplots(1, 1)
+ax.axvline(0, color='grey', linestyle='--', label="Zero Lag")
+ax.plot(lags, correlations.mean(0), label='Cross-correlation')
+# ax.fill_between(0, correlations.mean(0), where=sig, alpha=0.2, zorder=5, facecolor='C7')
+correlation = correlate(X_norm.mean(0), Y_norm.mean(0), mode='full')
+ax.set_xlabel("Lag")
+ax.set_ylabel("Cross-Correlation")
+ax.set_title("Cross-Correlation Between X and Y")
+# Find min and max lags
+min_lag_idx = np.argmin(correlations.mean(0))
+min_lag = lags[min_lag_idx]
+print(f"Min lag: {min_lag}")
+max_lag_idx = np.argmax(correlations.mean(0))
+max_lag = lags[max_lag_idx]
+print(f"Max lag: {max_lag}")
+
+### Transfer Entropy
+from sklearn.metrics import mutual_info_score
+from pyinform.transferentropy import transfer_entropy
+
+# X: Predictive coding, Y: Representational change
+X, Y = mean_diag, sim_index
+
+from sklearn.preprocessing import MinMaxScaler
+scaler = MinMaxScaler(feature_range=(0, 10))
+X_scaled = scaler.fit_transform(X)
+Y_scaled = scaler.fit_transform(Y)
+X_discrete = X_scaled.astype(int)
+Y_discrete = Y_scaled.astype(int)
+
+fig, ax = plt.subplots(1, 1)
+ax.plot(X_discrete.mean(0), label='X: Predictive coding')
+ax.plot(Y_discrete.mean(0), label='Y: Representational change')
+ax.set_xlabel('Block')
+ax.set_ylabel('Scaled values')
+ax.set_title('Scaled data')
+ax.legend()
+
+k = 6 # Number of nearest neighbors
+# Calculate transfer entropy
+te_XY = transfer_entropy(X_discrete.mean(0), Y_discrete.mean(0), k=k, local=True)
+te_YX = transfer_entropy(Y_discrete.mean(0), X_discrete.mean(0), k=k, local=True)
+# Print results
+print(f"Transfer Entropy (X → Y): {te_XY}")
+print(f"Transfer Entropy (Y → X): {te_YX}")
+
+nn_xy = {}
+nn_yx = {}
+diff = {}
+for lag in range(1, 7):
+    if not lag in nn_xy:
+        nn_xy[lag] = []
+        nn_yx[lag] = []
+    for sub in range(len(subjects)):
+        X = X_discrete[sub]
+        Y = Y_discrete[sub]
+        te_XY = transfer_entropy(X, Y, k=lag, local=True)
+        te_YX = transfer_entropy(Y, X, k=lag, local=True)
+        nn_xy[lag].append(te_XY)
+        nn_yx[lag].append(te_YX)
+    nn_xy[lag] = np.squeeze(nn_xy[lag])
+    nn_yx[lag] = np.squeeze(nn_yx[lag])
+    diff[lag] = nn_xy[lag] - nn_yx[lag]
+    
+sig = {}
+for lag in range(1, 7):
+    pv = decod_stats(diff[lag], -1)
+    sig[lag] = pv < 0.05
+
+fig, ax = plt.subplots(1, 1)
+for lag in range(1, 7):
+    ax.plot(nn_xy[lag].mean(0), label=f'lag={lag}')
+ax.set_xlabel("Lag")
+ax.set_ylabel("Transfer Entropy")
+ax.set_title("Transfer Entropy X → Y")
+ax.legend()
+
+fig, ax = plt.subplots(1, 1)
+for lag in range(1, 7):
+    ax.plot(nn_yx[lag].mean(0), label=f'lag={lag}')
+ax.set_xlabel("Lag")
+ax.set_ylabel("Transfer Entropy")
+ax.set_title("Transfer Entropy Y → X")
+ax.legend()
+
+
+from sklearn.feature_selection import mutual_info_regression
+import numpy as np
+
+def optimal_lag_mi(X, Y, max_lag=10):
+    """Find the optimal lag based on Mutual Information."""
+    mi_scores = []
+    for lag in range(1, max_lag + 1):
+        mi = mutual_info_regression(X[:-lag].reshape(-1, 1), Y[lag:].reshape(-1, 1))
+        mi_scores.append(mi[0])
+
+    best_lag = np.argmax(mi_scores) + 1
+    return best_lag, mi_scores
+
+best_k, mi_scores = optimal_lag_mi(X, Y)
+print(f"Optimal lag for Transfer Entropy: {best_k}")

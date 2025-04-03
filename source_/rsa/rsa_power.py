@@ -40,7 +40,7 @@ def process_subject(subject, epoch_num):
     fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
     # compute source estimates
     filters = make_lcmv(epoch.info, fwd, data_cov, reg=0.05, noise_cov=noise_cov,
-                        pick_ori='vector', weight_norm="unit-noise-gain",
+                        pick_ori='max-power', weight_norm="unit-noise-gain",
                         rank=rank, reduce_rank=True, verbose=verbose)
     stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
     
@@ -49,14 +49,13 @@ def process_subject(subject, epoch_num):
     
     for network in networks:
         
-        res_dir = RESULTS_DIR / "RSA" / 'source' / network / lock / 'vector_rdm' / subject
+        res_dir = RESULTS_DIR / "RSA" / 'source' / network / lock / 'power_rdm' / subject
         ensure_dir(res_dir)
         
         if not op.exists(res_dir / f"pat-{epoch_num}.npy") or not op.exists(res_dir / f"rand-{epoch_num}.npy") or overwrite:
             # read labels
             lh_label, rh_label = mne.read_label(label_path / f'{network}-lh.label'), mne.read_label(label_path / f'{network}-rh.label')
             stcs_data = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs])
-            stcs_data = svd(stcs_data) # SVD decomposition
             assert len(stcs_data) == len(behav), "Length mismatch"
             
             if not op.exists(res_dir / f"pat-{epoch_num}.npy") or overwrite:

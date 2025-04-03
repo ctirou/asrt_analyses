@@ -31,9 +31,11 @@ networks = NETWORKS[:-2]
 figures_dir = FIGURES_DIR / "RSA" / "source" / lock
 ensure_dir(figures_dir)
 
+ori = "vector"
+
 all_highs, all_lows = {}, {}
 diff_sess = {}
-for network in networks:
+for network in networks[:-2]:
     print(f"Processing {network}...")
     if not network in diff_sess:        
         all_highs[network] = []
@@ -45,7 +47,7 @@ for network in networks:
         behav_dir = op.join(HOME / 'raw_behavs' / subject)
         sequence = get_sequence(behav_dir)
         # home = Path("/Users/coum/MEGAsync/RSA")
-        res_path = RESULTS_DIR / 'RSA' / 'source' / network / lock / 'morphed_rdm' / subject
+        res_path = RESULTS_DIR / 'RSA' / 'source' / network / lock / f'ori_rdm' / subject
         high, low = get_all_high_low(res_path, sequence, analysis, cv=True)    
         all_highs[network].append(high)    
         all_lows[network].append(low)
@@ -65,7 +67,7 @@ cmap = ['#0173B2','#DE8F05','#029E73','#D55E00','#CC78BC','#CA9161','#FBAFE4','#
 
 ### Plot similarity index ###
 fig, axes = plt.subplots(2, 4, figsize=(12, 4), sharex=True, sharey=True, layout='tight')
-for i, (ax, label, name) in enumerate(zip(axes.flat, networks, NETWORK_NAMES)):
+for i, (ax, label, name) in enumerate(zip(axes.flat, networks[:-2], NETWORK_NAMES[:-2])):
     ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
     ax.axvspan(0.28, 0.51, facecolor='green', edgecolor=None, alpha=.1)
     ax.axhline(0, color='grey', alpha=.5)
@@ -94,14 +96,14 @@ for i, (ax, label, name) in enumerate(zip(axes.flat, networks, NETWORK_NAMES)):
     ax.set_ylim(-.5, 2)
     # ax.axhline(0.51, color='grey', alpha=.5)
 # plt.show()
-fig.savefig(figures_dir / f"similarity_morphed-none.pdf", transparent=True)
+fig.savefig(figures_dir / f"similarity_{ori}.pdf", transparent=True)
 plt.close(fig)
 
 learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices.csv', sep="\t", index_col=0)
 
 ### Plot similarity index x learning index corr ###
-fig, axes = plt.subplots(2, 4, figsize=(12, 5), sharex=True, sharey=True, layout='tight')
-for i, (ax, label, name) in enumerate(zip(axes.flat, networks, NETWORK_NAMES)):
+fig, axes = plt.subplots(2, 4, figsize=(12, 4), sharex=True, sharey=True, layout='tight')
+for i, (ax, label, name) in enumerate(zip(axes.flat, networks[:-2], NETWORK_NAMES[:-2])):
     ax.axvspan(0.28, 0.51, facecolor='green', edgecolor=None, alpha=.1)
     ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
     ax.axhline(0, color='grey', alpha=.5)
@@ -130,13 +132,13 @@ for i, (ax, label, name) in enumerate(zip(axes.flat, networks, NETWORK_NAMES)):
     ax.set_title(name)
     # ax.set_ylim(-.5, .5)
     # ax.set_yticks([-.5, 0, .5])
-    ax.legend()
+    # ax.legend()
 plt.show()
 fig.savefig(figures_dir / f"corr_learning_morphed-power.pdf", transparent=True)
 plt.close(fig)
 
 ### Plot decoding performance ###
-ori = "none"
+ori = "vector"
 pattern, random = {}, {}
 for network in networks:
     if not network in pattern:
