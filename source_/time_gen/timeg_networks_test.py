@@ -44,18 +44,27 @@ def process_subject(subject, lock, jobs):
         all_behavs = list()
         all_stcs = list()
         
+        tmin = -1.7
+        tmax = -1.5
+
         for epoch_num in [0, 1, 2, 3, 4]:
             # read behav
             behav = pd.read_pickle(op.join(data_path, 'behav', f'{subject}-{epoch_num}.pkl'))
             # read epoch
             epoch_fname = op.join(data_path, lock, f"{subject}-{epoch_num}-epo.fif")
             epoch = mne.read_epochs(epoch_fname, verbose=verbose, preload=False)
-            # compute data covariance matrix on evoked data
-            data_cov = mne.compute_covariance(epoch, tmin=epoch.times[0], tmax=epoch.times[-1], method="auto", rank="info", verbose=verbose)
-            # read noise cov computed on resting state
-            noise_cov = mne.read_cov(data_path / 'noise_cov_auto' / f"{subject}-rs1-cov.fif", verbose=verbose)
+            
+            times = epoch.times
+            win = np.where((times >= -1.5) & (times <= 1.5))[0]
+            
+            data_cov = mne.compute_covariance(epoch, tmin=-1.5, tmax=1.5, method="empirical", rank="info", verbose=verbose)
+            # read noise cov computed on (n-1) random trial
+            filter = behav.trialtypes == 1
+            noise_epoch = epoch[filter]
+            noise_cov = mne.compute_covariance(noise_epoch, tmin=tmin, tmax=tmax, method="empirical", rank="info", verbose=verbose)
             # conpute rank
-            rank = mne.compute_rank(noise_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)
+            rank = mne.compute_rank(data_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)
+
             # read forward solution
             fwd_fname = RESULTS_DIR / "fwd" / lock / f"{subject}-{epoch_num}-fwd.fif"
             fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
@@ -81,11 +90,11 @@ def process_subject(subject, lock, jobs):
                 if not os.path.exists(res_dir / f"{subject}-{epoch_num}-scores.npy") or overwrite:
                     if trial_type == 'pattern':
                         pattern = behav.trialtypes == 1
-                        X = stcs_data[pattern]
+                        X = stcs_data[pattern][:, :, win]
                         y = behav.positions[pattern]
                     elif trial_type == 'random':
                         random = behav.trialtypes == 2
-                        X = stcs_data[random]
+                        X = stcs_data[random][:, :, win]
                         y = behav.positions[random]
                     else:
                         X = stcs_data
