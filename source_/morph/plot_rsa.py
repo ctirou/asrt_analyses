@@ -17,44 +17,37 @@ jobs = -1
 
 data_path = DATA_DIR
 subjects, epochs_list = SUBJS, EPOCHS
-metric = 'mahalanobis'
-trial_type = 'all'
 
 times = np.linspace(-.2, .6, 82)
-
-def format_func(value, tick_number):
-    return f'{value:.1f}'
 
 n_parcels = 200
 n_networks = 17
 networks = NETWORKS[:-2]
-figures_dir = FIGURES_DIR / "RSA" / "source" / lock
+
+ori = "none"
+figures_dir = FIGURES_DIR / "RSA" / "source" / lock / ori
 ensure_dir(figures_dir)
 
-ori = "vector"
-
+# Load RSA data
 all_highs, all_lows = {}, {}
 diff_sess = {}
-for network in networks[:-2]:
+for network in networks:
     print(f"Processing {network}...")
     if not network in diff_sess:        
         all_highs[network] = []
         all_lows[network] = []
         diff_sess[network] = []
-    
     for subject in subjects:        
         # RSA stuff
         behav_dir = op.join(HOME / 'raw_behavs' / subject)
         sequence = get_sequence(behav_dir)
         # home = Path("/Users/coum/MEGAsync/RSA")
-        res_path = RESULTS_DIR / 'RSA' / 'source' / network / lock / f'ori_rdm' / subject
+        res_path = RESULTS_DIR / 'RSA' / 'source' / network / lock / f'{ori}_rdm' / subject
         high, low = get_all_high_low(res_path, sequence, analysis, cv=True)    
         all_highs[network].append(high)    
         all_lows[network].append(low)
-        
     all_highs[network] = np.array(all_highs[network])
     all_lows[network] = np.array(all_lows[network])
-    # plot diff session by session
     for i in range(5):
         rev_low = all_lows[network][:, :, i, :].mean(1) - all_lows[network][:, :, 0, :].mean(axis=1)
         rev_high = all_highs[network][:, :, i, :].mean(1) - all_highs[network][:, :, 0, :].mean(axis=1)
@@ -67,7 +60,7 @@ cmap = ['#0173B2','#DE8F05','#029E73','#D55E00','#CC78BC','#CA9161','#FBAFE4','#
 
 ### Plot similarity index ###
 fig, axes = plt.subplots(2, 4, figsize=(12, 4), sharex=True, sharey=True, layout='tight')
-for i, (ax, label, name) in enumerate(zip(axes.flat, networks[:-2], NETWORK_NAMES[:-2])):
+for i, (ax, label, name) in enumerate(zip(axes.flat, networks, NETWORK_NAMES)):
     ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
     ax.axvspan(0.28, 0.51, facecolor='green', edgecolor=None, alpha=.1)
     ax.axhline(0, color='grey', alpha=.5)
@@ -96,14 +89,14 @@ for i, (ax, label, name) in enumerate(zip(axes.flat, networks[:-2], NETWORK_NAME
     ax.set_ylim(-.5, 2)
     # ax.axhline(0.51, color='grey', alpha=.5)
 # plt.show()
-fig.savefig(figures_dir / f"similarity_{ori}.pdf", transparent=True)
+fig.suptitle(f"Similarity index – ori=${ori}$")
+fig.savefig(figures_dir / f"similarity.pdf", transparent=True)
 plt.close(fig)
 
-learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices.csv', sep="\t", index_col=0)
-
 ### Plot similarity index x learning index corr ###
+learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices.csv', sep="\t", index_col=0)
 fig, axes = plt.subplots(2, 4, figsize=(12, 4), sharex=True, sharey=True, layout='tight')
-for i, (ax, label, name) in enumerate(zip(axes.flat, networks[:-2], NETWORK_NAMES[:-2])):
+for i, (ax, label, name) in enumerate(zip(axes.flat, networks, NETWORK_NAMES)):
     ax.axvspan(0.28, 0.51, facecolor='green', edgecolor=None, alpha=.1)
     ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
     ax.axhline(0, color='grey', alpha=.5)
@@ -126,19 +119,19 @@ for i, (ax, label, name) in enumerate(zip(axes.flat, networks[:-2], NETWORK_NAME
     # axd[j].fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, color=cmap[i], alpha=0.2)
     # ax.fill_between(times, 0, all_rhos.mean(0) - sem, where=sig_unc, alpha=.3, label='Significance - uncorrected', facecolor="#7294D4")    
     # axd[j].fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, color=cmap[i], alpha=0.2)
-    ax.fill_between(times, all_rhos.mean(0) - sem, 0, where=sig_unc, alpha=.3, label='uncorrected', facecolor="#7294D4")
-    ax.fill_between(times, all_rhos.mean(0) - sem, 0, where=sig, alpha=.4, facecolor="#F2AD00", label='corrected')
+    # ax.fill_between(times, all_rhos.mean(0) - sem, 0, where=sig_unc, alpha=.3, label='uncorrected', facecolor="#7294D4")
+    # ax.fill_between(times, all_rhos.mean(0) - sem, 0, where=sig, alpha=.4, facecolor="#F2AD00", label='corrected')
     # ax.set_ylabel("Rho", fontsize=11)
     ax.set_title(name)
     # ax.set_ylim(-.5, .5)
     # ax.set_yticks([-.5, 0, .5])
     # ax.legend()
-plt.show()
-fig.savefig(figures_dir / f"corr_learning_morphed-power.pdf", transparent=True)
+# plt.show()
+fig.suptitle(f"Similarity index x learning index correlation – ori=${ori}$")
+fig.savefig(figures_dir / "corr_learning.pdf", transparent=True)
 plt.close(fig)
 
 ### Plot decoding performance ###
-ori = "vector"
 pattern, random = {}, {}
 for network in networks:
     if not network in pattern:
@@ -174,8 +167,9 @@ for i, (ax, label, name) in enumerate(zip(axes.flat, networks, NETWORK_NAMES)):
     ax.set_ylabel('Acc. (%)', fontsize=11)
     ax.set_ylim(0.2, 0.45)
     ax.set_title(name)
-fig.suptitle("Pattern trials")
-fig.savefig(figures_dir / f"{ori}_pat-decoding.pdf", transparent=True)
+fig.suptitle("Pattern trials decoding – ori=${ori}$")
+fig.savefig(figures_dir / "pat-decoding.pdf", transparent=True)
+plt.close(fig)
 
 fig, axes = plt.subplots(2, 4, figsize=(12, 5), sharex=True, sharey=True, layout='tight')
 for i, (ax, label, name) in enumerate(zip(axes.flat, networks, NETWORK_NAMES)):
@@ -199,5 +193,6 @@ for i, (ax, label, name) in enumerate(zip(axes.flat, networks, NETWORK_NAMES)):
     ax.set_ylabel('Acc. (%)', fontsize=11)
     ax.set_ylim(0.2, 0.45)
     ax.set_title(name)
-fig.suptitle("Random trials")
-fig.savefig(figures_dir / f"{ori}_rand-decoding.pdf", transparent=True)
+fig.suptitle("Random trials decoding – ori=${ori}$")
+fig.savefig(figures_dir / "rand-decoding.pdf", transparent=True)
+plt.close(fig)
