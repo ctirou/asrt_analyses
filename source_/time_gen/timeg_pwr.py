@@ -9,7 +9,7 @@ from sklearn.pipeline import make_pipeline
 from mne.beamformer import make_lcmv, apply_lcmv_epochs
 from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LogisticRegressionCV
 import gc
 import sys
 from joblib import Parallel, delayed
@@ -35,7 +35,7 @@ def process_subject(subject, jobs):
     # define classifier
     clf = make_pipeline(StandardScaler(), LogisticRegressionCV(max_iter=100000, solver=solver, class_weight="balanced", random_state=42, n_jobs=jobs))
     clf = GeneralizingEstimator(clf, scoring=scoring, n_jobs=jobs)
-    cv = StratifiedKFold(folds, shuffle=True, random_state=42)    
+    cv = StratifiedKFold(folds, shuffle=True, random_state=42)
     # network and custom label_names
     networks = NETWORKS[:-2]
     label_path = RESULTS_DIR / 'networks_200_7' / subject    
@@ -129,8 +129,6 @@ def process_subject(subject, jobs):
         stcs_data = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in all_stcs])
         behav_data = behav_df.reset_index(drop=True)
         assert len(stcs_data) == len(behav_data), "Shape mismatch"
-        del behav_df, all_stcs
-        gc.collect()
     
         for trial_type in ['pattern', 'random']:
             res_dir = res_path / network / trial_type
@@ -163,7 +161,6 @@ def process_subject(subject, jobs):
         
 if is_cluster:
     jobs = 20
-    # Check that SLURM_ARRAY_TASK_ID is available and use it to get the subject
     try:
         subject_num = int(os.getenv("SLURM_ARRAY_TASK_ID"))
         subject = subjects[subject_num]

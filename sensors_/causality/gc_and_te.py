@@ -167,7 +167,7 @@ Y_norm = np.array([zscore(Y[sub, :]) for sub in range(Y.shape[0])])
 # ax.legend()
 # ax.set_title('Z-score normalization')
 
-# Example usage
+# # Example usage
 stationary_flags, X_stationary, diffs_applied = ensure_stationarity(X_norm, max_diff=4)
 _, Y_stationary, _ = ensure_stationarity(Y_norm, max_diff=4)
 
@@ -395,7 +395,7 @@ for isub, sub in enumerate(subjects):
         # Ensure valid lag
         # lag = min(optimal_lags[isub], len(X[isub]) - 1)
         lag = optimal_lags[isub] if optimal_lags[isub] < 7 else 6
-        
+        lag = global_lag
 
         # Compute Transfer Entropy
         xy = transfer_entropy(X[isub], Y[isub], k=lag, local=True)
@@ -408,11 +408,6 @@ for isub, sub in enumerate(subjects):
     except Exception as e:
         print(f"Error computing TE for {sub}: {e}")
 print("\nAll computations complete!")
-
-xys = [np.load(res_dir / f"{sub}_te_xy.npy") for sub in subjects]
-yxs = [np.load(res_dir / f"{sub}_te_yx.npy") for sub in subjects]
-
-xys, yxs = np.array(xys), np.array(yxs)
 
 # Transfer Entropy – using IDTxl – in progress...
 from idtxl.bivariate_te import BivariateTE
