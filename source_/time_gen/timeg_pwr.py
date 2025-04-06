@@ -24,8 +24,8 @@ solver = 'lbfgs'
 scoring = "accuracy"
 folds = 10
 
-verbose = True
-overwrite = True
+verbose = 'error'
+overwrite = False
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
 res_path = TIMEG_DATA_DIR / 'results' / 'source' / 'max-power'
@@ -33,65 +33,63 @@ ensure_dir(res_path)
 
 def process_subject(subject, jobs):
     # define classifier
-    clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
+    clf = make_pipeline(StandardScaler(), LogisticRegressionCV(max_iter=100000, solver=solver, class_weight="balanced", random_state=42, n_jobs=jobs))
     clf = GeneralizingEstimator(clf, scoring=scoring, n_jobs=jobs)
     cv = StratifiedKFold(folds, shuffle=True, random_state=42)    
     # network and custom label_names
     networks = NETWORKS[:-2]
-    label_path = RESULTS_DIR / f'networks_200_7' / subject    
+    label_path = RESULTS_DIR / 'networks_200_7' / subject    
     
-    for trial_type in ['pattern', 'random']:
-        all_behavs = list()
-        all_stcs = list()
+    all_behavs = list()
+    all_stcs = list()
+    
+    tmin = -1.7
+    tmax = -1.5
+    
+    for epoch_num in [0, 1, 2, 3, 4]:
+        # read behav
+        behav = pd.read_pickle(op.join(data_path, 'behav', f'{subject}-{epoch_num}.pkl'))
+        # read epoch
+        epoch_fname = op.join(data_path, lock, f"{subject}-{epoch_num}-epo.fif")
+        epoch = mne.read_epochs(epoch_fname, verbose=verbose, preload=False)
         
-        tmin = -1.7
-        tmax = -1.5
+        times = epoch.times
+        win = np.where((times >= -1.5) & (times <= 1.5))[0]
         
-        for epoch_num in [0, 1, 2, 3, 4]:
-            # read behav
-            behav = pd.read_pickle(op.join(data_path, 'behav', f'{subject}-{epoch_num}.pkl'))
-            # read epoch
-            epoch_fname = op.join(data_path, lock, f"{subject}-{epoch_num}-epo.fif")
-            epoch = mne.read_epochs(epoch_fname, verbose=verbose, preload=False)
-            
-            times = epoch.times
-            win = np.where((times >= -1.5) & (times <= 1.5))[0]
-            
-            # compute data covariance matrix on evoked data
-            data_cov = mne.compute_covariance(epoch, tmin=-1.5, tmax=1.5, method="empirical", rank="info", verbose=verbose)
-            # compute noise covariance matrix on the previous noise random trial
-            filter = behav.trialtypes == 1
-            noise_epoch = epoch[filter]
-            noise_cov = mne.compute_covariance(noise_epoch, tmin=tmin, tmax=tmax, method="empirical", rank="info", verbose=verbose)
-            # conpute rank
-            rank = mne.compute_rank(noise_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)
-            
-            # read forward solution
-            fwd_fname = TIMEG_DATA_DIR / "fwd" / lock / f"{subject}-{epoch_num}-fwd.fif"
-            fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
-            
-            # compute source estimates
-            filters = make_lcmv(epoch.info, fwd, data_cov, reg=0.05, noise_cov=noise_cov,
-                                pick_ori='max-power', weight_norm="unit-noise-gain",
-                                rank=rank, reduce_rank=True, verbose=verbose)
-            stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
+        # compute data covariance matrix
+        data_cov = mne.compute_covariance(epoch, tmin=-1.5, tmax=1.5, method="empirical", rank="info", verbose=verbose)
+        # compute noise covariance matrix on the previous noise random trial
+        filter = behav.trialtypes == 1
+        noise_epoch = epoch[filter]
+        noise_cov = mne.compute_covariance(noise_epoch, tmin=tmin, tmax=tmax, method="empirical", rank="info", verbose=verbose)
+        # conpute rank
+        rank = mne.compute_rank(noise_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)
+        
+        # read forward solution
+        fwd_fname = TIMEG_DATA_DIR / "fwd" / lock / f"{subject}-{epoch_num}-fwd.fif"
+        fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
+        
+        # compute source estimates
+        filters = make_lcmv(epoch.info, fwd, data_cov, reg=0.05, noise_cov=noise_cov,
+                            pick_ori='max-power', weight_norm="unit-noise-gain",
+                            rank=rank, reduce_rank=True, verbose=verbose)
+        stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
 
-            del noise_cov, data_cov, fwd, filters
-            gc.collect()
+        del epoch, noise_cov, data_cov, fwd, filters
+        gc.collect()
 
-            for network in networks:
-                                
-                print("Processing", subject, epoch_num, trial_type, network)
+        for network in networks:
+            # read labels
+            lh_label, rh_label = mne.read_label(label_path / f'{network}-lh.label'), mne.read_label(label_path / f'{network}-rh.label')
+            stcs_data = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs])
+            assert len(stcs_data) == len(behav), "Length mismatch"
+            
+            for trial_type in ['pattern', 'random']:
                 res_dir = res_path / network / trial_type
                 ensure_dir(res_dir)
-
-                # read labels
-                lh_label, rh_label = mne.read_label(label_path / f'{network}-lh.label'), mne.read_label(label_path / f'{network}-rh.label')
-                stcs_data = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs])
-                assert len(stcs_data) == len(behav), "Length mismatch"
                 
-                # run time generalization decoding on unique epoch
                 if not os.path.exists(res_dir / f"{subject}-{epoch_num}-scores.npy") or overwrite:
+                    print("Processing", subject, epoch_num, trial_type, network)
                     if trial_type == 'pattern':
                         pattern = behav.trialtypes == 1
                         X = stcs_data[pattern][:, :, win]
@@ -101,40 +99,45 @@ def process_subject(subject, jobs):
                         X = stcs_data[random][:, :, win]
                         y = behav.positions[random]
                     y = y.reset_index(drop=True)            
-                    assert X.shape[0] == y.shape[0]
-                    scores = cross_val_multiscore(clf, X, y, cv=cv, n_jobs=jobs)                    
+                    assert X.shape[0] == y.shape[0], "Length mismatch"
+                    
+                    scores = cross_val_multiscore(clf, X, y, cv=cv, n_jobs=jobs, verbose=verbose)                    
                     np.save(op.join(res_dir, f"{subject}-{epoch_num}-scores.npy"), scores.mean(0))
-
-                    del stcs_data, X, y, scores
+                    
+                    del X, y, scores
                     gc.collect()
-            
-            # append epochs
-            all_behavs.append(behav)
-            all_stcs.extend(stcs)
-            
-            del epoch, behav, stcs
-            if trial_type == 'button':
-                del epoch_bsl
+                
+                else:
+                    print("Skipping", subject, epoch_num, trial_type, network)
+
+            del stcs_data
             gc.collect()
         
-        behav_df = pd.concat(all_behavs)
-        del all_behavs
-        gc.collect()
+        if epoch_num != 0:
+            all_behavs.append(behav)
+            all_stcs.extend(stcs)
         
-        for network in networks:
-            
-            print("Processing", subject, 'all', trial_type, network)
+        del stcs, behav
+        gc.collect()
+    
+    behav_df = pd.concat(all_behavs)
+    del all_behavs
+    gc.collect()
+    
+    for network in networks:
+        lh_label, rh_label = mne.read_label(label_path / f'{network}-lh.label'), mne.read_label(label_path / f'{network}-rh.label')
+        stcs_data = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in all_stcs])
+        behav_data = behav_df.reset_index(drop=True)
+        assert len(stcs_data) == len(behav_data), "Shape mismatch"
+        del behav_df, all_stcs
+        gc.collect()
+    
+        for trial_type in ['pattern', 'random']:
             res_dir = res_path / network / trial_type
             ensure_dir(res_dir)
-            
-            # read labels
-            lh_label, rh_label = mne.read_label(label_path / f'{network}-lh.label'), mne.read_label(label_path / f'{network}-rh.label')
-            stcs_data = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in all_stcs])
-            assert len(stcs_data) == len(behav), "Length mismatch"
-            
-            behav_data = behav_df.reset_index(drop=True)
-            assert len(stcs_data) == len(behav_data)
+
             if not op.exists(res_dir / f"{subject}-all-scores.npy") or overwrite:
+                print("Processing", subject, 'all', trial_type, network)
                 if trial_type == 'pattern':
                     pattern = behav_data.trialtypes == 1
                     X = stcs_data[pattern][:, :, win]
@@ -145,16 +148,19 @@ def process_subject(subject, jobs):
                     y = behav_data.positions[random]
                 y = y.reset_index(drop=True)
                 assert X.shape[0] == y.shape[0]
-                del stcs_data, behav_data
-                gc.collect()
-                scores = cross_val_multiscore(clf, X, y, cv=cv)
+                
+                scores = cross_val_multiscore(clf, X, y, cv=cv, n_jobs=jobs, verbose=verbose)
                 np.save(op.join(res_dir, f"{subject}-all-scores.npy"), scores.mean(0))
+                
                 del X, y, scores
                 gc.collect()
-        
-        del behav_df, all_stcs
+            
+            else:
+                print("Skipping", subject, 'all', trial_type, network)
+
+        del stcs_data, behav_data
         gc.collect()
-    
+        
 if is_cluster:
     jobs = 20
     # Check that SLURM_ARRAY_TASK_ID is available and use it to get the subject
@@ -166,7 +172,5 @@ if is_cluster:
         print("Error: SLURM_ARRAY_TASK_ID is not set correctly or is out of bounds.")
         sys.exit(1)
 else:
-    jobs = -1
-    # Parallel(-1)(delayed(process_subject)(subject, lock, jobs) for subject in subjects)
-    for subject in subjects:
-        process_subject(subject, jobs)
+    jobs = 1
+    Parallel(-1)(delayed(process_subject)(subject, jobs) for subject in subjects)
