@@ -24,7 +24,7 @@ n_parcels = 200
 n_networks = 17
 networks = NETWORKS[:-2]
 
-ori = "none"
+ori = "power"
 figures_dir = FIGURES_DIR / "RSA" / "source" / lock / ori
 ensure_dir(figures_dir)
 
@@ -94,7 +94,7 @@ fig.savefig(figures_dir / f"similarity.pdf", transparent=True)
 plt.close(fig)
 
 ### Plot similarity index x learning index corr ###
-learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices.csv', sep="\t", index_col=0)
+learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices2.csv', sep="\t", index_col=0)
 fig, axes = plt.subplots(2, 4, figsize=(12, 4), sharex=True, sharey=True, layout='tight')
 for i, (ax, label, name) in enumerate(zip(axes.flat, networks, NETWORK_NAMES)):
     ax.axvspan(0.28, 0.51, facecolor='green', edgecolor=None, alpha=.1)
@@ -116,7 +116,8 @@ for i, (ax, label, name) in enumerate(zip(axes.flat, networks, NETWORK_NAMES)):
     ax.fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, alpha=0.2, zorder=5, facecolor='C7')
     # Highlight significant regions
     ax.fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, where=sig, alpha=0.5, zorder=5, color=cmap[i])
-    # axd[j].fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, color=cmap[i], alpha=0.2)
+    ax.fill_between(times, all_rhos.mean(0) - sem, 0, where=sig, alpha=0.3, zorder=5, facecolor=cmap[i])
+    # ax.fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, color=cmap[i], alpha=0.2)
     # ax.fill_between(times, 0, all_rhos.mean(0) - sem, where=sig_unc, alpha=.3, label='Significance - uncorrected', facecolor="#7294D4")    
     # axd[j].fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, color=cmap[i], alpha=0.2)
     # ax.fill_between(times, all_rhos.mean(0) - sem, 0, where=sig_unc, alpha=.3, label='uncorrected', facecolor="#7294D4")
@@ -143,9 +144,9 @@ for network in networks:
         rand = np.load(RESULTS_DIR / 'RSA' / 'source' / network / lock / f'{ori}_scores' / 'random' / f"{subject}-all-scores.npy")
         random[network].append(rand)
     pattern[network] = np.array(pattern[network])
-    random[network] = np.array(random[network])    
+    random[network] = np.array(random[network])
 
-fig, axes = plt.subplots(2, 4, figsize=(12, 5), sharex=True, sharey=True, layout='tight')
+fig, axes = plt.subplots(2, 4, figsize=(12, 4), sharex=True, sharey=True, layout='tight')
 for i, (ax, label, name) in enumerate(zip(axes.flat, networks, NETWORK_NAMES)):
     data = pattern[label]
     ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
@@ -167,11 +168,11 @@ for i, (ax, label, name) in enumerate(zip(axes.flat, networks, NETWORK_NAMES)):
     ax.set_ylabel('Acc. (%)', fontsize=11)
     ax.set_ylim(0.2, 0.45)
     ax.set_title(name)
-fig.suptitle("Pattern trials decoding – ori=${ori}$")
+fig.suptitle(f"Pattern trials decoding – ori=${ori}$")
 fig.savefig(figures_dir / "pat-decoding.pdf", transparent=True)
 plt.close(fig)
 
-fig, axes = plt.subplots(2, 4, figsize=(12, 5), sharex=True, sharey=True, layout='tight')
+fig, axes = plt.subplots(2, 4, figsize=(12, 4), sharex=True, sharey=True, layout='tight')
 for i, (ax, label, name) in enumerate(zip(axes.flat, networks, NETWORK_NAMES)):
     data = random[label]
     ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
@@ -193,6 +194,6 @@ for i, (ax, label, name) in enumerate(zip(axes.flat, networks, NETWORK_NAMES)):
     ax.set_ylabel('Acc. (%)', fontsize=11)
     ax.set_ylim(0.2, 0.45)
     ax.set_title(name)
-fig.suptitle("Random trials decoding – ori=${ori}$")
+fig.suptitle(f"Random trials decoding – ori=${ori}$")
 fig.savefig(figures_dir / "rand-decoding.pdf", transparent=True)
 plt.close(fig)

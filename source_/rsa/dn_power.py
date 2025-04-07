@@ -26,13 +26,13 @@ solver = 'lbfgs'
 scoring = "accuracy"
 folds = 10
 
-verbose = 'error'
+verbose = True
 overwrite = False
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
 def process_subject(subject, jobs):
     # define classifier
-    clf = make_pipeline(StandardScaler(), LogisticRegressionCV(max_iter=5000000, solver=solver, class_weight="balanced", random_state=42, n_jobs=jobs))
+    clf = make_pipeline(StandardScaler(), LogisticRegressionCV(max_iter=10000000, solver=solver, class_weight="balanced", random_state=42, n_jobs=jobs))
     clf = SlidingEstimator(clf, scoring=scoring, n_jobs=jobs, verbose=verbose)
     cv = StratifiedKFold(folds, shuffle=True, random_state=42)  
     # define networks labels path
@@ -85,7 +85,7 @@ def process_subject(subject, jobs):
             ensure_dir(res_dir)
             
             if not op.exists(res_dir / f"{subject}-all-scores.npy") or overwrite:
-                print("Processing", subject, 'all', network, trial_type)
+                print("Processing", subject, network, trial_type)
                 if trial_type == 'pattern':
                     pattern = behav_data.trialtypes == 1
                     X = stcs_data[pattern]
@@ -127,4 +127,4 @@ if is_cluster:
         sys.exit(1)
 else:
     jobs = 1
-    Parallel(-1)(delayed(process_subject)(subject, lock, jobs) for subject in subjects)
+    Parallel(-1)(delayed(process_subject)(subject, jobs) for subject in subjects)

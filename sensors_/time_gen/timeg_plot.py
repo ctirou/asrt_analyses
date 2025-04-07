@@ -13,8 +13,7 @@ from matplotlib import colors
 
 # analysis = "pat_bsl_filtered_3300_3160"
 data_path = TIMEG_DATA_DIR
-subjects = SUBJS
-subjects = ['sub01', 'sub02', 'sub03', 'sub04', 'sub06', 'sub07', 'sub08', 'sub09', 'sub10', 'sub12', 'sub13', 'sub14', 'sub15']
+subjects = SUBJS + ['sub03', 'sub06']
 
 lock = 'stim'
 jobs = -1
@@ -29,7 +28,8 @@ times = np.linspace(-1.5, 4, 559)
 figure_dir = FIGURES_DIR / "time_gen" / "sensors" / lock
 ensure_dir(figure_dir)
 
-res_dir = data_path / 'results' / 'sensors' / lock
+res_dir = data_path / 'results' / 'sensors' / lock 
+res_dir = data_path / 'results' / 'sensors' / lock / 'logRegCV'
 
 # load patterns and randoms time-generalization on all epochs
 all_patterns, all_randoms = [], []
@@ -51,18 +51,21 @@ for subject in tqdm(subjects):
 all_patterns, all_randoms = np.array(all_patterns), np.array(all_randoms)
 patterns, randoms = np.array(patterns), np.array(randoms)
 
-learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices2.csv', sep="\t", index_col=0)
+learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices3.csv', sep="\t", index_col=0)
 chance = .25
 threshold = .05
 
 ensure_dir(res_dir / "pval")
 if not op.exists(res_dir / "pval" / "all_pattern-pval.npy") or overwrite:
+    print('Computing pval for all patterns')
     pval = gat_stats(all_patterns - chance, jobs)
     np.save(res_dir / "pval" / "all_pattern-pval.npy", pval)
-if not op.exists(res_dir / "random" / "pval" / "all_random-pval.npy") or overwrite:
+if not op.exists(res_dir / "pval" / "all_random-pval.npy") or overwrite:
+    print('Computing pval for all randoms')
     pval = gat_stats(all_randoms - chance, jobs)
     np.save(res_dir / "pval" / "all_random-pval.npy", pval)
 if not op.exists(res_dir / "pval" / "all_contrast-pval.npy") or overwrite:
+    print('Computing pval for all contrasts')
     contrasts = all_patterns - all_randoms
     pval = gat_stats(contrasts, jobs)
     np.save(res_dir / "pval" / "all_contrast-pval.npy", pval)
@@ -193,7 +196,7 @@ for ax, data, title, pval, vmin, vmax in zip(axs.flat, [contrasts, rhos], \
     rect = plt.Rectangle([-0.75, -0.75], 0.72, 0.68, fill=False, edgecolor=rectcolor, linestyle='-', lw=2)
     ax.add_patch(rect)
     cbar = fig.colorbar(im, ax=ax, orientation='vertical', fraction=.1, ticks=[vmin, vmax])
-    cbar.set_label(label, rotation=270, fontsize=13)        
+    cbar.set_label(label, rotation=270, fontsize=13)
 fig.savefig(figure_dir / "contrast_corr2.pdf", transparent=True)
 plt.close()
 

@@ -67,14 +67,14 @@ for subject in tqdm(subjects):
         # patterns.append(np.mean(subdict[subject][i]["random_high"]))
         randoms.append(np.mean(subdict[subject][i]["random_high"]))
         
-        learning_index = (np.mean(randoms) - np.mean(patterns)) / np.mean(randoms)
-        # learning_index = np.mean(randoms) - np.mean(patterns)
+        # learning_index = (np.mean(randoms) - np.mean(patterns)) / np.mean(randoms)
+        learning_index = np.mean(randoms) - np.mean(patterns)
         learn_index_dict[subject][i] = learning_index if i != 0 else 0
 
 # Save learning indices to CSV
 learn_index_df = pd.DataFrame.from_dict(learn_index_dict, orient='index')
-if not op.exists(figures_dir / 'behav' / 'learning_indices2.csv'):
-    learn_index_df.to_csv(figures_dir / 'behav' / 'learning_indices2.csv', sep='\t')
+if not op.exists(figures_dir / 'behav' / 'learning_indices3.csv'):
+    learn_index_df.to_csv(figures_dir / 'behav' / 'learning_indices3.csv', sep='\t')
 
 # Calculate means and standard errors
 mean_all = [np.mean(all_RT[f'Epoch_{i}']) for i in range(5)]
@@ -87,7 +87,9 @@ mean_random_low = [np.mean(random_low_RT[f'Epoch_{i}']) for i in range(5)]
 stderr_random_low = [np.std(random_low_RT[f'Epoch_{i}']) / np.sqrt(n) for i in range(5)]
 
 color1 = "#5B9BD5"
+color1 = "#FFD966"
 color2 = "#61CBF5"
+color2 = "#FF718A"
 color3 = "#A6CAEC"
 color4 = "black" 
 
@@ -101,11 +103,11 @@ for subject in subjects:
         ax.scatter(str(i), subdict[subject][i]["all"], color=color4, marker=".", alpha=0.3)
         # ax.scatter(str(i), subdict[subject][i]["random_low"], color=color3, marker=".", alpha=0.2)
         if i > 0:
-            ax.scatter(str(i), subdict[subject][i]["pattern"], color=color1, marker=".", alpha=0.3)
-            ax.scatter(str(i), subdict[subject][i]["random_high"], color=color2, marker=".", alpha=0.2)
-ax.plot(sessions, mean_all, '-o', color=color4, label="All", markersize=7, alpha=1)
+            ax.scatter(str(i), subdict[subject][i]["pattern"], color=color1, marker=".", alpha=0.4)
+            ax.scatter(str(i), subdict[subject][i]["random_high"], color=color2, marker=".", alpha=0.4)
+ax.plot(sessions, mean_all, '-o', color=color4, label="All", markersize=7, alpha=.7)
 ax.plot(sessions[1:], mean_pattern, '-o', color=color1, label="Pattern pair", markersize=7, alpha=1)
-ax.plot(sessions[1:], mean_random_high, '-o', color=color2, label="Random pair", markersize=7, alpha=.9)
+ax.plot(sessions[1:], mean_random_high, '-o', color=color2, label="Random pair", markersize=7, alpha=1)
 # ax.plot(sessions, mean_random_low, '-o', color=color3, label="Random low", markersize=7, alpha=.9)
 ax.legend(loc='lower left', frameon=False, title=f"n = {n}")
 ax.set_ylabel("Reaction time (ms)", fontsize=12)
@@ -129,9 +131,10 @@ axlow.set_xlabel("Session", fontsize=12)
 # Add asterisks above all mean random values
 for i, (mean_li, std_li) in enumerate(zip(learning_indices_mean, learning_indices_stderr)):
     if i != 0:
-        axlow.annotate('*', (sessions[i], mean_li + std_li + 0.005), ha='center', color='black', fontweight='bold', fontsize=14)
+        axlow.annotate('*', (sessions[i], mean_li + std_li + 0.005), ha='center', color='black', fontweight='bold', fontsize=12)
 # axlow.set_ylim(bottom=0)  # Set the lower limit of the y-axis to 0 to reduce the height
-axlow.set_ylim(0, 0.3)  # Set the lower limit of the y-axis to 0 to reduce the height
+# axlow.set_ylim(0, 0.3)  # Set the lower limit of the y-axis to 0 to reduce the height
+axlow.set_ylim(0, 110)  # Set the lower limit of the y-axis to 0 to reduce the height
 
-fig.savefig(figures_dir / 'behav' / 'combined_4.pdf', transparent=True)
+fig.savefig(figures_dir / 'behav' / 'combined_5.pdf', transparent=True)
 plt.close()

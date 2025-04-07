@@ -7,9 +7,9 @@ from config import *
 from mne.decoding import GeneralizingEstimator, cross_val_multiscore
 from sklearn.pipeline import make_pipeline
 from mne.beamformer import make_lcmv, apply_lcmv_epochs
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedKFold, LeaveOneOut
 from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import LogisticRegressionCV
+from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
 import gc
 import sys
 from joblib import Parallel, delayed
@@ -28,14 +28,16 @@ verbose = 'error'
 overwrite = False
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
-res_path = TIMEG_DATA_DIR / 'results' / 'source' / 'max-power'
+res_path = TIMEG_DATA_DIR / 'results' / 'source' / 'max-power2'
 ensure_dir(res_path)
 
 def process_subject(subject, jobs):
-    # define classifier
-    clf = make_pipeline(StandardScaler(), LogisticRegressionCV(max_iter=100000, solver=solver, class_weight="balanced", random_state=42, n_jobs=jobs))
+    # define classifier'
+    clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
+    # clf = make_pipeline(StandardScaler(), LogisticRegressionCV(max_iter=100000, solver=solver, class_weight="balanced", random_state=42, n_jobs=jobs))
     clf = GeneralizingEstimator(clf, scoring=scoring, n_jobs=jobs)
-    cv = StratifiedKFold(folds, shuffle=True, random_state=42)
+    skf = StratifiedKFold(folds, shuffle=True, random_state=42)
+    loo = LeaveOneOut()
     # network and custom label_names
     networks = NETWORKS[:-2]
     label_path = RESULTS_DIR / 'networks_200_7' / subject    
@@ -90,17 +92,21 @@ def process_subject(subject, jobs):
                 
                 if not os.path.exists(res_dir / f"{subject}-{epoch_num}-scores.npy") or overwrite:
                     print("Processing", subject, epoch_num, trial_type, network)
+                    
                     if trial_type == 'pattern':
                         pattern = behav.trialtypes == 1
                         X = stcs_data[pattern][:, :, win]
                         y = behav.positions[pattern]
+
                     elif trial_type == 'random':
                         random = behav.trialtypes == 2
                         X = stcs_data[random][:, :, win]
                         y = behav.positions[random]
-                    y = y.reset_index(drop=True)            
+                    
+                    y = y.reset_index(drop=True)
                     assert X.shape[0] == y.shape[0], "Length mismatch"
                     
+                    cv = loo if any(np.unique(y, return_counts=True)[1] < 10) else skf
                     scores = cross_val_multiscore(clf, X, y, cv=cv, n_jobs=jobs, verbose=verbose)                    
                     np.save(op.join(res_dir, f"{subject}-{epoch_num}-scores.npy"), scores.mean(0))
                     
@@ -147,6 +153,7 @@ def process_subject(subject, jobs):
                 y = y.reset_index(drop=True)
                 assert X.shape[0] == y.shape[0]
                 
+                cv = loo if any(np.unique(y, return_counts=True)[1] < 10) else skf
                 scores = cross_val_multiscore(clf, X, y, cv=cv, n_jobs=jobs, verbose=verbose)
                 np.save(op.join(res_dir, f"{subject}-all-scores.npy"), scores.mean(0))
                 
@@ -159,6 +166,9 @@ def process_subject(subject, jobs):
         del stcs_data, behav_data
         gc.collect()
         
+    del all_stcs, behav_df
+    gc.collect()
+        
 if is_cluster:
     jobs = 20
     try:
@@ -169,5 +179,7 @@ if is_cluster:
         print("Error: SLURM_ARRAY_TASK_ID is not set correctly or is out of bounds.")
         sys.exit(1)
 else:
-    jobs = 1
-    Parallel(-1)(delayed(process_subject)(subject, jobs) for subject in subjects)
+    jobs = 15
+    # Parallel(-1)(delayed(process_subject)(subject, jobs) for subject in subjects)
+    for subject in subjects[4:]:
+        process_subject(subject, jobs)

@@ -9,9 +9,9 @@ from config import *
 from mne import read_epochs, concatenate_epochs
 from mne.decoding import cross_val_multiscore, GeneralizingEstimator
 from sklearn.pipeline import make_pipeline
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedKFold, LeaveOneOut
 from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import LogisticRegressionCV
+from sklearn.linear_model import LogisticRegressionCV, LogisticRegression
 from joblib import Parallel, delayed
 
 data_path = TIMEG_DATA_DIR / 'rdm_bsling'
@@ -27,9 +27,11 @@ is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
 def process_subject(subject, jobs):    
     # define classifier
-    clf = make_pipeline(StandardScaler(), LogisticRegressionCV(max_iter=100000, solver=solver, class_weight="balanced", random_state=42, n_jobs=jobs))
+    clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42, n_jobs=jobs))
+    # clf = make_pipeline(StandardScaler(), LogisticRegressionCV(max_iter=100000, solver=solver, class_weight="balanced", random_state=42, n_jobs=jobs))
     clf = GeneralizingEstimator(clf, scoring=scoring, n_jobs=jobs)
-    cv = StratifiedKFold(folds, shuffle=True, random_state=42)
+    skf = StratifiedKFold(folds, shuffle=True, random_state=42)
+    loo = LeaveOneOut()
         
     all_behavs = list()
     all_epochs = list()
@@ -61,6 +63,7 @@ def process_subject(subject, jobs):
                 assert X.shape[0] == y.shape[0]
                 gc.collect()
                 
+                cv = loo if any(np.unique(y, return_counts=True)[1] < 10) else skf
                 scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=verbose, n_jobs=jobs)
                 np.save(res_dir / f"{subject}-{epoch_num}-scores.npy", scores.mean(0))
             
@@ -99,6 +102,7 @@ def process_subject(subject, jobs):
             y = y.reset_index(drop=True)            
             assert X.shape[0] == y.shape[0]
             
+            cv = loo if any(np.unique(y, return_counts=True)[1] < 10) else skf
             scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=verbose, n_jobs=jobs)
             np.save(res_dir / f"{subject}-all-scores.npy", scores.mean(0))
             del X, y, scores
