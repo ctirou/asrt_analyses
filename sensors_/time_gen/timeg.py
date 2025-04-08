@@ -14,7 +14,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegressionCV, LogisticRegression
 from joblib import Parallel, delayed
 
-data_path = TIMEG_DATA_DIR / 'rdm_bsling'
+data_path = TIMEG_DATA_DIR / 'gen44'
 subjects = SUBJS + ['sub03', 'sub06']
 lock = 'stim'
 folds = 10
@@ -27,8 +27,8 @@ is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
 def process_subject(subject, jobs):    
     # define classifier
-    clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42, n_jobs=jobs))
-    # clf = make_pipeline(StandardScaler(), LogisticRegressionCV(max_iter=100000, solver=solver, class_weight="balanced", random_state=42, n_jobs=jobs))
+    # clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42, n_jobs=jobs))
+    clf = make_pipeline(StandardScaler(), LogisticRegressionCV(max_iter=100000, solver=solver, class_weight="balanced", random_state=42, n_jobs=jobs))
     clf = GeneralizingEstimator(clf, scoring=scoring, n_jobs=jobs)
     skf = StratifiedKFold(folds, shuffle=True, random_state=42)
     loo = LeaveOneOut()
@@ -40,13 +40,13 @@ def process_subject(subject, jobs):
         
         behav = pd.read_pickle(op.join(data_path, 'behav', f'{subject}-{epoch_num}.pkl'))
         epoch_fname = op.join(data_path, lock, f"{subject}-{epoch_num}-epo.fif")
-        epoch_gen = read_epochs(epoch_fname, verbose="error", preload=True)
+        epoch_gen = read_epochs(epoch_fname, verbose=verbose, preload=True)
         
         times = epoch_gen.times
-        win = np.where((times >= -1.5) & (times <= 3))[0]            
+        win = np.where((times >= -1.5) & (times <= 3))[0]        
         
         for trial_type in ['pattern', 'random']:
-            res_dir = TIMEG_DATA_DIR / 'results' / 'sensors' / lock / trial_type
+            res_dir = TIMEG_DATA_DIR / 'results' / 'sensors' / lock / f'{trial_type}_logRegCV'
             ensure_dir(res_dir)
         
             if not op.exists(res_dir / f"{subject}-{epoch_num}-scores.npy") or overwrite:
@@ -66,7 +66,6 @@ def process_subject(subject, jobs):
                 cv = loo if any(np.unique(y, return_counts=True)[1] < 10) else skf
                 scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=verbose, n_jobs=jobs)
                 np.save(res_dir / f"{subject}-{epoch_num}-scores.npy", scores.mean(0))
-            
             else:
                 print(f"Skipping {subject} - session {epoch_num} - {trial_type}...")
         

@@ -24,12 +24,10 @@ def compute_spearman(t, g, vector, contrasts):
 
 times = np.linspace(-1.5, 4, 559)
 
-# figure_dir = data_path / 'figures' / 'sensors' / lock
 figure_dir = FIGURES_DIR / "time_gen" / "sensors" / lock
 ensure_dir(figure_dir)
 
-res_dir = data_path / 'results' / 'sensors' / lock 
-res_dir = data_path / 'results' / 'sensors' / lock / 'logRegCV'
+res_dir = data_path / 'results' / 'sensors' / lock
 
 # load patterns and randoms time-generalization on all epochs
 all_patterns, all_randoms = [], []
@@ -134,10 +132,10 @@ for ax, data, title in zip(axs.flat, [all_patterns, all_randoms], ["pattern", "r
     ax.axvline(0, color="k")
     ax.axhline(0, color="k")
     xx, yy = np.meshgrid(times[idx], times[idx], copy=False, indexing='xy')
-    pval = np.load(res_dir / "pval" / f"all_{title.lower()}-pval.npy")
-    sig = pval < threshold
-    ax.contour(xx, yy, sig[idx][:, idx], colors='black', levels=[0],
-                        linestyles='--', linewidths=1, alpha=.5)
+    # pval = np.load(res_dir / "pval" / f"all_{title.lower()}-pval.npy")
+    # sig = pval < threshold
+    # ax.contour(xx, yy, sig[idx][:, idx], colors='black', levels=[0],
+    #                     linestyles='--', linewidths=1, alpha=.5)
     if title == "random":
         ax.set_xlabel("Testing time (s)", fontsize=13)
 cbar = fig.colorbar(images[0], ax=axs, orientation='vertical', fraction=.1, ticks=[0.18, 0.32])
