@@ -34,7 +34,7 @@ ensure_dir(res_path)
 
 def process_subject(subject, jobs):
     # define classifier'
-    clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
+    # clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
     clf = make_pipeline(StandardScaler(), LogisticRegressionCV(max_iter=100000, solver=solver, class_weight="balanced", random_state=42, n_jobs=jobs))
     clf = GeneralizingEstimator(clf, scoring=scoring, n_jobs=jobs)
     skf = StratifiedKFold(folds, shuffle=True, random_state=42)
@@ -52,10 +52,7 @@ def process_subject(subject, jobs):
         # read epoch
         epoch_fname = op.join(data_path, lock, f"{subject}-{epoch_num}-epo.fif")
         big_epoch = mne.read_epochs(epoch_fname, verbose=verbose, preload=True).crop(-1.5, 1.5)
-                
-        # compute data covariance matrix
-        data_cov = mne.compute_covariance(big_epoch, tmin=-1.5, tmax=1.5, method="empirical", rank="info", verbose=verbose)
-        
+                        
         filter = behav.trialtypes == 2
         noise_epoch = big_epoch[filter]
         noise_cov = mne.compute_covariance(noise_epoch, tmin=-0.2, tmax=0, method="empirical", rank="info", verbose=verbose)
@@ -64,6 +61,8 @@ def process_subject(subject, jobs):
         del big_epoch, noise_epoch
         gc.collect()
         
+        # compute data covariance matrix
+        data_cov = mne.compute_covariance(epoch, method="empirical", rank="info", verbose=verbose)
         # conpute rank
         rank = mne.compute_rank(data_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)
         
@@ -116,7 +115,7 @@ def process_subject(subject, jobs):
                 
                 else:
                     print("Skipping", subject, epoch_num, trial_type, network)
-
+                
             del stcs_data
             gc.collect()
         
@@ -162,7 +161,7 @@ def process_subject(subject, jobs):
                 gc.collect()
             
             else:
-                print("Skipping", subject, 'all', trial_type, network)
+                print("Skipping", subject, 'all', trial_type, network)            
 
         del stcs_data, behav_data
         gc.collect()
@@ -180,7 +179,7 @@ if is_cluster:
         print("Error: SLURM_ARRAY_TASK_ID is not set correctly or is out of bounds.")
         sys.exit(1)
 else:
-    jobs = 15
+    jobs = -1
     # Parallel(-1)(delayed(process_subject)(subject, jobs) for subject in subjects)
     for subject in subjects:
         process_subject(subject, jobs)
