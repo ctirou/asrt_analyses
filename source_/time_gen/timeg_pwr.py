@@ -179,7 +179,7 @@ if is_cluster:
         print("Error: SLURM_ARRAY_TASK_ID is not set correctly or is out of bounds.")
         sys.exit(1)
 else:
-    jobs = -1
+    jobs = 15
     # Parallel(-1)(delayed(process_subject)(subject, jobs) for subject in subjects)
     for subject in subjects:
         process_subject(subject, jobs)

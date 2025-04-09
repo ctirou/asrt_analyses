@@ -12,7 +12,7 @@ data_path = DATA_DIR
 subjects = SUBJS
 metric = 'mahalanobis'
 
-subjects = ['sub01', 'sub02', 'sub03', 'sub04', 'sub06', 'sub07', 'sub08', 'sub09', 'sub10', 'sub12', 'sub13', 'sub14', 'sub15']
+subjects = SUBJS + ['sub03', 'sub06']
 
 analysis = 'pat_high_rdm_high'
 lock = 'stim'
@@ -41,7 +41,7 @@ for subject in tqdm(subjects):
     all_lows.append(low)
     # Decoding stuff
     for trial_type in ['pattern', 'random']:
-        res_path = RESULTS_DIR / 'RSA' / 'sensors' / lock / 'decoding' / trial_type
+        res_path = RESULTS_DIR / 'RSA' / 'sensors' / lock / 'decoding' / trial_type / "max-power-cv"
         if not trial_type in all_decoding:
             all_decoding[trial_type] = []
         all_decoding[trial_type].append(np.load(res_path / f"{subject}-scores.npy"))
@@ -128,7 +128,6 @@ for trial_type, color in zip(['pattern', 'random'], [cpat, crdm]):
     # axd['A'].fill_between(times, decoding.mean(0) - sem, decoding.mean(0) + sem, where=sig, alpha=0.3, zorder=10, facecolor=color, label=f'{trial_type.capitalize()}')
     # Highlight significant regions
     axd['A'].fill_between(times, decoding.mean(0) - sem, chance, where=sig, alpha=0.1, facecolor=color)
-    # break
 
 # axd['A'].text(0.1, 48.5, '$Stimulus$', fontsize=11, ha='center')
 axd['A'].text(0.1, 41.7, '$Stimulus$', fontsize=11, ha='center')

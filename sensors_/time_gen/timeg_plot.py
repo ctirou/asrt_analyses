@@ -33,10 +33,10 @@ res_dir = data_path / 'results' / 'sensors' / lock
 all_patterns, all_randoms = [], []
 patterns, randoms = [], []
 for subject in tqdm(subjects):
-    pattern = np.load(op.join(res_dir, "pattern", f"{subject}-all-scores.npy"))
-    all_patterns.append(pattern)
-    random = np.load(op.join(res_dir, "random", f"{subject}-all-scores.npy"))
-    all_randoms.append(random)
+    # pattern = np.load(op.join(res_dir, "pattern_logRegCv", f"{subject}-all-scores.npy"))
+    # all_patterns.append(pattern)
+    # random = np.load(op.join(res_dir, "random_logRegCv", f"{subject}-all-scores.npy"))
+    # all_randoms.append(random)
     
     pat, rand = [], []
     for i in range(5):
@@ -117,8 +117,10 @@ plt.rcParams.update({'font.size': 12, 'font.family': 'serif', 'font.serif': 'Ari
 fig, axs = plt.subplots(2, 1, sharex=True, layout='constrained', figsize=(7, 6))
 norm = colors.Normalize(vmin=0.18, vmax=0.32)
 images = []
-for ax, data, title in zip(axs.flat, [all_patterns, all_randoms], ["pattern", "random"]):
-    images.append(ax.imshow(data[:, idx][:, :, idx].mean(0), 
+# for ax, data, title in zip(axs.flat, [all_patterns, all_randoms], ["pattern", "random"]):
+for ax, data, title in zip(axs.flat, [patterns, randoms], ["pattern", "random"]):
+    # images.append(ax.imshow(data[:, idx][:, :, idx].mean(0), 
+    images.append(ax.imshow(data[:, :, idx][:, :, :, idx].mean((0, 1)), 
                             norm=norm,
                             interpolation="lanczos",
                             origin="lower",

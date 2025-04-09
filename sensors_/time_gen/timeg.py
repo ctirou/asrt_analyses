@@ -85,7 +85,7 @@ def process_subject(subject, jobs):
     gc.collect()
     
     for trial_type in ['pattern', 'random']:
-        res_dir = TIMEG_DATA_DIR / 'results' / 'sensors' / lock / trial_type
+        res_dir = TIMEG_DATA_DIR / 'results' / 'sensors' / lock / f'{trial_type}_logRegCV'
         ensure_dir(res_dir)
         
         if not op.exists(res_dir / f"{subject}-all-scores.npy") or overwrite:

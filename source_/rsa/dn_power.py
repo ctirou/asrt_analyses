@@ -7,9 +7,9 @@ from config import *
 from mne.decoding import SlidingEstimator, cross_val_multiscore
 from sklearn.pipeline import make_pipeline
 from mne.beamformer import make_lcmv, apply_lcmv_epochs
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedKFold, LeaveOneOut
 from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
 import gc
 import sys
 from joblib import Parallel, delayed
@@ -26,18 +26,21 @@ solver = 'lbfgs'
 scoring = "accuracy"
 folds = 10
 
-verbose = True
+verbose = 'error'
 overwrite = False
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
-def process_subject(subject, jobs):
+def process_subject(subject, trial_type, jobs):
     # define classifier
+    # clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42, n_jobs=jobs))
     clf = make_pipeline(StandardScaler(), LogisticRegressionCV(max_iter=10000000, solver=solver, class_weight="balanced", random_state=42, n_jobs=jobs))
     clf = SlidingEstimator(clf, scoring=scoring, n_jobs=jobs, verbose=verbose)
-    cv = StratifiedKFold(folds, shuffle=True, random_state=42)  
+    skf = StratifiedKFold(folds, shuffle=True, random_state=42)
+    loo = LeaveOneOut()
+    
     # define networks labels path
     networks = NETWORKS[:-2]
-    label_path = RESULTS_DIR / f'networks_200_7' / subject
+    label_path = RESULTS_DIR / 'networks_200_7' / subject
     
     # for network in networks:
     all_behavs = list()
@@ -47,7 +50,7 @@ def process_subject(subject, jobs):
         # read behav
         behav = pd.read_pickle(op.join(data_path, 'behav', f'{subject}-{epoch_num}.pkl'))
         # read epoch
-        epoch_fname = op.join(data_path, lock, f"{subject}-{epoch_num}-epo.fif")
+        epoch_fname = data_path / lock / f"{subject}-{epoch_num}-{'pat' if trial_type == 'pattern' else 'rand'}-epo.fif"
         epoch = mne.read_epochs(epoch_fname, verbose=verbose, preload=True).crop(-0.2, 0.6)
 
         data_cov = mne.compute_covariance(epoch, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
@@ -67,10 +70,11 @@ def process_subject(subject, jobs):
         all_behavs.append(behav)
         all_stcs.extend(stcs)
         
-    behav_df = pd.concat(all_behavs)
-    behav_data = behav_df.reset_index(drop=True)
+    behav_data = pd.concat(all_behavs).reset_index(drop=True)
+    filter = behav_data.trialtypes == 1 if trial_type == 'pattern' else behav_data.trialtypes == 2
+    behav_data = behav_data[filter].reset_index(drop=True)
     
-    del all_behavs, behav_df
+    del all_behavs
     gc.collect()
     
     for network in networks:
@@ -78,39 +82,31 @@ def process_subject(subject, jobs):
         lh_label, rh_label = mne.read_label(label_path / f'{network}-lh.label'), mne.read_label(label_path / f'{network}-rh.label')
         stcs_data = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in all_stcs])
         
-        assert len(stcs_data) == len(behav_data), "Length mismatch"
+        res_dir = RESULTS_DIR / "RSA" / "source" / network / lock / "max-power-cv" / trial_type
+        ensure_dir(res_dir)
         
-        for trial_type in ['pattern', 'random']:
-            res_dir = RESULTS_DIR / "RSA" / "source" / network / lock / "power_scores_cv" / trial_type
-            ensure_dir(res_dir)
+        if not op.exists(res_dir / f"{subject}-all-scores.npy") or overwrite:
+            print("Processing", subject, network, trial_type)
             
-            if not op.exists(res_dir / f"{subject}-all-scores.npy") or overwrite:
-                print("Processing", subject, network, trial_type)
-                if trial_type == 'pattern':
-                    pattern = behav_data.trialtypes == 1
-                    X = stcs_data[pattern]
-                    y = behav_data.positions[pattern]
-                elif trial_type == 'random':
-                    random = behav_data.trialtypes == 2
-                    X = stcs_data[random]
-                    y = behav_data.positions[random]
-                else:
-                    X = stcs_data
-                    y = behav_data.positions
-                y = y.reset_index(drop=True)
-                assert X.shape[0] == y.shape[0], "Length mismatch"
-                
-                scores = cross_val_multiscore(clf, X, y, cv=cv, n_jobs=jobs, verbose=verbose)
-                np.save(op.join(res_dir, f"{subject}-all-scores.npy"), scores.mean(0))
-                
-                del X, y, scores
-                gc.collect()
+            X = stcs_data.copy()
+            y = behav_data.positions
+            y = y.reset_index(drop=True)
+            assert X.shape[0] == y.shape[0], "Length mismatch"
             
-            else:
-                print("Skipping", subject, network, trial_type)
-    
-        del stcs_data
-        gc.collect()
+            del stcs_data
+            gc.collect()
+            
+            cv = loo if any(np.unique(y, return_counts=True)[1] < 10) else skf
+            scores = cross_val_multiscore(clf, X, y, cv=cv, n_jobs=jobs, verbose=verbose)
+            np.save(op.join(res_dir, f"{subject}-all-scores.npy"), scores.mean(0))
+            
+            del X, y, scores
+            gc.collect()
+        
+        else:
+            print("Skipping", subject, network, trial_type)    
+            del stcs_data
+            gc.collect()
 
     del all_stcs, behav_data
     gc.collect()
@@ -121,10 +117,11 @@ if is_cluster:
     try:
         subject_num = int(os.getenv("SLURM_ARRAY_TASK_ID"))
         subject = subjects[subject_num]
-        process_subject(subject, jobs)
+        trial_type = sys.argv[1]
+        process_subject(subject, trial_type, jobs)
     except (IndexError, ValueError) as e:
         print("Error: SLURM_ARRAY_TASK_ID is not set correctly or is out of bounds.")
         sys.exit(1)
 else:
     jobs = 1
-    Parallel(-1)(delayed(process_subject)(subject, jobs) for subject in subjects)
+    Parallel(-1)(delayed(process_subject)(subject, trial_type, jobs) for subject in subjects for trial_type in ['pattern', 'random']) 
