@@ -16,7 +16,7 @@ is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 subjects = SUBJS + ['sub03', 'sub06']
 mode_ICA = True
 generalizing = False
-filtering = False
+filtering = True
 overwrite = True
 verbose = True
 rdm_bsling = True
@@ -187,16 +187,15 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                 # Create epochs time locked on stimulus onset and button response, and baseline epochs
                 reject = dict(mag=5e-12)
                 picks = mne.pick_types(raw.info, meg=True, eeg=False, eog=False, stim=False) # by default eog is True
-                if generalizing or rdm_bsling:
+                if generalizing:
                         epochs_stim = mne.Epochs(raw, events_stim, tmin=tmin, tmax=tmax, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)
                         epochs_bsl = epochs_stim.copy().crop(-.2, 0)                   
                         epochs_button = mne.Epochs(raw, events_button, tmin=tmin, tmax=tmax, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)
-                # elif rdm_bsling and not generalizing:
-                #         epochs_stim = mne.Epochs(raw, events_stim, tmin=tmin, tmax=tmax, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)                   
-                #         epochs_bsl = epochs_stim.copy().crop(-1.7, -1.5)
-                #         epochs_stim.apply_baseline((-1.7, -1.5))
-                #         # epochs_stim = epochs_stim.copy().crop(-0.2, 0.6)           
-                #         epochs_button = mne.Epochs(raw, events_button, tmin=tmin, tmax=tmax, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)                    
+                elif rdm_bsling and not generalizing:
+                        epochs_stim = mne.Epochs(raw, events_stim, tmin=tmin, tmax=tmax, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)                   
+                        epochs_bsl = epochs_stim.copy().crop(-1.7, -1.5)
+                        epochs_stim.apply_baseline((-1.7, -1.5))
+                        epochs_button = mne.Epochs(raw, events_button, tmin=tmin, tmax=tmax, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)                    
                 else:
                         epochs_stim = mne.Epochs(raw, events_stim, tmin=tmin, tmax=tmax, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)                   
                         epochs_bsl = epochs_stim.copy().crop(-.2, 0)           
@@ -261,21 +260,21 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                 bsl_data = np.mean(bsl_data, axis=2)
                 epochs_button._data[:, bsl_channels, :] -= bsl_data[:, :, np.newaxis]
                 # Save epochs 
-                if rdm_bsling:
-                        # Save epochs for pattern baselined on previous random pre-stimulus period
-                        pattern = stim_df.trialtypes == 1
-                        pat_epo = epochs_stim[pattern]
-                        pat_epo.apply_baseline((-1.7, -1.5))
-                        pat_epo.save(op.join(res_path, 'stim', f'{subject}-{session_num}-pat-epo.fif'), overwrite=overwrite)
-                        # Save epochs for random baselined on pre-stimulus period
-                        random = stim_df.trialtypes == 2
-                        rand_epo = epochs_stim[random]
-                        rand_epo.apply_baseline((-0.2, 0))
-                        rand_epo.save(op.join(res_path, 'stim', f'{subject}-{session_num}-rand-epo.fif'), overwrite=overwrite)
-                else:
-                        epochs_stim.save(op.join(res_path, 'stim', f'{subject}-{session_num}-epo.fif'), overwrite=overwrite)
-                        epochs_bsl.save(op.join(res_path, 'bsl', f'{subject}-{session_num}-epo.fif'), overwrite=overwrite)
-                        # epochs_button.save(op.join(res_path, 'button', f'{subject}-{session_num}-epo.fif'), overwrite=overwrite)
+                # if rdm_bsling:
+                #         # Save epochs for pattern baselined on previous random pre-stimulus period
+                #         pattern = stim_df.trialtypes == 1
+                #         pat_epo = epochs_stim[pattern]
+                #         pat_epo.apply_baseline((-1.7, -1.5))
+                #         pat_epo.save(op.join(res_path, 'stim', f'{subject}-{session_num}-pat-epo.fif'), overwrite=overwrite)
+                #         # Save epochs for random baselined on pre-stimulus period
+                #         random = stim_df.trialtypes == 2
+                #         rand_epo = epochs_stim[random]
+                #         rand_epo.apply_baseline((-0.2, 0))
+                #         rand_epo.save(op.join(res_path, 'stim', f'{subject}-{session_num}-rand-epo.fif'), overwrite=overwrite)
+                # else:
+                epochs_stim.save(op.join(res_path, 'stim', f'{subject}-{session_num}-epo.fif'), overwrite=overwrite)
+                epochs_bsl.save(op.join(res_path, 'bsl', f'{subject}-{session_num}-epo.fif'), overwrite=overwrite)
+                epochs_button.save(op.join(res_path, 'button', f'{subject}-{session_num}-epo.fif'), overwrite=overwrite)
                 # Save behavioral data
                 behav_df = stim_df
                 behav_df.to_pickle(op.join(res_path, 'behav', f'{subject}-{session_num}.pkl'))

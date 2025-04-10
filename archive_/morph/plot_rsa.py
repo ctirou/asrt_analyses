@@ -139,9 +139,9 @@ for network in networks:
         pattern[network] = []
         random[network] = []
     for subject in subjects:
-        pat = np.load(RESULTS_DIR / 'RSA' / 'source' / network / lock / f'{ori}_scores' / 'pattern' / f"{subject}-all-scores.npy")
+        pat = np.load(RESULTS_DIR / 'RSA' / 'source' / network / lock / 'max-power' / 'pattern' / f"{subject}-scores.npy")
         pattern[network].append(pat)
-        rand = np.load(RESULTS_DIR / 'RSA' / 'source' / network / lock / f'{ori}_scores' / 'random' / f"{subject}-all-scores.npy")
+        rand = np.load(RESULTS_DIR / 'RSA' / 'source' / network / lock / 'max-power' / 'random' / f"{subject}-scores.npy")
         random[network].append(rand)
     pattern[network] = np.array(pattern[network])
     random[network] = np.array(random[network])
