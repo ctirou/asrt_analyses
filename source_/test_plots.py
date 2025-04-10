@@ -203,3 +203,97 @@ for i, (ax, label, name) in enumerate(zip(axes.flat, networks, NETWORK_NAMES)):
 fig.suptitle(f"Random trials decoding – ori=${ori}$")
 fig.savefig(figures_dir / "rand-decoding.pdf", transparent=True)
 plt.close(fig)
+
+# Temporal generalization
+patterns, randoms = {}, {}
+all_patterns, all_randoms = {}, {}
+for network in tqdm(networks):
+    if not network in patterns:
+        patterns[network], randoms[network] = [], []
+        all_patterns[network], all_randoms[network] = [], []
+    all_pat, all_rand, all_diag = [], [], []
+    patpat, randrand = [], []
+    for i, subject in enumerate(subjects[:-2]):
+        pat, rand = [], []
+        for j in [0, 1, 2, 3, 4]:
+            pat.append(np.load(TIMEG_DATA_DIR / 'results' / 'source' / 'max-power' / network / 'pattern' / f"{subject}-{j}-scores.npy"))
+            rand.append(np.load(TIMEG_DATA_DIR / 'results' / 'source' / 'max-power' / network / 'random' / f"{subject}-{j}-scores.npy"))
+        patpat.append(np.array(pat))
+        randrand.append(np.array(rand))
+    
+        all_pat.append(np.load(TIMEG_DATA_DIR / 'results' / 'source' / 'max-power' / network / 'pattern' / f"{subject}-all-scores.npy"))
+        all_rand.append(np.load(TIMEG_DATA_DIR / 'results' / 'source' / 'max-power' / network / 'random' / f"{subject}-all-scores.npy"))
+    all_patterns[network] = np.array(all_pat)
+    all_randoms[network] = np.array(all_rand)
+    patterns[network] = np.array(patpat)
+    randoms[network] = np.array(randrand)
+
+# Pattern
+cmap1 = "RdBu_r"
+fig, axes = plt.subplots(2, 5, figsize=(15, 5), sharex=True, sharey=True, layout='constrained')
+for ax, network, name in zip(axes.flatten(), networks, NETWORK_NAMES):
+    # im = axes[i].imshow(
+    im = ax.imshow(
+        all_patterns[network].mean(0),
+        interpolation="lanczos",
+        origin="lower",
+        cmap=cmap1,
+        extent=timesg[[0, -1, 0, -1]],
+        aspect=0.5,
+        vmin=0.2,
+        vmax=0.3)
+    ax.set_ylabel("Training Time (s)")
+    ax.set_title(f"{name}", fontsize=10, fontstyle="italic")
+    ax.axvline(0, color="k", alpha=.5)
+    ax.axhline(0, color="k", alpha=.5)
+    if network == networks[-1]:
+        ax.set_xlabel("Testing Time (s)")
+    # cbar = plt.colorbar(im, ax=ax)
+    # cbar.set_label("accuracy")
+# fig.savefig(figures_dir / f"pattern.pdf", transparent=True)
+
+# Random
+fig, axes = plt.subplots(2, 5, figsize=(15, 5), sharex=True, sharey=True, layout='constrained')
+for ax, network, name in zip(axes.flatten(), networks, NETWORK_NAMES):
+    im = ax.imshow(
+        all_randoms[network].mean(0),
+        interpolation="lanczos",
+        origin="lower",
+        cmap=cmap1,
+        extent=timesg[[0, -1, 0, -1]],
+        aspect=0.5,
+        vmin=0.2,
+        vmax=0.3)
+    ax[i].set_ylabel("Training Time (s)")
+    ax.set_title(f"{name}", fontsize=10, fontstyle="italic")
+    ax[i].axvline(0, color="k", alpha=.5)
+    ax[i].axhline(0, color="k", alpha=.5)
+    if network == networks[-1]:
+        ax[i].set_xlabel("Testing Time (s)")
+    # cbar = plt.colorbar(im, ax=axes[i])
+    # cbar.set_label("accuracy")
+# fig.suptitle("Random", fontsize=14)
+# fig.savefig(figures_dir / f"random.pdf", transparent=True)
+
+# Contrast
+fig, axes = plt.subplots(2, 5, figsize=(15, 5), sharex=True, sharey=True, layout='constrained')
+for ax, network, name in zip(axes.flatten(), networks, NETWORK_NAMES):
+    all_contrast = all_patterns[network] - all_randoms[network]
+    im = ax.imshow(
+        all_contrast.mean(0),
+        interpolation="lanczos",
+        origin="lower",
+        cmap=cmap1,
+        extent=timesg[[0, -1, 0, -1]],
+        aspect=0.5,
+        vmin=-0.05,
+        vmax=0.05)
+    ax.set_ylabel("Training Time (s)")
+    ax.set_title(f"{name}", fontsize=10, fontstyle="italic")
+    ax.axvline(0, color="k", alpha=.5)
+    ax.axhline(0, color="k", alpha=.5)
+    if network == networks[-1]:
+        ax.set_xlabel("Testing Time (s)")
+    # cbar = plt.colorbar(im, ax=axes[i])
+    # cbar.set_label("accuracy")
+# fig.savefig(figures_dir / f"contrast.pdf", transparent=True)
