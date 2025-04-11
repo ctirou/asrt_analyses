@@ -76,21 +76,6 @@ for subject in tqdm(subjects):
 pattern, random = np.array(pattern), np.array(random)
 contrast = pattern - random
 
-# pval = gat_stats(contrast.mean(1), -1)
-# sig = pval < 0.05
-# plt.imshow(contrast.mean((0, 1)),
-#            interpolation="lanczos",
-#                             origin="lower",
-#                             cmap='RdBu_r',
-#                             extent=timesg[[0, -1, 0, -1]],
-#                             aspect=0.5)
-# plt.axhline(0, color='black', lw=1)
-# plt.axvline(0, color='black', lw=1)
-# xx, yy = np.meshgrid(timesg, timesg, copy=False, indexing='xy')
-# plt.contour(xx, yy, sig, colors='black', levels=[0],
-#                     linestyles='--', linewidths=1, alpha=.5)
-# plt.show()
-
 # # mean box
 # means = []
 # for sub in range(len(subjects)):
@@ -187,53 +172,53 @@ except AssertionError as e:
     y = y[:, :small]
 assert x.shape == y.shape, f"Shapes do not match: {x.shape} != {y.shape}"
 
-# bees = [i for i in range(x.shape[1])]
-# fig, ax = plt.subplots(1, 1)
-# ax.set_xticks(bees)
-# ax.axvspan(0, 2, color='grey', alpha=0.1)
-# ax.plot(bees, x.mean(0), label='x: predictive coding')
-# ax.plot(bees, y.mean(0), label='y: representational change')
-# ax.set_xticklabels(bees)
-# ax.set_xlabel('Block')
-# ax.legend()
-# ax.set_title('Stationary data')
+bees = [i for i in range(x.shape[1])]
+fig, ax = plt.subplots(1, 1)
+ax.set_xticks(bees)
+ax.axvspan(0, 2, color='grey', alpha=0.1)
+ax.plot(bees, x.mean(0), label='x: predictive coding')
+ax.plot(bees, y.mean(0), label='y: representational change')
+ax.set_xticklabels(bees)
+ax.set_xlabel('Block')
+ax.legend()
+ax.set_title('Stationary data')
 
-# from statsmodels.tsa.stattools import grangercausalitytests
-# from statsmodels.tsa.api import VAR
-# import pandas as pd
+from statsmodels.tsa.stattools import grangercausalitytests
+from statsmodels.tsa.api import VAR
+import pandas as pd
 
-# # X -> Y
-# AIC, BIC, HQIC = [], [], []
-# for sub in range(len(subjects)):
-#     print(f"\n##### Subject {sub} #####")
-#     data = pd.DataFrame({'X': x[sub], 'Y': y[sub]})
-#     # gc_res = grangercausalitytests(data, 5, verbose=True)
+# X -> Y
+AIC, BIC, HQIC = [], [], []
+for sub in range(len(subjects)):
+    print(f"\n##### Subject {sub} #####")
+    data = pd.DataFrame({'X': x[sub], 'Y': y[sub]})
+    # gc_res = grangercausalitytests(data, 5, verbose=True)
     
-#     model = VAR(data)
-#     lag_order = model.select_order(5) # Check this    
-#     AIC.append(lag_order.aic)
-#     BIC.append(lag_order.bic)
-#     HQIC.append(lag_order.hqic)
+    model = VAR(data)
+    lag_order = model.select_order(5) # Check this    
+    AIC.append(lag_order.aic)
+    BIC.append(lag_order.bic)
+    HQIC.append(lag_order.hqic)
 
-# print("\nMean AIC:", np.mean(AIC))
-# print("Mean BIC:", np.mean(BIC))
-# print("Mean HQIC:", np.mean(HQIC))
+print("\nMean AIC:", np.mean(AIC))
+print("Mean BIC:", np.mean(BIC))
+print("Mean HQIC:", np.mean(HQIC))
 
-# # Y -> X
-# AIC, BIC, HQIC = [], [], []
-# for sub in range(len(subjects)):
-#     print(f"\n##### Subject {sub} #####")
-#     data = pd.DataFrame({'X': y[sub], 'Y': x[sub]})
-#     # gc_res = grangercausalitytests(data, [6], verbose=True)
-#     model = VAR(data)
-#     lag_order = model.select_order(5)
-#     AIC.append(lag_order.aic)
-#     BIC.append(lag_order.bic)
-#     HQIC.append(lag_order.hqic)
+# Y -> X
+AIC, BIC, HQIC = [], [], []
+for sub in range(len(subjects)):
+    print(f"\n##### Subject {sub} #####")
+    data = pd.DataFrame({'X': y[sub], 'Y': x[sub]})
+    # gc_res = grangercausalitytests(data, [6], verbose=True)
+    model = VAR(data)
+    lag_order = model.select_order(5)
+    AIC.append(lag_order.aic)
+    BIC.append(lag_order.bic)
+    HQIC.append(lag_order.hqic)
 
-# print("\nMean AIC:", np.mean(AIC))
-# print("Mean BIC:", np.mean(BIC))
-# print("Mean HQIC:", np.mean(HQIC))
+print("\nMean AIC:", np.mean(AIC))
+print("Mean BIC:", np.mean(BIC))
+print("Mean HQIC:", np.mean(HQIC))
 
 ### Cross-correlation
 from scipy.signal import correlate
@@ -245,13 +230,6 @@ correlations = np.array(correlations)
 # Generate lag indices
 lags = np.arange(-len(X_norm.mean(0)) + 1, len(X_norm.mean(0)))
 
-fig, ax = plt.subplots(1, 1)
-ax.axvline(0, color='grey', linestyle='--', label="Zero Lag")
-ax.axhline(0, color='grey', linestyle='-')
-ax.plot(lags, correlations.mean(0), label='Cross-correlation')
-# ax.fill_between(0, correlations.mean(0), where=sig, alpha=0.2, zorder=5, facecolor='C7')
-correlation = correlate(X_norm.mean(0), Y_norm.mean(0), mode='full')
-
 corr_list = []
 for sub in range(len(subjects)):
     corr = correlate(X_norm[sub], Y_norm[sub], mode='full')
@@ -260,18 +238,7 @@ corr_list = np.array(corr_list)
 
 pval = decod_stats(corr_list, -1)
 sig = pval < 0.05
-
 whre = np.where(pval != 1)[0]
-fig, ax = plt.subplots(1, 1)
-ax.plot(lags, corr_list.mean(0), label='Cross-correlation')
-ax.axvline(0, color='grey', linestyle='--', label="Zero Lag")
-ax.axhline(0, color='grey', linestyle='-')
-ax.axvline(lags[whre])
-
-
-ax.set_xlabel("Lag")
-ax.set_ylabel("Cross-Correlation")
-ax.set_title("Cross-Correlation Between X and Y")
 
 # Find min and max lags
 min_lag_idx = np.argmin(correlations.mean(0))
@@ -281,194 +248,136 @@ max_lag_idx = np.argmax(correlations.mean(0))
 max_lag = lags[max_lag_idx]
 print(f"Max lag: {max_lag}")
 
+fig, ax = plt.subplots(1, 1)
+ax.plot(lags, corr_list.mean(0), label='Cross-correlation')
+ax.axvline(0, color='grey', linestyle='--', label="Zero Lag")
+ax.axhline(0, color='grey', linestyle='-')
+ax.set_xlabel("Lag")
+ax.set_ylabel("Cross-Correlation")
+ax.set_title("Cross-Correlation Between X and Y")
+ax.axvline(lags[whre], color='black', label='sig')
+ax.axvline(lags[max_lag_idx], color='red', label='max lag')
+ax.axvline(lags[min_lag_idx], color='blue', label='min lag')
+ax.legend()
+
 ### Transfer Entropy - using PyInform
 from pyinform.transferentropy import transfer_entropy
+from sklearn.preprocessing import MinMaxScaler
+from scipy.stats import zscore
 
 # X: Predictive coding, Y: Representational change
 X, Y = mean_diag, sim_index
-
-from sklearn.preprocessing import MinMaxScaler
+# Apply z-score normalization to each subject individually
+X_norm = np.array([zscore(X[sub, :]) for sub in range(X.shape[0])])
+Y_norm = np.array([zscore(Y[sub, :]) for sub in range(Y.shape[0])])
+# Apply Min-Max scaling to each subject individually
 scaler = MinMaxScaler(feature_range=(0, 10))
 X_scaled = scaler.fit_transform(X)
 Y_scaled = scaler.fit_transform(Y)
 X_discrete = X_scaled.astype(int)
 Y_discrete = Y_scaled.astype(int)
 
-# fig, ax = plt.subplots(1, 1)
-# ax.plot(X_discrete.mean(0), label='X: Predictive coding')
-# ax.plot(Y_discrete.mean(0), label='Y: Representational change')
-# ax.set_xlabel('Block')
-# ax.set_ylabel('Scaled values')
-# ax.set_title('Scaled data')
-# ax.legend()
-
-# k = 3 # Number of nearest neighbors
-# # Calculate transfer entropy
-# te_XY = transfer_entropy(X_discrete.mean(0), Y_discrete.mean(0), k=k, local=False)
-# te_YX = transfer_entropy(Y_discrete.mean(0), X_discrete.mean(0), k=k, local=False)
-# # Print results
-# print(f"Transfer Entropy (X → Y): {te_XY}")
-# print(f"Transfer Entropy (Y → X): {te_YX}")
-
-# nn_xy = {}
-# nn_yx = {}
-# diff = {}
-# for lag in range(1, 7):
-#     if not lag in nn_xy:
-#         nn_xy[lag] = []
-#         nn_yx[lag] = []
-#     for sub in range(len(subjects)):
-#         X = X_discrete[sub]
-#         Y = Y_discrete[sub]
-#         te_XY = transfer_entropy(X, Y, k=lag, local=True)
-#         te_YX = transfer_entropy(Y, X, k=lag, local=True)
-#         nn_xy[lag].append(te_XY)
-#         nn_yx[lag].append(te_YX)
-#     nn_xy[lag] = np.squeeze(nn_xy[lag])
-#     nn_yx[lag] = np.squeeze(nn_yx[lag])
-#     diff[lag] = nn_xy[lag] - nn_yx[lag]
-    
-# sig = {}
-# for lag in range(1, 7):
-#     pv = decod_stats(diff[lag], -1)
-#     sig[lag] = pv < 0.05
-
-# fig, ax = plt.subplots(1, 1)
-# for lag in range(1, 7):
-#     ax.plot(nn_xy[lag].mean(0), label=f'lag={lag}')
-# ax.set_xlabel("Lag")
-# ax.set_ylabel("Transfer Entropy")
-# ax.set_title("Transfer Entropy X → Y")
-# ax.legend()
-
-# fig, ax = plt.subplots(1, 1)
-# for lag in range(1, 7):
-#     ax.plot(nn_yx[lag].mean(0), label=f'lag={lag}')
-# ax.set_xlabel("Lag")
-# ax.set_ylabel("Transfer Entropy")
-# ax.set_title("Transfer Entropy Y → X")
-# ax.legend()
-
-from sklearn.feature_selection import mutual_info_regression
-
-X = X_discrete.copy()
-Y = Y_discrete.copy() # Representational change
-
-def optimal_lag_mi(X_sub, Y_sub, max_lag=10):
-    """
-    Find optimal lag for Transfer Entropy using Mutual Information for one subject.
-    
-    Args:
-        X_sub (array): Time series for X (shape: n_time_points).
-        Y_sub (array): Time series for Y (shape: n_time_points).
-        max_lag (int): Maximum lag to test.
-
-    Returns:
-        best_lag (int): Optimal lag with highest Mutual Information.
-    """
-    mi_scores = []
-    for lag in range(1, max_lag + 1):
-        mi = mutual_info_regression(X_sub[:-lag].reshape(-1, 1), Y_sub[lag:].reshape(-1, 1), random_state=42)
-        # mi = mutual_info_regression(X_sub[:-lag].reshape(-1, 1), Y_sub[lag:].reshape(-1, 1))
-        mi_scores.append(mi[0])  # Store MI score for this lag
-
-    best_lag = np.argmax(mi_scores) + 1  # Best lag is the one with highest MI
-    return best_lag, mi_scores
-
-# ---- Run for all subjects ----
-def find_optimal_lags(X, Y, max_lag=10):
-    """
-    Compute optimal lag for TE per subject.
-    
-    Args:
-        X (array): Shape (n_subjects, n_time_points).
-        Y (array): Shape (n_subjects, n_time_points).
-        max_lag (int): Maximum lag to test.
-
-    Returns:
-        optimal_lags (list): Optimal lag per subject.
-        global_lag (int): Median of all subject lags.
-    """
-    optimal_lags = []
-    for sub in range(X.shape[0]):  # Iterate over subjects
-        best_lag, _ = optimal_lag_mi(X[sub], Y[sub], max_lag)
-        optimal_lags.append(best_lag)
-    
-    global_lag = int(np.median(optimal_lags))  # Take median for a global choice
-    return optimal_lags, global_lag
-
 optimal_lags, global_lag = find_optimal_lags(X, Y)
+optimal_lags, global_lag = find_optimal_lags(X_norm, Y_norm)
 print("Optimal lags per subject:", optimal_lags)
 print("Global (median) lag:", global_lag)
 
-res_dir = RESULTS_DIR / 'causality' / 'sensors' 
+res_dir = RESULTS_DIR / 'causality' / 'sensors' / "basic"
 ensure_dir(res_dir)
-
 # Iterate over subjects
 for isub, sub in enumerate(subjects):
-
     print(f"Computing TE for {sub} ({isub})...")
-
     try:
-        # Ensure valid lag
-        # lag = min(optimal_lags[isub], len(X[isub]) - 1)
-        lag = optimal_lags[isub] if optimal_lags[isub] < 7 else 6
         lag = global_lag
-
-        # Compute Transfer Entropy
-        xy = transfer_entropy(X[isub], Y[isub], k=lag, local=True)
-        yx = transfer_entropy(Y[isub], X[isub], k=lag, local=True)
-        
-        # Save local TE results as .npy files
-        np.save(res_dir / f"{sub}_te_xy.npy", xy)
-        np.save(res_dir / f"{sub}_te_yx.npy", yx)
-
+        for l in range(1, global_lag + 1):
+            # Compute Transfer Entropy
+            xy = transfer_entropy(X[isub], Y[isub], k=l, local=True)
+            yx = transfer_entropy(Y[isub], X[isub], k=l, local=True)
+            # Save local TE results as .npy files
+            np.save(res_dir / f"{sub}_te_xy-{l}.npy", xy)
+            np.save(res_dir / f"{sub}_te_yx-{l}.npy", yx)
     except Exception as e:
         print(f"Error computing TE for {sub}: {e}")
 print("\nAll computations complete!")
 
-# Transfer Entropy – using IDTxl – in progress...
-from idtxl.bivariate_te import BivariateTE
-from idtxl.data import Data
-import logging
-
-logging.getLogger().setLevel(logging.WARNING)  # Suppress excessive IDTxl outputtes_xy, tes_yx = [], []
-
+res_dir = RESULTS_DIR / 'causality' / 'sensors' / "normalized"
+ensure_dir(res_dir)
+# Iterate over subjects
 for isub, sub in enumerate(subjects):
-    lag = min(optimal_lags[isub], X.shape[1] - 1)  # Ensure lag does not exceed time points
+    print(f"Computing TE for {sub} ({isub})...")
+    try:
+        lag = global_lag
+        for l in range(1, global_lag + 1):
+            # Compute Transfer Entropy
+            xy = transfer_entropy(X_norm[isub], Y_norm[isub], k=l, local=True)
+            yx = transfer_entropy(Y_norm[isub], X_norm[isub], k=l, local=True)
+            # Save local TE results as .npy files
+            np.save(res_dir / f"{sub}_te_xy-{l}.npy", xy)
+            np.save(res_dir / f"{sub}_te_yx-{l}.npy", yx)
+    except Exception as e:
+        print(f"Error computing TE for {sub}: {e}")
+print("\nAll computations complete!")
+
+res_dir = RESULTS_DIR / 'causality' / 'sensors' / "discretized"
+ensure_dir(res_dir)
+# Iterate over subjects
+for isub, sub in enumerate(subjects):
+    print(f"Computing TE for {sub} ({isub})...")
+    try:
+        lag = global_lag
+        for l in range(1, global_lag + 1):
+            # Compute Transfer Entropy
+            xy = transfer_entropy(X_discrete[isub], Y_discrete[isub], k=l, local=True)
+            yx = transfer_entropy(Y_discrete[isub], X_discrete[isub], k=l, local=True)
+            # Save local TE results as .npy files
+            np.save(res_dir / f"{sub}_te_xy-{l}.npy", xy)
+            np.save(res_dir / f"{sub}_te_yx-{l}.npy", yx)
+    except Exception as e:
+        print(f"Error computing TE for {sub}: {e}")
+print("\nAll computations complete!")
+
+# # Transfer Entropy – using IDTxl – in progress...
+# from idtxl.bivariate_te import BivariateTE
+# from idtxl.data import Data
+# import logging
+
+# logging.getLogger().setLevel(logging.WARNING)  # Suppress excessive IDTxl outputtes_xy, tes_yx = [], []
+
+# for isub, sub in enumerate(subjects):
+#     lag = min(optimal_lags[isub], X.shape[1] - 1)  # Ensure lag does not exceed time points
     
-    # Format data for IDTxl: Shape (n_timepoints, n_variables)
-    data_array = np.vstack([X[isub], Y[isub]])  # Shape (n_timepoints, 2)
-    data = Data(data_array, dim_order='ps')  # 'p' = points, 's' = sources
+#     # Format data for IDTxl: Shape (n_timepoints, n_variables)
+#     data_array = np.vstack([X[isub], Y[isub]])  # Shape (n_timepoints, 2)
+#     data = Data(data_array, dim_order='ps')  # 'p' = points, 's' = sources
     
-    network = BivariateTE()
-    settings = {'source_target': [[0, 1]], # X → Y
-                'cmi_estimator': 'JidtKraskovCMI', 
-                'max_lag_sources': int(lag), # Optimal lag per subject
-                'min_lag_sources': 0, # Lag - 1  
-                'local_analysis': True, # Local analysis
-                } 
+#     network = BivariateTE()
+#     settings = {'source_target': [[0, 1]], # X → Y
+#                 'cmi_estimator': 'JidtKraskovCMI', 
+#                 'max_lag_sources': int(lag), # Optimal lag per subject
+#                 'min_lag_sources': 0, # Lag - 1  
+#                 'local_analysis': True, # Local analysis
+#                 } 
     
-    # TE X -> Y
-    results = network.analyse_network(settings=settings, data=data)
-    
-    
-    te_xy = results.get_single_target(1, fdr=False) # Transfer entropy value
+#     # TE X -> Y
+#     results = network.analyse_network(settings=settings, data=data)
     
     
-    results.get_target_delays(target=1, fdr=False)
+#     te_xy = results.get_single_target(1, fdr=False) # Transfer entropy value
     
     
-    print(f"TE X → Y: {te_xy} for {sub} with lags = [{min_lag}, {max_lag}]")
-    # results.print_edge_list(weights="max_te_lag", fdr=False)
-    # plot_network(results=results, weights="max_te_lag", fdr=False)
-    # plt.show()
+#     results.get_target_delays(target=1, fdr=False)
     
-    # TE Y -> X
-    settings['source_target'] = [[1, 0]] # Y → X
-    results = network.analyse_network(settings=settings, data=data)
-    te_yx = results.get_single_target(1)['fx'] # Transfer entropy value
-    print(f"TE Y → X: {te_yx} for {sub} with lags = [{min_lag}, {max_lag}]")
-    # results.print_edge_list(weights="max_te_lag", fdr=False)
-    # plot_network(results=results, weights="max_te_lag", fdr=False)
-    # plt.show()
+    
+#     print(f"TE X → Y: {te_xy} for {sub} with lags = [{min_lag}, {max_lag}]")
+#     # results.print_edge_list(weights="max_te_lag", fdr=False)
+#     # plot_network(results=results, weights="max_te_lag", fdr=False)
+#     # plt.show()
+    
+#     # TE Y -> X
+#     settings['source_target'] = [[1, 0]] # Y → X
+#     results = network.analyse_network(settings=settings, data=data)
+#     te_yx = results.get_single_target(1)['fx'] # Transfer entropy value
+#     print(f"TE Y → X: {te_yx} for {sub} with lags = [{min_lag}, {max_lag}]")
+#     # results.print_edge_list(weights="max_te_lag", fdr=False)
+#     # plot_network(results=results, weights="max_te_lag", fdr=False)
+#     # plt.show()

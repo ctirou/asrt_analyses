@@ -935,3 +935,47 @@ def ensure_stationarity(series, max_diff=2):
     stationary_series = np.array([s[:max_length] for s in stationary_series])
 
     return stationarity_flags, stationary_series, applied_diffs
+
+def optimal_lag_mi(X_sub, Y_sub, max_lag=10):
+    from sklearn.feature_selection import mutual_info_regression
+    """
+    Find optimal lag for Transfer Entropy using Mutual Information for one subject.
+    
+    Args:
+        X_sub (array): Time series for X (shape: n_time_points).
+        Y_sub (array): Time series for Y (shape: n_time_points).
+        max_lag (int): Maximum lag to test.
+
+    Returns:
+        best_lag (int): Optimal lag with highest Mutual Information.
+    """
+    mi_scores = []
+    for lag in range(1, max_lag + 1):
+        mi = mutual_info_regression(X_sub[:-lag].reshape(-1, 1), Y_sub[lag:].reshape(-1, 1), random_state=42)
+        # mi = mutual_info_regression(X_sub[:-lag].reshape(-1, 1), Y_sub[lag:].reshape(-1, 1))
+        mi_scores.append(mi[0])  # Store MI score for this lag
+
+    best_lag = np.argmax(mi_scores) + 1  # Best lag is the one with highest MI
+    return best_lag, mi_scores
+
+# ---- Run for all subjects ----
+def find_optimal_lags(X, Y, max_lag=10):
+    """
+    Compute optimal lag for TE per subject.
+    
+    Args:
+        X (array): Shape (n_subjects, n_time_points).
+        Y (array): Shape (n_subjects, n_time_points).
+        max_lag (int): Maximum lag to test.
+
+    Returns:
+        optimal_lags (list): Optimal lag per subject.
+        global_lag (int): Median of all subject lags.
+    """
+    optimal_lags = []
+    for sub in range(X.shape[0]):  # Iterate over subjects
+        best_lag, _ = optimal_lag_mi(X[sub], Y[sub], max_lag)
+        optimal_lags.append(best_lag)
+    
+    global_lag = int(np.median(optimal_lags))  # Take median for a global choice
+    return optimal_lags, global_lag

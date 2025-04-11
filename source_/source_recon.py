@@ -8,10 +8,11 @@ import sys
 
 subjects = SUBJS
 epochs_list = EPOCHS
-data_path = DATA_DIR
-# data_path = TIMEG_DATA_DIR
+# data_path = DATA_DIR
+data_path = TIMEG_DATA_DIR
 subjects_dir = FREESURFER_DIR
-res_path = RESULTS_DIR
+# res_path = RESULTS_DIR
+res_path = TIMEG_DATA_DIR
 
 lock = 'stim'
 jobs = -1
@@ -20,19 +21,18 @@ overwrite = False
 verbose = True
 
 # create results directories
-folders = ["src", "vol_src", "bem", "trans", "fwd", "new_fwd"]
-for lockf in ['stim', 'button']:
-    for f in folders:
-        # if f in folders[-2:]:
-        if f in folders[-3:]:
-            path = op.join(res_path, f, lockf)
-            ensure_dir(path)
-        else:
-            ensure_dir(os.path.join(res_path, f))
+folders = ["src", "vol_src", "bem", "trans", "fwd"]
+for f in folders:
+    # if f in folders[-2:]:
+    if f in folders[-3:]:
+        path = op.join(res_path, f, lock)
+        ensure_dir(path)
+    else:
+        ensure_dir(os.path.join(res_path, f))
 
 # best_labels = [('Left-' + l.replace('-lh', '')) if '-lh' in l else ('Right-' + l.replace('-rh', '')) if '-rh' in l else l for l in VOLUME_LABELS]    
 
-def process_subject(subject, lock, jobs):
+def process_subject(subject, jobs):
     # bem model
     bem_fname = op.join(res_path, "bem", "%s-bem-sol.fif" % (subject))
     model_fname = op.join(res_path, "bem", "%s-bem.fif" % (subject))
@@ -48,7 +48,7 @@ def process_subject(subject, lock, jobs):
     
     # cortex source space
     src_fname = op.join(res_path, "src", "%s-src.fif" % (subject))
-    if not op.exists(src_fname) or overwrite:
+    if not op.exists(src_fname) or False:
         src = mne.setup_source_space(subject, spacing='oct6',
                                         subjects_dir=subjects_dir,
                                         add_dist=True,
@@ -78,6 +78,9 @@ def process_subject(subject, lock, jobs):
     thal_labels = [l for l in aseg_labels if 'Thal' in l]
     hipp_thal_labels = hipp_labels + thal_labels
     
+    cerebellum_labels = [l for l in aseg_labels if 'Cerebellum-Cortex' in l]
+    htc_labels = hipp_labels + thal_labels + cerebellum_labels
+    
     # vol_src_hipp_fname = op.join(res_path, "src", "%s-hipp-vol-src.fif" % (subject))
     # if not op.exists(vol_src_hipp_fname) or overwrite:
     #     vol_src_hipp = mne.setup_volume_source_space(
@@ -102,22 +105,38 @@ def process_subject(subject, lock, jobs):
     #         verbose=verbose)
     #     mne.write_source_spaces(vol_src_thal_fname, vol_src_thal, overwrite=True)
         
-    # vol_src_hipp_thal_fname = op.join(res_path, "src", "%s-hipp-thal-vol-src.fif" % (subject))
-    vol_src_hipp_thal_fname = op.join(res_path, "vol_src", "%s-hipp-thal-vol-src.fif" % (subject))
-    if not op.exists(vol_src_hipp_thal_fname) or overwrite:
+    # # vol_src_hipp_thal_fname = op.join(res_path, "src", "%s-hipp-thal-vol-src.fif" % (subject))
+    # vol_src_hipp_thal_fname = op.join(res_path, "vol_src", "%s-hipp-thal-vol-src.fif" % (subject))
+    # if not op.exists(vol_src_hipp_thal_fname) or overwrite:
+    #     surface = subjects_dir / subject / "bem" / "inner_skull.surf" # inner skull surface (to try)
+    #     vol_src_hipp_thal = mne.setup_volume_source_space(
+    #         subject,
+    #         surface=surface,
+    #         # bem=model_fname,
+    #         mri="aseg.mgz",
+    #         volume_label=hipp_thal_labels,
+    #         subjects_dir=subjects_dir,
+    #         n_jobs=jobs,
+    #         verbose=verbose)
+    #     mne.write_source_spaces(vol_src_hipp_thal_fname, vol_src_hipp_thal, overwrite=True, verbose=verbose)
+    # else:
+    #     vol_src_hipp_thal = mne.read_source_spaces(vol_src_hipp_thal_fname, verbose=verbose)
+
+    vol_src_htc_fname = op.join(res_path, "src", "%s-htc-vol-src.fif" % (subject))
+    if not op.exists(vol_src_htc_fname) or overwrite:
         surface = subjects_dir / subject / "bem" / "inner_skull.surf" # inner skull surface (to try)
-        vol_src_hipp_thal = mne.setup_volume_source_space(
+        vol_src_htc = mne.setup_volume_source_space(
             subject,
             surface=surface,
             # bem=model_fname,
             mri="aseg.mgz",
-            volume_label=hipp_thal_labels,
+            volume_label=htc_labels,
             subjects_dir=subjects_dir,
             n_jobs=jobs,
             verbose=verbose)
-        mne.write_source_spaces(vol_src_hipp_thal_fname, vol_src_hipp_thal, overwrite=True, verbose=verbose)
+        mne.write_source_spaces(vol_src_htc_fname, vol_src_htc, overwrite=True, verbose=verbose)
     else:
-        vol_src_hipp_thal = mne.read_source_spaces(vol_src_hipp_thal_fname, verbose=verbose)
+        vol_src_htc = mne.read_source_spaces(vol_src_htc_fname, verbose=verbose)
     
     # vol_src_lh_fname = op.join(res_path, "src", "%s-lh-vol-src.fif" % (subject))
     # if not op.exists(vol_src_lh_fname) or overwrite:
@@ -179,7 +198,8 @@ def process_subject(subject, lock, jobs):
     # vol_src.plot(subjects_dir=subjects_dir)
     
     # labels = mne.get_volume_labels_from_src(src, subject, subjects_dir)
-    mixed = src + vol_src_hipp_thal
+    # mixed = src + vol_src_hipp_thal
+    mixed = src + vol_src_htc
     # # visualize source spaces
     # fig = mne.viz.plot_alignment(
     # subject=subject,
@@ -195,15 +215,15 @@ def process_subject(subject, lock, jobs):
     # all_epochs = list()
     
     for epoch_num in range(5):
-        print(f"Processing {subject} {lock} {epoch_num}...")
+        print(f"Processing {subject} {epoch_num}...")
         
         epoch_fname = op.join(data_path, lock, f"{subject}-{epoch_num}-epo.fif")
         epoch = mne.read_epochs(epoch_fname, preload=False, verbose=verbose)
         # all_epochs.append(epoch)
         
         # create trans file
-        trans_fname = os.path.join(res_path, "trans", lock, "%s-%i-trans.fif" % (subject, epoch_num))
-        if not op.exists(trans_fname) or overwrite:
+        trans_fname = os.path.join(res_path, "trans", "%s-%i-trans.fif" % (subject, epoch_num))
+        if not op.exists(trans_fname) or True:
             coreg = mne.coreg.Coregistration(epoch.info, subject, subjects_dir)
             coreg.fit_fiducials(verbose=verbose)
             coreg.fit_icp(n_iterations=6, verbose=verbose)
@@ -211,8 +231,8 @@ def process_subject(subject, lock, jobs):
             coreg.fit_icp(n_iterations=100, verbose=verbose)
             mne.write_trans(trans_fname, coreg.trans, overwrite=True, verbose=verbose)
         # compute forward solution
-        fwd_fname = res_path / "fwd" / lock / f"{subject}-{epoch_num}-fwd.fif"
-        if not op.exists(fwd_fname) or overwrite:
+        fwd_fname = res_path / "fwd" / f"{subject}-{epoch_num}-fwd.fif"
+        if not op.exists(fwd_fname) or True:
             fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,
                                         src=src, bem=bem_fname,
                                         meg=True, eeg=False,
@@ -222,7 +242,7 @@ def process_subject(subject, lock, jobs):
             mne.write_forward_solution(fwd_fname, fwd, overwrite=True, verbose=verbose)
             del fwd        
         # fwd_fname = op.join(res_path, "fwd", lock, f"{subject}-hipp-thal-{epoch_num}-fwd.fif")
-        fwd_fname = op.join(res_path, "new_fwd", lock, f"{subject}-hipp-thal-{epoch_num}-fwd.fif")
+        fwd_fname = op.join(res_path, "fwd", f"{subject}-htc-{epoch_num}-fwd.fif")
         if not op.exists(fwd_fname) or overwrite:
             fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,
                                         src=mixed, bem=bem_fname,
@@ -268,6 +288,5 @@ def process_subject(subject, lock, jobs):
     # del epochs, src, vol_src_hipp_thal, mixed
     # gc.collect()
         
-for lock in ['stim', 'button']:
-    for subject in subjects:
-        process_subject(subject, lock, jobs=-1)
+for subject in subjects:
+    process_subject(subject, jobs=-1)
