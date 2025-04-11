@@ -245,15 +245,33 @@ correlations = np.array(correlations)
 # Generate lag indices
 lags = np.arange(-len(X_norm.mean(0)) + 1, len(X_norm.mean(0)))
 
-# fig, ax = plt.subplots(1, 1)
-# ax.axvline(0, color='grey', linestyle='--', label="Zero Lag")
-# ax.axhline(0, color='grey', linestyle='-')
-# ax.plot(lags, correlations.mean(0), label='Cross-correlation')
-# # ax.fill_between(0, correlations.mean(0), where=sig, alpha=0.2, zorder=5, facecolor='C7')
-# correlation = correlate(X_norm.mean(0), Y_norm.mean(0), mode='full')
-# ax.set_xlabel("Lag")
-# ax.set_ylabel("Cross-Correlation")
-# ax.set_title("Cross-Correlation Between X and Y")
+fig, ax = plt.subplots(1, 1)
+ax.axvline(0, color='grey', linestyle='--', label="Zero Lag")
+ax.axhline(0, color='grey', linestyle='-')
+ax.plot(lags, correlations.mean(0), label='Cross-correlation')
+# ax.fill_between(0, correlations.mean(0), where=sig, alpha=0.2, zorder=5, facecolor='C7')
+correlation = correlate(X_norm.mean(0), Y_norm.mean(0), mode='full')
+
+corr_list = []
+for sub in range(len(subjects)):
+    corr = correlate(X_norm[sub], Y_norm[sub], mode='full')
+    corr_list.append(corr)
+corr_list = np.array(corr_list)
+
+pval = decod_stats(corr_list, -1)
+sig = pval < 0.05
+
+whre = np.where(pval != 1)[0]
+fig, ax = plt.subplots(1, 1)
+ax.plot(lags, corr_list.mean(0), label='Cross-correlation')
+ax.axvline(0, color='grey', linestyle='--', label="Zero Lag")
+ax.axhline(0, color='grey', linestyle='-')
+ax.axvline(lags[whre])
+
+
+ax.set_xlabel("Lag")
+ax.set_ylabel("Cross-Correlation")
+ax.set_title("Cross-Correlation Between X and Y")
 
 # Find min and max lags
 min_lag_idx = np.argmin(correlations.mean(0))
