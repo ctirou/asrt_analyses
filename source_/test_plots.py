@@ -20,7 +20,8 @@ timesg = np.linspace(-1.5, 1.5, 307)
 
 n_parcels = 200
 n_networks = 17
-networks = NETWORKS[:-2]
+networks = NETWORKS + ['Cerebellum-Cortex']
+network_names = NETWORK_NAMES + ['Cerebellum']
 
 ori = "power"
 # figures_dir = FIGURES_DIR / "RSA" / "source" / lock / ori
@@ -29,7 +30,7 @@ ensure_dir(figures_dir)
 
 threshold = 0.05
 chance = 0.25
-cmap = ['#0173B2','#DE8F05','#029E73','#D55E00','#CC78BC','#CA9161','#FBAFE4','#ECE133','#56B4E9']
+cmap = ['#0173B2', '#DE8F05', '#029E73', '#D55E00', '#CC78BC', '#CA9161', '#FBAFE4', '#ECE133', '#56B4E9', '#76B041']
 
 # Load RSA data
 all_highs, all_lows = {}, {}
@@ -58,8 +59,8 @@ for network in networks:
     diff_sess[network] = np.array(diff_sess[network]).swapaxes(0, 1)
 
 ### Plot similarity index ###
-fig, axes = plt.subplots(2, 4, figsize=(12, 4), sharex=True, sharey=True, layout='tight')
-for i, (ax, label, name) in enumerate(zip(axes.flat, networks, NETWORK_NAMES)):
+fig, axes = plt.subplots(2, 5, figsize=(15, 4), sharex=True, sharey=True, layout='tight')
+for i, (ax, label, name) in enumerate(zip(axes.flat, networks, network_names)):
     ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
     ax.axvspan(0.28, 0.51, facecolor='green', edgecolor=None, alpha=.1)
     ax.axhline(0, color='grey', alpha=.5)
@@ -84,18 +85,17 @@ for i, (ax, label, name) in enumerate(zip(axes.flat, networks, NETWORK_NAMES)):
     # ax.xaxis.set_major_locator(plt.MultipleLocator(0.2))
     # axd[j].set_xticklabels([])
     # ax.set_xlabel('Time (s)', fontsize=11)
-    ax.set_title(name)
+    ax.set_title(name, fontstyle='italic')
     ax.set_ylim(-.5, 2)
     # ax.axhline(0.51, color='grey', alpha=.5)
 # plt.show()
-fig.suptitle(f"Similarity index – ori=${ori}$")
 fig.savefig(figures_dir / "similarity.pdf", transparent=True)
 plt.close(fig)
 
 ### Plot similarity index x learning index corr ###
 learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices2.csv', sep="\t", index_col=0)
-fig, axes = plt.subplots(2, 4, figsize=(12, 4), sharex=True, sharey=True, layout='tight')
-for i, (ax, label, name) in enumerate(zip(axes.flat, networks, NETWORK_NAMES)):
+fig, axes = plt.subplots(2, 5, figsize=(15, 4), sharex=True, sharey=True, layout='tight')
+for i, (ax, label, name) in enumerate(zip(axes.flat, networks, network_names)):
     ax.axvspan(0.28, 0.51, facecolor='green', edgecolor=None, alpha=.1)
     ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
     ax.axhline(0, color='grey', alpha=.5)
@@ -122,19 +122,18 @@ for i, (ax, label, name) in enumerate(zip(axes.flat, networks, NETWORK_NAMES)):
     # ax.fill_between(times, all_rhos.mean(0) - sem, 0, where=sig_unc, alpha=.3, label='uncorrected', facecolor="#7294D4")
     # ax.fill_between(times, all_rhos.mean(0) - sem, 0, where=sig, alpha=.4, facecolor="#F2AD00", label='corrected')
     # ax.set_ylabel("Rho", fontsize=11)
-    ax.set_title(name)
+    ax.set_title(name, fontstyle='italic')
     # ax.set_ylim(-.5, .5)
     # ax.set_yticks([-.5, 0, .5])
     # ax.legend()
 # plt.show()
-fig.suptitle(f"Similarity index x learning index correlation – ori=${ori}$")
 fig.savefig(figures_dir / "similarity-corr.pdf", transparent=True)
 plt.close(fig)
 
 ### Plot decoding performance ###
 time_filter = np.where((timesg >= -0.2) & (timesg <= 0.6))[0]
 pattern, random = {}, {}
-for network in networks:
+for network in tqdm(networks):
     if not network in pattern:
         pattern[network] = []
         random[network] = []
@@ -150,8 +149,8 @@ for network in networks:
     pattern[network] = np.array(pattern[network])
     random[network] = np.array(random[network])
 
-fig, axes = plt.subplots(2, 4, figsize=(12, 4), sharex=True, sharey=True, layout='tight')
-for i, (ax, label, name) in enumerate(zip(axes.flat, networks, NETWORK_NAMES)):
+fig, axes = plt.subplots(2, 5, figsize=(12, 4), sharex=True, sharey=True, layout='tight')
+for i, (ax, label, name) in enumerate(zip(axes.flat, networks, network_names)):
     data = pattern[label]
     ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
     ax.axhline(.25, color='grey', alpha=.5)
@@ -176,8 +175,8 @@ fig.suptitle(f"Pattern trials decoding – ori=${ori}$")
 fig.savefig(figures_dir / "decoding-pat.pdf", transparent=True)
 plt.close(fig)
 
-fig, axes = plt.subplots(2, 4, figsize=(12, 4), sharex=True, sharey=True, layout='tight')
-for i, (ax, label, name) in enumerate(zip(axes.flat, networks, NETWORK_NAMES)):
+fig, axes = plt.subplots(2, 5, figsize=(12, 4), sharex=True, sharey=True, layout='tight')
+for i, (ax, label, name) in enumerate(zip(axes.flat, networks, network_names)):
     data = random[label]
     ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
     ax.axhline(.25, color='grey', alpha=.5)
@@ -237,9 +236,10 @@ for network in tqdm(networks):
 cmap1 = "RdBu_r"
 c1 = "#708090"
 c1 = "#20B2AA"
+c1 = "#00BFA6"
 # Pattern
 fig, axes = plt.subplots(2, 5, figsize=(20, 4), sharex=True, sharey=True, layout='constrained')
-for ax, network, name in zip(axes.flatten(), networks, NETWORK_NAMES):
+for ax, network, name in zip(axes.flatten(), networks, network_names):
     # im = axes[i].imshow(
     im = ax.imshow(
         all_patterns[network].mean(0),
@@ -255,7 +255,7 @@ for ax, network, name in zip(axes.flatten(), networks, NETWORK_NAMES):
     pval = np.load(res_dir / network / "pval" / "all_pattern-pval.npy")
     sig = pval < threshold
     ax.contour(xx, yy, sig, colors=c1, levels=[0],
-                        linestyles='-', linewidths=1)
+                        linestyles='--', linewidths=1)
     ax.axvline(0, color="k", alpha=.5)
     ax.axhline(0, color="k", alpha=.5)
 fig.savefig(figures_dir / "timeg-pattern.pdf", transparent=True)
@@ -263,7 +263,7 @@ plt.close(fig)
 
 # Random
 fig, axes = plt.subplots(2, 5, figsize=(20, 4), sharex=True, sharey=True, layout='constrained')
-for ax, network, name in zip(axes.flatten(), networks, NETWORK_NAMES):
+for ax, network, name in zip(axes.flatten(), networks, network_names):
     im = ax.imshow(
         all_randoms[network].mean(0),
         interpolation="lanczos",
@@ -278,17 +278,15 @@ for ax, network, name in zip(axes.flatten(), networks, NETWORK_NAMES):
     pval = np.load(res_dir / network / "pval" / "all_random-pval.npy")
     sig = pval < threshold
     ax.contour(xx, yy, sig, colors=c1, levels=[0],
-                        linestyles='solid', linewidths=1)
+                        linestyles='--', linewidths=1)
     ax.axvline(0, color="k", alpha=.5)
     ax.axhline(0, color="k", alpha=.5)
 fig.savefig(figures_dir / "timeg-random.pdf", transparent=True)
 plt.close(fig)
 
 # Contrast
-c2 = "#20B2AA"
-c2 = "#00BFA6"
 fig, axes = plt.subplots(2, 5, figsize=(20, 4), sharex=True, sharey=True, layout='constrained')
-for ax, network, name in zip(axes.flatten(), networks, NETWORK_NAMES):
+for ax, network, name in zip(axes.flatten(), networks, network_names):
     all_contrast = all_patterns[network] - all_randoms[network]
     im = ax.imshow(
         all_contrast.mean(0),
@@ -303,8 +301,8 @@ for ax, network, name in zip(axes.flatten(), networks, NETWORK_NAMES):
     xx, yy = np.meshgrid(timesg, timesg, copy=False, indexing='xy')
     pval = np.load(res_dir / network / "pval" / "all_contrast-pval.npy")
     sig = pval < threshold
-    ax.contour(xx, yy, sig, colors=c2, levels=[0],
-                        linestyles='solid', linewidths=1)
+    ax.contour(xx, yy, sig, colors=c1, levels=[0],
+                        linestyles='--', linewidths=1)
     ax.axvline(0, color="k", alpha=.5)
     ax.axhline(0, color="k", alpha=.5)
 fig.savefig(figures_dir / "timeg-contrast.pdf", transparent=True)
@@ -312,7 +310,7 @@ plt.close(fig)
 
 # Correlation with learning
 fig, axes = plt.subplots(2, 5, figsize=(20, 4), sharex=True, sharey=True, layout='constrained')
-for ax, network, name in zip(axes.flatten(), networks, NETWORK_NAMES):
+for ax, network, name in zip(axes.flatten(), networks, network_names):
     rhos = np.load(res_dir / network / "corr" / "rhos_learn.npy")
     pval = np.load(res_dir / network / "corr" / "pval_learn-pval.npy")
     sig = pval < threshold

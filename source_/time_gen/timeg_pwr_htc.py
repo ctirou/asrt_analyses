@@ -142,9 +142,6 @@ def process_subject(subject, jobs):
     gc.collect()
     
     for region in ['Hippocampus', 'Thalamus', 'Cerebellum-Cortex']:
-        # results dir
-        res_dir = res_path / lock / region / trial_type
-        ensure_dir(res_dir)
     
         labels = [label for label in label_tc.keys() if region in label]
         stcs_data = np.concatenate([np.real(label_tc[label]) for label in labels], axis=1) # this works

@@ -28,19 +28,19 @@ verbose = True
 overwrite = False
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
-# res_path = TIMEG_DATA_DIR / 'results' / 'source' / 'max-power'
-res_path = TIMEG_DATA_DIR / 'results' / 'source' / 'max-power-cv'
+networks = NETWORKS[:-2]
+
+res_path = TIMEG_DATA_DIR / 'results' / 'source' / 'max-power'
 ensure_dir(res_path)
 
 def process_subject(subject, jobs):
     # define classifier'
-    # clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
-    clf = make_pipeline(StandardScaler(), LogisticRegressionCV(max_iter=100000, solver=solver, class_weight="balanced", random_state=42, n_jobs=jobs))
+    clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
     clf = GeneralizingEstimator(clf, scoring=scoring, n_jobs=jobs)
     skf = StratifiedKFold(folds, shuffle=True, random_state=42)
     loo = LeaveOneOut()
+
     # network and custom label_names
-    networks = NETWORKS[:-2]
     label_path = RESULTS_DIR / 'networks_200_7' / subject    
     
     all_behavs = list()

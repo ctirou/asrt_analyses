@@ -8,17 +8,15 @@ import sys
 
 subjects = SUBJS
 epochs_list = EPOCHS
-# data_path = DATA_DIR
-data_path = TIMEG_DATA_DIR
 subjects_dir = FREESURFER_DIR
-# res_path = RESULTS_DIR
-res_path = TIMEG_DATA_DIR
+# data_path, res_path = TIMEG_DATA_DIR, TIMEG_DATA_DIR
+data_path, res_path = DATA_DIR, RESULTS_DIR
 
 lock = 'stim'
 jobs = -1
 
 overwrite = False
-verbose = True
+verbose = 'error'
 
 # create results directories
 folders = ["src", "vol_src", "bem", "trans", "fwd"]
@@ -48,7 +46,7 @@ def process_subject(subject, jobs):
     
     # cortex source space
     src_fname = op.join(res_path, "src", "%s-src.fif" % (subject))
-    if not op.exists(src_fname) or False:
+    if not op.exists(src_fname) or overwrite:
         src = mne.setup_source_space(subject, spacing='oct6',
                                         subjects_dir=subjects_dir,
                                         add_dist=True,
@@ -122,7 +120,8 @@ def process_subject(subject, jobs):
     # else:
     #     vol_src_hipp_thal = mne.read_source_spaces(vol_src_hipp_thal_fname, verbose=verbose)
 
-    vol_src_htc_fname = op.join(res_path, "src", "%s-htc-vol-src.fif" % (subject))
+    # vol_src_htc_fname = op.join(res_path, "src", "%s-htc-vol-src.fif" % (subject))
+    vol_src_htc_fname = op.join(TIMEG_DATA_DIR, "src", "%s-htc-vol-src.fif" % (subject))
     if not op.exists(vol_src_htc_fname) or overwrite:
         surface = subjects_dir / subject / "bem" / "inner_skull.surf" # inner skull surface (to try)
         vol_src_htc = mne.setup_volume_source_space(
@@ -222,17 +221,20 @@ def process_subject(subject, jobs):
         # all_epochs.append(epoch)
         
         # create trans file
-        trans_fname = os.path.join(res_path, "trans", "%s-%i-trans.fif" % (subject, epoch_num))
-        if not op.exists(trans_fname) or True:
+        # trans_fname = os.path.join(res_path, "trans", "%s-%i-trans.fif" % (subject, epoch_num))
+        trans_fname = os.path.join(res_path, "trans", lock, "%s-%i-trans.fif" % (subject, epoch_num))
+        if not op.exists(trans_fname) or overwrite:
             coreg = mne.coreg.Coregistration(epoch.info, subject, subjects_dir)
             coreg.fit_fiducials(verbose=verbose)
             coreg.fit_icp(n_iterations=6, verbose=verbose)
             coreg.omit_head_shape_points(distance=5.0/1000)
             coreg.fit_icp(n_iterations=100, verbose=verbose)
             mne.write_trans(trans_fname, coreg.trans, overwrite=True, verbose=verbose)
+        
         # compute forward solution
-        fwd_fname = res_path / "fwd" / f"{subject}-{epoch_num}-fwd.fif"
-        if not op.exists(fwd_fname) or True:
+        # fwd_fname = res_path / "fwd" / f"{subject}-{epoch_num}-fwd.fif"
+        fwd_fname = res_path / "fwd" / lock / f"{subject}-{epoch_num}-fwd.fif"
+        if not op.exists(fwd_fname) or overwrite:
             fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,
                                         src=src, bem=bem_fname,
                                         meg=True, eeg=False,
@@ -242,7 +244,9 @@ def process_subject(subject, jobs):
             mne.write_forward_solution(fwd_fname, fwd, overwrite=True, verbose=verbose)
             del fwd        
         # fwd_fname = op.join(res_path, "fwd", lock, f"{subject}-hipp-thal-{epoch_num}-fwd.fif")
-        fwd_fname = op.join(res_path, "fwd", f"{subject}-htc-{epoch_num}-fwd.fif")
+        
+        # fwd_fname = res_path / "fwd" / f"{subject}-htc-{epoch_num}-fwd.fif"
+        fwd_fname = res_path / "fwd" / lock / f"{subject}-htc-{epoch_num}-fwd.fif"
         if not op.exists(fwd_fname) or overwrite:
             fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,
                                         src=mixed, bem=bem_fname,

@@ -14,10 +14,7 @@ subjects, subjects_dir = SUBJS, FREESURFER_DIR
 
 lock = 'stim'
 # network and custom label_names
-n_parcels = 200
-n_networks = 7
-networks = NETWORKS
-res_dir = data_path / 'results' / 'source' / lock
+networks = NETWORKS + ['Cerebellum-Cortex']
 res_dir = TIMEG_DATA_DIR / 'results' / 'source' / 'max-power'
 ensure_dir(res_dir)
 overwrite = False
@@ -32,10 +29,9 @@ def compute_spearman(t, g, vector, contrasts):
 # Load data, compute, and save correlations and pvals 
 learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices3.csv', sep="\t", index_col=0)
 
-all_diags = {}
 patterns, randoms = {}, {}
 all_patterns, all_randoms = {}, {}
-for network in networks[:-2]:
+for network in networks:
     print(f"Processing {network}...")
     if not network in patterns:
         patterns[network], randoms[network] = [], []
@@ -71,21 +67,21 @@ for network in networks[:-2]:
         pval = gat_stats(all_patterns[network] - all_randoms[network], -1)
         np.save(res_dir / network / "pval" / "all_contrast-pval.npy", pval)
     
-    # save learn df x time gen correlation and pvals
-    ensure_dir(res_dir / network / "corr")    
-    if not op.exists(res_dir / network / "corr" / "rhos_learn.npy") or True:
-        contrasts = patterns[network] - randoms[network]
-        contrasts = zscore(contrasts, axis=-1)  # je sais pas si zscore avant correlation pour la RSA mais c'est mieux je pense
-        all_rhos = []
-        for sub in range(len(subjects)):
-            rhos = np.empty((times.shape[0], times.shape[0]))
-            vector = learn_index_df.iloc[sub]  # vector to correlate with
-            contrast = contrasts[sub]
-            results = Parallel(n_jobs=-1)(delayed(compute_spearman)(t, g, vector, contrast) for t in range(len(times)) for g in range(len(times)))
-            for idx, (t, g) in enumerate([(t, g) for t in range(len(times)) for g in range(len(times))]):
-                rhos[t, g] = results[idx]
-            all_rhos.append(rhos)
-        all_rhos = np.array(all_rhos)
-        np.save(res_dir / network / "corr" / "rhos_learn.npy", all_rhos)
-        pval = gat_stats(all_rhos, -1)
-        np.save(res_dir / network / "corr" / "pval_learn-pval.npy", pval)    
+    # # save learn df x time gen correlation and pvals
+    # ensure_dir(res_dir / network / "corr")    
+    # if not op.exists(res_dir / network / "corr" / "rhos_learn.npy") or True:
+    #     contrasts = patterns[network] - randoms[network]
+    #     contrasts = zscore(contrasts, axis=-1)  # je sais pas si zscore avant correlation pour la RSA mais c'est mieux je pense
+    #     all_rhos = []
+    #     for sub in range(len(subjects)):
+    #         rhos = np.empty((times.shape[0], times.shape[0]))
+    #         vector = learn_index_df.iloc[sub]  # vector to correlate with
+    #         contrast = contrasts[sub]
+    #         results = Parallel(n_jobs=-1)(delayed(compute_spearman)(t, g, vector, contrast) for t in range(len(times)) for g in range(len(times)))
+    #         for idx, (t, g) in enumerate([(t, g) for t in range(len(times)) for g in range(len(times))]):
+    #             rhos[t, g] = results[idx]
+    #         all_rhos.append(rhos)
+    #     all_rhos = np.array(all_rhos)
+    #     np.save(res_dir / network / "corr" / "rhos_learn.npy", all_rhos)
+    #     pval = gat_stats(all_rhos, -1)
+    #     np.save(res_dir / network / "corr" / "pval_learn-pval.npy", pval)    

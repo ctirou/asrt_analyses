@@ -2,6 +2,18 @@ import os
 import sys
 from config import *
 from joblib import Parallel, delayed
+import os.path as op
+import pandas as pd
+import numpy as np
+import gc
+from base import ensure_dir
+from mne import read_epochs
+from mne.decoding import cross_val_multiscore, GeneralizingEstimator
+from sklearn.pipeline import make_pipeline
+from sklearn.model_selection import LeaveOneOut, StratifiedKFold, train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score as acc, balanced_accuracy_score as bacc
 
 # data_path = TIMEG_DATA_DIR / 'gen44'
 data_path = TIMEG_DATA_DIR
@@ -15,18 +27,6 @@ overwrite = False
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
 def process_subject(subject, lock, jobs):
-    import os.path as op
-    import pandas as pd
-    import numpy as np
-    import gc
-    from base import ensure_dir
-    from mne import read_epochs
-    from mne.decoding import cross_val_multiscore, GeneralizingEstimator
-    from sklearn.pipeline import make_pipeline
-    from sklearn.model_selection import LeaveOneOut, StratifiedKFold, train_test_split
-    from sklearn.preprocessing import StandardScaler
-    from sklearn.linear_model import LogisticRegression
-    from sklearn.metrics import accuracy_score as acc, balanced_accuracy_score as bacc
     
     # define classifier
     clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
