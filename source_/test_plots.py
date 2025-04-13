@@ -5,11 +5,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from base import *
 from config import *
-from mne import read_epochs
 from scipy.stats import ttest_1samp, spearmanr as spear
 from tqdm.auto import tqdm
-from matplotlib.ticker import FuncFormatter
-from pathlib import Path
 
 lock = 'stim'
 analysis = 'pat_high_rdm_high'
@@ -29,6 +26,10 @@ ori = "power"
 # figures_dir = FIGURES_DIR / "RSA" / "source" / lock / ori
 figures_dir = FIGURES_DIR / "test_plots"
 ensure_dir(figures_dir)
+
+threshold = 0.05
+chance = 0.25
+cmap = ['#0173B2','#DE8F05','#029E73','#D55E00','#CC78BC','#CA9161','#FBAFE4','#ECE133','#56B4E9']
 
 # Load RSA data
 all_highs, all_lows = {}, {}
@@ -55,10 +56,6 @@ for network in networks:
         rev_high = all_highs[network][:, :, i, :].mean(1) - all_highs[network][:, :, 0, :].mean(axis=1)
         diff_sess[network].append(rev_low - rev_high)
     diff_sess[network] = np.array(diff_sess[network]).swapaxes(0, 1)
-
-threshold = 0.05
-chance = 0.25
-cmap = ['#0173B2','#DE8F05','#029E73','#D55E00','#CC78BC','#CA9161','#FBAFE4','#ECE133','#56B4E9']
 
 ### Plot similarity index ###
 fig, axes = plt.subplots(2, 4, figsize=(12, 4), sharex=True, sharey=True, layout='tight')
@@ -206,6 +203,7 @@ fig.savefig(figures_dir / "decoding-rand.pdf", transparent=True)
 plt.close(fig)
 
 # Temporal generalization
+res_dir = TIMEG_DATA_DIR / 'results' / 'source' / 'max-power'
 patterns, randoms = {}, {}
 all_patterns, all_randoms = {}, {}
 all_diags = {}
@@ -218,13 +216,13 @@ for network in tqdm(networks):
     for i, subject in enumerate(subjects):
         pat, rand = [], []
         for j in [0, 1, 2, 3, 4]:
-            pat.append(np.load(TIMEG_DATA_DIR / 'results' / 'source' / 'max-power' / network / 'pattern' / f"{subject}-{j}-scores.npy"))
-            rand.append(np.load(TIMEG_DATA_DIR / 'results' / 'source' / 'max-power' / network / 'random' / f"{subject}-{j}-scores.npy"))
+            pat.append(np.load(res_dir / network / 'pattern' / f"{subject}-{j}-scores.npy"))
+            rand.append(np.load(res_dir / network / 'random' / f"{subject}-{j}-scores.npy"))
         patpat.append(np.array(pat))
         randrand.append(np.array(rand))
     
-        all_pat.append(np.load(TIMEG_DATA_DIR / 'results' / 'source' / 'max-power' / network / 'pattern' / f"{subject}-all-scores.npy"))
-        all_rand.append(np.load(TIMEG_DATA_DIR / 'results' / 'source' / 'max-power' / network / 'random' / f"{subject}-all-scores.npy"))
+        all_pat.append(np.load(res_dir / network / 'pattern' / f"{subject}-all-scores.npy"))
+        all_rand.append(np.load(res_dir / network / 'random' / f"{subject}-all-scores.npy"))
         
         diag = np.array(all_pat) - np.array(all_rand)
         all_diag.append(np.diag(diag[i]))
@@ -240,7 +238,7 @@ cmap1 = "RdBu_r"
 c1 = "#708090"
 c1 = "#20B2AA"
 # Pattern
-fig, axes = plt.subplots(2, 5, figsize=(20, 7), sharex=True, sharey=True, layout='constrained')
+fig, axes = plt.subplots(2, 5, figsize=(20, 4), sharex=True, sharey=True, layout='constrained')
 for ax, network, name in zip(axes.flatten(), networks, NETWORK_NAMES):
     # im = axes[i].imshow(
     im = ax.imshow(
@@ -252,24 +250,19 @@ for ax, network, name in zip(axes.flatten(), networks, NETWORK_NAMES):
         aspect=0.5,
         vmin=0.2,
         vmax=0.3)
-    ax.set_ylabel("Training Time (s)")
     ax.set_title(f"{name}", fontsize=10, fontstyle="italic")
-    ax.axvline(0, color="k", alpha=.5)
-    ax.axhline(0, color="k", alpha=.5)
-    if network == networks[-1]:
-        ax.set_xlabel("Testing Time (s)")
-    # cbar = plt.colorbar(im, ax=ax)
-    # cbar.set_label("accuracy")
     xx, yy = np.meshgrid(timesg, timesg, copy=False, indexing='xy')
-    pval = np.load(TIMEG_DATA_DIR / 'results' / 'source' / 'max-power' / network / "pval" / "all_pattern-pval.npy")
+    pval = np.load(res_dir / network / "pval" / "all_pattern-pval.npy")
     sig = pval < threshold
     ax.contour(xx, yy, sig, colors=c1, levels=[0],
                         linestyles='-', linewidths=1)
+    ax.axvline(0, color="k", alpha=.5)
+    ax.axhline(0, color="k", alpha=.5)
 fig.savefig(figures_dir / "timeg-pattern.pdf", transparent=True)
 plt.close(fig)
 
 # Random
-fig, axes = plt.subplots(2, 5, figsize=(20, 7), sharex=True, sharey=True, layout='constrained')
+fig, axes = plt.subplots(2, 5, figsize=(20, 4), sharex=True, sharey=True, layout='constrained')
 for ax, network, name in zip(axes.flatten(), networks, NETWORK_NAMES):
     im = ax.imshow(
         all_randoms[network].mean(0),
@@ -280,26 +273,21 @@ for ax, network, name in zip(axes.flatten(), networks, NETWORK_NAMES):
         aspect=0.5,
         vmin=0.2,
         vmax=0.3)
-    ax.set_ylabel("Training Time (s)")
     ax.set_title(f"{name}", fontsize=10, fontstyle="italic")
-    ax.axvline(0, color="k", alpha=.5)
-    ax.axhline(0, color="k", alpha=.5)
-    if network == networks[-1]:
-        ax.set_xlabel("Testing Time (s)")
-    # cbar = plt.colorbar(im, ax=axes[i])
-    # cbar.set_label("accuracy")
     xx, yy = np.meshgrid(timesg, timesg, copy=False, indexing='xy')
-    pval = np.load(TIMEG_DATA_DIR / 'results' / 'source' / 'max-power' / network / "pval" / "all_random-pval.npy")
+    pval = np.load(res_dir / network / "pval" / "all_random-pval.npy")
     sig = pval < threshold
     ax.contour(xx, yy, sig, colors=c1, levels=[0],
                         linestyles='solid', linewidths=1)
+    ax.axvline(0, color="k", alpha=.5)
+    ax.axhline(0, color="k", alpha=.5)
 fig.savefig(figures_dir / "timeg-random.pdf", transparent=True)
 plt.close(fig)
 
 # Contrast
-# c2 = "#00BFA6"
 c2 = "#20B2AA"
-fig, axes = plt.subplots(2, 5, figsize=(20, 7), sharex=True, sharey=True, layout='constrained')
+c2 = "#00BFA6"
+fig, axes = plt.subplots(2, 5, figsize=(20, 4), sharex=True, sharey=True, layout='constrained')
 for ax, network, name in zip(axes.flatten(), networks, NETWORK_NAMES):
     all_contrast = all_patterns[network] - all_randoms[network]
     im = ax.imshow(
@@ -311,27 +299,22 @@ for ax, network, name in zip(axes.flatten(), networks, NETWORK_NAMES):
         aspect=0.5,
         vmin=-0.05,
         vmax=0.05)
-    ax.set_ylabel("Training Time (s)")
     ax.set_title(f"{name}", fontsize=10, fontstyle="italic")
-    ax.axvline(0, color="k", alpha=.5)
-    ax.axhline(0, color="k", alpha=.5)
-    if network == networks[-1]:
-        ax.set_xlabel("Testing Time (s)")
-    # cbar = plt.colorbar(im, ax=axes[i])
-    # cbar.set_label("accuracy")
     xx, yy = np.meshgrid(timesg, timesg, copy=False, indexing='xy')
-    pval = np.load(TIMEG_DATA_DIR / 'results' / 'source' / 'max-power' / network / "pval" / "all_contrast-pval.npy")
+    pval = np.load(res_dir / network / "pval" / "all_contrast-pval.npy")
     sig = pval < threshold
     ax.contour(xx, yy, sig, colors=c2, levels=[0],
                         linestyles='solid', linewidths=1)
+    ax.axvline(0, color="k", alpha=.5)
+    ax.axhline(0, color="k", alpha=.5)
 fig.savefig(figures_dir / "timeg-contrast.pdf", transparent=True)
 plt.close(fig)
 
 # Correlation with learning
-fig, axes = plt.subplots(2, 5, figsize=(20, 7), sharex=True, sharey=True, layout='constrained')
+fig, axes = plt.subplots(2, 5, figsize=(20, 4), sharex=True, sharey=True, layout='constrained')
 for ax, network, name in zip(axes.flatten(), networks, NETWORK_NAMES):
-    rhos = np.load(TIMEG_DATA_DIR / 'results' / 'source' / 'max-power' / network / "corr" / "rhos_learn.npy")
-    pval = np.load(TIMEG_DATA_DIR / 'results' / 'source' / 'max-power' / network / "corr" / "pval_learn-pval.npy")
+    rhos = np.load(res_dir / network / "corr" / "rhos_learn.npy")
+    pval = np.load(res_dir / network / "corr" / "pval_learn-pval.npy")
     sig = pval < threshold
     im = ax.imshow(
         rhos.mean(0),
@@ -342,16 +325,11 @@ for ax, network, name in zip(axes.flatten(), networks, NETWORK_NAMES):
         aspect=0.5,
         vmin=-.1,
         vmax=.1)
-    if network == networks[-1]:
-        ax.set_xlabel("Testing Time (s)")
-    ax.set_ylabel("Training Time (s)")
     ax.set_title(f"{name}", style='italic')
     ax.axvline(0, color="k")
     ax.axhline(0, color="k")
     xx, yy = np.meshgrid(timesg, timesg, copy=False, indexing='xy')
     ax.contour(xx, yy, sig, colors=c2, levels=[0],
                         linestyles='solid', linewidths=1)
-    # cbar = plt.colorbar(im, ax=axes[i])
-    # cbar.set_label("accuracy")
 fig.savefig(figures_dir / "timeg-corr.pdf", transparent=True)
 plt.close(fig)

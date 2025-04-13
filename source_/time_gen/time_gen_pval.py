@@ -12,8 +12,6 @@ from joblib import Parallel, delayed
 data_path = TIMEG_DATA_DIR
 subjects, subjects_dir = SUBJS, FREESURFER_DIR
 
-analysis = 'tg_rdm_emp'
-
 lock = 'stim'
 # network and custom label_names
 n_parcels = 200
