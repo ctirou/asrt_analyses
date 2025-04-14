@@ -38,32 +38,9 @@ for subject in range(len(subjects)):
     sim_index.append(np.array(sub_sim))
 sim_index = np.array(sim_index)
 
-# Calculate peak for all participants
-# Then mean
-blocks = np.arange(23)
-peaks = list()
-for subject in range(len(subjects)):
-    peaks.append(blocks[np.argmax(sim_index[subject])])
-peaks = np.array(peaks)
-peak_rsa = int(round(peaks.mean()))
-# print('Peak:', m_peak)
-
 # load time gen data
 timeg_data_path = TIMEG_DATA_DIR / 'results' / 'sensors' / lock
 timesg = np.linspace(-1.5, 4, 559)
-
-pattern, random = [], []
-for subject in tqdm(subjects):
-    pat, rand = [], []
-    for epoch_num in range(5):
-        blocks = range(1, 4) if epoch_num == 0 else range(1, 6)
-        for block in blocks:
-            pat.append(np.load(timeg_data_path / 'split_pattern' /  f"{subject}-{epoch_num}-{block}.npy"))
-            rand.append(np.load(timeg_data_path / 'split_random' / f"{subject}-{epoch_num}-{block}.npy"))
-    pattern.append(np.array(pat))
-    random.append(np.array(rand))
-pattern, random = np.array(pattern), np.array(random)
-contrast = pattern - random
 
 pattern, random = [], []
 for subject in tqdm(subjects):
@@ -76,16 +53,6 @@ for subject in tqdm(subjects):
 pattern, random = np.array(pattern), np.array(random)
 contrast = pattern - random
 
-# # mean box
-# means = []
-# for sub in range(len(subjects)):
-#     tg = []
-#     for block in range(23):
-#         data = contrast[sub, block, idx_timeg, :][:, idx_timeg]
-#         tg.append(data.mean())
-#     means.append(np.array(tg))
-# means = np.array(means)
-
 idx_timeg = np.where((timesg >= -0.5) & (timesg < 0))[0]
 # mean diag
 mean_diag = []
@@ -97,12 +64,15 @@ for sub in range(len(subjects)):
     mean_diag.append(np.array(tg))
 mean_diag = np.array(mean_diag)
 
-blocks = np.arange(23)
-peaks = list()
-for subject in range(len(subjects)):
-    peaks.append(blocks[np.argmax(mean_diag[subject])])
-peaks = np.array(peaks)
-peak_tg = int(round(peaks.mean()))
+# # mean box
+# means = []
+# for sub in range(len(subjects)):
+#     tg = []
+#     for block in range(23):
+#         data = contrast[sub, block, idx_timeg, :][:, idx_timeg]
+#         tg.append(data.mean())
+#     means.append(np.array(tg))
+# means = np.array(means)
 
 # cmap = plt.cm.get_cmap('tab20', len(subjects))
 # fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(7, 9), sharex=True)
@@ -142,26 +112,23 @@ from scipy.stats import zscore
 X_norm = np.array([zscore(X[sub, :]) for sub in range(X.shape[0])])
 Y_norm = np.array([zscore(Y[sub, :]) for sub in range(Y.shape[0])])
 
-# fig, ax = plt.subplots(1, 1)
-# ax.set_xticks([i for i in range(1, 24)])
-# ax.axvspan(1, 3, color='grey', alpha=0.1)
-# ax.plot([i for i in range(1, 24)], X_norm.mean(0), label='x: predictive coding')
-# ax.plot([i for i in range(1, 24)], Y_norm.mean(0), label='y: representational change')
-# ax.set_xlabel('Block')
-# ax.set_xticklabels([str(i) for i in range(1, 24)])
-# ax.legend()
-# ax.set_title('Z-score normalization')
+fig, ax = plt.subplots(1, 1)
+ax.set_xticks([i for i in range(1, 24)])
+ax.axvspan(1, 3, color='grey', alpha=0.1)
+ax.plot([i for i in range(1, 24)], X_norm.mean(0), label='x: predictive coding')
+ax.plot([i for i in range(1, 24)], Y_norm.mean(0), label='y: representational change')
+ax.set_xlabel('Block')
+ax.set_xticklabels([str(i) for i in range(1, 24)])
+ax.legend()
+ax.set_title('Z-score normalization')
 
-# # Example usage
+### Granger causality
+from statsmodels.tsa.stattools import grangercausalitytests
+from statsmodels.tsa.api import VAR
+import pandas as pd
+
 stationary_flags, X_stationary, diffs_applied = ensure_stationarity(X_norm, max_diff=4)
 _, Y_stationary, _ = ensure_stationarity(Y_norm, max_diff=4)
-
-# # Example usage
-# stationary_flags, X_stationary, diffs_applied = ensure_stationarity(mean_diag)
-# _, Y_stationary, _ = ensure_stationarity(sim_index)
-# # Print summary
-# print(f"Subjects that remained non-stationary: {np.sum(~np.array(stationary_flags))} / {len(stationary_flags)}")
-# print(f"Max differencing applied: {max(diffs_applied)}")
 
 x, y = X_stationary.copy(), Y_stationary.copy()
 try:
@@ -172,81 +139,37 @@ except AssertionError as e:
     y = y[:, :small]
 assert x.shape == y.shape, f"Shapes do not match: {x.shape} != {y.shape}"
 
-bees = [i for i in range(x.shape[1])]
-fig, ax = plt.subplots(1, 1)
-ax.set_xticks(bees)
-ax.axvspan(0, 2, color='grey', alpha=0.1)
-ax.plot(bees, x.mean(0), label='x: predictive coding')
-ax.plot(bees, y.mean(0), label='y: representational change')
-ax.set_xticklabels(bees)
-ax.set_xlabel('Block')
-ax.legend()
-ax.set_title('Stationary data')
-
-from statsmodels.tsa.stattools import grangercausalitytests
-from statsmodels.tsa.api import VAR
-import pandas as pd
-
 # X -> Y
-AIC, BIC, HQIC = [], [], []
+max_lags = 6
+pvalues = []
 for sub in range(len(subjects)):
-    print(f"\n##### Subject {sub} #####")
-    data = pd.DataFrame({'X': x[sub], 'Y': y[sub]})
-    # gc_res = grangercausalitytests(data, 5, verbose=True)
-    
-    model = VAR(data)
-    lag_order = model.select_order(5) # Check this    
-    AIC.append(lag_order.aic)
-    BIC.append(lag_order.bic)
-    HQIC.append(lag_order.hqic)
-
-print("\nMean AIC:", np.mean(AIC))
-print("Mean BIC:", np.mean(BIC))
-print("Mean HQIC:", np.mean(HQIC))
-
-# Y -> X
-AIC, BIC, HQIC = [], [], []
-for sub in range(len(subjects)):
-    print(f"\n##### Subject {sub} #####")
-    data = pd.DataFrame({'X': y[sub], 'Y': x[sub]})
-    # gc_res = grangercausalitytests(data, [6], verbose=True)
-    model = VAR(data)
-    lag_order = model.select_order(5)
-    AIC.append(lag_order.aic)
-    BIC.append(lag_order.bic)
-    HQIC.append(lag_order.hqic)
-
-print("\nMean AIC:", np.mean(AIC))
-print("Mean BIC:", np.mean(BIC))
-print("Mean HQIC:", np.mean(HQIC))
+    data = pd.DataFrame({'X': X_norm[sub], 'Y': Y_norm[sub]})
+    results = grangercausalitytests(data, max_lags, verbose=False)
+    pval = [round(results[i+1][0]['ssr_ftest'][1], 4) for i in range(max_lags)]
+    pvalues.append(pval)    
+pvalues = np.array(pvalues)
+sig = pvalues < 0.05
+print(np.unique(sig, return_counts=True))
 
 ### Cross-correlation
 from scipy.signal import correlate
-correlations = []
-for sub in range(len(subjects)):
-    corr = correlate(X_norm[sub], Y_norm[sub], mode='full')
-    correlations.append(corr)
-correlations = np.array(correlations)
+from scipy.stats import ttest_1samp
 # Generate lag indices
 lags = np.arange(-len(X_norm.mean(0)) + 1, len(X_norm.mean(0)))
 
 corr_list = []
 for sub in range(len(subjects)):
-    corr = correlate(X_norm[sub], Y_norm[sub], mode='full')
+    corr = correlate(X[sub], Y[sub], mode='full')
     corr_list.append(corr)
 corr_list = np.array(corr_list)
 
 pval = decod_stats(corr_list, -1)
-sig = pval < 0.05
-whre = np.where(pval != 1)[0]
+pval_unc = ttest_1samp(corr_list, axis=0, popmean=0)[1]
 
-# Find min and max lags
-min_lag_idx = np.argmin(correlations.mean(0))
-min_lag = lags[min_lag_idx]
-print(f"Min lag: {min_lag}")
-max_lag_idx = np.argmax(correlations.mean(0))
-max_lag = lags[max_lag_idx]
-print(f"Max lag: {max_lag}")
+sig = pval < 0.05
+sig_unc = pval_unc < 0.05
+
+whre = np.where(pval != 1)[0]
 
 fig, ax = plt.subplots(1, 1)
 ax.plot(lags, corr_list.mean(0), label='Cross-correlation')
@@ -256,8 +179,6 @@ ax.set_xlabel("Lag")
 ax.set_ylabel("Cross-Correlation")
 ax.set_title("Cross-Correlation Between X and Y")
 ax.axvline(lags[whre], color='black', label='sig')
-ax.axvline(lags[max_lag_idx], color='red', label='max lag')
-ax.axvline(lags[min_lag_idx], color='blue', label='min lag')
 ax.legend()
 
 ### Transfer Entropy - using PyInform
@@ -335,49 +256,3 @@ for isub, sub in enumerate(subjects):
     except Exception as e:
         print(f"Error computing TE for {sub}: {e}")
 print("\nAll computations complete!")
-
-# # Transfer Entropy – using IDTxl – in progress...
-# from idtxl.bivariate_te import BivariateTE
-# from idtxl.data import Data
-# import logging
-
-# logging.getLogger().setLevel(logging.WARNING)  # Suppress excessive IDTxl outputtes_xy, tes_yx = [], []
-
-# for isub, sub in enumerate(subjects):
-#     lag = min(optimal_lags[isub], X.shape[1] - 1)  # Ensure lag does not exceed time points
-    
-#     # Format data for IDTxl: Shape (n_timepoints, n_variables)
-#     data_array = np.vstack([X[isub], Y[isub]])  # Shape (n_timepoints, 2)
-#     data = Data(data_array, dim_order='ps')  # 'p' = points, 's' = sources
-    
-#     network = BivariateTE()
-#     settings = {'source_target': [[0, 1]], # X → Y
-#                 'cmi_estimator': 'JidtKraskovCMI', 
-#                 'max_lag_sources': int(lag), # Optimal lag per subject
-#                 'min_lag_sources': 0, # Lag - 1  
-#                 'local_analysis': True, # Local analysis
-#                 } 
-    
-#     # TE X -> Y
-#     results = network.analyse_network(settings=settings, data=data)
-    
-    
-#     te_xy = results.get_single_target(1, fdr=False) # Transfer entropy value
-    
-    
-#     results.get_target_delays(target=1, fdr=False)
-    
-    
-#     print(f"TE X → Y: {te_xy} for {sub} with lags = [{min_lag}, {max_lag}]")
-#     # results.print_edge_list(weights="max_te_lag", fdr=False)
-#     # plot_network(results=results, weights="max_te_lag", fdr=False)
-#     # plt.show()
-    
-#     # TE Y -> X
-#     settings['source_target'] = [[1, 0]] # Y → X
-#     results = network.analyse_network(settings=settings, data=data)
-#     te_yx = results.get_single_target(1)['fx'] # Transfer entropy value
-#     print(f"TE Y → X: {te_yx} for {sub} with lags = [{min_lag}, {max_lag}]")
-#     # results.print_edge_list(weights="max_te_lag", fdr=False)
-#     # plot_network(results=results, weights="max_te_lag", fdr=False)
-#     # plt.show()
