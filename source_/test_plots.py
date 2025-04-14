@@ -234,9 +234,9 @@ for network in tqdm(networks):
     randoms[network] = np.array(randrand)
 
 cmap1 = "RdBu_r"
-c1 = "#708090"
 c1 = "#20B2AA"
 c1 = "#00BFA6"
+c1 = "#708090"
 # Pattern
 fig, axes = plt.subplots(2, 5, figsize=(20, 4), sharex=True, sharey=True, layout='constrained')
 for ax, network, name in zip(axes.flatten(), networks, network_names):
@@ -321,13 +321,13 @@ for ax, network, name in zip(axes.flatten(), networks, network_names):
         cmap=cmap1,
         extent=timesg[[0, -1, 0, -1]],
         aspect=0.5,
-        vmin=-.1,
-        vmax=.1)
+        vmin=-.2,
+        vmax=.2)
     ax.set_title(f"{name}", style='italic')
+    xx, yy = np.meshgrid(timesg, timesg, copy=False, indexing='xy')
+    ax.contour(xx, yy, sig, colors=c1, levels=[0],
+                        linestyles='solid', linewidths=1)
     ax.axvline(0, color="k")
     ax.axhline(0, color="k")
-    xx, yy = np.meshgrid(timesg, timesg, copy=False, indexing='xy')
-    ax.contour(xx, yy, sig, colors=c2, levels=[0],
-                        linestyles='solid', linewidths=1)
 fig.savefig(figures_dir / "timeg-corr.pdf", transparent=True)
 plt.close(fig)

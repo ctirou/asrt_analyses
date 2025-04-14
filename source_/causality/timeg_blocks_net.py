@@ -30,6 +30,8 @@ networks = NETWORKS[:-2]
 
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
+res_path = data_path / 'results' / 'source' / 'max-power'
+
 def process_subject(subject, jobs):
     # define classifier
     clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
@@ -38,8 +40,6 @@ def process_subject(subject, jobs):
     label_path = RESULTS_DIR / 'networks_200_7' / subject    
 
     for network in networks:
-        res_path = data_path / 'results' / 'source' / 'max-power' / network / f"split_all_{trial_type}"
-        ensure_dir(res_path)
         
         # read labels
         lh_label, rh_label = mne.read_label(label_path / f'{network}-lh.label'), mne.read_label(label_path / f'{network}-rh.label')
@@ -89,12 +89,10 @@ def process_subject(subject, jobs):
             assert len(stcs_data) == len(behav), "Length mismatch"
             
             blocks = np.unique(behav["blocks"])
-            
-            Xtraining_pat, Xtesting_pat, ytraining_pat, ytesting_pat = [], [], [], []
-            Xtraining_rand, Xtesting_rand, ytraining_rand, ytesting_rand = [], [], [], []
-            
+                        
             for block in blocks:
                 
+                print("Spliting pattern on epoch", epoch_num, "block", block, network)
                 pattern = (behav.trialtypes == 1) & (behav.blocks == block)                
                 X = stcs_data[pattern]
                 y = behav.positions[pattern]
@@ -107,7 +105,8 @@ def process_subject(subject, jobs):
                 all_Xtesting_pat.append(X_test)
                 all_ytesting_pat.append(y_test)
                 all_ytraining_pat.append(y_train)
-
+                
+                print("Spliting random on epoch", epoch_num, "block", block, network)
                 random =  (behav.trialtypes == 2) & (behav.blocks == block)
                 X = stcs_data[random]
                 y = behav.positions[random]
@@ -116,42 +115,41 @@ def process_subject(subject, jobs):
                 
                 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
                 
-                
                 all_Xtraining_rand.append(X_train)
                 all_Xtesting_rand.append(X_test)
                 all_ytesting_rand.append(y_test)
                 all_ytraining_rand.append(y_train)
                         
-            del epoch, behav
+            del behav
             gc.collect()
         
-    res_path = data_path / 'results' / 'source' / 'max-power' / network / "split_all_pattern"
-    ensure_dir(res_path)
-
-    all_Xtraining_pat = np.concatenate(all_Xtraining_pat)
-    all_ytraining_pat = np.concatenate(all_ytraining_pat)
-    clf.fit(all_Xtraining_pat, all_ytraining_pat)
-
-    for block in range(23):
-        if not op.exists(res_path / f"{subject}-{block+1}.npy") or overwrite:
-            print("Scoring...")
-            ypred = clf.predict(all_Xtesting_pat[block])
-            acc_matrix = np.apply_along_axis(lambda x: acc(all_ytesting_pat[block], x), 0, ypred)
-            np.save(res_path / f"{subject}-{block+1}.npy", acc_matrix)
-    
-    res_path = data_path / 'results' / 'source' / 'max-power' / network / "split_all_random"
-    ensure_dir(res_path)
-    
-    all_Xtraining_rand = np.concatenate(all_Xtraining_rand)
-    all_ytraining_rand = np.concatenate(all_ytraining_rand)
-    clf.fit(all_Xtraining_rand, all_ytraining_rand)
-    
-    for block in range(23):
-        if not op.exists(res_path / f"{subject}-{block+1}.npy") or overwrite:
-            print("Scoring...")
-            ypred = clf.predict(all_Xtesting_rand[block])
-            acc_matrix = np.apply_along_axis(lambda x: acc(all_ytesting_rand[block], x), 0, ypred)
-            np.save(res_path / f"{subject}-{block+1}.npy", acc_matrix)
+        print("Fitting pattern...")    
+        res_dir = res_path / network / "split_all_pattern"
+        ensure_dir(res_dir)
+        all_Xtraining_pat = np.concatenate(all_Xtraining_pat)
+        all_ytraining_pat = np.concatenate(all_ytraining_pat)
+        assert len(all_Xtraining_pat) == len(all_ytraining_pat), "Length mismatch in pattern"
+        clf.fit(all_Xtraining_pat, all_ytraining_pat)
+        for block in range(23):
+            if not op.exists(res_dir / f"{subject}-{block+1}.npy") or overwrite:
+                print("Scoring pattern on block", block, network)
+                ypred = clf.predict(all_Xtesting_pat[block])
+                acc_matrix = np.apply_along_axis(lambda x: acc(all_ytesting_pat[block], x), 0, ypred)
+                np.save(res_dir / f"{subject}-{block+1}.npy", acc_matrix)
+        
+        print("Fitting random...")
+        res_dir = res_path / network / "split_all_random"
+        ensure_dir(res_dir)
+        all_Xtraining_rand = np.concatenate(all_Xtraining_rand)
+        all_ytraining_rand = np.concatenate(all_ytraining_rand)
+        assert len(all_Xtraining_rand) == len(all_ytraining_rand), "Length mismatch in random"
+        clf.fit(all_Xtraining_rand, all_ytraining_rand)
+        for block in range(23):
+            if not op.exists(res_dir / f"{subject}-{block+1}.npy") or overwrite:
+                print("Scoring random on block", block+1, network)
+                ypred = clf.predict(all_Xtesting_rand[block])
+                acc_matrix = np.apply_along_axis(lambda x: acc(all_ytesting_rand[block], x), 0, ypred)
+                np.save(res_dir / f"{subject}-{block+1}.npy", acc_matrix)
 
 if is_cluster:
     try:
