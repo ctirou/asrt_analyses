@@ -979,3 +979,46 @@ def find_optimal_lags(X, Y, max_lag=10):
     
     global_lag = int(np.median(optimal_lags))  # Take median for a global choice
     return optimal_lags, global_lag
+
+def mixed_model_pvalues(df, dependent, predictor, group):
+    """
+    Fit a mixed model and extract both Wald and Likelihood Ratio p-values.
+    
+    Parameters:
+        df (pd.DataFrame): Your long-format dataframe.
+        dependent (str): Dependent variable (e.g. 'Y').
+        predictor (str): Predictor variable (e.g. 'X_lag').
+        group (str): Grouping factor (e.g. 'participant').
+
+    Returns:
+        dict: Wald and Likelihood Ratio test p-values.
+    """
+    import statsmodels.formula.api as smf
+    from scipy.stats import chi2
+
+    # Build formula strings
+    full_formula = f"{dependent} ~ {predictor}"
+    reduced_formula = f"{dependent} ~ 1"
+    
+    # Fit full model
+    full_model = smf.mixedlm(full_formula, df, groups=df[group])
+    full_result = full_model.fit()
+    
+    # Fit reduced model (intercept-only)
+    reduced_model = smf.mixedlm(reduced_formula, df, groups=df[group])
+    reduced_result = reduced_model.fit()
+    
+    # Extract Wald p-value for the predictor
+    wald_pvalue = full_result.pvalues[predictor]
+    
+    # Likelihood Ratio Test
+    lr_stat = 2 * (full_result.llf - reduced_result.llf)
+    lr_pvalue = chi2.sf(lr_stat, df=1)  # df=1 for one extra predictor
+    
+    # Report both
+    return {
+        'Wald_pvalue': wald_pvalue,
+        'LikelihoodRatio_pvalue': lr_pvalue,
+        'coef': full_result.params[predictor],
+        'std_err': full_result.bse[predictor]
+    }
