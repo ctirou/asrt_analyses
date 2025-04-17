@@ -122,8 +122,6 @@ if is_cluster:
         print("Error: SLURM_ARRAY_TASK_ID is not set correctly or is out of bounds.")
         sys.exit(1)
 else:
-    # for epoch_num in range(5):
-    # Parallel(-1)(delayed(process_subject)(subject, epoch_num) for subject in subjects for epoch_num in range(5))
     Parallel(-1)(delayed(process_subject)(subject, network, epoch_num)\
         for subject in subjects\
             for network in networks\

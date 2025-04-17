@@ -9,8 +9,8 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 path_data = DATA_DIR
 figures_dir = FIGURES_DIR
 
-# subjects = SUBJS
-subjects = ['sub01', 'sub02', 'sub03', 'sub04', 'sub06', 'sub07', 'sub08', 'sub09', 'sub10', 'sub12', 'sub13', 'sub14', 'sub15']
+subjects = ALL_SUBJS
+subjects = SUBJS
 
 pattern_RT = {f'Epoch_{i}': [] for i in range(5)}
 random_high_RT = {f'Epoch_{i}': [] for i in range(5)}
@@ -99,7 +99,7 @@ if not op.exists(figures_dir / 'behav' / 'learning_indices3.csv'):
     
 # Save block learning indices to CSV
 learn_index_blocks_df = pd.DataFrame.from_dict(learn_index_blocks_d, orient='index')
-if not op.exists(figures_dir / 'behav' / 'learning_indices_blocks3.csv'):
+if not op.exists(figures_dir / 'behav' / 'learning_indices_blocks.csv'):
     learn_index_blocks_df.to_csv(figures_dir / 'behav' / 'learning_indices_blocks.csv', sep='\t')
 
 # Plot blocks performance
