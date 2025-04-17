@@ -8,11 +8,9 @@ from tqdm.auto import tqdm
 from base import *
 from config import *
 
+subjects = ALL_SUBJS
 data_path = DATA_DIR
-subjects = SUBJS
 metric = 'mahalanobis'
-
-subjects = SUBJS + ['sub03', 'sub06']
 
 analysis = 'pat_high_rdm_high'
 lock = 'stim'
@@ -84,12 +82,14 @@ cmap1 = colors['Darjeeling1']
 
 c1 = "#0173B2"
 c2 = "#3B9AB2"
+
+c2 = "#56B4E9"
+
 c3 = "#029E73"
 c4 = "#CC78BC"
 c5 = "#ECE133"
 c6 = "#029E73"
 
-cpat = "#FFD966"
 cpat = "#FAD510"
 crdm = "#FF718B"
 
@@ -104,16 +104,12 @@ for ax in axd.values():
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     # ax.set_prop_cycle(cycler('color', colors['Darjeeling1']))
-    if ax not in [axd['A'], axd['C']]:
+    if ax != axd['C']:
         if lock == 'stim':
-            ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, zorder=0, alpha=.1)
+            ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, zorder=-1, alpha=.1)
         else:
             ax.axvline(0, color='black')
 ### A ### Decoding
-if lock == 'stim':
-        axd['A'].axvspan(0, 0.2, facecolor='grey', edgecolor=None, zorder=0, alpha=.1)
-else:
-    axd['A'].axvline(0, color='black', label='Button press')
 # Plot for subplot A
 axd['A'].axhline(chance, color='grey', alpha=0.5)
 for trial_type, color in zip(['pattern', 'random'], [cpat, crdm]):
@@ -237,7 +233,7 @@ for sub in range(len(subjects)):
     r, p = spear(mdiff[sub], learn_index_df.iloc[sub])
     rhos.append(r)
 pval = ttest_1samp(rhos, 0)[1]
-ptext = f"p = {pval:.3f}" if pval > 0.001 else "p < 0.001"
+ptext = f"p = {pval:.2f}" if pval > 0.001 else "p < 0.001"
 axd['C'].legend(frameon=False, title=ptext, loc='upper left')
 
 plt.savefig(figures_dir /  f"{lock}-rsa3.pdf", transparent=True)

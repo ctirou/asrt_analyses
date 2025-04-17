@@ -30,7 +30,7 @@ all_decoding = {}
 
 for subject in tqdm(subjects):
     
-    res_path = RESULTS_DIR / 'RSA' / 'sensors' / lock / f"cv_rdm" / subject
+    res_path = RESULTS_DIR / 'RSA' / 'sensors' / lock / "cv_rdm" / subject
     ensure_dir(res_path)
         
     # RSA stuff
