@@ -20,9 +20,11 @@ verbose = 'error'
 overwrite = False
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
-def process_subject(subject, epoch_num):
+networks = NETWORKS[:-2]
 
-    networks = NETWORKS[:-2]
+def process_subject(subject, network, epoch_num):
+
+    # networks = NETWORKS[:-2]
     label_path = RESULTS_DIR / 'networks_200_7' / subject
             
     # read behav
@@ -47,18 +49,23 @@ def process_subject(subject, epoch_num):
     del noise_cov, data_cov, fwd, filters, epoch
     gc.collect()
     
-    for network in networks:
+    # for network in networks:
         
-        res_dir = RESULTS_DIR / "RSA" / 'source' / network / lock / 'loocv_rdm_blocks' / subject
-        ensure_dir(res_dir)
+    res_dir = RESULTS_DIR / "RSA" / 'source' / network / lock / 'loocv_rdm_blocks' / subject
+    ensure_dir(res_dir)
+    
+    # read labels
+    lh_label, rh_label = mne.read_label(label_path / f'{network}-lh.label'), mne.read_label(label_path / f'{network}-rh.label')
+    stcs_data = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs])
+    assert len(stcs_data) == len(behav), "Length mismatch"
+
+    del stcs, lh_label, rh_label
+    gc.collect()
         
-        # read labels
-        lh_label, rh_label = mne.read_label(label_path / f'{network}-lh.label'), mne.read_label(label_path / f'{network}-rh.label')
-        stcs_data = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs])
-        assert len(stcs_data) == len(behav), "Length mismatch"
-            
-        blocks = np.unique(behav.blocks)
-        all_pats, all_rands = [], []
+    blocks = np.unique(behav.blocks)
+    all_pats, all_rands = [], []
+
+    if not op.exists(res_dir / f"pat-{epoch_num}.npy") or not op.exists(res_dir / f"rand-{epoch_num}.npy") or overwrite:
 
         for block in blocks:
             
@@ -66,7 +73,7 @@ def process_subject(subject, epoch_num):
             print(f"Processing {subject} - session {epoch_num} - block {block} - {network}")
 
             if not op.exists(res_dir / f"pat-{epoch_num}-{block}.npy") or overwrite:
-                filter = (behav["trialtypes"] == 1) & (behav["blocks"] == block)        
+                filter = (behav["trialtypes"] == 1) & (behav["blocks"] == block)     
                 X_pat = stcs_data[filter]
                 y_pat = behav[filter].reset_index(drop=True).positions
                 assert len(X_pat) == len(y_pat)
@@ -96,13 +103,13 @@ def process_subject(subject, epoch_num):
         
         np.save(res_dir / f"pat-{epoch_num}.npy", all_pats)
         np.save(res_dir / f"rand-{epoch_num}.npy", all_rands)
-
-        del stcs_data, lh_label, rh_label
-        gc.collect()
-        
-    del stcs
-    gc.collect()
     
+    else:
+        print("Files already exist, skipping", subject, epoch_num, network)
+        
+    del stcs_data
+    gc.collect()
+        
 if is_cluster:
     # Check that SLURM_ARRAY_TASK_ID is available and use it to get the subject
     try:
@@ -116,4 +123,8 @@ if is_cluster:
         sys.exit(1)
 else:
     # for epoch_num in range(5):
-    Parallel(-1)(delayed(process_subject)(subject, epoch_num) for subject in subjects for epoch_num in range(5))
+    # Parallel(-1)(delayed(process_subject)(subject, epoch_num) for subject in subjects for epoch_num in range(5))
+    Parallel(-1)(delayed(process_subject)(subject, network, epoch_num)\
+        for subject in subjects\
+            for network in networks\
+                for epoch_num in range(5))

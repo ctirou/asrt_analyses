@@ -73,36 +73,36 @@ mean_diag = np.array(mean_diag)
 #         tg.append(data.mean())
 #     means.append(np.array(tg))
 # means = np.array(means)
+blocks = [i for i in range(1, 24)]
+cmap = plt.cm.get_cmap('tab20', len(subjects))
+fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(7, 9), sharex=True)
+for ax in fig.axes:
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.axhline(0, color='grey', linestyle='-', alpha=0.5)
+    # ax.axvspan(0, 2, color='grey', alpha=0.1)
+    ax.set_xticks(blocks)
+    ax.set_xticklabels(['01', '02', '03'] + [str(i) for i in range(1, 21)])
+    # ax.axvspan(3, 7, color='purple', alpha=0.1)
+    # ax.axvspan(8, 12, color='purple', alpha=0.1)s
+    # ax.axvspan(13, 17, color='purple', alpha=0.1)
+    # ax.axvspan(18, 22, color='purple', alpha=0.1)
 
-# cmap = plt.cm.get_cmap('tab20', len(subjects))
-# fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(7, 9), sharex=True)
-# for ax in fig.axes:
-#     ax.spines['top'].set_visible(False)
-#     ax.spines['right'].set_visible(False)
-#     ax.axhline(0, color='grey', linestyle='-', alpha=0.5)
-#     # ax.axvspan(0, 2, color='grey', alpha=0.1)
-#     ax.set_xticks(blocks)
-#     ax.set_xticklabels(['01', '02', '03'] + [str(i) for i in range(1, 21)])
-#     # ax.axvspan(3, 7, color='purple', alpha=0.1)
-#     # ax.axvspan(8, 12, color='purple', alpha=0.1)s
-#     # ax.axvspan(13, 17, color='purple', alpha=0.1)
-#     # ax.axvspan(18, 22, color='purple', alpha=0.1)
+for i in range(sim_index.shape[0]):
+    ax1.plot(blocks, sim_index[i], alpha=0.5, color=cmap(i))
+ax1.plot(blocks, sim_index.mean(0), lw=3, color='#00A08A', label='Mean')
+ax1.set_ylabel('Mean RSA effect')
+ax1.legend(frameon=False)
+ax1.set_title('Representational change')
 
-# for i in range(sim_index.shape[0]):
-#     ax1.plot(blocks, sim_index[i], alpha=0.5, color=cmap(i))
-# ax1.plot(blocks, sim_index.mean(0), lw=3, color='#00A08A', label='Mean')
-# ax1.set_ylabel('Mean RSA effect')
-# ax1.legend(frameon=False)
-# ax1.set_title('Representational change')
-
-# for i in range(mean_diag.shape[0]):
-#     ax2.plot(blocks, mean_diag[i], alpha=0.5, color=cmap(i))
-# ax2.plot(blocks, mean_diag.mean(0), lw=3, color='#FD6467', label='Mean')
-# ax2.set_xlabel('Block')
-# ax2.set_ylabel('Mean predictive effect')
-# ax2.legend(frameon=False)
-# ax2.set_title('Predictive coding')
-# # fig.tight_layout()
+for i in range(mean_diag.shape[0]):
+    ax2.plot(blocks, mean_diag[i], alpha=0.5, color=cmap(i))
+ax2.plot(blocks, mean_diag.mean(0), lw=3, color='#FD6467', label='Mean')
+ax2.set_xlabel('Block')
+ax2.set_ylabel('Mean predictive effect')
+ax2.legend(frameon=False)
+ax2.set_title('Predictive coding')
+fig.tight_layout()
 
 X = mean_diag.copy() # Predictive coding
 Y = sim_index.copy() # Representational change
@@ -112,11 +112,41 @@ from scipy.stats import zscore
 X_norm = np.array([zscore(X[sub, :]) for sub in range(X.shape[0])])
 Y_norm = np.array([zscore(Y[sub, :]) for sub in range(Y.shape[0])])
 
+fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(7, 9), sharex=True)
+for ax in fig.axes:
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.axhline(0, color='grey', linestyle='-', alpha=0.5)
+    # ax.axvspan(0, 2, color='grey', alpha=0.1)
+    ax.set_xticks(blocks)
+    ax.set_xticklabels(['01', '02', '03'] + [str(i) for i in range(1, 21)])
+    # ax.axvspan(3, 7, color='purple', alpha=0.1)
+    # ax.axvspan(8, 12, color='purple', alpha=0.1)s
+    # ax.axvspan(13, 17, color='purple', alpha=0.1)
+    # ax.axvspan(18, 22, color='purple', alpha=0.1)
+
+for i in range(Y_norm.shape[0]):
+    ax1.plot(blocks, Y_norm[i], alpha=0.5, color=cmap(i))
+ax1.plot(blocks, Y_norm.mean(0), lw=3, color='#00A08A', label='Mean')
+ax1.set_ylabel('Mean RSA effect')
+ax1.legend(frameon=False)
+ax1.set_title('Representational change')
+
+for i in range(X_norm.shape[0]):
+    ax2.plot(blocks, X_norm[i], alpha=0.5, color=cmap(i))
+ax2.plot(blocks, X_norm.mean(0), lw=3, color='#FD6467', label='Mean')
+ax2.set_xlabel('Block')
+ax2.set_ylabel('Mean predictive effect')
+ax2.legend(frameon=False)
+ax2.set_title('Predictive coding')
+fig.tight_layout()
+
+
 fig, ax = plt.subplots(1, 1)
 ax.set_xticks([i for i in range(1, 24)])
 ax.axvspan(1, 3, color='grey', alpha=0.1)
-ax.plot([i for i in range(1, 24)], X_norm.mean(0), label='x: predictive coding')
-ax.plot([i for i in range(1, 24)], Y_norm.mean(0), label='y: representational change')
+ax.plot([i for i in range(1, 24)], X.mean(0), label='x: predictive coding')
+ax.plot([i for i in range(1, 24)], Y.mean(0), label='y: representational change')
 ax.set_xlabel('Block')
 ax.set_xticklabels([str(i) for i in range(1, 24)])
 ax.legend()

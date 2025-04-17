@@ -225,7 +225,7 @@ NEW_LABELS2 = ['corpus_callosum',
 
 NETWORKS = ['Vis', 'SomMot', 'DorsAttn', 'SalVentAttn', 'Limbic', 'Cont', 'Default', 'Hippocampus', 'Thalamus']
 # NETWORK_NAMES = [' Visual', 'Somatomotor', 'Dorsal\nAttention', 'Salience /\nVentral\nAttention', 'Limbic', 'Control', 'Default', 'Hippocampus', 'Thalamus']
-NETWORK_NAMES = ['Visual', 'Somatomotor', 'Dorsal\nAttention', 'Ventral\nAttention', 'Limbic', 'Control', 'Default', 'Hippocampus', 'Thalamus']
+NETWORK_NAMES = ['Visual', 'Somatomotor', 'Dorsal Attention', 'Ventral Attention', 'Limbic', 'Control', 'Default', 'Hippocampus', 'Thalamus']
 
 schaefer_17 = ['VisCent', 'VisPeri', 'SomMotA', 'SomMotB', 'DorsAttnA', 'DorsAttnB', 'SalVentAttnA', 'SalVentAttnB',
                'LimbicA', 'LimbicB', 'ContA', 'ContB', 'ContC', 'DefaultA', 'DefaultB', 'DefaultC', 'TempPar']
