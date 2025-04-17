@@ -18,16 +18,19 @@ random_low_RT = {f'Epoch_{i}': [] for i in range(5)}
 all_RT = {f'Epoch_{i}': [] for i in range(5)}
 
 sessions = ['0', '1', '2', '3', '4']
+blocks = np.arange(23)
 n = len(subjects)
 
 subdict = {}
 learn_index_dict = {}
+learn_index_blocks_d = {}
 
 for subject in tqdm(subjects):
-
     
     subdict[subject] = {}
     learn_index_dict[subject] = {}
+    
+    learn_index_blocks_d[subject] = {}
     
     for i in range(5):
         
@@ -64,17 +67,59 @@ for subject in tqdm(subjects):
         subdict[subject][i]["random_low"] = np.mean(subdict[subject][i]["random_low"]) if subdict[subject][i]["random_low"] else np.nan
 
         patterns.append(np.mean(subdict[subject][i]["pattern"]))
-        # patterns.append(np.mean(subdict[subject][i]["random_high"]))
         randoms.append(np.mean(subdict[subject][i]["random_high"]))
         
         # learning_index = (np.mean(randoms) - np.mean(patterns)) / np.mean(randoms)
         learning_index = np.mean(randoms) - np.mean(patterns)
         learn_index_dict[subject][i] = learning_index if i != 0 else 0
-
-# Save learning indices to CSV
+        
+        nblocks = np.unique(behav_df.blocks)
+        for block in nblocks:
+            
+            idx = "0" + str(block) if i == 0 else str(block)
+            # learn_index_blocks_d[subject][idx] = {'pattern': [], 'random_high': []}
+            learn_index_blocks_d[subject][idx] = 0
+            
+            pat, rand = [], []
+            for j, _ in enumerate(behav_df.RTs):
+                if behav_df.blocks[j] == block and behav_df.triplets[j] == 30:
+                    # learn_index_blocks_d[subject][idx]['pattern'].append(behav_df.RTs[j])
+                    pat.append(behav_df.RTs[j])
+                elif behav_df.blocks[j] == block and behav_df.triplets[j] == 32:
+                    # learn_index_blocks_d[subject][idx]['random_high'].append(behav_df.RTs[j])
+                    rand.append(behav_df.RTs[j])
+            
+            index = np.mean(rand) - np.mean(pat)
+            learn_index_blocks_d[subject][idx] = index if idx not in ['01', '02', '03'] else 0
+                
+# Save session learning indices to CSV
 learn_index_df = pd.DataFrame.from_dict(learn_index_dict, orient='index')
 if not op.exists(figures_dir / 'behav' / 'learning_indices3.csv'):
     learn_index_df.to_csv(figures_dir / 'behav' / 'learning_indices3.csv', sep='\t')
+    
+# Save block learning indices to CSV
+learn_index_blocks_df = pd.DataFrame.from_dict(learn_index_blocks_d, orient='index')
+if not op.exists(figures_dir / 'behav' / 'learning_indices_blocks3.csv'):
+    learn_index_blocks_df.to_csv(figures_dir / 'behav' / 'learning_indices_blocks.csv', sep='\t')
+
+# Plot blocks performance
+block_labels = ['01', '02', '03'] + [str(i) for i in range(1, 21)]
+fig, ax = plt.subplots(1, 1, figsize=(13, 5), layout="tight")
+plt.rcParams.update({'font.family': 'serif', 'font.serif': 'Arial'})
+learning_indices_mean = learn_index_blocks_df.mean(axis=0)
+learning_indices_stderr = learn_index_blocks_df.sem(axis=0)
+bar_width = 0.5  # Adjust the width of the bars
+ax.bar(block_labels, learning_indices_mean, yerr=learning_indices_stderr, alpha=0.7, capsize=5, color="#46ACC8", width=bar_width)
+ax.set_ylabel("Learning index", fontsize=12)
+ax.spines['top'].set_visible(False)
+ax.spines['right'].set_visible(False)
+ax.set_xlabel("Blocks", fontsize=12)
+# # Add asterisks above all mean random values
+# for i, (mean_li, std_li) in enumerate(zip(learning_indices_mean, learning_indices_stderr)):
+#     if i not in [0, 1, 2]:
+#         ax.annotate('*', (block_labels[i], mean_li + std_li + 0.005), ha='center', color='black', fontweight='bold', fontsize=12)
+fig.suptitle('Learning index per block', fontsize=16)
+fig.savefig(figures_dir / 'behav' / 'learning_index_blocks.pdf', transparent=True)
 
 # Calculate means and standard errors
 mean_all = [np.mean(all_RT[f'Epoch_{i}']) for i in range(5)]
