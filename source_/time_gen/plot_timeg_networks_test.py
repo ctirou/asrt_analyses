@@ -20,25 +20,17 @@ lock = 'stim'
 # network and custom label_names
 n_parcels = 200
 n_networks = 7
-networks = NETWORKS
-network_names = NETWORK_NAMES
 figures_dir = FIGURES_DIR / "time_gen" / "source" / lock
 ensure_dir(figures_dir)
 overwrite = False
 
-names = NETWORK_NAMES
-times = np.linspace(-1.5, 1.5, 305)
+networks = NETWORKS + ['Cerebellum-Cortex']
+network_names = NETWORK_NAMES + ['Cerebellum']
+times = np.linspace(-1.5, 1.5, 307)
 chance = .25
 threshold = .05
+res_dir = TIMEG_DATA_DIR / 'results' / 'source' / 'max-power'
 
-# analysis = "tg_0206_emp"
-# analysis = "tg_rs_emp"
-analysis = "tg_rdm_emp"
-# analysis = "tg_rdm_emp_reduced"
-res_dir = data_path / analysis / lock
-
-def compute_spearman(t, g, vector, contrasts):
-    return spearmanr(vector, contrasts[:, t, g])[0]
 
 # Load data, compute, and save correlations and pvals 
 learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices.csv', sep="\t", index_col=0)
@@ -54,10 +46,10 @@ for network in tqdm(networks):
     for i, subject in enumerate(subjects):
         pat, rand = [], []
         for j in [0, 1, 2, 3, 4]:
-            pat.append(np.load(res_dir / network / 'pattern' / f"{subject}-{j}-scores.npy"))
-            rand.append(np.load(res_dir / network / 'random' / f"{subject}-{j}-scores.npy"))
-        patpat.append(np.array(pat))
-        randrand.append(np.array(rand))
+            pat = np.load(res_dir / network / 'pattern' / f"{subject}-{j}-scores.npy")
+            rand = np.load(res_dir / network / 'random' / f"{subject}-{j}-scores.npy")
+            patpat.append(np.array(pat))
+            randrand.append(np.array(rand))
     
         all_pat.append(np.load(res_dir / network / 'pattern' / f"{subject}-all-scores.npy"))
         all_rand.append(np.load(res_dir / network / 'random' / f"{subject}-all-scores.npy"))
@@ -77,188 +69,6 @@ cmap1 = "RdBu_r"
 cmap2 = "coolwarm"
 cmap3 = 'magma'
 
-### plot pattern for all networks ###
-fig, axes = plt.subplots(9, 1, figsize=(6, 12), sharex=True, sharey=True, layout='constrained')
-# fig.suptitle("Pattern", fontsize=14)
-for i, (network, name) in enumerate(zip(networks, names)):
-    im = axes[i].imshow(
-        all_patterns[network].mean(0),
-        interpolation="lanczos",
-        origin="lower",
-        cmap=cmap1,
-        extent=times[[0, -1, 0, -1]],
-        aspect=0.5,
-        vmin=0.24,
-        vmax=0.26)
-    axes[i].set_ylabel("Training Time (s)")
-    # axes[i].set_title(f"${name}$", fontsize=10)
-    axes[i].axvline(0, color="k", alpha=.5)
-    axes[i].axhline(0, color="k", alpha=.5)
-    if network == networks[-1]:
-        axes[i].set_xlabel("Testing Time (s)")
-    cbar = plt.colorbar(im, ax=axes[i])
-    cbar.set_label("accuracy")
-    xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
-    pval = np.load(res_dir / network / "pval" / "all_pattern-pval.npy")
-    sig = pval < threshold
-    axes[i].contour(xx, yy, sig, colors='Gray', levels=[0],
-                        linestyles='solid', linewidths=1)
-# fig.savefig(figures_dir / f"pattern.pdf", transparent=True)
-
-### plot random for all networks ###
-fig, axes = plt.subplots(7, 1, figsize=(6, 12), sharex=True, layout='tight')
-fig.suptitle("Random", fontsize=14)
-for i, (network, name) in enumerate(zip(networks, names)):
-    im = axes[i].imshow(
-        all_randoms[network].mean(0),
-        interpolation="lanczos",
-        origin="lower",
-        cmap=cmap1,
-        extent=times[[0, -1, 0, -1]],
-        aspect=0.5,
-        vmin=0.2,
-        vmax=0.3)
-    axes[i].set_ylabel("Training Time (s)")
-    axes[i].set_title(f"${name}$", fontsize=10)
-    axes[i].axvline(0, color="k", alpha=.5)
-    axes[i].axhline(0, color="k", alpha=.5)
-    if network == networks[-1]:
-        axes[i].set_xlabel("Testing Time (s)")
-    cbar = plt.colorbar(im, ax=axes[i])
-    cbar.set_label("accuracy")
-    xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
-    pval = np.load(res_dir / network / "pval" / "all_random-pval.npy")
-    sig = pval < threshold
-    axes[i].contour(xx, yy, sig, colors='Gray', levels=[0],
-                        linestyles='solid', linewidths=1)
-fig.savefig(figures_dir / f"random.pdf", transparent=True)
-
-### plot contrast for all networks ###
-fig, axes = plt.subplots(9, 1, figsize=(6, 12), sharex=True, layout='tight')
-fig.suptitle("Contrast = Pattern – Random", fontsize=14)
-for i, (network, name) in enumerate(zip(networks, names)):
-    all_contrast = all_patterns[network] - all_randoms[network]
-    im = axes[i].imshow(
-        all_contrast.mean(0),
-        interpolation="lanczos",
-        origin="lower",
-        cmap=cmap1,
-        extent=times[[0, -1, 0, -1]],
-        aspect=0.5,
-        vmin=-0.01,
-        vmax=0.01)
-    axes[i].set_ylabel("Training Time (s)")
-    axes[i].set_title(f"${name}$", fontsize=10)
-    axes[i].axvline(0, color="k", alpha=.5)
-    axes[i].axhline(0, color="k", alpha=.5)
-    if network == networks[-1]:
-        axes[i].set_xlabel("Testing Time (s)")
-    cbar = plt.colorbar(im, ax=axes[i])
-    cbar.set_label("accuracy")
-    xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
-    pval = np.load(res_dir / network / "pval" / "all_contrast-pval.npy")
-    sig = pval < threshold
-    axes[i].contour(xx, yy, sig, colors='Gray', levels=[0],
-                        linestyles='solid', linewidths=1)
-fig.savefig(figures_dir / f"contrast.pdf", transparent=True)
-
-### plot diagonal for all networks ###
-fig, axes = plt.subplots(9, 1, figsize=(6, 12), sharex=True, layout='tight')
-fig.suptitle("Contrast diagonal", fontsize=14)
-for i, (network, name) in enumerate(zip(networks, names)):
-    axes[i].plot(times, all_diags[network].mean(0))
-    pval = decod_stats(all_diags[network], -1)
-    sig = pval < threshold
-    axes[i].fill_between(times, 0, all_diags[network].mean(0), where=sig, color='C7', alpha=.5)
-    axes[i].axhline(0, color='grey', alpha=.5)
-    axes[i].set_ylabel("difference")
-    axes[i].set_title(f"${name}$", fontsize=10)
-    axes[i].axvspan(0, 0.2, color='gray', alpha=0.1)
-fig.savefig(figures_dir / f"diagonals.pdf", transparent=True)
-
-### plot learn df x time gen correlation for all networks ###
-fig, axes = plt.subplots(9, 1, figsize=(6, 12), sharex=True, layout='tight')
-fig.suptitle("learn df x time gen correlation", fontsize=14)
-for i, (network, name) in enumerate(zip(networks, names)):
-    rhos = np.load(res_dir / network / "corr" / "rhos_learn.npy")
-    pval = np.load(res_dir / network / "corr" / "pval_learn-pval.npy")
-    sig = pval < threshold
-    im = axes[i].imshow(
-        rhos.mean(0),
-        interpolation="lanczos",
-        origin="lower",
-        cmap=cmap1,
-        extent=times[[0, -1, 0, -1]],
-        aspect=0.5,
-        vmin=-.2,
-        vmax=.2)
-    if network == networks[-1]:
-        axes[i].set_xlabel("Testing Time (s)")
-    axes[i].set_ylabel("Training Time (s)")
-    axes[i].set_title(f"{name}", style='italic')
-    axes[i].axvline(0, color="k")
-    axes[i].axhline(0, color="k")
-    xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
-    axes[i].contour(xx, yy, sig, colors='Gray', levels=[0],
-                        linestyles='solid', linewidths=1)
-    cbar = plt.colorbar(im, ax=axes[i])
-    cbar.set_label("accuracy")
-fig.savefig(figures_dir / "learn_corr.pdf", transparent=True)
-
-### Mean effect ###
-mean_pred_sess = []
-mean_percep_sess = []
-filt = np.where((times >= 0.05) & (times <= 0.55))[0]
-filter_time = np.where((times >= -0.5) & (times < 0))[0]  # Correct filtering condition
-for i, net in enumerate(networks):
-    contrast = all_patterns[net] - all_randoms[net]
-    pred, perc = [], []
-    for sub in range(len(subjects)):
-        pred.append(np.diag(contrast[sub,])[filter_time])
-        perc.append((all_diags[net][sub, filt]))
-    mean_pred_sess.append(np.array(pred))
-    mean_percep_sess.append(np.array(perc))
-    
-mean_pred_sess = np.array(mean_pred_sess)
-mean_percep_sess = np.array(mean_percep_sess)
-sem_net = np.std(mean_pred_sess, axis=1) / np.sqrt(len(mean_pred_sess[0]))  # SEM for mean_pred
-sem_diag = np.std(mean_percep_sess, axis=1) / np.sqrt(len(mean_percep_sess[0]))  # SEM for mean_percep
-
-### Plot mean effect ### 
-alpha = 0.05
-color_diag = '#0072B2'  # Blue
-color_net = '#E69F00'  # Orange
-# Perform statistical tests for mean_pred (one-sample t-test against 0)
-mean_pred_significance = [ttest_1samp(data.mean(-1), 0)[1] < alpha for data in mean_pred_sess]
-fig, ax = plt.subplots(figsize=(10, 7))
-ax.grid(axis='y', linestyle='--', alpha=0.3)
-x = np.arange(len(networks))
-spacing = 0.35
-rects2 = ax.bar(x + spacing/2, mean_pred_sess.mean((1, 2)), spacing, label='Prediction effect', color=color_net, edgecolor='black')
-rects1 = ax.bar(x - spacing/2, mean_percep_sess.mean((1, 2)), spacing, label='(Random - Pattern) contrast diagonal', color=color_diag, edgecolor='black')
-# ax.errorbar(x - spacing/2, mean_percep, yerr=sem_net, fmt='none', color='black', capsize=5)
-# ax.errorbar(x + spacing/2, mean_pred, yerr=sem_diag, fmt='none', color='black', capsize=5)
-# Annotate significant mean_pred bars with an asterisk
-for i, rect in enumerate(rects2):
-    if mean_pred_significance[i]:
-        ax.annotate('*',
-                    xy=(rect.get_x() + rect.get_width() / 2, rect.get_height()),
-                    xytext=(0, 3),
-                    textcoords="offset points",
-                    ha='center', va='bottom',
-                    fontsize=20, color='black')
-ax.set_ylabel('Mean effect / diagonal')
-ax.set_xticks(x)
-ax.set_xticklabels(names, rotation=45, ha='right', fontsize=12)
-ax.axhline(0, color='grey', linewidth=2)
-ax.legend(frameon=False)
-ax.spines['top'].set_visible(False)
-ax.spines['right'].set_visible(False)
-fig.tight_layout()
-fig.suptitle('Mean contrast and prediction effects by network', pad=20, fontsize=16)
-fig.savefig(figures_dir / f"mean_effect.pdf", transparent=True)
-plt.show()
-
 def crop_images(screenshot):
     nonwhite_pix = (screenshot != 255).any(-1)
     nonwhite_row = nonwhite_pix.any(1)
@@ -276,29 +86,37 @@ design = [['br11', 'br12', 'a1', 'a2', 'a3'],
           ['br71', 'br72', 'g1', 'g2', 'g3'],
           ['br81', 'br82', 'h1', 'h2', 'h3'],
           ['br91', 'br92', 'i1', 'i2', 'i3'],
+          ['br101', 'br102', 'k1', 'k2', 'k3'],
           ['l', 'l', 'j', 'j', 'j']]
-vmin, vmax = 0.23, 0.27
+vmin, vmax = 0.2, 0.3
 
-fig, axes = plt.subplot_mosaic(design, figsize=(12, 16), sharey=False, sharex=False, layout="constrained",
-                               gridspec_kw={'height_ratios': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1.5],
+fig, axes = plt.subplot_mosaic(design, figsize=(12, 20), sharey=False, sharex=False, layout="constrained",
+                               gridspec_kw={'height_ratios': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1.5],
                                             'width_ratios': [.2, .2, .5, .5, .5]})
 plt.rcParams.update({'font.size': 10, 'font.family': 'serif', 'font.serif': 'Arial'})
 # fig.suptitle("Comparison of Pattern, Random, and Contrast Accuracy Over Time", fontsize=14, fontweight='bold')
 ### Plot brain ###
-cmap = ['#0173B2','#DE8F05','#029E73','#D55E00','#CC78BC','#CA9161','#FBAFE4','#ECE133','#56B4E9']
+cmap = ['#0173B2','#DE8F05','#029E73','#D55E00','#CC78BC','#CA9161','#FBAFE4','#ECE133','#56B4E9', "#76B041"]
+sig_color = "#00BFA6"
+sig_color = '#708090'
 brain_kwargs = dict(hemi='both', background="white", cortex="low_contrast", surf='inflated', subjects_dir=subjects_dir, size=(800, 400))
 for i, (label, sideA, sideB) in enumerate(zip(networks, \
-    ['br11', 'br21', 'br31', 'br41', 'br51', 'br61', 'br71', 'br81', 'br91'], ['br12', 'br22', 'br32', 'br42', 'br52', 'br62', 'br72', 'br82', 'br92'])):
+    ['br11', 'br21', 'br31', 'br41', 'br51', 'br61', 'br71', 'br81', 'br91', 'br101'], ['br12', 'br22', 'br32', 'br42', 'br52', 'br62', 'br72', 'br82', 'br92', 'br102'])):
     # Initialize Brain object
     # Add labels
-    if label in networks[:-2]:
-        brain = Brain(subject='sub01', alpha=1, **brain_kwargs) 
+    if label in networks[:-3]:
+        brain = Brain(subject='fsaverage2', alpha=1, **brain_kwargs) 
         for hemi in ['lh', 'rh']:
         # hemi = 'split'
             brain.add_label(f'{label}', color=cmap[i], hemi=hemi, borders=False, alpha=.85, subdir='n7')
     else:
-        brain = Brain(subject='sub01', alpha=.5, **brain_kwargs) 
-        labels = ['Left-Hippocampus', 'Right-Hippocampus'] if label == 'Hippocampus' else ['Left-Thalamus-Proper', 'Right-Thalamus-Proper']
+        brain = Brain(subject='fsaverage2', alpha=.5, **brain_kwargs) 
+        if label == 'Hippocampus':
+            labels = ['Left-Hippocampus', 'Right-Hippocampus']
+        elif label == 'Thalamus':
+            labels = ['Left-Thalamus-Proper', 'Right-Thalamus-Proper']
+        else:
+            labels = ['Left-Cerebellum-Cortex', 'Right-Cerebellum-Cortex']
         brain.add_volume_labels(aseg='aseg', labels=labels, colors=cmap[i], alpha=.85, legend=False)
     
     # brain.set_data_smoothing(50)
@@ -323,7 +141,7 @@ for i, (label, sideA, sideB) in enumerate(zip(networks, \
     axes[sideB].axis('off')
 
 ### Pattern ###
-for network, pattern_idx in zip(networks, ['a1', 'b1', 'c1', 'd1', 'e1', 'f1', 'g1', 'h1', 'i1']):
+for network, pattern_idx in zip(networks, ['a1', 'b1', 'c1', 'd1', 'e1', 'f1', 'g1', 'h1', 'i1', 'k1']):
     im = axes[pattern_idx].imshow(all_patterns[network].mean(0),
                                   interpolation="lanczos",
                                   origin="lower",
@@ -338,9 +156,9 @@ for network, pattern_idx in zip(networks, ['a1', 'b1', 'c1', 'd1', 'e1', 'f1', '
     xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
     pval = np.load(res_dir / network / "pval" / "all_pattern-pval.npy")
     sig = pval < threshold
-    axes[pattern_idx].contour(xx, yy, sig, colors='grey', levels=[0], linestyles='-', linewidths=1)
+    axes[pattern_idx].contour(xx, yy, sig, colors=sig_color, levels=[0], linestyles='-', linewidths=1)
     axes[pattern_idx].set_ylabel("Training time (s)")
-    if pattern_idx == 'i1':
+    if pattern_idx == 'k1':
         axes[pattern_idx].set_xlabel("Testing time (s)")
     else:
         axes[pattern_idx].set_xticklabels([])
@@ -354,7 +172,7 @@ for network, pattern_idx in zip(networks, ['a1', 'b1', 'c1', 'd1', 'e1', 'f1', '
     # axes[pattern_idx].tick_params(axis='y', which='both', left=True, labelleft=False)
 
 ### Random ###    
-for network, random_idx in zip(networks, ['a2', 'b2', 'c2', 'd2', 'e2', 'f2', 'g2', 'h2', 'i2']):
+for network, random_idx in zip(networks, ['a2', 'b2', 'c2', 'd2', 'e2', 'f2', 'g2', 'h2', 'i2', 'k2']):
     im = axes[random_idx].imshow(all_randoms[network].mean(0),
                                  interpolation="lanczos",
                                  origin="lower",
@@ -365,7 +183,7 @@ for network, random_idx in zip(networks, ['a2', 'b2', 'c2', 'd2', 'e2', 'f2', 'g
                                  vmax=vmax)
     axes[random_idx].axvline(0, color="k", alpha=.5)
     axes[random_idx].axhline(0, color="k", alpha=.5)
-    if random_idx == 'i2':
+    if random_idx == 'k2':
         axes[random_idx].set_xlabel("Testing time (s)")
     else:
         axes[random_idx].set_xticklabels([])
@@ -374,7 +192,7 @@ for network, random_idx in zip(networks, ['a2', 'b2', 'c2', 'd2', 'e2', 'f2', 'g
     xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
     pval = np.load(res_dir / network / "pval" / "all_random-pval.npy")
     sig = pval < threshold
-    axes[random_idx].contour(xx, yy, sig, colors='grey', levels=[0], linestyles='-', linewidths=1)
+    axes[random_idx].contour(xx, yy, sig, colors=sig_color, levels=[0], linestyles='-', linewidths=1)
     
     if random_idx == 'a2':
         axes[random_idx].set_title("Random")
@@ -382,7 +200,8 @@ for network, random_idx in zip(networks, ['a2', 'b2', 'c2', 'd2', 'e2', 'f2', 'g
         cbar.set_label('Accuracy')
 
 ### Contrast ###
-for network, contrast_idx in zip(networks, ['a3', 'b3', 'c3', 'd3', 'e3', 'f3', 'g3', 'h3', 'i3']):
+vminC, vmaxC = -0.05, 0.05
+for network, contrast_idx in zip(networks, ['a3', 'b3', 'c3', 'd3', 'e3', 'f3', 'g3', 'h3', 'i3', 'k3']):
     all_contrast = all_patterns[network] - all_randoms[network]
     im = axes[contrast_idx].imshow(all_contrast.mean(0),
                                    interpolation="lanczos",
@@ -390,12 +209,12 @@ for network, contrast_idx in zip(networks, ['a3', 'b3', 'c3', 'd3', 'e3', 'f3', 
                                    cmap=cmap2,
                                    extent=times[[0, -1, 0, -1]],
                                    aspect=0.5,
-                                   vmin=-0.01,
-                                   vmax=0.01)
+                                   vmin=vminC,
+                                   vmax=vmaxC)
     
     axes[contrast_idx].axvline(0, color="k", alpha=.5)
     axes[contrast_idx].axhline(0, color="k", alpha=.5)
-    if contrast_idx == 'i3':
+    if contrast_idx == 'k3':
         axes[contrast_idx].set_xlabel("Testing time (s)")
     else:
         axes[contrast_idx].set_xticklabels([])
@@ -404,11 +223,11 @@ for network, contrast_idx in zip(networks, ['a3', 'b3', 'c3', 'd3', 'e3', 'f3', 
     xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
     pval = np.load(res_dir / network / "pval" / "all_contrast-pval.npy")
     sig = pval < threshold
-    axes[contrast_idx].contour(xx, yy, sig, colors='black', levels=[0], linestyles='solid', linewidths=1)
+    axes[contrast_idx].contour(xx, yy, sig, colors=sig_color, levels=[0], linestyles='solid', linewidths=1)
         
     if contrast_idx == 'a3':
         axes[contrast_idx].set_title("Contrast (Pattern - Random)")
-        cbar = fig.colorbar(im, ax=axes[contrast_idx], location='top', fraction=0.1, ticks=[-0.01, 0.01])
+        cbar = fig.colorbar(im, ax=axes[contrast_idx], location='top', fraction=0.1, ticks=[vminC, vmaxC])
         cbar.set_label("Difference in accuracy")
 
 mean_diag = []
@@ -444,6 +263,8 @@ c2 = '#5BBCD6'  # Orange
 mean_net_significance = [ttest_1samp(data, 0)[1] < alpha for data in mean_net_sess]
 
 # axes['d'].grid(axis='y', linestyle='--', alpha=0.3)
+ymin = -0.04
+ymax = 0.04
 x = np.arange(len(networks))
 spacing = 0.35
 rects1 = axes['j'].bar(x + spacing/2, mean_net, spacing, label='Pre-activation', facecolor=c1, alpha=.8, edgecolor=None)
@@ -463,11 +284,12 @@ for i, rect in enumerate(rects1):
 axes['j'].errorbar(x - spacing/2, mean_diag, yerr=sem_net, fmt='none', color='black', capsize=3)
 axes['j'].errorbar(x + spacing/2, mean_net, yerr=sem_diag, fmt='none', color='black', capsize=3)
 axes['j'].set_xticks(x)
-axes['j'].set_xticklabels(names, rotation=45, ha='right')
+axes['j'].set_xticklabels(network_names, rotation=45, ha='right')
 axes['j'].axhline(0, color='grey', linewidth=2)
 axes['j'].set_title('Predictive coding during pre-stimulus period and perception', fontsize=12, pad=-20)
 axes['j'].set_ylabel('Mean effect', labelpad=-20)
-axes['j'].set_yticks([-0.01, 0.01])
+axes['j'].set_ylim(ymin, ymax)
+axes['j'].set_yticks([ymin, ymax])
 axes['j'].legend(frameon=False, loc='upper left', fontsize=9)
 axes['j'].spines['top'].set_visible(False)
 axes['j'].spines['right'].set_visible(False)
@@ -490,5 +312,5 @@ axes['l'].set_aspect(0.5)
 #     if key is None:
 #         ax.set_visible(False)
 
-fig.savefig(figures_dir / f"pattern_random_contrast-5.pdf", transparent=True)
+fig.savefig(figures_dir / f"test-pattern_random_contrast-5.pdf", transparent=True)
 plt.close()

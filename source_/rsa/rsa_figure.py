@@ -11,6 +11,7 @@ from tqdm.auto import tqdm
 from matplotlib.ticker import FuncFormatter, FormatStrFormatter
 from cycler import cycler
 import seaborn as sns
+# from surfer import Brain
 
 lock = 'stim'
 # analysis = 'usual'
@@ -148,13 +149,14 @@ for i, (label, name, sideA, sideB) in enumerate(zip(networks, network_names, \
     # Initialize Brain object
     # Add labels
     if label in networks[:-3]:
-        brain = mne.viz.Brain(subject='sub01', alpha=1, **brain_kwargs) 
+        
+        brain = mne.viz.Brain(subject='fsaverage2', alpha=1, **brain_kwargs) 
         net_name = f'{name.strip()} network'        
         for hemi in ['lh', 'rh']:
         # hemi = 'split'
             brain.add_label(f'{label}', color=cmap[i], hemi=hemi, borders=False, alpha=.85, subdir='n7')
     else:
-        brain = mne.viz.Brain(subject='sub01', alpha=.5, **brain_kwargs) 
+        brain = mne.viz.Brain(subject='fsaverage2', alpha=.5, **brain_kwargs) 
         net_name = f'{name.strip()}'
         
         if label == 'Hippocampus':
@@ -164,7 +166,18 @@ for i, (label, name, sideA, sideB) in enumerate(zip(networks, network_names, \
         else:
             labels = ['Left-Cerebellum-Cortex', 'Right-Cerebellum-Cortex']
                     
-        brain.add_volume_labels(aseg='aseg', labels=labels, colors=cmap[i], alpha=.85, legend=False)
+        brain.add_volume_labels(aseg='aparc+aseg', labels=labels, colors=cmap[i], alpha=.85, legend=False)
+    
+    # brain = mne.viz.Brain(subject='fsaverage2', alpha=.5, **brain_kwargs) 
+    # for i, label in enumerate(['Hippocampus', 'Thalamus', 'Cerebellum-Cortex']):
+    #     if label == 'Hippocampus':
+    #         labels = ['Left-Hippocampus', 'Right-Hippocampus']
+    #     elif label == 'Thalamus':
+    #         labels = ['Left-Thalamus-Proper', 'Right-Thalamus-Proper']
+    #     else:
+    #         labels = ['Left-Cerebellum-Cortex', 'Right-Cerebellum-Cortex']
+    #     brain.add_volume_labels(aseg='aseg', labels=labels, colors=cmap[i], alpha=.85, legend=False)
+    
     
     # brain.set_data_smoothing(50)
     # Capture snapshots for the desired views 

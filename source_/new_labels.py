@@ -40,7 +40,7 @@ for subject in subjects:
     aseg_labels = list()
     for hemi in ['lh', 'rh', 'others']:
         # Create mixed source space
-        vol_src_fname = op.join(RESULTS_DIR, "src", f"{subject}-{hemi}-vol-src.fif")
+        vol_src_fname = op.join(RESULTS_DIR, "src", f"{subject}-htc-vol-src.fif")
         vol_src = mne.read_source_spaces(vol_src_fname, verbose=verbose)    
         aseg_labels.extend(mne.get_volume_labels_from_src(vol_src, subject, subjects_dir))
 
@@ -137,6 +137,9 @@ for subject in subjects:
     
     res_path = data_path / 'results' / f"networks_{n_parcels}_{n_networks}"
     ensure_dir(res_path / subject)
+    
+    res_path = FREESURFER_DIR / subject / 'label' / 'n7'
+    ensure_dir(res_path)
 
     for i, network in enumerate(network_names):
         
@@ -151,12 +154,12 @@ for subject in subjects:
         if isinstance(big_label, mne.BiHemiLabel):
             # Save left hemisphere
             if big_label.lh is not None:
-                big_label.lh.save(res_path / subject / f'{network}-lh.label')
+                big_label.lh.save(res_path / f'lh.{network}.label')
             # Save right hemisphere
             if big_label.rh is not None:
-                big_label.rh.save(res_path / subject / f'{network}-rh.label')
+                big_label.rh.save(res_path / f'rh.{network}.label')
         else:
-            big_label.save(res_path / subject / f'{network}.label')
+            big_label.save(res_path / f'{network}.label')
 
         # parc_fname = f"Shaefer2018_{n_parcels}_{n_networks}.{network}"
         # mne.write_labels_to_annot(labels=labels, subject=subject, parc=parc_fname, subjects_dir=subjects_dir, hemi=hemi, sort=True, overwrite=True, verbose=verbose)
