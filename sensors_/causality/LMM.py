@@ -69,7 +69,6 @@ from scipy.stats import zscore
 X_norm = np.array([zscore(X[sub, :]) for sub in range(X.shape[0])])
 Y_norm = np.array([zscore(Y[sub, :]) for sub in range(Y.shape[0])])
 
-
 data = {
     'participant': np.repeat(np.arange(len(subjects)), 23),
     'block': np.tile(np.arange(23), len(subjects)),
@@ -161,65 +160,99 @@ subjects = SUBJS
 networks = NETWORKS + ['Cerebellum-Cortex']
 network_names = NETWORK_NAMES + ['Cerebellum']
 times = np.linspace(-0.2, 0.6, 82)
-idx_time = np.where((times >= 0.28) & (times <= 0.51))[0]
-res_path = RESULTS_DIR / 'RSA' / 'source' / lock / "loocv_rdm_blocks"
+win = np.where((times >= 0.28) & (times <= 0.51))[0]
+res_path = RESULTS_DIR / 'RSA' / 'source'
 
 pattern, random = {}, {}
-for network in networks:
+sim_index = dict()
+for network in tqdm(networks):
     if network not in pattern:
         pattern[network], random[network] = [], []
-    for subject in tqdm(subjects):
-        res_dir = res_path / subject
+        sim_index[network] = []
+        # prac_pat, prac_rand = dict(), dict()
+    for subject in subjects:
+        res_dir = res_path / network / lock / "loocv_rdm_blocks" / subject
         behav_dir = op.join(HOME / 'raw_behavs' / subject)
         sequence = get_sequence(behav_dir)
-        pat, rand = get_all_high_low_blocks(res_path, sequence)
+        pat, rand = get_all_high_low_blocks(res_dir, sequence)
         pattern[network].append(pat)
         random[network].append(rand)
-pattern = np.array(pattern).mean(1)
-random = np.array(random).mean(1)
-win = np.where((times >= 0.28) & (times <= 0.51))[0]
-m_pattern = pattern[:, :, win].mean(-1)
-m_random = random[:, :, win].mean(-1)
-prac_pat = m_pattern[:, :3].mean(-1)
-prac_rand = m_random[:, :3].mean(-1)
-sim_index = list()
-for subject in range(len(subjects)):
-    sub_sim = list()
-    for i in range(23):
-        diff = (m_random[subject, i] - prac_rand[subject]) - (m_pattern[subject, i] - prac_pat[subject])
-        sub_sim.append(diff)
-    sim_index.append(np.array(sub_sim))
-sim_index = np.array(sim_index)
-
-all_highs, all_lows = {}, {}
-diff_sess = {}
-
-for network in networks:
-    print(f"Processing {network}...")
-    
-    if not network in all_highs:
-        all_highs[network] = []
-        all_lows[network] = []
-        diff_sess[network] = []
-    
-    h, l = [], []
-    
-    for subject in subjects[:2]:
-                        
-        # RSA stuff
-        behav_dir = op.join(HOME / "raw_behavs" / subject)
-        sequence = get_sequence(behav_dir)
-        res_dir = RESULTS_DIR / 'RSA' / 'source' / network / lock / 'loocv_rdm_blocks' / subject
+    pattern[network] = np.array(pattern[network])[:, :, :, win].mean((1, -1))
+    random[network] = np.array(random[network])[:, :, :, win].mean((1, -1))
         
-        high, low = get_all_high_low(res_dir, sequence, "pat_high_rdm_high", cv=True)    
-        all_highs[network].append(high)    
-        all_lows[network].append(low)
-    
-    all_highs[network] = np.array(all_highs[network]).mean(1)
-    all_lows[network] = np.array(all_lows[network]).mean(1)
-    
-    for i in range(5):
-        rev_low = all_lows[network][:, :, i, :].mean(1) - all_lows[network][:, :, 0, :].mean(axis=1)
-        rev_high = all_highs[network][:, :, i, :].mean(1) - all_highs[network][:, :, 0, :].mean(axis=1)
-        diff_sess[network].append(rev_low - rev_high)
-    diff_sess[network] = np.array(diff_sess[network]).swapaxes(0, 1)
+    for subject, _ in enumerate(subjects):
+        prac_pat = pattern[network][subject, :3].mean(-1)
+        prac_rand = random[network][subject, :3].mean(-1)
+        sub_sim = list()
+        for i in range(23):
+            diff = (random[network][subject, i] - prac_rand) - (pattern[network][subject, i] - prac_pat)
+            sub_sim.append(diff)
+        sim_index[network].append(np.array(sub_sim))
+    sim_index[network] = np.array(sim_index[network])
+
+fig, axs = plt.subplots(2, 5, figsize=(20, 4), sharex=True, sharey=True, layout='constrained')
+for i, (network, ax, name) in enumerate(zip(networks, axs.flatten(), network_names)):
+    ax.axvspan(1, 3, color='grey', alpha=.1)
+    ax.axhline(0, color='grey', linestyle='-', alpha=0.5)
+    ax.plot([i for i in range(1, 24)], np.poly1d(np.polyfit(range(1, 24), sim_index[network].mean(0), 1))(range(1, 24)), color='black', linestyle='--', alpha=0.5, label='linear fit')
+    ax.plot([i for i in range(1, 24)], sim_index[network].mean(0), color=cmap[i], alpha=1)
+    ax.set_title(name)
+    if ax == axs.flatten()[0]:
+        ax.legend(frameon=False, loc='upper left')
+fig.suptitle('Mean representational change dynamics', fontsize=16)
+
+xy_matrix = np.zeros((len(networks), len(networks)))
+yx_matrix = np.zeros((len(networks), len(networks)))
+
+xy_matrix_pv = np.zeros((len(networks), len(networks)))
+yx_matrix_pv = np.zeros((len(networks), len(networks)))
+
+X = data_diag.copy()
+Y = sim_index.copy()
+lag = 3
+
+for i, net1 in enumerate(networks):
+    for j, net2 in enumerate(networks):
+        
+        data = {
+            'participant': np.repeat(np.arange(len(subjects)), 23),
+            'block': np.tile(np.arange(23), len(subjects)),
+            'X': X[net1].flatten(),
+            'Y': Y[net2].flatten()
+            }
+        
+        df = pd.DataFrame(data)
+        # Create lagged variables per participant
+        df['X_lag'] = df.groupby('participant')['X'].shift(lag)
+        df['Y_lag'] = df.groupby('participant')['Y'].shift(lag)
+        # Remove missing lagged values
+        df = df.dropna().reset_index(drop=True)
+        
+        result_XtoY = mixed_model_pvalues(df, dependent='Y', predictor='X_lag', group='participant')
+        result_YtoX = mixed_model_pvalues(df, dependent='X', predictor='Y_lag', group='participant')
+        
+        xy_matrix[i, j] = result_XtoY['coef']
+        yx_matrix[i, j] = result_YtoX['coef']
+
+        xy_matrix_pv[i, j] = result_XtoY['LikelihoodRatio_pvalue']
+        yx_matrix_pv[i, j] = result_YtoX['LikelihoodRatio_pvalue']
+
+import seaborn as sns
+
+red_names = ['Vis', 'Mot', 'DAtt', 'VAtt', 'Limb', 'Ctrl', 'Dflt', 'Hpc', 'Thal', 'Crblm']
+
+fig, ax = plt.subplots(1, 1, figsize=(7, 5), layout='tight')
+cbar = sns.heatmap(xy_matrix_pv, vmin=0, vmax=0.05, annot=xy_matrix, fmt=".2f", cbar_kws={'label': 'p-value'}).collections[0].colorbar
+cbar.ax.set_ylabel('p-value', rotation=-90, va="bottom")
+ax.set_xticklabels(red_names)
+ax.set_yticklabels(red_names)
+ax.xaxis.tick_top()
+fig.suptitle("X -> Y : Predictive coding drives representational change")
+
+fig, ax = plt.subplots(1, 1, figsize=(7, 5), layout='tight')
+cbar = sns.heatmap(yx_matrix_pv, vmin=0, vmax=0.05, annot=yx_matrix, fmt=".2f", cbar_kws={'label': 'p-value'}).collections[0].colorbar
+cbar.ax.set_ylabel('p-value', rotation=-90, va="bottom")
+ax.set_xticklabels(red_names)
+ax.set_yticklabels(red_names)
+ax.xaxis.tick_top()
+fig.suptitle("Y -> X : Representational change drives predictive coding")
