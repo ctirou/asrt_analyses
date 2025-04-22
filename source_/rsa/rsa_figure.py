@@ -228,7 +228,7 @@ for i, (label, name, j, k) in enumerate(zip(networks, network_names,  \
             axd[l].set_title('Decoding')
             ymax = axd[l].get_ylim()[1]
         # elif l == 'A2':
-        elif l == 'Y2':
+        elif l == 'AB2':
             axd[l].set_xlabel('Time (s)', fontsize=11)
         if l == j:
             axd[l].set_xticklabels([])
@@ -265,7 +265,7 @@ for i, (label, name, j) in enumerate(zip(networks, network_names, ['B', 'E', 'H'
     axd[j].xaxis.set_major_formatter(FuncFormatter(lambda x, pos: f'{x:.1f}'))
     axd[j].xaxis.set_major_locator(plt.MultipleLocator(0.2))
     # axd[j].set_xticklabels([])
-    if j == 'Z':
+    if j == 'AC':
         axd[j].set_xlabel('Time (s)', fontsize=11)
     if j == 'B':
         axd[j].set_title(f'Similarity index')
@@ -301,7 +301,7 @@ for i, (label, name, j) in enumerate(zip(networks, network_names, ['C', 'F', 'I'
     axd[j].fill_between(times, all_rhos.mean(0) - sem, 0, where=sig, alpha=0.3, zorder=5, facecolor=cmap[i])
     axd[j].xaxis.set_major_formatter(FuncFormatter(lambda x, pos: f'{x:.1f}'))
     axd[j].xaxis.set_major_locator(plt.MultipleLocator(0.2))
-    if j == 'AA':
+    if j == 'AD':
         axd[j].set_xlabel('Time (s)', fontsize=11)
     # axd[j].legend(frameon=False, loc="lower right")
     if j == 'C':
@@ -311,7 +311,7 @@ for i, (label, name, j) in enumerate(zip(networks, network_names, ['C', 'F', 'I'
 
 fig.savefig(figures_dir / f"{lock}-test-rsa.pdf", transparent=True)
 # fig.savefig(figures_dir / f"{lock}-rsa.pdf", transparent=True)
-# plt.close()
+plt.close()
 
 
 # # Set parameters

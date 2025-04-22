@@ -90,7 +90,7 @@ design = [['br11', 'br12', 'a1', 'a2', 'a3'],
           ['l', 'l', 'j', 'j', 'j']]
 vmin, vmax = 0.2, 0.3
 
-fig, axes = plt.subplot_mosaic(design, figsize=(12, 20), sharey=False, sharex=False, layout="constrained",
+fig, axes = plt.subplot_mosaic(design, figsize=(12, 18), sharey=False, sharex=False, layout="constrained",
                                gridspec_kw={'height_ratios': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1.5],
                                             'width_ratios': [.2, .2, .5, .5, .5]})
 plt.rcParams.update({'font.size': 10, 'font.family': 'serif', 'font.serif': 'Arial'})
@@ -200,7 +200,7 @@ for network, random_idx in zip(networks, ['a2', 'b2', 'c2', 'd2', 'e2', 'f2', 'g
         cbar.set_label('Accuracy')
 
 ### Contrast ###
-vminC, vmaxC = -0.05, 0.05
+vminC, vmaxC = -0.03, 0.03
 for network, contrast_idx in zip(networks, ['a3', 'b3', 'c3', 'd3', 'e3', 'f3', 'g3', 'h3', 'i3', 'k3']):
     all_contrast = all_patterns[network] - all_randoms[network]
     im = axes[contrast_idx].imshow(all_contrast.mean(0),
@@ -233,7 +233,7 @@ for network, contrast_idx in zip(networks, ['a3', 'b3', 'c3', 'd3', 'e3', 'f3', 
 mean_diag = []
 mean_net_sess = []
 mean_diag_sess = []
-filt = np.where((times >= 0.05) & (times <= 0.55))[0]
+filt = np.where((times >= 0.1) & (times <= 0.6))[0]
 mean_net = []
 filter_time = np.where((times >= -0.5) & (times < 0))[0]  # Correct filtering condition
 for i, net in enumerate(networks):
@@ -263,8 +263,8 @@ c2 = '#5BBCD6'  # Orange
 mean_net_significance = [ttest_1samp(data, 0)[1] < alpha for data in mean_net_sess]
 
 # axes['d'].grid(axis='y', linestyle='--', alpha=0.3)
-ymin = -0.04
-ymax = 0.04
+ymin = -0.03
+ymax = 0.03
 x = np.arange(len(networks))
 spacing = 0.35
 rects1 = axes['j'].bar(x + spacing/2, mean_net, spacing, label='Pre-activation', facecolor=c1, alpha=.8, edgecolor=None)
@@ -272,25 +272,26 @@ rects2 = axes['j'].bar(x - spacing/2, mean_diag, spacing, label='Perception', fa
 # axes['d'].errorbar(x - spacing/2, mean_diag, yerr=sem_net, fmt='none', color='black', capsize=5)
 # axes['d'].errorbar(x + spacing/2, mean_net, yerr=sem_diag, fmt='none', color='black', capsize=5)
 # Annotate significant mean_net bars with an asterisk
-for i, rect in enumerate(rects1):
-    if mean_net_significance[i]:
-        axes['j'].annotate('*',
-                xy=(rect.get_x() + rect.get_width() / 2, rect.get_height()),
-                xytext=(0, 9),
-                textcoords="offset points",
-                ha='center', va='bottom',
-                fontsize=15, color='black')
+# for i, rect in enumerate(rects1):
+#     if mean_net_significance[i]:
+#         axes['j'].annotate('*',
+#                 xy=(rect.get_x() + rect.get_width() / 2, rect.get_height()),
+#                 xytext=(0, 9),
+#                 textcoords="offset points",
+#                 ha='center', va='bottom',
+#                 fontsize=15, color='black')
 
 axes['j'].errorbar(x - spacing/2, mean_diag, yerr=sem_net, fmt='none', color='black', capsize=3)
 axes['j'].errorbar(x + spacing/2, mean_net, yerr=sem_diag, fmt='none', color='black', capsize=3)
 axes['j'].set_xticks(x)
-axes['j'].set_xticklabels(network_names, rotation=45, ha='right')
+names = [name.replace(' ', '\n') for name in network_names]
+axes['j'].set_xticklabels(names, rotation=45, ha='right')
 axes['j'].axhline(0, color='grey', linewidth=2)
 axes['j'].set_title('Predictive coding during pre-stimulus period and perception', fontsize=12, pad=-20)
 axes['j'].set_ylabel('Mean effect', labelpad=-20)
 axes['j'].set_ylim(ymin, ymax)
 axes['j'].set_yticks([ymin, ymax])
-axes['j'].legend(frameon=False, loc='upper left', fontsize=9)
+# axes['j'].legend(frameon=False, loc='upper left', fontsize=9)
 axes['j'].spines['top'].set_visible(False)
 axes['j'].spines['right'].set_visible(False)
 
@@ -304,7 +305,7 @@ axes['l'].plot(times[filter_time], times[filter_time], color=c1, lw=3, label='Pr
 axes['l'].plot(times[filt], times[filt], color=c2, lw=3, label='Perception')
 axes['l'].set_xlabel("Testing time (s)")
 axes['l'].set_ylabel("Training time (s)")
-axes['l'].legend(loc='lower right', fontsize=9)
+axes['l'].legend(loc='upper left', fontsize=9)
 axes['l'].set_aspect(0.5)
 
 # # Hide all None areas
@@ -312,5 +313,5 @@ axes['l'].set_aspect(0.5)
 #     if key is None:
 #         ax.set_visible(False)
 
-fig.savefig(figures_dir / f"test-pattern_random_contrast-5.pdf", transparent=True)
+fig.savefig(figures_dir / "pattern_random_contrast-6.pdf", transparent=True)
 plt.close()

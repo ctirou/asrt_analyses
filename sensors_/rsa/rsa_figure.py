@@ -65,7 +65,7 @@ for i in range(5):
     diff_sess.append(rev_low - rev_high)
 diff_sess = np.array(diff_sess).swapaxes(0, 1)
 
-learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices3.csv', sep="\t", index_col=0)
+learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices3-all.csv', sep="\t", index_col=0)
 chance = 25
 threshold = 0.05
 
@@ -136,6 +136,7 @@ axd['A'].legend(loc='upper left', frameon=False)
 axd['A'].set_xlabel('Time (s)', fontsize=11)
 axd['A'].set_ylim(None, 45)
 axd['A'].set_title(f'Decoding performance of stimuli', fontsize=13)
+axd['A'].yaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter('%.1f'))
 
 ### B1 ### cvMD
 sem_high = np.std(high, axis=0) / np.sqrt(len(subjects))
