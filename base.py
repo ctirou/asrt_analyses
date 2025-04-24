@@ -692,10 +692,9 @@ def cv_mahalanobis(X, y, n_splits=10):
     from sklearn.model_selection import StratifiedKFold
     from sklearn.covariance import LedoitWolf
     from scipy.linalg import inv
-    from scipy.spatial.distance import pdist, squareform
     from tqdm.auto import tqdm
     
-    n_trials, n_channels, n_times = X.shape
+    _, _, n_times = X.shape
     conditions = np.unique(y)
     n_conditions = len(conditions)
 
@@ -755,7 +754,7 @@ def loocv_mahalanobis(X, y):
     from scipy.linalg import inv
     from tqdm.auto import tqdm
     
-    n_trials, n_channels, n_times = X.shape
+    n_trials, _, n_times = X.shape
     conditions = np.unique(y)
     n_conditions = len(conditions)
 

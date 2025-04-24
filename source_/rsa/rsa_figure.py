@@ -83,9 +83,9 @@ for network in networks:
     
     # plot diff session by session
     for i in range(5):
-        rev_low = all_lows[network][:, :, i, :].mean(1) - all_lows[network][:, :, 0, :].mean(axis=1)
-        rev_high = all_highs[network][:, :, i, :].mean(1) - all_highs[network][:, :, 0, :].mean(axis=1)
-        diff_sess[network].append(rev_low - rev_high)
+        low = all_lows[network][:, :, i, :].mean(1) - all_lows[network][:, :, 0, :].mean(1)
+        high = all_highs[network][:, :, i, :].mean(1) - all_highs[network][:, :, 0, :].mean(1)
+        diff_sess[network].append(low - high)
     diff_sess[network] = np.array(diff_sess[network]).swapaxes(0, 1)
     
 learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices3.csv', sep="\t", index_col=0)
@@ -313,7 +313,6 @@ fig.savefig(figures_dir / f"{lock}-test-rsa.pdf", transparent=True)
 # fig.savefig(figures_dir / f"{lock}-rsa.pdf", transparent=True)
 plt.close()
 
-
 # # Set parameters
 # network = "Vis"
 # subdir = 'n7'
@@ -341,3 +340,44 @@ plt.close()
 # axes[1].imshow(caudal_img)
 # axes[1].axis('off')
 # plt.show()
+
+fig, axes = plt.subplots(2, 5, figsize=(20, 5), sharex=True, sharey=True, layout='tight')
+for i, (label, ax) in enumerate(zip(networks, axes.flatten())):
+    ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
+    ax.axhline(0, color='grey', alpha=.5)
+    practice = all_lows[label][:, :, 0, :].mean((0, 1)) - all_highs[label][:, :, 0, :].mean((0, 1))
+    ax.plot(times, practice, color='black', label='prac')
+    for j in range(1, 5):
+        ax.plot(times, diff_sess[label][:, j, :].mean(0), label=f"{j}")
+    ax.set_title(network_names[i])
+    if i == 0:
+        ax.legend(ncol=3, frameon=False, loc="upper left")
+fig.suptitle('Source space RSA', fontstyle='italic')
+
+win = np.where((times >= -0.28) & (times <= 0.51))[0]
+fig, axes = plt.subplots(2, 5, figsize=(20, 5), sharex=True, sharey=True, layout='tight')
+for i, (label, ax) in enumerate(zip(networks, axes.flatten())):
+    ax.set_title(network_names[i])
+    slopes, intercepts = [], []
+    alltime = []
+    for sub, _ in enumerate(subjects):
+        prac = all_lows[label][sub, :, 0, win].mean((0, -1)) - all_highs[label][sub, :, 0, win].mean((0, -1))
+        per_sub = [diff_sess[label][sub, sess, win].mean(-1) for sess in range(1, 5)]
+        aller = np.array([prac] + per_sub)
+        ax.plot([i for i in range(5)], aller, alpha=0.5)
+        # ax.plot([i for i in range(5)], aller, color=cmap[i], alpha=0.5)        
+        slope, intercept = np.polyfit([0, 1, 2, 3, 4], aller, 1)
+        slopes.append(slope)
+        intercepts.append(intercept)
+        alltime.append(aller)
+    alltime = np.array(alltime)
+    ax.plot([i for i in range(5)], alltime.mean(0), color='black', alpha=1, linewidth=4)
+    ax.plot([i for i in range(5)], np.poly1d(np.polyfit(range(5), alltime.mean(0), 1))(range(5)), color='red', linestyle='--', alpha=1, label='linear fit', linewidth=2)
+    
+    
+    slopes = np.mean(slopes)
+    intercepts = np.mean(intercepts)
+    # ax.plot([0, 4], [intercepts, slopes * 4 + intercepts], color='black', alpha=1, label='linear fit')
+    ax.legend(frameon=False, loc="lower right", title=f'Slope: {slopes:.2f}')
+
+    

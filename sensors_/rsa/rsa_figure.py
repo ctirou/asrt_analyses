@@ -8,6 +8,7 @@ from tqdm.auto import tqdm
 from base import *
 from config import *
 
+subjects = SUBJS
 subjects = ALL_SUBJS
 data_path = DATA_DIR
 metric = 'mahalanobis'
@@ -239,3 +240,13 @@ axd['C'].legend(frameon=False, title=ptext, loc='upper left')
 
 plt.savefig(figures_dir /  f"{lock}-rsa3.pdf", transparent=True)
 plt.close()
+
+fig, ax = plt.subplots(1, 1, figsize=(12, 4), layout='tight')
+ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, zorder=-1, alpha=.1)
+ax.axhline(0, color='grey', alpha=0.5)
+practice = all_lows[:, :, 0, :].mean(axis=1) - all_highs[:, :, 0, :].mean(axis=1)
+ax.plot(times, practice.mean(0), label='prac', color='black')
+for j in range(1, 5):
+    ax.plot(times, diff_sess[:, j, :].mean(0), label=j)
+ax.legend(ncol=2, frameon=False)
+ax.set_title('Sensor space RSA', fontstyle='italic')

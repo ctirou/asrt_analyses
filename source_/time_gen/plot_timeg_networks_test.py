@@ -12,6 +12,7 @@ import matplotlib.colors as mcolors
 import seaborn as sns
 from tqdm.auto import tqdm
 from mne.viz import Brain
+from scipy.ndimage import gaussian_filter1d
 
 data_path = TIMEG_DATA_DIR
 subjects, subjects_dir = SUBJS, FREESURFER_DIR
@@ -34,6 +35,7 @@ res_dir = TIMEG_DATA_DIR / 'results' / 'source' / 'max-power'
 
 # Load data, compute, and save correlations and pvals 
 learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices.csv', sep="\t", index_col=0)
+diags = {}
 all_diags = {}
 patterns, randoms = {}, {}
 all_patterns, all_randoms = {}, {}
@@ -43,23 +45,36 @@ for network in tqdm(networks):
         all_patterns[network], all_randoms[network] = [], []
     all_pat, all_rand, all_diag = [], [], []
     patpat, randrand = [], []
+    ddd = []
+    
     for i, subject in enumerate(subjects):
+        
         pat, rand = [], []
+        dd = []
+        
         for j in [0, 1, 2, 3, 4]:
+            
             pat = np.load(res_dir / network / 'pattern' / f"{subject}-{j}-scores.npy")
             rand = np.load(res_dir / network / 'random' / f"{subject}-{j}-scores.npy")
             patpat.append(np.array(pat))
             randrand.append(np.array(rand))
+            
+            d = np.array(pat) - np.array(rand)
+            dd.append(np.diag(d))
     
         all_pat.append(np.load(res_dir / network / 'pattern' / f"{subject}-all-scores.npy"))
         all_rand.append(np.load(res_dir / network / 'random' / f"{subject}-all-scores.npy"))
         
         diag = np.array(all_pat) - np.array(all_rand)
         all_diag.append(np.diag(diag[i]))
-        
+
+        ddd.append(np.array(dd))
+            
     all_patterns[network] = np.array(all_pat)
     all_randoms[network] = np.array(all_rand)
+
     all_diags[network] = np.array(all_diag)
+    diags[network] = np.array(ddd)
     
     patterns[network] = np.array(patpat)
     randoms[network] = np.array(randrand)
@@ -88,7 +103,12 @@ design = [['br11', 'br12', 'a1', 'a2', 'a3'],
           ['br91', 'br92', 'i1', 'i2', 'i3'],
           ['br101', 'br102', 'k1', 'k2', 'k3'],
           ['l', 'l', 'j', 'j', 'j']]
+
 vmin, vmax = 0.2, 0.3
+
+cmap = ['#0173B2','#DE8F05','#029E73','#D55E00','#CC78BC','#CA9161','#FBAFE4','#ECE133','#56B4E9', "#76B041"]
+sig_color = "#00BFA6"
+sig_color = '#708090'
 
 fig, axes = plt.subplot_mosaic(design, figsize=(12, 18), sharey=False, sharex=False, layout="constrained",
                                gridspec_kw={'height_ratios': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1.5],
@@ -96,9 +116,6 @@ fig, axes = plt.subplot_mosaic(design, figsize=(12, 18), sharey=False, sharex=Fa
 plt.rcParams.update({'font.size': 10, 'font.family': 'serif', 'font.serif': 'Arial'})
 # fig.suptitle("Comparison of Pattern, Random, and Contrast Accuracy Over Time", fontsize=14, fontweight='bold')
 ### Plot brain ###
-cmap = ['#0173B2','#DE8F05','#029E73','#D55E00','#CC78BC','#CA9161','#FBAFE4','#ECE133','#56B4E9', "#76B041"]
-sig_color = "#00BFA6"
-sig_color = '#708090'
 brain_kwargs = dict(hemi='both', background="white", cortex="low_contrast", surf='inflated', subjects_dir=subjects_dir, size=(800, 400))
 for i, (label, sideA, sideB) in enumerate(zip(networks, \
     ['br11', 'br21', 'br31', 'br41', 'br51', 'br61', 'br71', 'br81', 'br91', 'br101'], ['br12', 'br22', 'br32', 'br42', 'br52', 'br62', 'br72', 'br82', 'br92', 'br102'])):
@@ -108,7 +125,7 @@ for i, (label, sideA, sideB) in enumerate(zip(networks, \
         brain = Brain(subject='fsaverage2', alpha=1, **brain_kwargs) 
         for hemi in ['lh', 'rh']:
         # hemi = 'split'
-            brain.add_label(f'{label}', color=cmap[i], hemi=hemi, borders=False, alpha=.85, subdir='n7')
+            brain.add_label(f'{label}', color=cmap[i], hemi=hemi, alpha=.85, subdir='n7')
     else:
         brain = Brain(subject='fsaverage2', alpha=.5, **brain_kwargs) 
         if label == 'Hippocampus':
@@ -119,8 +136,7 @@ for i, (label, sideA, sideB) in enumerate(zip(networks, \
             labels = ['Left-Cerebellum-Cortex', 'Right-Cerebellum-Cortex']
         brain.add_volume_labels(aseg='aseg', labels=labels, colors=cmap[i], alpha=.85, legend=False)
     
-    # brain.set_data_smoothing(50)
-    # Capture snapshots for the desired views 
+    # Capture snapshots for the desired views
     brain.show_view('lateral', distance="auto")
     lateral_img = brain.screenshot('rgb')
     brain.show_view('medial', distance="auto")
@@ -230,18 +246,18 @@ for network, contrast_idx in zip(networks, ['a3', 'b3', 'c3', 'd3', 'e3', 'f3', 
         cbar = fig.colorbar(im, ax=axes[contrast_idx], location='top', fraction=0.1, ticks=[vminC, vmaxC])
         cbar.set_label("Difference in accuracy")
 
-mean_diag = []
+percept = []
 mean_net_sess = []
 mean_diag_sess = []
-filt = np.where((times >= 0.1) & (times <= 0.6))[0]
-mean_net = []
+preact = []
+filt = np.where((times >= 0.25) & (times <= 0.6))[0]
 filter_time = np.where((times >= -0.5) & (times < 0))[0]  # Correct filtering condition
 for i, net in enumerate(networks):
     contrast = all_patterns[net] - all_randoms[net]
     # Compute mean net effect
-    mean_net.append(contrast[:, filter_time][:, :, filter_time].mean())
+    preact.append(contrast[:, filter_time][:, :, filter_time].mean())
     # Mean diagonal for the specific time window with absolute values
-    mean_diag.append((all_diags[net][:, filt].mean()))
+    percept.append((all_diags[net][:, filt].mean()))
     sess1, sess2 = [], []
     for sub in range(len(subjects)):
         # Mean for session 1 and 2 per subject
@@ -252,26 +268,31 @@ for i, net in enumerate(networks):
     mean_diag_sess.append(np.array(sess2))
 mean_net_sess = np.array(mean_net_sess).mean(-1)
 mean_diag_sess = np.array(mean_diag_sess)
-sem_net = np.std(mean_net_sess, axis=1) / np.sqrt(len(mean_net_sess[1]))  # SEM for mean_net
-sem_diag = np.std(mean_diag_sess, axis=1) / np.sqrt(len(mean_diag_sess[1]))  # SEM for mean_diag
+sem_net = np.std(mean_net_sess, axis=1) / np.sqrt(len(mean_net_sess[1]))  # SEM for preact
+sem_diag = np.std(mean_diag_sess, axis=1) / np.sqrt(len(mean_diag_sess[1]))  # SEM for percept
 
 ### Plot mean effect ### 
 alpha = 0.05
 c1 = '#FF0000'  # Blue
 c2 = '#5BBCD6'  # Orange
-# Perform statistical tests for mean_net (one-sample t-test against 0)
+# Perform statistical tests for preact (one-sample t-test against 0)
 mean_net_significance = [ttest_1samp(data, 0)[1] < alpha for data in mean_net_sess]
 
 # axes['d'].grid(axis='y', linestyle='--', alpha=0.3)
-ymin = -0.03
+ymin = -0.04
 ymax = 0.03
 x = np.arange(len(networks))
 spacing = 0.35
-rects1 = axes['j'].bar(x + spacing/2, mean_net, spacing, label='Pre-activation', facecolor=c1, alpha=.8, edgecolor=None)
-rects2 = axes['j'].bar(x - spacing/2, mean_diag, spacing, label='Perception', facecolor=c2, alpha=.8, edgecolor=None)
-# axes['d'].errorbar(x - spacing/2, mean_diag, yerr=sem_net, fmt='none', color='black', capsize=5)
-# axes['d'].errorbar(x + spacing/2, mean_net, yerr=sem_diag, fmt='none', color='black', capsize=5)
-# Annotate significant mean_net bars with an asterisk
+# rects1 = axes['j'].bar(x + spacing/2, preact, spacing, label='Pre-activation', facecolor=c1, alpha=.8, edgecolor=None)
+# rects2 = axes['j'].bar(x - spacing/2, percept, spacing, label='Perception', facecolor=c2, alpha=.8, edgecolor=None)
+
+rects1 = axes['j'].bar(x, preact, spacing, label='Pre-activation', facecolor=c1, alpha=.8, edgecolor=None)
+rects2 = axes['j'].bar(x, percept, spacing, label='Perception', facecolor=c2, alpha=.8, edgecolor=None)
+
+
+# axes['d'].errorbar(x - spacing/2, percept, yerr=sem_net, fmt='none', color='black', capsize=5)
+# axes['d'].errorbar(x + spacing/2, preact, yerr=sem_diag, fmt='none', color='black', capsize=5)
+# Annotate significant preact bars with an asterisk
 # for i, rect in enumerate(rects1):
 #     if mean_net_significance[i]:
 #         axes['j'].annotate('*',
@@ -281,12 +302,16 @@ rects2 = axes['j'].bar(x - spacing/2, mean_diag, spacing, label='Perception', fa
 #                 ha='center', va='bottom',
 #                 fontsize=15, color='black')
 
-axes['j'].errorbar(x - spacing/2, mean_diag, yerr=sem_net, fmt='none', color='black', capsize=3)
-axes['j'].errorbar(x + spacing/2, mean_net, yerr=sem_diag, fmt='none', color='black', capsize=3)
+# axes['j'].errorbar(x - spacing/2, percept, yerr=sem_net, fmt='none', color='black', capsize=3)
+# axes['j'].errorbar(x + spacing/2, preact, yerr=sem_diag, fmt='none', color='black', capsize=3)
+
+axes['j'].errorbar(x, percept, yerr=sem_net, fmt='none', color='black', capsize=3)
+axes['j'].errorbar(x, preact, yerr=sem_diag, fmt='none', color='black', capsize=3)
+
 axes['j'].set_xticks(x)
 names = [name.replace(' ', '\n') for name in network_names]
 axes['j'].set_xticklabels(names, rotation=45, ha='right')
-axes['j'].axhline(0, color='grey', linewidth=2)
+axes['j'].axhline(0, color='grey', linewidth=2, zorder=10)
 axes['j'].set_title('Predictive coding during pre-stimulus period and perception', fontsize=12, pad=-20)
 axes['j'].set_ylabel('Mean effect', labelpad=-20)
 axes['j'].set_ylim(ymin, ymax)
@@ -313,5 +338,76 @@ axes['l'].set_aspect(0.5)
 #     if key is None:
 #         ax.set_visible(False)
 
-fig.savefig(figures_dir / "pattern_random_contrast-6.pdf", transparent=True)
+fig.savefig(figures_dir / "pattern_random_contrast-9.pdf", transparent=True)
 plt.close()
+
+fns = []
+max_where = []
+f = np.where((times >= 0.1) & (times <= 1))[0]
+fig, axes = plt.subplots(2, 5, figsize=(20, 4), sharey=True, layout='tight')
+for i, (label, ax) in enumerate(zip(networks, axes.flatten())):
+    ax.set_title(network_names[i])
+    ax.axhline(0, color='k', alpha=.5)
+    ax.plot(times[f], all_diags[label][:, f].mean(0), color=cmap[i], alpha=1)
+    smoothed_curve = gaussian_filter1d(all_diags[label][:, f].mean(0), sigma=2)
+    ax.plot(times[f], smoothed_curve, color='#FF0000', lw=1.5)
+    
+    fnegative = np.where(smoothed_curve < 0)[0][0]
+    # ax.axvline(times[f][fnegative], color='k', alpha=1)
+    fns.append(times[f][fnegative])
+    
+    mwhre = np.where(smoothed_curve == np.max(smoothed_curve))[0][0]
+    max_where.append(times[f][mwhre])
+    # ax.axvline(times[f][mwhre], color='k', alpha=1)
+    ax.axvline(0.6, color='k', alpha=.5)
+
+mmax_where = np.mean(max_where)
+print(f"Mean max peak: {mmax_where:.2f} s")    
+    
+mfns = np.mean(fns)
+print(f"Mean first negative peak: {mfns:.2f} s")
+
+percpt_f = np.where((times >= 0.25) & (times <= 0.6))[0]
+preact_f = np.where((times >= -0.5) & (times < 0))[0]  # Correct filtering condition
+
+fig, ax = plt.subplots(figsize=(10, 5), layout='tight')
+for i, _ in enumerate(networks):
+    ax.scatter(percept[i], preact[i], color=cmap[i])
+    ax.annotate(network_names[i], (percept[i] + 0.0001, preact[i]), fontsize=14, ha='left', va='center')
+# Perform linear regression
+slope, intercept, r_value, p_value, std_err = linregress(percept, preact)
+# Plot the linear fit
+x_vals = np.linspace(min(percept), max(percept), 100)
+y_vals = slope * x_vals + intercept
+ax.plot(x_vals, y_vals, color='black', linestyle='--', label=f'Linear fit (R={r_value:.2f}, p={p_value:.3f})')
+# Add legend
+ax.legend(fontsize=12)
+ax.set_xlabel("Perception", fontsize=14)
+ax.set_ylabel("Pre-activation", fontsize=14)
+
+sub_percept, sub_preact = [], []
+for sub, _ in enumerate(subjects):
+    sub_percept.append(np.array([all_diags[net][sub, percpt_f].mean() for net in networks]))
+    sub_preact.append(np.array([all_diags[net][sub, preact_f].mean() for net in networks]))
+sub_percept, sub_preact = np.array(sub_percept), np.array(sub_preact)
+
+rhos = []
+for sub in range(len(subjects)):
+    rho, _ = spearmanr(sub_percept[sub], sub_preact[sub])
+    rhos.append(rho)
+pval = ttest_1samp(rhos, 0)[1]
+
+def fisher_tranform(r):
+    return 0.5 * np.log((1 + r) / (1 - r))
+
+from scipy.stats import pearsonr
+prhos = []
+for sub in range(len(subjects)):
+    # Compute the Pearson correlation coefficient
+    r, _ = pearsonr(sub_percept[sub], sub_preact[sub])
+    r = fisher_tranform(r)
+    prhos.append(r)
+ppval = ttest_1samp(prhos, 0)[1]
+
+print(f"Spearman correlation: {np.mean(rhos):.2f} ± {np.std(rhos):.2f}, p = {pval:.3f}")
+print(f"Pearson correlation: {np.mean(prhos):.2f} ± {np.std(prhos):.2f}, p = {ppval:.3f}")
