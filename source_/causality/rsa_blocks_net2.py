@@ -64,32 +64,27 @@ def process_subject(subject, network, epoch_num):
         
     blocks = np.unique(behav.blocks)
 
-    if not op.exists(res_dir / f"pat-{epoch_num}.npy") or not op.exists(res_dir / f"rand-{epoch_num}.npy") or overwrite:
-
-        for block in blocks:
-            
-            block = int(block)
-            print(f"Processing {subject} - session {epoch_num} - block {block} - {network}")
-
-            if not op.exists(res_dir / f"pat-{epoch_num}-{block}.npy") or overwrite:
-                filter = (behav["trialtypes"] == 1) & (behav["blocks"] == block)     
-                X_pat = stcs_data[filter]
-                y_pat = behav[filter].reset_index(drop=True).positions
-                assert len(X_pat) == len(y_pat)
-                rdm_pat = loocv_mahalanobis_parallel(X_pat, y_pat, 1)
-                np.save(res_dir / f"pat-{epoch_num}-{block}.npy", rdm_pat)
-            
-            if not op.exists(res_dir / f"rand-{epoch_num}-{block}.npy") or overwrite:
-                filter = (behav["trialtypes"] == 2) & (behav["blocks"] == block)            
-                X_rand = stcs_data[filter]
-                y_rand = behav[filter].reset_index(drop=True).positions
-                assert len(X_rand) == len(y_rand)
-                rdm_rand = loocv_mahalanobis_parallel(X_rand, y_rand, 1)
-                np.save(res_dir / f"rand-{epoch_num}-{block}.npy", rdm_rand)                
+    for block in blocks:
         
-    else:
-        print("Files already exist, skipping", subject, epoch_num, network)
+        block = int(block)
+        print(f"Processing {subject} - session {epoch_num} - block {block} - {network}")
+
+        if not op.exists(res_dir / f"pat-{epoch_num}-{block}.npy") or overwrite:
+            filter = (behav["trialtypes"] == 1) & (behav["blocks"] == block)     
+            X_pat = stcs_data[filter]
+            y_pat = behav[filter].reset_index(drop=True).positions
+            assert len(X_pat) == len(y_pat)
+            rdm_pat = loocv_mahalanobis_parallel(X_pat, y_pat, 1)
+            np.save(res_dir / f"pat-{epoch_num}-{block}.npy", rdm_pat)
         
+        if not op.exists(res_dir / f"rand-{epoch_num}-{block}.npy") or overwrite:
+            filter = (behav["trialtypes"] == 2) & (behav["blocks"] == block)            
+            X_rand = stcs_data[filter]
+            y_rand = behav[filter].reset_index(drop=True).positions
+            assert len(X_rand) == len(y_rand)
+            rdm_rand = loocv_mahalanobis_parallel(X_rand, y_rand, 1)
+            np.save(res_dir / f"rand-{epoch_num}-{block}.npy", rdm_rand)                
+                
     del stcs_data
     gc.collect()
         
