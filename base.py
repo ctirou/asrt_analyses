@@ -733,6 +733,65 @@ def cv_mahalanobis(X, y, n_splits=10):
 
     return distances
 
+def cv_mahalanobis_fixed(X, y, n_splits=10):
+    """
+    Cross-validated Mahalanobis distances using scipy.linalg.solve for better numerical stability.
+
+    Parameters:
+        X: ndarray (n_trials, n_channels, n_times)
+        y: array-like (n_trials,) condition labels
+        n_splits: int, number of cross-validation folds
+
+    Returns:
+        distances: ndarray (n_times, n_conditions, n_conditions)
+    """
+    import numpy as np
+    from sklearn.model_selection import StratifiedKFold
+    from sklearn.covariance import LedoitWolf
+    from scipy.linalg import solve
+    from tqdm.auto import tqdm
+
+    n_trials, n_channels, n_times = X.shape
+    conditions = np.unique(y)
+    n_conditions = len(conditions)
+
+    distances = np.zeros((n_times, n_conditions, n_conditions))
+    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
+
+    for t in tqdm(range(n_times)):
+        X_t = X[:, :, t]
+        dist_folds = np.zeros((n_conditions, n_conditions, n_splits))
+
+        for fold, (train_idx, test_idx) in enumerate(skf.split(X_t, y)):
+            X_train, X_test = X_t[train_idx], X_t[test_idx]
+            y_train, y_test = y[train_idx], y[test_idx]
+
+            # Estimate noise covariance from training data
+            lw = LedoitWolf()
+            lw.fit(X_train)
+            cov = lw.covariance_
+
+            # Compute condition means
+            train_means = {c: X_train[y_train == c].mean(axis=0) for c in conditions}
+            test_means = {c: X_test[y_test == c].mean(axis=0) for c in conditions}
+
+            for i, ci in enumerate(conditions):
+                for j, cj in enumerate(conditions):
+                    if j <= i:
+                        continue
+
+                    diff_train = train_means[ci] - train_means[cj]
+                    diff_test = test_means[ci] - test_means[cj]
+
+                    # More stable Mahalanobis: solve instead of invert
+                    dist = diff_train.T @ solve(cov, diff_test, assume_a='pos')
+                    dist_folds[i, j, fold] = dist
+                    dist_folds[j, i, fold] = dist
+
+        distances[t] = dist_folds.mean(axis=2)
+
+    return distances
+
 
 def loocv_mahalanobis(X, y):
     """
@@ -789,6 +848,142 @@ def loocv_mahalanobis(X, y):
         distances[time_idx] = cv_distances.mean(axis=2)
 
     return distances
+
+def loocv_mahalanobis_fixed(X, y):
+    """
+    Cross-validated Mahalanobis distances using Leave-One-Out CV and scipy.linalg.solve.
+
+    Parameters:
+        X: ndarray (n_trials, n_channels, n_times)
+        y: array-like (n_trials,) condition labels
+
+    Returns:
+        distances: ndarray (n_times, n_conditions, n_conditions)
+    """
+    import numpy as np
+    from sklearn.model_selection import LeaveOneOut
+    from sklearn.covariance import LedoitWolf
+    from scipy.linalg import solve
+    from tqdm.auto import tqdm
+
+    n_trials, n_channels, n_times = X.shape
+    conditions = np.unique(y)
+    n_conditions = len(conditions)
+
+    distances = np.zeros((n_times, n_conditions, n_conditions))
+    loo = LeaveOneOut()
+
+    for t in tqdm(range(n_times)):
+        X_t = X[:, :, t]
+        dist_folds = np.zeros((n_conditions, n_conditions, n_trials))
+
+        for fold, (train_idx, test_idx) in enumerate(loo.split(X_t)):
+            X_train, X_test = X_t[train_idx], X_t[test_idx]
+            y_train, y_test = y[train_idx], y[test_idx]
+
+            # Skip fold if test class not represented in train set (rare but possible in LOOCV)
+            if len(np.unique(y_train)) < len(conditions):
+                continue
+
+            # Covariance estimation on training set
+            lw = LedoitWolf()
+            lw.fit(X_train)
+            cov = lw.covariance_
+
+            # Mean vectors
+            train_means = {c: X_train[y_train == c].mean(axis=0) for c in conditions}
+            test_means = {c: X_test[y_test == c].mean(axis=0) for c in conditions}
+
+            for i, ci in enumerate(conditions):
+                for j, cj in enumerate(conditions):
+                    if j <= i:
+                        continue
+
+                    diff_train = train_means[ci] - train_means[cj]
+                    diff_test = test_means[ci] - test_means[cj]
+                    dist = diff_train.T @ solve(cov, diff_test, assume_a='pos')
+                    dist_folds[i, j, fold] = dist
+                    dist_folds[j, i, fold] = dist
+
+        distances[t] = dist_folds.mean(axis=2)
+
+    return distances
+
+def loocv_mahalanobis_parallel(X, y, n_jobs=-1, verbose=True):
+    """
+    Parallel cross-validated Mahalanobis distances using LOOCV,
+    with per-fold progress bars for each timepoint.
+
+    Parameters:
+        X: ndarray (n_trials, n_channels, n_times)
+        y: array-like (n_trials,) condition labels
+        n_jobs: int, number of parallel jobs (default: -1 = all cores)
+        verbose: bool, whether to show progress bars
+
+    Returns:
+        distances: ndarray (n_times, n_conditions, n_conditions)
+    """
+    import numpy as np
+    from sklearn.model_selection import LeaveOneOut
+    from sklearn.covariance import LedoitWolf
+    from scipy.linalg import solve
+    from joblib import Parallel, delayed
+    from tqdm.auto import tqdm
+
+    n_trials, n_channels, n_times = X.shape
+    conditions = np.unique(y)
+    n_conditions = len(conditions)
+    loo = LeaveOneOut()
+
+    def compute_timepoint(t):
+        X_t = X[:, :, t]
+        dist_folds = np.full((n_conditions, n_conditions, n_trials), np.nan)
+
+        iterator = loo.split(X_t)
+        if verbose:
+            iterator = tqdm(iterator, total=n_trials, desc=f"Time {t:03}", leave=False, position=t % 8)
+
+        for fold, (train_idx, test_idx) in enumerate(iterator):
+            X_train, X_test = X_t[train_idx], X_t[test_idx]
+            y_train, y_test = y[train_idx], y[test_idx]
+
+            if len(np.unique(y_train)) < len(conditions):
+                continue
+
+            lw = LedoitWolf()
+            lw.fit(X_train)
+            cov = lw.covariance_
+
+            train_means = {c: X_train[y_train == c].mean(axis=0) for c in conditions}
+            test_means = {c: X_test[y_test == c].mean(axis=0) for c in conditions if np.any(y_test == c)}
+
+            for i, ci in enumerate(conditions):
+                for j, cj in enumerate(conditions):
+                    if j <= i or ci not in test_means or cj not in test_means:
+                        continue
+
+                    diff_train = train_means[ci] - train_means[cj]
+                    diff_test = test_means[ci] - test_means[cj]
+
+                    if np.isnan(diff_test).any() or np.isnan(diff_train).any():
+                        continue
+
+                    dist = diff_train.T @ solve(cov, diff_test, assume_a='pos')
+                    dist_folds[i, j, fold] = dist
+                    dist_folds[j, i, fold] = dist
+
+        return np.nanmean(dist_folds, axis=2)
+
+    if verbose:
+        time_iterator = tqdm(range(n_times), desc="Timepoints")
+    else:
+        time_iterator = range(n_times)
+
+    distances = Parallel(n_jobs=n_jobs)(
+        delayed(compute_timepoint)(t) for t in time_iterator
+    )
+
+    return np.stack(distances, axis=0)
 
 def interpolate_rdm_nan(rdm):
     """Interpolate nan values in a RDM matrix by computing the mean of previous and subsequent block.

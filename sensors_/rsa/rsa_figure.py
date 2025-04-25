@@ -17,8 +17,7 @@ analysis = 'pat_high_rdm_high'
 lock = 'stim'
 
 # get times
-times = np.load(data_path / "times.npy")
-# timesg = np.load(data_path / "times_gen.npy")
+times = np.linspace(-0.2, 0.6, 82)
 
 figures_dir = FIGURES_DIR / "RSA" / "sensors"
 ensure_dir(figures_dir)
@@ -29,7 +28,7 @@ all_decoding = {}
 
 for subject in tqdm(subjects):
     
-    res_path = RESULTS_DIR / 'RSA' / 'sensors' / lock / "cv_rdm" / subject
+    res_path = RESULTS_DIR / 'RSA' / 'sensors' / lock / "cv_rdm_fixed" / subject
     ensure_dir(res_path)
         
     # RSA stuff
@@ -197,7 +196,6 @@ axd['D'].plot(times, all_rhos.mean(0), alpha=1, zorder=10, color=c6)
 # Fill the entire area with a semi-transparent color
 axd['D'].fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, alpha=0.2, zorder=5, facecolor=c6)
 # Overlay significant regions with the specified color
-# axd['D'].fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, where=sig, alpha=0.2, zorder=10, facecolor=c6, label='Significance')
 # Highlight significant regions
 axd['D'].fill_between(times, all_rhos.mean(0) - sem, 0, where=sig, alpha=0.1, zorder=5, facecolor=c6)
 axd['D'].set_ylabel("Spearman's rho", fontsize=11)
@@ -238,7 +236,7 @@ pval = ttest_1samp(rhos, 0)[1]
 ptext = f"p = {pval:.2f}" if pval > 0.001 else "p < 0.001"
 axd['C'].legend(frameon=False, title=ptext, loc='upper left')
 
-plt.savefig(figures_dir /  f"{lock}-rsa3.pdf", transparent=True)
+plt.savefig(figures_dir /  f"{lock}-rsa4.pdf", transparent=True)
 plt.close()
 
 fig, ax = plt.subplots(1, 1, figsize=(12, 4), layout='tight')

@@ -22,7 +22,7 @@ is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
 def process_subject(subject, epoch_num, verbose):
     
-    res_path = RESULTS_DIR / 'RSA' / 'sensors' / lock / "loocv_rdm_blocks_fixed" / subject
+    res_path = RESULTS_DIR / 'RSA' / 'sensors' / lock / "split_20s" / subject
     ensure_dir(res_path)
         
     # read behav
@@ -34,7 +34,9 @@ def process_subject(subject, epoch_num, verbose):
     data = epoch.get_data(picks='mag', copy=True)
     
     blocks = np.unique(behav["blocks"])
-
+    all_pats = []
+    all_rands = []
+    
     for block in blocks:
         block = int(block)
         print(f"Processing {subject} - session {epoch_num} - block {block}")
@@ -44,17 +46,33 @@ def process_subject(subject, epoch_num, verbose):
             X_pat = data[filter]
             y_pat = behav[filter].reset_index(drop=True).positions
             assert len(X_pat) == len(y_pat)
-            rdm_pat = loocv_mahalanobis_parallel(X_pat, y_pat, 1)
+            rdm_pat = loocv_mahalanobis(X_pat, y_pat)
             np.save(res_path / f"pat-{epoch_num}-{block}.npy", rdm_pat)
+        else:
+            rdm_pat = np.load(res_path / f"pat-{epoch_num}-{block}.npy")
+        all_pats.append(rdm_pat)
         
         if not op.exists(res_path / f"rand-{epoch_num}-{block}.npy") or overwrite:
             filter = (behav["trialtypes"] == 2) & (behav["blocks"] == block)            
             X_rand = data[filter]
             y_rand = behav[filter].reset_index(drop=True).positions
             assert len(X_rand) == len(y_rand)
-            rdm_rand = loocv_mahalanobis_parallel(X_rand, y_rand, 1)
+            rdm_rand = loocv_mahalanobis(X_rand, y_rand)
             np.save(res_path / f"rand-{epoch_num}-{block}.npy", rdm_rand)
+        else:
+            rdm_rand = np.load(res_path / f"rand-{epoch_num}-{block}.npy")
+        all_rands.append(rdm_rand)
             
+    all_pats, nan_pat = interpolate_rdm_nan(np.array(all_pats))
+    if nan_pat:
+        print(subject, "has pattern nans interpolated in session", epoch_num)
+    all_rands, nan_rand = interpolate_rdm_nan(np.array(all_rands))
+    if nan_rand:
+        print(subject, "has random nans interpolated in session", epoch_num)
+    
+    np.save(res_path / f"pat-{epoch_num}.npy", all_pats)
+    np.save(res_path / f"rand-{epoch_num}.npy", all_rands)
+
 if is_cluster:
     # Check that SLURM_ARRAY_TASK_ID is available and use it to get the subject
     try:
