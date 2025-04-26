@@ -792,6 +792,84 @@ def cv_mahalanobis_fixed(X, y, n_splits=10):
 
     return distances
 
+def cv_mahalanobis_parallel(X, y, n_jobs=-1, n_splits=10, verbose=True):
+    """
+    Parallelized Cross-validated Mahalanobis distances with tqdm_joblib and NaN safety.
+
+    Parameters:
+        X: ndarray (n_trials, n_channels, n_times)
+        y: array-like (n_trials,) condition labels
+        n_splits: int, number of cross-validation folds
+        n_jobs: int, number of parallel jobs (default: -1 = all CPUs)
+        verbose: bool, show progress bars
+
+    Returns:
+        distances: ndarray (n_times, n_conditions, n_conditions)
+    """
+    import numpy as np
+    from sklearn.model_selection import StratifiedKFold
+    from sklearn.covariance import LedoitWolf
+    from scipy.linalg import solve
+    from joblib import Parallel, delayed
+    from tqdm.auto import tqdm
+    from tqdm_joblib import tqdm_joblib
+
+    n_trials, n_channels, n_times = X.shape
+    conditions = np.unique(y)
+    n_conditions = len(conditions)
+
+    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
+
+    def compute_timepoint(t):
+        X_t = X[:, :, t]
+        dist_folds = np.zeros((n_conditions, n_conditions, n_splits))
+
+        fold_iterator = skf.split(X_t, y)
+        if verbose:
+            fold_iterator = tqdm(fold_iterator, total=n_splits, desc=f"Time {t:03}", leave=False, position=t % 8)
+
+        for fold, (train_idx, test_idx) in enumerate(fold_iterator):
+            X_train, X_test = X_t[train_idx], X_t[test_idx]
+            y_train, y_test = y[train_idx], y[test_idx]
+
+            try:
+                lw = LedoitWolf()
+                lw.fit(X_train)
+                cov = lw.covariance_
+
+                train_means = {c: X_train[y_train == c].mean(axis=0) for c in conditions}
+                test_means = {c: X_test[y_test == c].mean(axis=0) for c in conditions}
+
+                for i, ci in enumerate(conditions):
+                    for j, cj in enumerate(conditions):
+                        if j <= i:
+                            continue
+
+                        diff_train = train_means[ci] - train_means[cj]
+                        diff_test = test_means[ci] - test_means[cj]
+
+                        dist = diff_train.T @ solve(cov, diff_test, assume_a='pos')
+                        dist_folds[i, j, fold] = dist
+                        dist_folds[j, i, fold] = dist
+            except (ValueError, np.linalg.LinAlgError, KeyError, ZeroDivisionError):
+                # Catch common issues: singular covariances, missing classes, empty slices
+                dist_folds[:, :, fold] = np.nan
+
+        return np.nanmean(dist_folds, axis=2)  # <- safely ignore folds with NaNs
+
+    time_iterator = range(n_times)
+
+    if verbose:
+        with tqdm_joblib(tqdm(desc="Overall Timepoints", total=n_times)) as progress_bar:
+            distances = Parallel(n_jobs=n_jobs)(
+                delayed(compute_timepoint)(t) for t in time_iterator
+            )
+    else:
+        distances = Parallel(n_jobs=n_jobs)(
+            delayed(compute_timepoint)(t) for t in time_iterator
+        )
+
+    return np.stack(distances, axis=0)
 
 def loocv_mahalanobis(X, y):
     """
@@ -1034,7 +1112,6 @@ def remove_common_vertex(base_label, target_label):
                   subject=target_label.subject)
     
     return corrected_label
-
 
 def contiguous_regions(condition):
     import numpy as np

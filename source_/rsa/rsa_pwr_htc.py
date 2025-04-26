@@ -4,10 +4,11 @@ import os.path as op
 import numpy as np
 from mne.beamformer import make_lcmv, apply_lcmv_epochs
 import pandas as pd
-from base import ensure_dir, get_volume_estimate_tc, cv_mahalanobis
+from base import ensure_dir, get_volume_estimate_tc, cv_mahalanobis_parallel
 from config import *
 import gc
 import sys
+from joblib import Parallel, delayed
 
 data_path = DATA_DIR
 subjects, subjects_dir = SUBJS, FREESURFER_DIR
@@ -22,7 +23,7 @@ is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 res_path = RESULTS_DIR / 'RSA' / 'source'
 ensure_dir(res_path)
 
-def process_subject(subject, epoch_num):    
+def process_subject(subject, epoch_num, jobs):    
     # read volume source space
     vol_src_fname =  TIMEG_DATA_DIR / 'src' / f"{subject}-htc-vol-src.fif"
     vol_src = mne.read_source_spaces(vol_src_fname, verbose=verbose)
@@ -63,7 +64,7 @@ def process_subject(subject, epoch_num):
     
     for region in ['Hippocampus', 'Thalamus', 'Cerebellum-Cortex']:
         
-        res_dir = res_path / region / lock / 'power_rdm' / subject
+        res_dir = res_path / region / lock / 'power_rdm_fixed' / subject
         ensure_dir(res_dir)
 
         # get data from regions of interest
@@ -82,7 +83,7 @@ def process_subject(subject, epoch_num):
                 print(f"Skipping {subject} {epoch_num} due to low counts")
             else:
                 print("Processing", subject, "epoch", epoch_num, region, 'pattern')
-                rdm_pat = cv_mahalanobis(X_pat, y_pat)
+                rdm_pat = cv_mahalanobis_parallel(X_pat, y_pat, jobs)
                 np.save(res_dir / f"pat-{epoch_num}.npy", rdm_pat)
                 del X_pat, y_pat
                 gc.collect()
@@ -99,7 +100,7 @@ def process_subject(subject, epoch_num):
                 print(f"Skipping {subject} {epoch_num} due to low counts")
             else:
                 print("Processing", subject, "epoch", epoch_num, region, 'random')
-                rdm_rand = cv_mahalanobis(X_rand, y_rand)
+                rdm_rand = cv_mahalanobis_parallel(X_rand, y_rand, jobs)
                 np.save(res_dir / f"rand-{epoch_num}.npy", rdm_rand)
                 del X_rand, y_rand
                 gc.collect()
@@ -113,11 +114,9 @@ if is_cluster:
         subject_num = int(os.getenv("SLURM_ARRAY_TASK_ID"))
         subject = subjects[subject_num]
         epoch_num = str(sys.argv[1])
-        process_subject(subject, epoch_num)
+        process_subject(subject, epoch_num, jobs)
     except (IndexError, ValueError) as e:
         print("Error: SLURM_ARRAY_TASK_ID is not set correctly or is out of bounds.")
         sys.exit(1)
 else:
-    for subject in subjects:
-        for epoch_num in range(5):
-            process_subject(subject, epoch_num)
+    Parallel(-1)(delayed(process_subject)(subject, epoch_num, 1) for subject in subjects for epoch_num in range(5))

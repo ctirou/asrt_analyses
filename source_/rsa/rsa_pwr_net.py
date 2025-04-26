@@ -20,7 +20,7 @@ verbose = 'error'
 overwrite = False
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
-def process_subject(subject, epoch_num):
+def process_subject(subject, epoch_num, jobs):
 
     networks = NETWORKS[:-2]
     label_path = RESULTS_DIR / f'networks_200_7' / subject
@@ -49,7 +49,7 @@ def process_subject(subject, epoch_num):
     
     for network in networks:
         
-        res_dir = RESULTS_DIR / "RSA" / 'source' / network / lock / 'power_rdm' / subject
+        res_dir = RESULTS_DIR / "RSA" / 'source' / network / lock / 'power_rdm_fixed' / subject
         ensure_dir(res_dir)
         
         if not op.exists(res_dir / f"pat-{epoch_num}.npy") or not op.exists(res_dir / f"rand-{epoch_num}.npy") or overwrite:
@@ -70,7 +70,7 @@ def process_subject(subject, epoch_num):
                     print(f"Skipping {subject} {epoch_num} due to low counts")
                 else:
                     print("Processing", subject, "epoch", epoch_num, network, 'pattern')
-                    rdm_pat = cv_mahalanobis(X_pat, y_pat)
+                    rdm_pat = cv_mahalanobis_parallel(X_pat, y_pat, jobs)
                     np.save(res_dir / f"pat-{epoch_num}.npy", rdm_pat)
                     del X_pat, y_pat
                     gc.collect()
@@ -87,7 +87,7 @@ def process_subject(subject, epoch_num):
                     print(f"Skipping {subject} {epoch_num} due to low counts")
                 else:
                     print("Processing", subject, "epoch", epoch_num, network, 'random')
-                    rdm_rand = cv_mahalanobis(X_rand, y_rand)
+                    rdm_rand = cv_mahalanobis_parallel(X_rand, y_rand, jobs)
                     np.save(res_dir / f"rand-{epoch_num}.npy", rdm_rand)
                     del X_rand, y_rand
                     gc.collect()
@@ -103,14 +103,14 @@ def process_subject(subject, epoch_num):
     
 if is_cluster:
     epoch_num = str(sys.argv[1])
+    jobs = 20
     # Check that SLURM_ARRAY_TASK_ID is available and use it to get the subject
     try:
         subject_num = int(os.getenv("SLURM_ARRAY_TASK_ID"))
         subject = subjects[subject_num]
-        process_subject(subject, epoch_num)
+        process_subject(subject, epoch_num, jobs)
     except (IndexError, ValueError) as e:
         print("Error: SLURM_ARRAY_TASK_ID is not set correctly or is out of bounds.")
         sys.exit(1)
 else:
-    # for epoch_num in range(5):
-    Parallel(-1)(delayed(process_subject)(subject, epoch_num) for subject in subjects for epoch_num in range(5))
+    Parallel(-1)(delayed(process_subject)(subject, epoch_num, 1) for subject in subjects for epoch_num in range(5))
