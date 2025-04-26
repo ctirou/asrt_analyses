@@ -56,7 +56,7 @@ all_lows = np.array(all_lows)
 
 high = all_highs[:, :, 1:, :].mean((1, 2)) - all_highs[:, :, 0, :].mean(axis=1)
 low = all_lows[:, :, 1:, :].mean((1, 2)) - all_lows[:, :, 0, :].mean(axis=1)
-diff = low - high
+diff_lh = low - high
 
 diff_sess = list()   
 for i in range(5):
@@ -126,8 +126,7 @@ for trial_type, color in zip(['pattern', 'random'], [cpat, crdm]):
     # Highlight significant regions
     axd['A'].fill_between(times, decoding.mean(0) - sem, chance, where=sig, alpha=0.1, facecolor=color)
 
-# axd['A'].text(0.1, 48.5, '$Stimulus$', fontsize=11, ha='center')
-# axd['A'].text(0.1, 41.7, '$Stimulus$', fontsize=11, ha='center')
+axd['A'].text(0.1, 44, '$Stimulus$', fontsize=11, ha='center')
 axd['A'].text(0.6, 26, '$Chance$', fontsize=11, ha='center', va='top')
 axd['A'].set_ylabel('Accuracy (%)', fontsize=11)
 axd['A'].text(np.mean(times[sig]), 27, '*', fontsize=25, ha='center', va='center', color=cpat, weight='bold')
@@ -141,6 +140,7 @@ axd['A'].yaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter('%.1f'))
 ### B1 ### cvMD
 sem_high = np.std(high, axis=0) / np.sqrt(len(subjects))
 sem_low = np.std(low, axis=0) / np.sqrt(len(subjects))
+axd['B1'].axhline(0, color='grey', alpha=0.5)
 # High
 axd['B1'].plot(times, high.mean(0), alpha=1, zorder=10, color=cpat, label='Pattern')
 # Plot significant regions separately
@@ -157,26 +157,26 @@ axd['B1'].plot(times, low.mean(0), alpha=1, zorder=10, color=crdm, label='Random
 axd['B1'].fill_between(times, low.mean(0) - sem_low, low.mean(0) + sem_low, alpha=0.1, zorder=5, facecolor=crdm)
 # Highlight significant regions
 # axd['B1'].fill_between(times, low.mean(0) - sem, low.mean(0) + sem, where=sig, alpha=0.3, zorder=5, facecolor=c4)    
-axd['B1'].legend(frameon=False, loc='lower left')
+axd['B1'].legend(frameon=False, loc='upper left')
 axd['B1'].set_ylabel('cvMD', fontsize=11)
 axd['B1'].set_xticklabels([])
 axd['B1'].set_title(f'Mahalanobis distance within pairs', fontsize=13)
 
 ### B2 ### Similarity index
 axd['B2'].axhline(0, color='grey', alpha=0.5)
-p_values = decod_stats(diff, -1)
+p_values = decod_stats(diff_lh, -1)
 sig = p_values < 0.05
 idx_rsa = np.where(sig)[0] # to compute mean later
 np.save(figures_dir / 'sig_rsa.npy', idx_rsa)
-sem = np.std(diff, axis=0) / np.sqrt(len(subjects))
+sem = np.std(diff_lh, axis=0) / np.sqrt(len(subjects))
 # Plot the entire line in the default color
-axd['B2'].plot(times, diff.mean(0), alpha=1, zorder=10, color=c2)
+axd['B2'].plot(times, diff_lh.mean(0), alpha=1, zorder=10, color=c2)
 # Fill the entire area with a semi-transparent color
-axd['B2'].fill_between(times, diff.mean(0) - sem, diff.mean(0) + sem, alpha=0.2, zorder=5, facecolor=c2)
+axd['B2'].fill_between(times, diff_lh.mean(0) - sem, diff_lh.mean(0) + sem, alpha=0.2, zorder=5, facecolor=c2)
 # Overlay significant regions with the specified color
-axd['B2'].fill_between(times, diff.mean(0) - sem, 0, where=sig, alpha=0.1, zorder=10, facecolor=c2)
+axd['B2'].fill_between(times, diff_lh.mean(0) - sem, 0, where=sig, alpha=0.1, zorder=10, facecolor=c2)
 # Highlight significant regions
-# axd['B2'].fill_between(times, diff.mean(0) - sem, 0, where=sig, alpha=0.2, zorder=5, facecolor=c2)
+# axd['B2'].fill_between(times, diff_lh.mean(0) - sem, 0, where=sig, alpha=0.2, zorder=5, facecolor=c2)
 # axd['B2'].legend(frameon=False, loc="upper left")
 axd['B2'].text(np.mean(times[sig]), 0.1, '*', fontsize=25, ha='center', va='center', color=c2, weight='bold')
 axd['B2'].set_ylabel('Similarity index', fontsize=11)
