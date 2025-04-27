@@ -8,19 +8,16 @@ from config import *
 import sys
 from joblib import Parallel, delayed
 
-from statsmodels.tsa.stattools import grangercausalitytests
-from statsmodels.tsa.api import VAR
+data_path = DATA_DIR
+subjects = ALL_SUBJS
+lock = 'stim'
 
 overwrite = False
 verbose = 'error'
 
-data_path = DATA_DIR
-subjects = SUBJS + ['sub03', 'sub06']
-lock = 'stim'
-
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
-def process_subject(subject, epoch_num, verbose):
+def process_subject(subject, epoch_num, jobs, verbose):
     
     res_path = RESULTS_DIR / 'RSA' / 'sensors' / lock / "loocv_rdm_blocks_fixed" / subject
     ensure_dir(res_path)
@@ -44,7 +41,7 @@ def process_subject(subject, epoch_num, verbose):
             X_pat = data[filter]
             y_pat = behav[filter].reset_index(drop=True).positions
             assert len(X_pat) == len(y_pat)
-            rdm_pat = loocv_mahalanobis_parallel(X_pat, y_pat, 1)
+            rdm_pat = loocv_mahalanobis_parallel(X_pat, y_pat, jobs)
             np.save(res_path / f"pat-{epoch_num}-{block}.npy", rdm_pat)
         
         if not op.exists(res_path / f"rand-{epoch_num}-{block}.npy") or overwrite:
@@ -52,7 +49,7 @@ def process_subject(subject, epoch_num, verbose):
             X_rand = data[filter]
             y_rand = behav[filter].reset_index(drop=True).positions
             assert len(X_rand) == len(y_rand)
-            rdm_rand = loocv_mahalanobis_parallel(X_rand, y_rand, 1)
+            rdm_rand = loocv_mahalanobis_parallel(X_rand, y_rand, jobs)
             np.save(res_path / f"rand-{epoch_num}-{block}.npy", rdm_rand)
             
 if is_cluster:
@@ -60,9 +57,12 @@ if is_cluster:
     try:
         subject_num = int(os.getenv("SLURM_ARRAY_TASK_ID"))
         subject = subjects[subject_num]
-        process_subject(subject, verbose)
+        epoch_num = int(sys.argv[1])
+        jobs = int(os.getenv("SLURM_CPUS_PER_TASK", 1))
+        process_subject(subject, epoch_num, jobs, verbose)
     except (IndexError, ValueError) as e:
         print("Error: SLURM_ARRAY_TASK_ID is not set correctly or is out of bounds.")
         sys.exit(1)
 else:
-    Parallel(-1)(delayed(process_subject)(subject, epoch_num, verbose) for subject in subjects for epoch_num in range(5))
+    jobs = 1
+    Parallel(-1)(delayed(process_subject)(subject, epoch_num, jobs, verbose) for subject in subjects for epoch_num in range(5))

@@ -96,7 +96,10 @@ def process_subject(subject, jobs):
             gc.collect()
             
             blocks = np.unique(behav["blocks"])
-                        
+            
+            Xtraining_pat, Xtesting_pat, ytraining_pat, ytesting_pat = [], [], [], []
+            Xtraining_rand, Xtesting_rand, ytraining_rand, ytesting_rand = [], [], [], []
+            
             for block in blocks:
                 
                 print("Spliting on", region, "epoch", epoch_num, "block", block)
@@ -108,11 +111,17 @@ def process_subject(subject, jobs):
                 assert len(X) == len(y)
                 
                 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-                                
-                all_Xtraining_pat.append(X_train)
-                all_Xtesting_pat.append(X_test)
-                all_ytesting_pat.append(y_test)
-                all_ytraining_pat.append(y_train)
+                
+                Xtraining_pat.append(X_train)
+                Xtesting_pat.append(X_test)
+                ytraining_pat.append(y_train)
+                ytesting_pat.append(y_test)
+                
+                if epoch_num != 0:
+                    all_Xtraining_pat.append(X_train)
+                    all_Xtesting_pat.append(X_test)
+                    all_ytesting_pat.append(y_test)
+                    all_ytraining_pat.append(y_train)
                 
                 random =  (behav.trialtypes == 2) & (behav.blocks == block)
                 X = stcs_data[random]
@@ -121,11 +130,14 @@ def process_subject(subject, jobs):
                 assert len(X) == len(y)
                 
                 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-                
-                all_Xtraining_rand.append(X_train)
-                all_Xtesting_rand.append(X_test)
-                all_ytesting_rand.append(y_test)
-                all_ytraining_rand.append(y_train)
+
+                if epoch_num != 0:            
+                    all_Xtraining_rand.append(X_train)
+                    all_Xtesting_rand.append(X_test)
+                    all_ytesting_rand.append(y_test)
+                    all_ytraining_rand.append(y_train)
+            
+            
                         
             del behav
             gc.collect()

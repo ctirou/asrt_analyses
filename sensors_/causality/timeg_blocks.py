@@ -8,21 +8,20 @@ import numpy as np
 import gc
 from base import ensure_dir
 from mne import read_epochs
-from mne.decoding import cross_val_multiscore, GeneralizingEstimator
+from mne.decoding import GeneralizingEstimator
 from sklearn.pipeline import make_pipeline
-from sklearn.model_selection import LeaveOneOut, StratifiedKFold, train_test_split
+from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score as acc, balanced_accuracy_score as bacc
+from sklearn.metrics import accuracy_score as acc
 
-# data_path = TIMEG_DATA_DIR / 'gen44'
 data_path = TIMEG_DATA_DIR
-subjects = SUBJS + ['sub03', 'sub06']
+subjects = ALL_SUBJS
 lock = 'stim'
 solver = 'lbfgs'
 scoring = "accuracy"
-verbose = True
-overwrite = False
+verbose = 'error'
+overwrite = True
 
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
@@ -31,8 +30,6 @@ def process_subject(subject, lock, jobs):
     # define classifier
     clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
     clf = GeneralizingEstimator(clf, scoring=scoring, n_jobs=jobs)
-    # loo = LeaveOneOut()
-    # skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 
     for trial_type in ['pattern', 'random']:
         
@@ -40,7 +37,7 @@ def process_subject(subject, lock, jobs):
         all_ytraining, all_ytesting = [], []
 
         for epoch_num in [0, 1, 2, 3, 4]:
-            res_path = data_path / 'results' / 'sensors' / lock / f"split_all_{trial_type}"
+            res_path = data_path / 'results' / 'sensors' / lock / f"split_{trial_type}"
             ensure_dir(res_path)
             
             behav = pd.read_pickle(op.join(data_path, 'behav', f'{subject}-{epoch_num}.pkl'))
@@ -69,26 +66,28 @@ def process_subject(subject, lock, jobs):
                 ytraining.append(y_train)
                 ytesting.append(y_test)
                 
-                all_Xtraining.append(X_train)
-                all_Xtesting.append(X_test)
-                all_ytesting.append(y_test)
-                all_ytraining.append(y_train)
-                
+                if epoch_num != 0:
+                    all_Xtraining.append(X_train)
+                    all_Xtesting.append(X_test)
+                    all_ytesting.append(y_test)
+                    all_ytraining.append(y_train)
         
             Xtraining = np.concatenate(Xtraining)
             ytraining = np.concatenate(ytraining)            
-            # clf.fit(Xtraining, ytraining)
+            clf.fit(Xtraining, ytraining)
             
-            # for i in range(len(blocks)):
-            #     if not op.exists(res_path / f"{subject}-{epoch_num}-{i+1}.npy") or overwrite:
-            #         ypred = clf.predict(Xtesting[i])
-            #         print("Scoring...")
-            #         acc_matrix = np.apply_along_axis(lambda x: acc(ytesting[i], x), 0, ypred)
-            #         np.save(res_path / f"{subject}-{epoch_num}-{i+1}.npy", acc_matrix)
+            for i in range(len(blocks)):
+                if not op.exists(res_path / f"{subject}-{epoch_num}-{i+1}.npy") or overwrite:
+                    ypred = clf.predict(Xtesting[i])
+                    print("Scoring...")
+                    acc_matrix = np.apply_along_axis(lambda x: acc(ytesting[i], x), 0, ypred)
+                    np.save(res_path / f"{subject}-{epoch_num}-{i+1}.npy", acc_matrix)
             
             del epoch_gen, behav
             gc.collect()
-            
+        
+        res_path = data_path / 'results' / 'sensors' / lock / f"split_all_{trial_type}"
+        
         all_Xtraining = np.concatenate(all_Xtraining)
         all_ytraining = np.concatenate(all_ytraining)
         clf.fit(all_Xtraining, all_ytraining)

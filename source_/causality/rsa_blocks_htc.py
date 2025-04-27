@@ -20,7 +20,7 @@ verbose = 'error'
 overwrite = False
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
-def process_subject(subject, epoch_num):
+def process_subject(subject, epoch_num, jobs):
     
     # read volume source space
     vol_src_fname =  TIMEG_DATA_DIR / 'src' / f"{subject}-htc-vol-src.fif"
@@ -58,7 +58,7 @@ def process_subject(subject, epoch_num):
     
     for region in ['Hippocampus', 'Thalamus', 'Cerebellum-Cortex']:
         
-        res_dir = RESULTS_DIR / "RSA" / 'source' / region / lock / 'loocv_rdm_blocks' / subject
+        res_dir = RESULTS_DIR / "RSA" / 'source' / region / lock / 'loocv_rdm_blocks_fixed' / subject
         ensure_dir(res_dir)
         
         # get data from regions of interest
@@ -67,8 +67,6 @@ def process_subject(subject, epoch_num):
         assert len(stcs_data) == len(behav), "Length mismatch"
             
         blocks = np.unique(behav.blocks)
-        all_pats, all_rands = [], []
-
         for block in blocks:
             
             block = int(block)
@@ -79,32 +77,16 @@ def process_subject(subject, epoch_num):
                 X_pat = stcs_data[filter]
                 y_pat = behav[filter].reset_index(drop=True).positions
                 assert len(X_pat) == len(y_pat)
-                rdm_pat = loocv_mahalanobis(X_pat, y_pat)
+                rdm_pat = loocv_mahalanobis_parallel(X_pat, y_pat, jobs)
                 np.save(res_dir / f"pat-{epoch_num}-{block}.npy", rdm_pat)
-            else:
-                rdm_pat = np.load(res_dir / f"pat-{epoch_num}-{block}.npy")
-            all_pats.append(rdm_pat)
             
             if not op.exists(res_dir / f"rand-{epoch_num}-{block}.npy") or overwrite:
                 filter = (behav["trialtypes"] == 2) & (behav["blocks"] == block)            
                 X_rand = stcs_data[filter]
                 y_rand = behav[filter].reset_index(drop=True).positions
                 assert len(X_rand) == len(y_rand)
-                rdm_rand = loocv_mahalanobis(X_rand, y_rand)
+                rdm_rand = loocv_mahalanobis_parallel(X_rand, y_rand, jobs)
                 np.save(res_dir / f"rand-{epoch_num}-{block}.npy", rdm_rand)
-            else:
-                rdm_rand = np.load(res_dir / f"rand-{epoch_num}-{block}.npy")
-            all_rands.append(rdm_rand)
-                
-        all_pats, nan_pat = interpolate_rdm_nan(np.array(all_pats))
-        if nan_pat:
-            print(subject, "has pattern nans interpolated in session", epoch_num, region)
-        all_rands, nan_rand = interpolate_rdm_nan(np.array(all_rands))
-        if nan_rand:
-            print(subject, "has random nans interpolated in session", epoch_num, region)
-        
-        np.save(res_dir / f"pat-{epoch_num}.npy", all_pats)
-        np.save(res_dir / f"rand-{epoch_num}.npy", all_rands)
 
         del labels, stcs_data
         gc.collect()
@@ -118,11 +100,12 @@ if is_cluster:
         subject_num = int(os.getenv("SLURM_ARRAY_TASK_ID"))
         subject = subjects[subject_num]
         epoch_num = str(sys.argv[1])
-        process_subject(subject, epoch_num)
-    
+        jobs = int(os.getenv("SLURM_CPUS_PER_TASK", 1))
+        process_subject(subject, epoch_num, jobs)
     except (IndexError, ValueError) as e:
         print("Error: SLURM_ARRAY_TASK_ID is not set correctly or is out of bounds.")
         sys.exit(1)
 else:
-    # for epoch_num in range(5):
-    Parallel(-1)(delayed(process_subject)(subject, epoch_num) for subject in subjects for epoch_num in range(5))
+    # run on local machine
+    jobs = 1    
+    Parallel(-1)(delayed(process_subject)(subject, epoch_num, jobs) for subject in subjects for epoch_num in range(5))

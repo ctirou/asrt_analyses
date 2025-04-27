@@ -10,6 +10,8 @@ lock = 'stim'
 
 times = np.linspace(-0.2, 0.6, 82)
 win = np.where((times >= 0.28) & (times <= 0.51))[0]
+win = np.load(FIGURES_DIR / "RSA" / "sensors" / "sig_rsa.npy")
+# win = times[sig]
 
 pattern, random = [], []
 for subject in tqdm(subjects):

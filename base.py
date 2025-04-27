@@ -383,7 +383,7 @@ def get_in_out_seq(sequence, similarities, random_lows, analysis):
                 out_seq.append(pat_sim)
     return np.array(in_seq), np.array(out_seq)
 
-def get_all_high_low(res_path, sequence, analysis, cv=False):
+def get_all_high_low(res_path, sequence, analysis, cv=True):
     import numpy as np
     # create lists of possible combinations between stimuli
     one_twos_pat = list()
@@ -524,6 +524,15 @@ def get_all_high_low(res_path, sequence, analysis, cv=False):
                 low.append(pat_sim)
             else:
                 high.append(rand_sim)
+    elif analysis == 'pat_vs_rand':
+        for pair, rev_pair, pat_sim, rand_sim in zip(pairs, rev_pairs, similarities, random_lows):
+            high.append(pat_sim)
+            low.append(rand_sim)
+    elif analysis == 'all_pat_rdm_low':
+        for pair, rev_pair, pat_sim, rand_sim in zip(pairs, rev_pairs, similarities, random_lows):
+            high.append(pat_sim)
+            if not ((pair in pairs_in_sequence) or  not (rev_pair in pairs_in_sequence)):
+                low.append(rand_sim)
     else:
         for pair, rev_pair, pat_sim, rand_sim in zip(pairs, rev_pairs, similarities, random_lows):
             if ((pair in pairs_in_sequence) or (rev_pair in pairs_in_sequence)):

@@ -46,15 +46,17 @@ for network in networks:
         behav_dir = op.join(HOME / 'raw_behavs' / subject)
         sequence = get_sequence(behav_dir)
         # home = Path("/Users/coum/MEGAsync/RSA")
-        res_path = RESULTS_DIR / 'RSA' / 'source' / network / lock / f'{ori}_rdm' / subject
+        res_path = RESULTS_DIR / 'RSA' / 'source' / network / lock / f'{ori}_rdm_fixed' / subject
         high, low = get_all_high_low(res_path, sequence, analysis, cv=True)    
         all_highs[network].append(high)    
         all_lows[network].append(low)
     all_highs[network] = np.array(all_highs[network])
     all_lows[network] = np.array(all_lows[network])
     for i in range(5):
-        rev_low = all_lows[network][:, :, i, :].mean(1) - all_lows[network][:, :, 0, :].mean(axis=1)
-        rev_high = all_highs[network][:, :, i, :].mean(1) - all_highs[network][:, :, 0, :].mean(axis=1)
+        # rev_low = all_lows[network][:, :, i, :].mean(1) - all_lows[network][:, :, 0, :].mean(axis=1)
+        # rev_high = all_highs[network][:, :, i, :].mean(1) - all_highs[network][:, :, 0, :].mean(axis=1)
+        rev_low = all_lows[network][:, :, i, :].mean(1)
+        rev_high = all_highs[network][:, :, i, :].mean(1)
         diff_sess[network].append(rev_low - rev_high)
     diff_sess[network] = np.array(diff_sess[network]).swapaxes(0, 1)
 
@@ -62,10 +64,14 @@ for network in networks:
 fig, axes = plt.subplots(2, 5, figsize=(15, 4), sharex=True, sharey=True, layout='tight')
 for i, (ax, label, name) in enumerate(zip(axes.flat, networks, network_names)):
     ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
-    ax.axvspan(0.28, 0.51, facecolor='green', edgecolor=None, alpha=.1)
+    # ax.axvspan(0.28, 0.51, facecolor='green', edgecolor=None, alpha=.1)
     ax.axhline(0, color='grey', alpha=.5)
-    high = all_highs[label][:, :, 1:, :].mean((1, 2)) - all_highs[label][:, :, 0, :].mean(1)
-    low = all_lows[label][:, :, 1:, :].mean((1, 2)) - all_lows[label][:, :, 0, :].mean(axis=1)
+    # high = all_highs[label][:, :, 1:, :].mean((1, 2)) - all_highs[label][:, :, 0, :].mean(1)
+    # low = all_lows[label][:, :, 1:, :].mean((1, 2)) - all_lows[label][:, :, 0, :].mean(axis=1)
+
+    high = all_highs[label][:, :, 1:, :].mean((1, 2))
+    low = all_lows[label][:, :, 1:, :].mean((1, 2))
+
     diff = low - high
     p_values = decod_stats(diff, jobs)
     sig = p_values < threshold
@@ -86,20 +92,20 @@ for i, (ax, label, name) in enumerate(zip(axes.flat, networks, network_names)):
     # axd[j].set_xticklabels([])
     # ax.set_xlabel('Time (s)', fontsize=11)
     ax.set_title(name, fontstyle='italic')
-    ax.set_ylim(-.5, 2)
+    # ax.set_ylim(-.5, 2)
     # ax.axhline(0.51, color='grey', alpha=.5)
 # plt.show()
-fig.savefig(figures_dir / "similarity.pdf", transparent=True)
+fig.savefig(figures_dir / "similarity_fixed2.pdf", transparent=True)
 plt.close(fig)
 
 ### Plot similarity index x learning index corr ###
 learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices3.csv', sep="\t", index_col=0)
 fig, axes = plt.subplots(2, 5, figsize=(15, 4), sharex=True, sharey=True, layout='tight')
 for i, (ax, label, name) in enumerate(zip(axes.flat, networks, network_names)):
-    ax.axvspan(0.28, 0.51, facecolor='green', edgecolor=None, alpha=.1)
+    # ax.axvspan(0.28, 0.51, facecolor='green', edgecolor=None, alpha=.1)
     ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
     ax.axhline(0, color='grey', alpha=.5)
-    all_rhos = np.array([[spear(learn_index_df.iloc[sub, :], diff_sess[label][sub, :, t])[0] for t in range(len(times))] for sub in range(len(subjects))])
+    all_rhos = np.array([[spear(learn_index_df.iloc[sub, 1:], diff_sess[label][sub, 1:, t])[0] for t in range(len(times))] for sub in range(len(subjects))])
     sem = np.std(all_rhos, axis=0) / np.sqrt(len(subjects))
     # axd[j].plot(times, all_rhos.mean(0), color=cmap[i])
     p_values_unc = ttest_1samp(all_rhos, axis=0, popmean=0)[1]
@@ -127,7 +133,7 @@ for i, (ax, label, name) in enumerate(zip(axes.flat, networks, network_names)):
     # ax.set_yticks([-.5, 0, .5])
     # ax.legend()
 # plt.show()
-fig.savefig(figures_dir / "similarity-corr.pdf", transparent=True)
+fig.savefig(figures_dir / "similarity-corr_fixed2.pdf", transparent=True)
 plt.close(fig)
 
 ### Plot decoding performance ###

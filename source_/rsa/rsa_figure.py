@@ -70,7 +70,7 @@ for network in networks:
         # RSA stuff
         behav_dir = op.join(HOME / "raw_behavs" / subject)
         sequence = get_sequence(behav_dir)
-        res_path = RESULTS_DIR / 'RSA' / 'source' / network / lock / 'power_rdm' / subject
+        res_path = RESULTS_DIR / 'RSA' / 'source' / network / lock / 'power_rdm_fixed' / subject
         high, low = get_all_high_low(res_path, sequence, analysis, cv=True)    
         all_highs[network].append(high)    
         all_lows[network].append(low)
@@ -309,7 +309,7 @@ for i, (label, name, j) in enumerate(zip(networks, network_names, ['C', 'F', 'I'
     axd[j].set_ylim(-.5, .5)
     axd[j].set_yticks([-1, 0, 1])
 
-fig.savefig(figures_dir / f"{lock}-test-rsa.pdf", transparent=True)
+fig.savefig(figures_dir / f"{lock}-test-rsa_fixed.pdf", transparent=True)
 # fig.savefig(figures_dir / f"{lock}-rsa.pdf", transparent=True)
 plt.close()
 

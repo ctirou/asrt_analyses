@@ -154,6 +154,8 @@ def process_subject(subject, jobs):
                     print(f"Scoring quarter {i+1} for {subject} epoch {epoch_num} pattern")
                     acc_matrix = np.apply_along_axis(lambda x: acc(ytesting_pat[i], x), 0, ypred)
                     np.save(res_dir / f"{subject}-{epoch_num}-{i+1}.npy", acc_matrix)
+                else:
+                    print(f"Quarter {i+1} for {subject} epoch {epoch_num} pattern exists, skipping")
 
             # Random per session
             res_dir = res_path / network / "split_20s_random"
@@ -169,6 +171,8 @@ def process_subject(subject, jobs):
                     print(f"Scoring quarter {i+1} for {subject} epoch {epoch_num} random")
                     acc_matrix = np.apply_along_axis(lambda x: acc(ytesting_rand[i], x), 0, ypred)
                     np.save(res_dir / f"{subject}-{epoch_num}-{i+1}.npy", acc_matrix)
+                else:
+                    print(f"Quarter {i+1} for {subject} epoch {epoch_num} random exists, skipping")
                         
             del behav
             gc.collect()
@@ -186,6 +190,8 @@ def process_subject(subject, jobs):
                 print(f"Scoring quarter {i+1} for {subject} all pattern")
                 acc_matrix = np.apply_along_axis(lambda x: acc(all_ytesting_pat[i], x), 0, ypred)
                 np.save(res_dir / f"{subject}-{i+1}.npy", acc_matrix)
+            else:
+                print(f"Quarter {i+1} for {subject} all pattern exists, skipping")
         
         # Random all sessions
         res_dir = res_path / network / "split_20s_all_random"
@@ -200,6 +206,8 @@ def process_subject(subject, jobs):
                 print(f"Scoring quarter {i+1} for {subject} all random")
                 acc_matrix = np.apply_along_axis(lambda x: acc(all_ytesting_rand[i], x), 0, ypred)
                 np.save(res_dir / f"{subject}-{i+1}.npy", acc_matrix)
+            else:
+                print(f"Quarter {i+1} for {subject} all random exists, skipping")
 
 if is_cluster:
     try:

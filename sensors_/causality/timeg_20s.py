@@ -14,9 +14,9 @@ from sklearn.model_selection import KFold
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score as acc
-# data_path = TIMEG_DATA_DIR / 'gen44'
+
 data_path = TIMEG_DATA_DIR
-subjects = SUBJS + ['sub03', 'sub06']
+subjects = ALL_SUBJS
 lock = 'stim'
 solver = 'lbfgs'
 scoring = "accuracy"
