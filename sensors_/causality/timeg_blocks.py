@@ -51,15 +51,15 @@ def process_subject(subject, jobs):
             Xtraining, Xtesting, ytraining, ytesting = [], [], [], []
             for block in blocks:
                 
-                good = behav.blocks == block
-                bad = behav.blocks != block
+                this_block = behav.blocks == block
+                out_blocks = behav.blocks != block
                 
-                X_train = epoch_gen.get_data(copy=False)[good & filter][:, :, idx]
-                y_train = behav[good & filter].positions
+                X_train = epoch_gen.get_data(copy=False)[out_blocks & filter][:, :, idx]
+                y_train = behav[out_blocks & filter].positions
                 y_train = y_train.reset_index(drop=True)
                 
-                X_test = epoch_gen.get_data(copy=False)[bad & filter][:, :, idx]
-                y_test = behav[bad & filter].positions
+                X_test = epoch_gen.get_data(copy=False)[this_block & filter][:, :, idx]
+                y_test = behav[this_block & filter].positions
                 y_test = y_test.reset_index(drop=True)
                                             
                 Xtraining.append(X_train)

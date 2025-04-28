@@ -100,22 +100,17 @@ def process_subject(subject, jobs):
             
             for block in blocks:
                 
-                good = behav.blocks == block
-                bad = behav.blocks != block
+                this_block = behav.blocks == block
+                out_blocks = behav.blocks != block
                 
-                pattern = behav.trialtypes == 1                
-                X_train = stcs_data[good & pattern]
-                y_train = behav[good & pattern].positions
+                pattern = behav.trialtypes == 1
+                X_train = stcs_data[out_blocks & pattern]
+                y_train = behav[out_blocks & pattern].positions
                 y_train = y_train.reset_index(drop=True)
                 
-                X_test = stcs_data[bad & pattern]
-                y_test = behav[bad & pattern].positions
+                X_test = stcs_data[this_block & pattern]
+                y_test = behav[this_block & pattern].positions
                 y_test = y_test.reset_index(drop=True)
-                                            
-                Xtraining_pat.append(X_train)
-                Xtesting_pat.append(X_test)
-                ytraining_pat.append(y_train)
-                ytesting_pat.append(y_test)
                 
                 if epoch_num != 0:
                     all_Xtraining_pat.append(X_train)
@@ -124,12 +119,12 @@ def process_subject(subject, jobs):
                     all_ytesting_pat.append(y_test)
                 
                 random = behav.trialtypes == 2                
-                X_train = stcs_data[good & random]
-                y_train = behav[good & random].positions
+                X_train = stcs_data[out_blocks & random]
+                y_train = behav[out_blocks & random].positions
                 y_train = y_train.reset_index(drop=True)
                 
-                X_test = stcs_data[bad & random]
-                y_test = behav[bad & random].positions
+                X_test = stcs_data[this_block & random]
+                y_test = behav[this_block & random].positions
                 y_test = y_test.reset_index(drop=True)
                                             
                 Xtraining_rand.append(X_train)

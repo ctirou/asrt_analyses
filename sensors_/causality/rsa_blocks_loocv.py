@@ -35,21 +35,6 @@ def process_subject(subject, epoch_num, jobs, verbose):
     for block in blocks:
         block = int(block)
         print(f"Processing {subject} - session {epoch_num} - block {block}")
-        
-        good = behav.blocks == block
-        bad = behav.blocks != block
-        pattern = behav.trialtypes == 1
-        
-        X_train = epoch.get_data(copy=False)[good & pattern]
-        y_train = behav[good & pattern].positions
-        y_train = y_train.reset_index(drop=True)
-        
-        X_test = epoch.get_data(copy=False)[bad & pattern]
-        y_test = behav[bad & pattern].positions
-        y_test = y_test.reset_index(drop=True)
-        
-        rdm_pat = train_test_cvMD(X_train, y_train, X_test, y_test, -1)
-        
 
         if not op.exists(res_path / f"pat-{epoch_num}-{block}.npy") or overwrite:
             filter = (behav["trialtypes"] == 1) & (behav["blocks"] == block)        

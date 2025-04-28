@@ -885,6 +885,75 @@ def cv_mahalanobis_parallel(X, y, n_jobs=-1, n_splits=10, verbose=True):
 
     return np.stack(distances, axis=0)
 
+def train_test_mahalanobis(X_train, X_test, y_train, y_test, n_jobs=-1, verbose=True):
+    """
+    Parallelized Cross-validated Mahalanobis distances with tqdm_joblib and NaN safety.
+
+    Parameters:
+        X: ndarray (n_trials, n_channels, n_times)
+        y: array-like (n_trials,) condition labels
+        n_splits: int, number of cross-validation folds
+        n_jobs: int, number of parallel jobs (default: -1 = all CPUs)
+        verbose: bool, show progress bars
+
+    Returns:
+        distances: ndarray (n_times, n_conditions, n_conditions)
+    """
+    import numpy as np
+    from sklearn.model_selection import StratifiedKFold
+    from sklearn.covariance import LedoitWolf
+    from scipy.linalg import solve
+    from joblib import Parallel, delayed
+    from tqdm.auto import tqdm
+    from tqdm_joblib import tqdm_joblib
+
+    _, _, n_times = X_train.shape
+    conditions = np.unique(y_train)
+    n_conditions = len(conditions)
+
+    def compute_timepoint(t, X_train, X_test, y_train, y_test, conditions):
+        dist = np.full((n_conditions, n_conditions), np.nan)
+        
+        X_train_t = X_train[:, :, t]
+        X_test_t = X_test[:, :, t]
+        
+        try:
+            lw = LedoitWolf()
+            lw.fit(X_train_t)
+            cov = lw.covariance_
+
+            train_means = {c: X_train_t[y_train == c].mean(axis=0) for c in conditions}
+            test_means = {c: X_test_t[y_test == c].mean(axis=0) for c in conditions}
+
+            for i, ci in enumerate(conditions):
+                for j, cj in enumerate(conditions):
+                    if j <= i:
+                        continue
+                    diff_train = train_means[ci] - train_means[cj]
+                    diff_test = test_means[ci] - test_means[cj]
+                    d = diff_train.T @ solve(cov, diff_test, assume_a='pos')
+                    dist[i, j] = d
+                    dist[j, i] = d
+                    
+        except (ValueError, np.linalg.LinAlgError, KeyError, ZeroDivisionError):
+            pass
+
+        return dist
+
+    time_iterator = range(n_times)
+
+    if verbose:
+        with tqdm_joblib(tqdm(desc="Timepoints", total=n_times)):
+            distances = Parallel(n_jobs=n_jobs)(
+                delayed(compute_timepoint)(t, X_train, X_test, y_train, y_test, conditions) for t in time_iterator
+            )   
+    else:
+        distances = Parallel(n_jobs=n_jobs)(
+            delayed(compute_timepoint)(t, X_train, X_test, y_train, y_test, conditions) for t in time_iterator
+        )
+    
+    return np.stack(distances, axis=0)
+
 def loocv_mahalanobis(X, y):
     """
     Compute LOOCV Mahalanobis distances between conditions for each time point.
