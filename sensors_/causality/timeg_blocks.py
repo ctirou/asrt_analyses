@@ -6,11 +6,10 @@ import os.path as op
 import pandas as pd
 import numpy as np
 import gc
-from base import ensure_dir
+from base import ensured
 from mne import read_epochs
 from mne.decoding import GeneralizingEstimator
 from sklearn.pipeline import make_pipeline
-from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score as acc
@@ -37,8 +36,7 @@ def process_subject(subject, jobs):
         all_ytraining, all_ytesting = [], []
 
         for epoch_num in [0, 1, 2, 3, 4]:
-            res_path = data_path / 'results' / 'sensors' / lock / f"split_{trial_type}"
-            ensure_dir(res_path)
+            res_path = ensured(data_path / 'results' / 'sensors' / lock / f"split_{trial_type}")
             
             behav = pd.read_pickle(op.join(data_path, 'behav', f'{subject}-{epoch_num}.pkl'))
             epoch_fname = op.join(data_path, lock, f"{subject}-{epoch_num}-epo.fif")
@@ -48,19 +46,22 @@ def process_subject(subject, jobs):
             times = epoch_gen.times
             idx = np.where(times >= -1.5)[0]
             blocks = np.unique(behav["blocks"])
+            filter = (behav.trialtypes == 1) if trial_type == 'pattern' else (behav.trialtypes == 2)
             
             Xtraining, Xtesting, ytraining, ytesting = [], [], [], []
             for block in blocks:
                 
-                filter = (behav.trialtypes == 1) & (behav.blocks == block) if trial_type == 'pattern' \
-                    else (behav.trialtypes == 2) & (behav.blocks == block)
-                X = epoch_gen.get_data()[filter][:, :, idx]
-                y = behav.positions[filter]
-                y = y.reset_index(drop=True)
-                assert len(X) == len(y)
+                good = behav.blocks == block
+                bad = behav.blocks != block
                 
-                X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+                X_train = epoch_gen.get_data(copy=False)[good & filter][:, :, idx]
+                y_train = behav[good & filter].positions
+                y_train = y_train.reset_index(drop=True)
                 
+                X_test = epoch_gen.get_data(copy=False)[bad & filter][:, :, idx]
+                y_test = behav[bad & filter].positions
+                y_test = y_test.reset_index(drop=True)
+                                            
                 Xtraining.append(X_train)
                 Xtesting.append(X_test)
                 ytraining.append(y_train)
@@ -86,7 +87,7 @@ def process_subject(subject, jobs):
             del epoch_gen, behav
             gc.collect()
         
-        res_path = data_path / 'results' / 'sensors' / lock / f"split_all_{trial_type}"
+        res_path = ensured(data_path / 'results' / 'sensors' / lock / f"split_all_{trial_type}")
         
         all_Xtraining = np.concatenate(all_Xtraining)
         all_ytraining = np.concatenate(all_ytraining)

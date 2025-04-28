@@ -12,6 +12,11 @@ from sklearn.linear_model import LogisticRegressionCV
 def ensure_dir(path):
     if not os.path.exists(path):
         os.makedirs(path, exist_ok=True)
+
+def ensured(path):
+    if not os.path.exists(path):
+        os.makedirs(path, exist_ok=True)
+    return path
         
 def decod_stats(X, jobs):
     """Statistical test applied across subjects"""
