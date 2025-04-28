@@ -137,12 +137,34 @@ def process_subject(subject, jobs):
                     all_ytesting_rand.append(y_test)
                     all_ytraining_rand.append(y_train)
             
+                del stcs_data, behav
+                gc.collect()
             
-                        
-            del behav
-            gc.collect()
-        
-        print("Fitting pattern...")    
+            # Fit on epoch data and test on block - pattern
+            res_dir = res_path / region / "split_pattern"
+            Xtraining_pat = np.concatenate(Xtraining_pat)
+            ytraining_pat = np.concatenate(ytraining_pat)            
+            clf.fit(Xtraining_pat, ytraining_pat)
+            for i, _ in enumerate(Xtesting_pat):
+                if not op.exists(res_dir / f"{subject}-{epoch_num}-{i+1}.npy") or overwrite:
+                    ypred = clf.predict(Xtesting_pat[i])
+                    print("Scoring...")
+                    acc_matrix = np.apply_along_axis(lambda x: acc(ytesting_pat[i], x), 0, ypred)
+                    np.save(res_dir / f"{subject}-{epoch_num}-{i+1}.npy", acc_matrix)
+
+            # Fit on epoch data and test on block - random
+            res_dir = res_path / region / "split_random"
+            Xtraining_rand = np.concatenate(Xtraining_rand)
+            ytraining_rand = np.concatenate(ytraining_rand)
+            clf.fit(Xtraining_rand, ytraining_rand)
+            for i, _ in enumerate(Xtesting_rand):
+                if not op.exists(res_dir / f"{subject}-{epoch_num}-{i+1}.npy") or overwrite:
+                    ypred = clf.predict(Xtesting_rand[i])
+                    print("Scoring...")
+                    acc_matrix = np.apply_along_axis(lambda x: acc(ytesting_rand[i], x), 0, ypred)
+                    np.save(res_dir / f"{subject}-{epoch_num}-{i+1}.npy", acc_matrix)
+                                
+        print("Fitting pattern...")
         res_dir = res_path / region / "split_all_pattern"
         ensure_dir(res_dir)
         all_Xtraining_pat = np.concatenate(all_Xtraining_pat)
@@ -150,12 +172,12 @@ def process_subject(subject, jobs):
         assert len(all_Xtraining_pat) == len(all_ytraining_pat), "Length mismatch in pattern"
         clf.fit(all_Xtraining_pat, all_ytraining_pat)
         
-        for block in range(23):
-            if not op.exists(res_dir / f"{subject}-{block+1}.npy") or overwrite:
-                print("Scoring pattern on block", block, region)
-                ypred = clf.predict(all_Xtesting_pat[block])
-                acc_matrix = np.apply_along_axis(lambda x: acc(all_ytesting_pat[block], x), 0, ypred)
-                np.save(res_dir / f"{subject}-{block+1}.npy", acc_matrix)
+        for i, _ in enumerate(all_Xtesting_pat):
+            if not op.exists(res_dir / f"{subject}-{i+1}.npy") or overwrite:
+                print("Scoring pattern on block", i, region)
+                ypred = clf.predict(all_Xtesting_pat[i])
+                acc_matrix = np.apply_along_axis(lambda x: acc(all_ytesting_pat[i], x), 0, ypred)
+                np.save(res_dir / f"{subject}-{i+1}.npy", acc_matrix)
         
         print("Fitting random...")
         res_dir = res_path / region / "split_all_random"
@@ -165,12 +187,12 @@ def process_subject(subject, jobs):
         assert len(all_Xtraining_rand) == len(all_ytraining_rand), "Length mismatch in random"
         clf.fit(all_Xtraining_rand, all_ytraining_rand)
         
-        for block in range(23):
-            if not op.exists(res_dir / f"{subject}-{block+1}.npy") or overwrite:
-                print("Scoring random on block", block+1, region)
-                ypred = clf.predict(all_Xtesting_rand[block])
-                acc_matrix = np.apply_along_axis(lambda x: acc(all_ytesting_rand[block], x), 0, ypred)
-                np.save(res_dir / f"{subject}-{block+1}.npy", acc_matrix)
+        for i, _ in enumerate(all_Xtesting_rand):
+            if not op.exists(res_dir / f"{subject}-{i+1}.npy") or overwrite:
+                print("Scoring random on block", i+1, region)
+                ypred = clf.predict(all_Xtesting_rand[i])
+                acc_matrix = np.apply_along_axis(lambda x: acc(all_ytesting_rand[i], x), 0, ypred)
+                np.save(res_dir / f"{subject}-{i+1}.npy", acc_matrix)
 
 if is_cluster:
     try:

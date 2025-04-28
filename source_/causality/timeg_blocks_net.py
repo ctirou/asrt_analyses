@@ -88,7 +88,13 @@ def process_subject(subject, jobs):
             stcs_data = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs])
             assert len(stcs_data) == len(behav), "Length mismatch"
             
+            del stcs
+            gc.collect()
+            
             blocks = np.unique(behav["blocks"])
+            
+            Xtraining_pat, Xtesting_pat, ytraining_pat, ytesting_pat = [], [], [], []
+            Xtraining_rand, Xtesting_rand, ytraining_rand, ytesting_rand = [], [], [], []
                         
             for block in blocks:
                 
@@ -100,11 +106,17 @@ def process_subject(subject, jobs):
                 assert len(X) == len(y)
                 
                 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-                                
-                all_Xtraining_pat.append(X_train)
-                all_Xtesting_pat.append(X_test)
-                all_ytesting_pat.append(y_test)
-                all_ytraining_pat.append(y_train)
+                
+                Xtraining_pat.append(X_train)
+                Xtesting_pat.append(X_test)
+                ytraining_pat.append(y_train)
+                ytesting_pat.append(y_test)
+                
+                if epoch_num != 0:                
+                    all_Xtraining_pat.append(X_train)
+                    all_Xtesting_pat.append(X_test)
+                    all_ytesting_pat.append(y_test)
+                    all_ytraining_pat.append(y_train)
                 
                 print("Spliting random on epoch", epoch_num, "block", block, network)
                 random =  (behav.trialtypes == 2) & (behav.blocks == block)
@@ -115,14 +127,45 @@ def process_subject(subject, jobs):
                 
                 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
                 
-                all_Xtraining_rand.append(X_train)
-                all_Xtesting_rand.append(X_test)
-                all_ytesting_rand.append(y_test)
-                all_ytraining_rand.append(y_train)
-                        
-            del behav
-            gc.collect()
-        
+                Xtraining_rand.append(X_train)
+                Xtesting_rand.append(X_test)
+                ytraining_rand.append(y_train)
+                ytesting_rand.append(y_test)
+                
+                if epoch_num != 0:                
+                    all_Xtraining_rand.append(X_train)
+                    all_Xtesting_rand.append(X_test)
+                    all_ytesting_rand.append(y_test)
+                    all_ytraining_rand.append(y_train)
+            
+                del stcs_data, behav
+                gc.collect()
+            
+            # Fit on epoch data and test on block - pattern
+            res_dir = res_path / network / "split_pattern"
+            Xtraining_pat = np.concatenate(Xtraining_pat)
+            ytraining_pat = np.concatenate(ytraining_pat)            
+            clf.fit(Xtraining_pat, ytraining_pat)
+            for i, _ in enumerate(Xtesting_pat):
+                if not op.exists(res_dir / f"{subject}-{epoch_num}-{i+1}.npy") or overwrite:
+                    ypred = clf.predict(Xtesting_pat[i])
+                    print("Scoring...")
+                    acc_matrix = np.apply_along_axis(lambda x: acc(ytesting_pat[i], x), 0, ypred)
+                    np.save(res_dir / f"{subject}-{epoch_num}-{i+1}.npy", acc_matrix)
+
+            # Fit on epoch data and test on block - random
+            res_dir = res_path / network / "split_random"
+            Xtraining_rand = np.concatenate(Xtraining_rand)
+            ytraining_rand = np.concatenate(ytraining_rand)
+            clf.fit(Xtraining_rand, ytraining_rand)
+            for i, _ in enumerate(Xtesting_rand):
+                if not op.exists(res_dir / f"{subject}-{epoch_num}-{i+1}.npy") or overwrite:
+                    ypred = clf.predict(Xtesting_rand[i])
+                    print("Scoring...")
+                    acc_matrix = np.apply_along_axis(lambda x: acc(ytesting_rand[i], x), 0, ypred)
+                    np.save(res_dir / f"{subject}-{epoch_num}-{i+1}.npy", acc_matrix)
+                    
+        # Train on all data and test on block - pattern
         print("Fitting pattern...")    
         res_dir = res_path / network / "split_all_pattern"
         ensure_dir(res_dir)
@@ -137,6 +180,7 @@ def process_subject(subject, jobs):
                 acc_matrix = np.apply_along_axis(lambda x: acc(all_ytesting_pat[block], x), 0, ypred)
                 np.save(res_dir / f"{subject}-{block+1}.npy", acc_matrix)
         
+        # Train on all data and test on block - random
         print("Fitting random...")
         res_dir = res_path / network / "split_all_random"
         ensure_dir(res_dir)

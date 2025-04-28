@@ -25,7 +25,7 @@ overwrite = True
 
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
-def process_subject(subject, lock, jobs):
+def process_subject(subject, jobs):
     
     # define classifier
     clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
@@ -76,7 +76,7 @@ def process_subject(subject, lock, jobs):
             ytraining = np.concatenate(ytraining)            
             clf.fit(Xtraining, ytraining)
             
-            for i in range(len(blocks)):
+            for i, _ in enumerate(Xtesting):
                 if not op.exists(res_path / f"{subject}-{epoch_num}-{i+1}.npy") or overwrite:
                     ypred = clf.predict(Xtesting[i])
                     print("Scoring...")
@@ -92,24 +92,24 @@ def process_subject(subject, lock, jobs):
         all_ytraining = np.concatenate(all_ytraining)
         clf.fit(all_Xtraining, all_ytraining)
         
-        for block in range(23):
-            if not op.exists(res_path / f"{subject}-{block+1}.npy") or overwrite:
-                ypred = clf.predict(all_Xtesting[block])
+        for i, _ in enumerate(all_Xtesting):
+            if not op.exists(res_path / f"{subject}-{i+1}.npy") or overwrite:
+                ypred = clf.predict(all_Xtesting[i])
                 print("Scoring...")
-                acc_matrix = np.apply_along_axis(lambda x: acc(all_ytesting[block], x), 0, ypred)
-                np.save(res_path / f"{subject}-{block+1}.npy", acc_matrix)
+                acc_matrix = np.apply_along_axis(lambda x: acc(all_ytesting[i], x), 0, ypred)
+                np.save(res_path / f"{subject}-{i+1}.npy", acc_matrix)
 
 if is_cluster:
     try:
         subject_num = int(os.getenv("SLURM_ARRAY_TASK_ID"))
         subject = subjects[subject_num]
-        jobs = 20
-        process_subject(subject, lock, jobs)
+        jobs = int(os.getenv("SLURM_CPUS_PER_TASK", 1))
+        process_subject(subject, jobs)
     except (IndexError, ValueError) as e:
         print("Error: SLURM_ARRAY_TASK_ID is not set correctly or is out of bounds.")
         sys.exit(1)
 else:
     lock = 'stim'
     jobs = 15
-    Parallel(-1)(delayed(process_subject)(subject, lock, jobs) for subject in subjects)
+    Parallel(-1)(delayed(process_subject)(subject, jobs) for subject in subjects)
         

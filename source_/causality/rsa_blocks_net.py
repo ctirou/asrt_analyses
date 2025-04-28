@@ -58,7 +58,7 @@ def process_subject(subject, epoch_num, jobs):
         stcs_data = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs])
         assert len(stcs_data) == len(behav), "Length mismatch"
 
-        del stcs, lh_label, rh_label
+        del lh_label, rh_label
         gc.collect()
             
         blocks = np.unique(behav.blocks)
@@ -86,6 +86,9 @@ def process_subject(subject, epoch_num, jobs):
                     
         del stcs_data
         gc.collect()
+    
+    del behav, stcs
+    gc.collect()
         
 if is_cluster:
     # Check that SLURM_ARRAY_TASK_ID is available and use it to get the subject
