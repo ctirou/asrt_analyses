@@ -27,7 +27,7 @@ overwrite = True
 
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
-res_path = data_path / 'results' / 'source' / 'max-power'
+res_path = ensured(data_path / 'results' / 'source' / 'max-power')
 
 def process_subject(subject, jobs):
     # define classifier
