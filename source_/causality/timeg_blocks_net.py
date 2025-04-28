@@ -5,26 +5,23 @@ import pandas as pd
 import numpy as np
 import gc
 import mne
-from mne import read_epochs
-from mne.decoding import cross_val_multiscore, GeneralizingEstimator
+from mne.decoding import GeneralizingEstimator
 from mne.beamformer import make_lcmv, apply_lcmv_epochs
 from sklearn.pipeline import make_pipeline
-from sklearn.model_selection import LeaveOneOut, StratifiedKFold, train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score as acc, balanced_accuracy_score as bacc
-from base import ensure_dir
+from sklearn.metrics import accuracy_score as acc
+from base import ensured
 from config import *
 from joblib import Parallel, delayed
 
-# data_path = TIMEG_DATA_DIR / 'gen44'
 data_path = TIMEG_DATA_DIR
 subjects = SUBJS
 lock = 'stim'
 solver = 'lbfgs'
 scoring = "accuracy"
 verbose = 'error'
-overwrite = False
+overwrite = True
 
 networks = NETWORKS[:-2]
 
@@ -98,51 +95,55 @@ def process_subject(subject, jobs):
                         
             for block in blocks:
                 
-                print("Spliting pattern on epoch", epoch_num, "block", block, network)
-                pattern = (behav.trialtypes == 1) & (behav.blocks == block)                
-                X = stcs_data[pattern]
-                y = behav.positions[pattern]
-                y = y.reset_index(drop=True)
-                assert len(X) == len(y)
+                good = behav.blocks == block
+                bad = behav.blocks != block
                 
-                X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+                pattern = behav.trialtypes == 1                
+                X_train = stcs_data[good & pattern]
+                y_train = behav[good & pattern].positions
+                y_train = y_train.reset_index(drop=True)
                 
+                X_test = stcs_data[bad & pattern]
+                y_test = behav[bad & pattern].positions
+                y_test = y_test.reset_index(drop=True)
+                                            
                 Xtraining_pat.append(X_train)
                 Xtesting_pat.append(X_test)
                 ytraining_pat.append(y_train)
                 ytesting_pat.append(y_test)
                 
-                if epoch_num != 0:                
+                if epoch_num != 0:
                     all_Xtraining_pat.append(X_train)
                     all_Xtesting_pat.append(X_test)
-                    all_ytesting_pat.append(y_test)
                     all_ytraining_pat.append(y_train)
+                    all_ytesting_pat.append(y_test)
                 
-                print("Spliting random on epoch", epoch_num, "block", block, network)
-                random =  (behav.trialtypes == 2) & (behav.blocks == block)
-                X = stcs_data[random]
-                y = behav.positions[random]
-                y = y.reset_index(drop=True)
-                assert len(X) == len(y)
+                random = behav.trialtypes == 2                
+                X_train = stcs_data[good & random]
+                y_train = behav[good & random].positions
+                y_train = y_train.reset_index(drop=True)
                 
-                X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-                
+                X_test = stcs_data[bad & random]
+                y_test = behav[bad & random].positions
+                y_test = y_test.reset_index(drop=True)
+                                            
                 Xtraining_rand.append(X_train)
                 Xtesting_rand.append(X_test)
                 ytraining_rand.append(y_train)
                 ytesting_rand.append(y_test)
                 
-                if epoch_num != 0:                
+                if epoch_num != 0:
                     all_Xtraining_rand.append(X_train)
                     all_Xtesting_rand.append(X_test)
-                    all_ytesting_rand.append(y_test)
                     all_ytraining_rand.append(y_train)
+                    all_ytesting_rand.append(y_test)
             
-                del stcs_data, behav
-                gc.collect()
+            del stcs_data, behav
+            gc.collect()
             
             # Fit on epoch data and test on block - pattern
-            res_dir = res_path / network / "split_pattern"
+            print("Fitting on epoch data and testing on block - pattern")
+            res_dir = ensured(res_path / network / "split_pattern")
             Xtraining_pat = np.concatenate(Xtraining_pat)
             ytraining_pat = np.concatenate(ytraining_pat)            
             clf.fit(Xtraining_pat, ytraining_pat)
@@ -154,7 +155,8 @@ def process_subject(subject, jobs):
                     np.save(res_dir / f"{subject}-{epoch_num}-{i+1}.npy", acc_matrix)
 
             # Fit on epoch data and test on block - random
-            res_dir = res_path / network / "split_random"
+            print("Fitting on epoch data and testing on block - random")
+            res_dir = ensured(res_path / network / "split_random")
             Xtraining_rand = np.concatenate(Xtraining_rand)
             ytraining_rand = np.concatenate(ytraining_rand)
             clf.fit(Xtraining_rand, ytraining_rand)
@@ -166,9 +168,8 @@ def process_subject(subject, jobs):
                     np.save(res_dir / f"{subject}-{epoch_num}-{i+1}.npy", acc_matrix)
                     
         # Train on all data and test on block - pattern
-        print("Fitting pattern...")    
-        res_dir = res_path / network / "split_all_pattern"
-        ensure_dir(res_dir)
+        print("Fitting on all data and testing on block - pattern")
+        res_dir = ensured(res_path / network / "split_all_pattern")
         all_Xtraining_pat = np.concatenate(all_Xtraining_pat)
         all_ytraining_pat = np.concatenate(all_ytraining_pat)
         assert len(all_Xtraining_pat) == len(all_ytraining_pat), "Length mismatch in pattern"
@@ -181,9 +182,8 @@ def process_subject(subject, jobs):
                 np.save(res_dir / f"{subject}-{block+1}.npy", acc_matrix)
         
         # Train on all data and test on block - random
-        print("Fitting random...")
-        res_dir = res_path / network / "split_all_random"
-        ensure_dir(res_dir)
+        print("Fitting on all data and testing on block - random")
+        res_dir = ensured(res_path / network / "split_all_random")
         all_Xtraining_rand = np.concatenate(all_Xtraining_rand)
         all_ytraining_rand = np.concatenate(all_ytraining_rand)
         assert len(all_Xtraining_rand) == len(all_ytraining_rand), "Length mismatch in random"
@@ -208,4 +208,3 @@ else:
     lock = 'stim'
     jobs = 15
     Parallel(-1)(delayed(process_subject)(subject, jobs) for subject in subjects)
-        
