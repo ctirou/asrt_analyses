@@ -885,6 +885,68 @@ def cv_mahalanobis_parallel(X, y, n_jobs=-1, n_splits=10, verbose=True):
 
     return np.stack(distances, axis=0)
 
+def train_test_mahalanobis_fast(X_train, X_test, y_train, y_test, n_jobs=-1, verbose=True):
+    """
+    Memory-efficient and vectorized Mahalanobis between train/test patterns.
+
+    Returns:
+        distances: ndarray of shape (n_times, n_conditions, n_conditions)
+    """
+    import numpy as np
+    from sklearn.covariance import LedoitWolf
+    from scipy.linalg import solve
+    from joblib import Parallel, delayed
+    from tqdm.auto import tqdm
+    from tqdm_joblib import tqdm_joblib
+
+    n_trials_train, n_channels, n_times = X_train.shape
+    n_trials_test, _, _ = X_test.shape
+    conditions = np.unique(y_test)
+    n_conditions = len(conditions)
+
+    def compute_timepoint(t):
+        try:
+            Xtr = X_train[:, :, t]
+            Xte = X_test[:, :, t]
+
+            lw = LedoitWolf().fit(Xtr)
+            cov = lw.covariance_
+
+            train_means = np.stack([Xtr[y_train == c].mean(0) for c in conditions])
+            test_means = np.stack([Xte[y_test == c].mean(0) for c in conditions])
+
+            diff_train = train_means[:, None, :] - train_means[None, :, :]
+            diff_test = test_means[:, None, :] - test_means[None, :, :]
+
+            flat_diff_test = diff_test.reshape(-1, n_channels)  # (n_cond², n_channels)
+            solved = solve(cov, flat_diff_test.T, assume_a='pos').T
+            solved = solved.reshape(n_conditions, n_conditions, n_channels)
+
+            dist = np.einsum('ijk,ijk->ij', diff_train, solved)
+            return dist
+
+        except Exception as e:
+            print(f"Error at time {t}: {e}")
+            return np.full((n_conditions, n_conditions), np.nan)
+        
+        except Exception as e:
+            print(f"Error at time {t}: {e}")
+            return np.full((n_conditions, n_conditions), np.nan)
+
+    time_iterator = range(n_times)
+
+    if verbose:
+        with tqdm_joblib(tqdm(desc="Computing Mahalanobis", total=n_times)):
+            distances = Parallel(n_jobs=n_jobs)(
+                delayed(compute_timepoint)(t) for t in time_iterator
+            )
+    else:
+        distances = Parallel(n_jobs=n_jobs)(
+            delayed(compute_timepoint)(t) for t in time_iterator
+        )
+
+    return np.stack(distances, axis=0)  # (n_times, n_conditions, n_conditions)
+
 def train_test_mahalanobis(X_train, X_test, y_train, y_test, n_jobs=-1, verbose=True):
     """
     Parallelized Cross-validated Mahalanobis distances with tqdm_joblib and NaN safety.
@@ -900,7 +962,6 @@ def train_test_mahalanobis(X_train, X_test, y_train, y_test, n_jobs=-1, verbose=
         distances: ndarray (n_times, n_conditions, n_conditions)
     """
     import numpy as np
-    from sklearn.model_selection import StratifiedKFold
     from sklearn.covariance import LedoitWolf
     from scipy.linalg import solve
     from joblib import Parallel, delayed

@@ -19,7 +19,7 @@ is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
 def process_subject(subject, epoch_num, jobs, verbose):
     
-    res_path = RESULTS_DIR / 'RSA' / 'sensors' / lock / "loocv_rdm_blocks_fixed" / subject
+    res_path = RESULTS_DIR / 'RSA' / 'sensors' / lock / "split" / subject
     ensure_dir(res_path)
         
     # read behav
@@ -36,35 +36,33 @@ def process_subject(subject, epoch_num, jobs, verbose):
         block = int(block)
         print(f"Processing {subject} - session {epoch_num} - block {block}")
         
-        good = behav.blocks == block
-        bad = behav.blocks != block
-        pattern = behav.trialtypes == 1
-        
-        X_train = epoch.get_data(copy=False)[good & pattern]
-        y_train = behav[good & pattern].positions
-        y_train = y_train.reset_index(drop=True)
-        
-        X_test = epoch.get_data(copy=False)[bad & pattern]
-        y_test = behav[bad & pattern].positions
-        y_test = y_test.reset_index(drop=True)
-        
-        rdm_pat = train_test_cvMD(X_train, y_train, X_test, y_test, -1)
-        
+        this_block = behav.blocks == block
+        out_blocks = behav.blocks != block
 
         if not op.exists(res_path / f"pat-{epoch_num}-{block}.npy") or overwrite:
-            filter = (behav["trialtypes"] == 1) & (behav["blocks"] == block)        
-            X_pat = data[filter]
-            y_pat = behav[filter].reset_index(drop=True).positions
-            assert len(X_pat) == len(y_pat)
-            rdm_pat = loocv_mahalanobis_parallel(X_pat, y_pat, jobs)
+            pattern = behav.trialtypes == 1        
+            X_train = epoch.get_data(copy=False)[out_blocks & pattern]
+            y_train = behav[out_blocks & pattern].positions
+            y_train = y_train.reset_index(drop=True)
+            
+            X_test = epoch.get_data(copy=False)[this_block & pattern]
+            y_test = behav[this_block & pattern].positions
+            y_test = y_test.reset_index(drop=True)
+            
+            rdm_pat = train_test_mahalanobis_fast(X_train, X_test, y_train, y_test, n_jobs=jobs)
             np.save(res_path / f"pat-{epoch_num}-{block}.npy", rdm_pat)
-        
+
         if not op.exists(res_path / f"rand-{epoch_num}-{block}.npy") or overwrite:
-            filter = (behav["trialtypes"] == 2) & (behav["blocks"] == block)            
-            X_rand = data[filter]
-            y_rand = behav[filter].reset_index(drop=True).positions
-            assert len(X_rand) == len(y_rand)
-            rdm_rand = loocv_mahalanobis_parallel(X_rand, y_rand, jobs)
+            random = behav.trialtypes == 2
+            X_train = epoch.get_data(copy=False)[out_blocks & random]
+            y_train = behav[out_blocks & random].positions
+            y_train = y_train.reset_index(drop=True)
+            
+            X_test = epoch.get_data(copy=False)[this_block & random]
+            y_test = behav[this_block & random].positions
+            y_test = y_test.reset_index(drop=True)
+            
+            rdm_rand = train_test_mahalanobis_fast(X_train, X_test, y_train, y_test, n_jobs=jobs)
             np.save(res_path / f"rand-{epoch_num}-{block}.npy", rdm_rand)
             
 if is_cluster:
