@@ -6,7 +6,7 @@ import os.path as op
 import pandas as pd
 import numpy as np
 import gc
-from base import ensure_dir
+from base import ensured
 from mne import read_epochs
 from mne.decoding import GeneralizingEstimator
 from sklearn.pipeline import make_pipeline
@@ -21,7 +21,7 @@ lock = 'stim'
 solver = 'lbfgs'
 scoring = "accuracy"
 verbose = 'error'
-overwrite = False
+overwrite = True
 
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
@@ -38,31 +38,42 @@ def process_subject(subject, jobs):
         all_ytraining, all_ytesting = [], []
 
         for epoch_num in [0, 1, 2, 3, 4]:
-            res_path = data_path / 'results' / 'sensors' / f"split_20s_{trial_type}"
-            ensure_dir(res_path)
+            res_path = ensured(data_path / 'results' / 'sensors' / f"split_20s_{trial_type}")
             
             behav = pd.read_pickle(op.join(data_path, 'behav', f'{subject}-{epoch_num}.pkl'))
             epoch_fname = op.join(data_path, lock, f"{subject}-{epoch_num}-epo.fif")
-            epoch_gen = read_epochs(epoch_fname, verbose=verbose, preload=True)
-            assert len(behav) == len(epoch_gen)
+            epoch = read_epochs(epoch_fname, verbose=verbose, preload=True)
             
-            times = epoch_gen.times
+            times = epoch.times
             idx = np.where(times >= -1.5)[0]
+            data = epoch.get_data(picks='mag', copy=True)[:, :, idx]
+            assert len(behav) == len(data)
+            
             blocks = np.unique(behav["blocks"])
             
             Xtraining, Xtesting, ytraining, ytesting = [], [], [], []
+            
+            del epoch
+            gc.collect()
+            
             for block in blocks:
-                
-                filter = (behav.trialtypes == 1) & (behav.blocks == block) if trial_type == 'pattern' \
-                    else (behav.trialtypes == 2) & (behav.blocks == block)
-                X = epoch_gen.get_data(copy=False)[filter][:, :, idx]
-                y = behav.positions[filter]
-                y = y.reset_index(drop=True)
-                assert len(X) == len(y), "X and y lengths do not match"
+                block = int(block)
+                print(f"Processing {subject} - session {epoch_num} - block {block} - {trial_type}")
+                                
+                this_block = behav.blocks == block
+                X = data[this_block]
+                y = behav[this_block].reset_index(drop=True)
+                assert len(X) == len(y), "Data and behavior lengths do not match"
+
+                filter = np.where(y.trialtypes == 1)[0] if trial_type == 'pattern' else np.where(y.trialtypes == 2)[0]
                 
                 for train_index, test_index in kf.split(X):
-                    X_train, X_test = X[train_index], X[test_index]
-                    y_train, y_test = y.iloc[train_index], y.iloc[test_index]
+                    
+                    trainxfilter = np.intersect1d(train_index, filter)
+                    testxfilter = np.intersect1d(test_index, filter)
+                    
+                    X_train, X_test = X[trainxfilter], X[testxfilter]
+                    y_train, y_test = y.iloc[trainxfilter].positions, y.iloc[testxfilter].positions
                     
                     Xtraining.append(X_train)
                     Xtesting.append(X_test)
@@ -90,11 +101,10 @@ def process_subject(subject, jobs):
                     acc_matrix = np.apply_along_axis(lambda x: acc(ytesting[i], x), 0, ypred)
                     np.save(res_path / f"{subject}-{epoch_num}-{i+1}.npy", acc_matrix)
             
-            del epoch_gen, behav
+            del epoch, behav
             gc.collect()
             
-        res_path = data_path / 'results' / 'sensors' / f"split_20s_all_{trial_type}"
-        ensure_dir(res_path)
+        res_path = ensured(data_path / 'results' / 'sensors' / f"split_20s_all_{trial_type}")
         
         all_Xtraining = np.concatenate(all_Xtraining)
         all_ytraining = np.concatenate(all_ytraining)

@@ -887,10 +887,11 @@ def cv_mahalanobis_parallel(X, y, n_jobs=-1, n_splits=10, verbose=True):
 
 def train_test_mahalanobis_fast(X_train, X_test, y_train, y_test, n_jobs=-1, verbose=True):
     """
-    Memory-efficient and vectorized Mahalanobis between train/test patterns.
+    Computes Mahalanobis distances between class means in training and testing sets.
+    Handles missing conditions by filling with NaNs.
 
     Returns:
-        distances: ndarray of shape (n_times, n_conditions, n_conditions)
+        distances: ndarray (n_times, n_conditions, n_conditions)
     """
     import numpy as np
     from sklearn.covariance import LedoitWolf
@@ -901,34 +902,52 @@ def train_test_mahalanobis_fast(X_train, X_test, y_train, y_test, n_jobs=-1, ver
 
     n_trials_train, n_channels, n_times = X_train.shape
     n_trials_test, _, _ = X_test.shape
-    conditions = np.unique(y_test)
+    conditions = [1, 2, 3, 4]
     n_conditions = len(conditions)
+    cond_idx = {c: i for i, c in enumerate(conditions)}  # for indexing
 
     def compute_timepoint(t):
         try:
             Xtr = X_train[:, :, t]
             Xte = X_test[:, :, t]
 
+            # Skip timepoints with too few trials
+            if Xtr.shape[0] < 2 or Xte.shape[0] < 2:
+                return np.full((n_conditions, n_conditions), np.nan)
+
             lw = LedoitWolf().fit(Xtr)
             cov = lw.covariance_
 
-            train_means = np.stack([Xtr[y_train == c].mean(0) for c in conditions])
-            test_means = np.stack([Xte[y_test == c].mean(0) for c in conditions])
+            # Only keep conditions present in both train and test
+            present_train = set(y_train)
+            present_test = set(y_test)
+            valid_conditions = list(present_train & present_test)
 
-            diff_train = train_means[:, None, :] - train_means[None, :, :]
-            diff_test = test_means[:, None, :] - test_means[None, :, :]
+            train_means = {}
+            test_means = {}
 
-            flat_diff_test = diff_test.reshape(-1, n_channels)  # (n_cond², n_channels)
-            solved = solve(cov, flat_diff_test.T, assume_a='pos').T
-            solved = solved.reshape(n_conditions, n_conditions, n_channels)
+            for c in valid_conditions:
+                train_means[c] = Xtr[y_train == c].mean(0)
+                test_means[c] = Xte[y_test == c].mean(0)
 
-            dist = np.einsum('ijk,ijk->ij', diff_train, solved)
+            dist = np.full((n_conditions, n_conditions), np.nan)
+
+            for i, ci in enumerate(conditions):
+                for j, cj in enumerate(conditions):
+                    if j <= i:
+                        continue
+                    if ci in train_means and cj in train_means and ci in test_means and cj in test_means:
+                        diff_train = train_means[ci] - train_means[cj]
+                        diff_test = test_means[ci] - test_means[cj]
+                        try:
+                            mahal = diff_train.T @ solve(cov, diff_test, assume_a='pos')
+                        except np.linalg.LinAlgError:
+                            mahal = np.nan
+                        dist[cond_idx[ci], cond_idx[cj]] = mahal
+                        dist[cond_idx[cj], cond_idx[ci]] = mahal
+
             return dist
 
-        except Exception as e:
-            print(f"Error at time {t}: {e}")
-            return np.full((n_conditions, n_conditions), np.nan)
-        
         except Exception as e:
             print(f"Error at time {t}: {e}")
             return np.full((n_conditions, n_conditions), np.nan)
@@ -945,7 +964,7 @@ def train_test_mahalanobis_fast(X_train, X_test, y_train, y_test, n_jobs=-1, ver
             delayed(compute_timepoint)(t) for t in time_iterator
         )
 
-    return np.stack(distances, axis=0)  # (n_times, n_conditions, n_conditions)
+    return np.stack(distances, axis=0)  # shape: (n_times, n_conditions, n_conditions)
 
 def train_test_mahalanobis(X_train, X_test, y_train, y_test, n_jobs=-1, verbose=True):
     """

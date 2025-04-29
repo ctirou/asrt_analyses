@@ -34,7 +34,7 @@ def process_subject(subject, jobs):
     clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
     clf = GeneralizingEstimator(clf, scoring=scoring, n_jobs=jobs)
     # network and custom label_names
-    label_path = RESULTS_DIR / 'networks_200_7' / subject    
+    label_path = RESULTS_DIR / 'networks_200_7' / subject
 
     for network in networks:
         
@@ -107,6 +107,11 @@ def process_subject(subject, jobs):
                 y_test = behav[this_block & pattern].positions
                 y_test = y_test.reset_index(drop=True)
                 
+                Xtraining_pat.append(X_train)
+                Xtesting_pat.append(X_test)
+                ytraining_pat.append(y_train)
+                ytesting_pat.append(y_test)
+
                 if epoch_num != 0:
                     all_Xtraining_pat.append(X_train)
                     all_Xtesting_pat.append(X_test)
@@ -183,7 +188,7 @@ def process_subject(subject, jobs):
         all_ytraining_rand = np.concatenate(all_ytraining_rand)
         assert len(all_Xtraining_rand) == len(all_ytraining_rand), "Length mismatch in random"
         clf.fit(all_Xtraining_rand, all_ytraining_rand)
-        for i, _ in enumerate(all_ytesting_rand):
+        for i, _ in enumerate(all_Xtesting_rand):
             if not op.exists(res_dir / f"{subject}-{i+1}.npy") or overwrite:
                 print("Scoring random on block", i+1, network)
                 ypred = clf.predict(all_Xtesting_rand[i])
