@@ -7,6 +7,7 @@ import gc
 import sys
 
 subjects = SUBJS
+subjects = ['sub03', 'sub06']
 epochs_list = EPOCHS
 subjects_dir = FREESURFER_DIR
 # data_path, res_path = TIMEG_DATA_DIR, TIMEG_DATA_DIR
@@ -120,8 +121,8 @@ def process_subject(subject, jobs):
     # else:
     #     vol_src_hipp_thal = mne.read_source_spaces(vol_src_hipp_thal_fname, verbose=verbose)
 
-    # vol_src_htc_fname = op.join(res_path, "src", "%s-htc-vol-src.fif" % (subject))
-    vol_src_htc_fname = op.join(TIMEG_DATA_DIR, "src", "%s-htc-vol-src.fif" % (subject))
+    # vol_src_htc_fname = op.join(TIMEG_DATA_DIR, "src", "%s-htc-vol-src.fif" % (subject))
+    vol_src_htc_fname = op.join(res_path, "src", "%s-htc-vol-src.fif" % (subject))
     if not op.exists(vol_src_htc_fname) or overwrite:
         surface = subjects_dir / subject / "bem" / "inner_skull.surf" # inner skull surface (to try)
         vol_src_htc = mne.setup_volume_source_space(
