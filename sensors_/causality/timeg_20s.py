@@ -21,7 +21,7 @@ lock = 'stim'
 solver = 'lbfgs'
 scoring = "accuracy"
 verbose = 'error'
-overwrite = True
+overwrite = False
 
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
@@ -58,7 +58,7 @@ def process_subject(subject, jobs):
             
             for block in blocks:
                 block = int(block)
-                print(f"Processing {subject} - session {epoch_num} - block {block} - {trial_type}")
+                print(f"Splitting {subject} - session {epoch_num} - block {block} - {trial_type}")
                                 
                 this_block = behav.blocks == block
                 X = data[this_block]
@@ -74,6 +74,8 @@ def process_subject(subject, jobs):
                     
                     X_train, X_test = X[trainxfilter], X[testxfilter]
                     y_train, y_test = y.iloc[trainxfilter].positions, y.iloc[testxfilter].positions
+                    
+                    print(f"Xtrain: {len(X_train)}, Xtest: {len(X_test)}, ytrain: {len(y_train)}, ytest: {len(y_test)}")
                     
                     Xtraining.append(X_train)
                     Xtesting.append(X_test)
@@ -95,13 +97,16 @@ def process_subject(subject, jobs):
             assert len(Xtesting) == len(ytesting), "Xtesting and ytesting lengths do not match"
 
             for i, _ in enumerate(Xtesting):
+                if len(Xtesting[i]) == 0 or len(ytesting[i]) == 0:
+                    print(f"Skipping quarter {i+1} for subject {subject} epoch {epoch_num} {trial_type}")
+                    continue
                 if not op.exists(res_path / f"{subject}-{epoch_num}-{i+1}.npy") or overwrite:
+                    print(f"Scoring quarter {i+1} for {subject} epoch {epoch_num} {trial_type}")
                     ypred = clf.predict(Xtesting[i])
-                    print(f"Scoring quarter {i+1} for subject {subject} epoch {epoch_num} {trial_type}")
                     acc_matrix = np.apply_along_axis(lambda x: acc(ytesting[i], x), 0, ypred)
                     np.save(res_path / f"{subject}-{epoch_num}-{i+1}.npy", acc_matrix)
             
-            del epoch, behav
+            del behav
             gc.collect()
             
         res_path = ensured(data_path / 'results' / 'sensors' / f"split_20s_all_{trial_type}")
@@ -114,6 +119,9 @@ def process_subject(subject, jobs):
         
         assert len(all_Xtesting) == len(all_ytesting), "all_Xtesting and all_ytesting lengths do not match"
         for i, _ in enumerate(all_Xtesting):
+            if len(all_Xtesting[i]) == 0 or len(all_ytesting[i]) == 0:
+                print(f"Skipping quarter {i+1} for {subject} all {trial_type}")
+                continue
             if not op.exists(res_path / f"{subject}_{i+1}.npy") or overwrite:
                 ypred = clf.predict(all_Xtesting[i])
                 print(f"Scoring quarter {i+1} for subject {subject} all {trial_type}")

@@ -5,15 +5,14 @@ import pandas as pd
 import numpy as np
 import gc
 import mne
-from mne import read_epochs
-from mne.decoding import cross_val_multiscore, GeneralizingEstimator
+from mne.decoding import GeneralizingEstimator
 from mne.beamformer import make_lcmv, apply_lcmv_epochs
 from sklearn.pipeline import make_pipeline
-from sklearn.model_selection import LeaveOneOut, StratifiedKFold, train_test_split, KFold
+from sklearn.model_selection import KFold
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score as acc, balanced_accuracy_score as bacc
-from base import ensure_dir
+from sklearn.metrics import accuracy_score as acc
+from base import ensured
 from config import *
 from joblib import Parallel, delayed
 
@@ -22,7 +21,7 @@ subjects = SUBJS
 lock = 'stim'
 solver = 'lbfgs'
 scoring = "accuracy"
-verbose = True
+verbose = 'error'
 overwrite = False
 
 networks = NETWORKS[:-2]
@@ -95,17 +94,24 @@ def process_subject(subject, jobs):
             Xtraining_rand, Xtesting_rand, ytraining_rand, ytesting_rand = [], [], [], []
             
             for block in blocks:
-                
+                block = int(block)
                 print("Spliting pattern on epoch", epoch_num, "block", block, network)
-                pattern = (behav.trialtypes == 1) & (behav.blocks == block)                
-                X = stcs_data[pattern]
-                y = behav.positions[pattern]
-                y = y.reset_index(drop=True)
-                assert len(X) == len(y)
+                
+                this_block = behav.blocks == block
+                X = stcs_data[this_block]
+                y = behav[this_block].reset_index(drop=True)
+                assert len(X) == len(y), "Data and behavior lengths do not match"
+                
+                pattern = np.where(y.trialtypes == 1)[0]
+                random = np.where(y.trialtypes == 2)[0]              
                 
                 for train_index, test_index in kf.split(X):
-                    X_train, X_test = X[train_index], X[test_index]
-                    y_train, y_test = y.iloc[train_index], y.iloc[test_index]
+                    
+                    trainxpat = np.intersect1d(train_index, pattern)
+                    testxpat = np.intersect1d(test_index, pattern)
+                    
+                    X_train, X_test = X[trainxpat], X[testxpat]
+                    y_train, y_test = y.iloc[trainxpat].positions, y.iloc[testxpat].positions
                     
                     Xtraining_pat.append(X_train)
                     Xtesting_pat.append(X_test)
@@ -118,16 +124,11 @@ def process_subject(subject, jobs):
                         all_ytesting_pat.append(y_test)
                         all_ytraining_pat.append(y_train)
                     
-                print("Spliting random on epoch", epoch_num, "block", block, network)
-                random =  (behav.trialtypes == 2) & (behav.blocks == block)
-                X = stcs_data[random]
-                y = behav.positions[random]
-                y = y.reset_index(drop=True)
-                assert len(X) == len(y)
-                                
-                for train_index, test_index in kf.split(X):
-                    X_train, X_test = X[train_index], X[test_index]
-                    y_train, y_test = y.iloc[train_index], y.iloc[test_index]
+                    trainxrand = np.intersect1d(train_index, random)
+                    testxrand = np.intersect1d(test_index, random)
+                    
+                    X_train, X_test = X[trainxrand], X[testxrand]
+                    y_train, y_test = y.iloc[trainxrand].positions, y.iloc[testxrand].positions
                     
                     Xtraining_rand.append(X_train)
                     Xtesting_rand.append(X_test)
@@ -140,15 +141,20 @@ def process_subject(subject, jobs):
                         all_ytesting_rand.append(y_test)
                         all_ytraining_rand.append(y_train)
             
+            del stcs_data, behav
+            gc.collect()
+            
             # Pattern per session
-            res_dir = res_path / network / "split_20s_pattern"
-            ensure_dir(res_dir)
+            res_dir = ensured(res_path / network / "split_20s_pattern")
             Xtraining_pat = np.concatenate(Xtraining_pat)
             ytraining_pat = np.concatenate(ytraining_pat)
             assert len(Xtraining_pat) == len(ytraining_pat), "Xtraining and ytraining lengths do not match"
             clf.fit(Xtraining_pat, ytraining_pat)
             assert len(Xtesting_pat) == len(ytesting_pat), "Xtesting and ytesting lengths do not match"
             for i, _ in enumerate(Xtesting_pat):
+                if len(Xtesting_pat[i]) == 0 or len(ytesting_pat[i]) == 0:
+                    print(f"Skipping quarter {i+1} for subject {subject} epoch {epoch_num} pattern")
+                    continue
                 if not op.exists(res_dir / f"{subject}-{epoch_num}-{i+1}.npy") or overwrite:
                     ypred = clf.predict(Xtesting_pat[i])
                     print(f"Scoring quarter {i+1} for {subject} epoch {epoch_num} pattern")
@@ -158,14 +164,16 @@ def process_subject(subject, jobs):
                     print(f"Quarter {i+1} for {subject} epoch {epoch_num} pattern exists, skipping")
 
             # Random per session
-            res_dir = res_path / network / "split_20s_random"
-            ensure_dir(res_dir)
+            res_dir = ensured(res_path / network / "split_20s_random")
             Xtraining_rand = np.concatenate(Xtraining_rand)
             ytraining_rand = np.concatenate(ytraining_rand)
             assert len(Xtraining_rand) == len(ytraining_rand), "Xtraining and ytraining lengths do not match"
             clf.fit(Xtraining_rand, ytraining_rand)
             assert len(Xtesting_rand) == len(ytesting_rand), "Xtesting and ytesting lengths do not match"
             for i, _ in enumerate(Xtesting_rand):
+                if len(Xtesting_rand[i]) == 0 or len(ytesting_rand[i]) == 0:
+                    print(f"Skipping quarter {i+1} for subject {subject} epoch {epoch_num} random")
+                    continue
                 if not op.exists(res_dir / f"{subject}-{epoch_num}-{i+1}.npy") or overwrite:
                     ypred = clf.predict(Xtesting_rand[i])
                     print(f"Scoring quarter {i+1} for {subject} epoch {epoch_num} random")
@@ -174,17 +182,16 @@ def process_subject(subject, jobs):
                 else:
                     print(f"Quarter {i+1} for {subject} epoch {epoch_num} random exists, skipping")
                         
-            del behav
-            gc.collect()
-        
         # Pattern all sessions
-        res_dir = res_path / network / "split_20s_all_pattern"
-        ensure_dir(res_dir)
+        res_dir = ensured(res_path / network / "split_20s_all_pattern")
         all_Xtraining_pat = np.concatenate(all_Xtraining_pat)
         all_ytraining_pat = np.concatenate(all_ytraining_pat)
         assert len(all_Xtraining_pat) == len(all_ytraining_pat), "Length mismatch in pattern"
         clf.fit(all_Xtraining_pat, all_ytraining_pat)
         for i, _ in enumerate(all_Xtesting_pat):
+            if len(all_Xtesting_pat[i]) == 0 or len(all_ytesting_pat[i]) == 0:
+                print(f"Skipping quarter {i+1} for {subject} all pattern")
+                continue
             if not op.exists(res_dir / f"{subject}-{i+1}.npy") or overwrite:
                 ypred = clf.predict(all_Xtesting_pat[i])
                 print(f"Scoring quarter {i+1} for {subject} all pattern")
@@ -194,13 +201,15 @@ def process_subject(subject, jobs):
                 print(f"Quarter {i+1} for {subject} all pattern exists, skipping")
         
         # Random all sessions
-        res_dir = res_path / network / "split_20s_all_random"
-        ensure_dir(res_dir)
+        res_dir = ensured(res_path / network / "split_20s_all_random")
         all_Xtraining_rand = np.concatenate(all_Xtraining_rand)
         all_ytraining_rand = np.concatenate(all_ytraining_rand)
         assert len(all_Xtraining_rand) == len(all_ytraining_rand), "Length mismatch in random"
         clf.fit(all_Xtraining_rand, all_ytraining_rand)
         for i, _ in enumerate(all_Xtesting_rand):
+            if len(all_Xtesting_rand[i]) == 0 or len(all_ytesting_rand[i]) == 0:
+                print(f"Skipping quarter {i+1} for {subject} all random")
+                continue
             if not op.exists(res_dir / f"{subject}-{i+1}.npy") or overwrite:
                 ypred = clf.predict(all_Xtesting_rand[i])
                 print(f"Scoring quarter {i+1} for {subject} all random")
