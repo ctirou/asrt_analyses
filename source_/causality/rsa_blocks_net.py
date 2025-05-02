@@ -112,49 +112,49 @@ def process_subject(subject, jobs, verbose):
             del data
             gc.collect()
             
-        res_dir = ensured(res_path / "split_pattern")
-        for i, _ in enumerate(Xtesting_pat):
-            if not op.exists(res_dir / f"{subject}-{epoch_num}-{i+1}.npy") or overwrite:
-                print(f"Processing {subject} - session {epoch_num} - block {i+1}")
-                rdm_pat = train_test_mahalanobis_fast(Xtraining_pat[i], Xtesting_pat[i], ytraining_pat[i], ytesting_pat[i], n_jobs=jobs)
-                np.save(res_dir / f"{subject}-{epoch_num}-{i+1}.npy", rdm_pat)
+            res_dir = ensured(res_path / "split_pattern")
+            for i, _ in enumerate(Xtesting_pat):
+                if not op.exists(res_dir / f"{subject}-{epoch_num}-{i+1}.npy") or overwrite:
+                    print(f"Processing {subject} - session {epoch_num} - block {i+1}")
+                    rdm_pat = train_test_mahalanobis_fast(Xtraining_pat[i], Xtesting_pat[i], ytraining_pat[i], ytesting_pat[i], n_jobs=jobs)
+                    np.save(res_dir / f"{subject}-{epoch_num}-{i+1}.npy", rdm_pat)
+                else:
+                    print(f"File {res_dir / f'{subject}-{epoch_num}-{i+1}.npy'} already exists, skipping.")
+            del Xtraining_pat, Xtesting_pat, ytraining_pat, ytesting_pat
+            gc.collect()
+                    
+            res_dir = ensured(res_path / "split_random")
+            for i, _ in enumerate(Xtesting_rand):
+                if not op.exists(res_path / f"{subject}-{epoch_num}-{i+1}.npy") or overwrite:
+                    print(f"Processing {subject} - session {epoch_num} - block {i+1}")
+                    rdm_rand = train_test_mahalanobis_fast(Xtraining_rand[i], Xtesting_rand[i], ytraining_rand[i], ytesting_rand[i], n_jobs=jobs)
+                    np.save(res_path / f"{subject}-{epoch_num}-{i+1}.npy", rdm_rand)
+                else:
+                    print(f"File {f'{subject}-{epoch_num}-{i+1}.npy'} already exists, skipping.")
+            del Xtraining_rand, Xtesting_rand, ytraining_rand, ytesting_rand
+            gc.collect()
+        
+        res_dir = ensured(res_path / "split_all_pattern")
+        for i, _ in enumerate(all_Xtesting_pat):
+            if not op.exists(res_dir / f"{subject}-{i+1}.npy") or overwrite:
+                print(f"Processing {subject} - block {i+1}")
+                rdm_pat = train_test_mahalanobis_fast(all_Xtraining_pat[i], all_Xtesting_pat[i], all_ytraining_pat[i], all_ytesting_pat[i], n_jobs=jobs)
+                np.save(res_dir / f"{subject}-{i+1}.npy", rdm_pat)
             else:
-                print(f"File {res_dir / f'{subject}-{epoch_num}-{i+1}.npy'} already exists, skipping.")
-        del Xtraining_pat, Xtesting_pat, ytraining_pat, ytesting_pat
+                print(f"File {f'{subject}-{i+1}.npy'} already exists, skipping.")
+        del all_Xtraining_pat, all_Xtesting_pat, all_ytraining_pat, all_ytesting_pat
         gc.collect()
-                
-        res_dir = ensured(res_path / "split_random")
-        for i, _ in enumerate(Xtesting_rand):
-            if not op.exists(res_path / f"{subject}-{epoch_num}-{i+1}.npy") or overwrite:
-                print(f"Processing {subject} - session {epoch_num} - block {i+1}")
-                rdm_rand = train_test_mahalanobis_fast(Xtraining_rand[i], Xtesting_rand[i], ytraining_rand[i], ytesting_rand[i], n_jobs=jobs)
-                np.save(res_path / f"{subject}-{epoch_num}-{i+1}.npy", rdm_rand)
+        
+        res_dir = ensured(res_path / "split_all_random")
+        for i, _ in enumerate(all_Xtesting_rand):
+            if not op.exists(res_dir / f"{subject}-{i+1}.npy") or overwrite:
+                print(f"Processing {subject} - block {i+1}")
+                rdm_rand = train_test_mahalanobis_fast(all_Xtraining_rand[i], all_Xtesting_rand[i], all_ytraining_rand[i], all_ytesting_rand[i], n_jobs=jobs)
+                np.save(res_dir / f"{subject}-{i+1}.npy", rdm_rand)
             else:
-                print(f"File {f'{subject}-{epoch_num}-{i+1}.npy'} already exists, skipping.")
-        del Xtraining_rand, Xtesting_rand, ytraining_rand, ytesting_rand
+                print(f"File {f'{subject}-{i+1}.npy'} already exists, skipping.")
+        del all_Xtraining_rand, all_Xtesting_rand, all_ytraining_rand, all_ytesting_rand
         gc.collect()
-    
-    res_dir = ensured(res_path / "split_all_pattern")
-    for i, _ in enumerate(all_Xtesting_pat):
-        if not op.exists(res_dir / f"{subject}-{i+1}.npy") or overwrite:
-            print(f"Processing {subject} - block {i+1}")
-            rdm_pat = train_test_mahalanobis_fast(all_Xtraining_pat[i], all_Xtesting_pat[i], all_ytraining_pat[i], all_ytesting_pat[i], n_jobs=jobs)
-            np.save(res_dir / f"{subject}-{i+1}.npy", rdm_pat)
-        else:
-            print(f"File {f'{subject}-{i+1}.npy'} already exists, skipping.")
-    del all_Xtraining_pat, all_Xtesting_pat, all_ytraining_pat, all_ytesting_pat
-    gc.collect()
-    
-    res_dir = ensured(res_path / "split_all_random")
-    for i, _ in enumerate(all_Xtesting_rand):
-        if not op.exists(res_dir / f"{subject}-{i+1}.npy") or overwrite:
-            print(f"Processing {subject} - block {i+1}")
-            rdm_rand = train_test_mahalanobis_fast(all_Xtraining_rand[i], all_Xtesting_rand[i], all_ytraining_rand[i], all_ytesting_rand[i], n_jobs=jobs)
-            np.save(res_dir / f"{subject}-{i+1}.npy", rdm_rand)
-        else:
-            print(f"File {f'{subject}-{i+1}.npy'} already exists, skipping.")
-    del all_Xtraining_rand, all_Xtesting_rand, all_ytraining_rand, all_ytesting_rand
-    gc.collect()
                                 
 if is_cluster:
     # Check that SLURM_ARRAY_TASK_ID is available and use it to get the subject
