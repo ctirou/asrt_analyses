@@ -51,7 +51,6 @@ def process_subject(subject, jobs, verbose):
         
         for block in blocks:
             block = int(block)
-            print(f"Processing {subject} - session {epoch_num} - block {block}")
 
             this_block = behav.blocks == block
             X = data[this_block]
