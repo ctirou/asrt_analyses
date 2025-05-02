@@ -235,7 +235,7 @@ def process_subject(subject, jobs):
         # compute forward solution
         # fwd_fname = res_path / "fwd" / f"{subject}-{epoch_num}-fwd.fif"
         fwd_fname = res_path / "fwd" / lock / f"{subject}-{epoch_num}-fwd.fif"
-        if not op.exists(fwd_fname) or overwrite:
+        if not op.exists(fwd_fname) or True:
             fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,
                                         src=src, bem=bem_fname,
                                         meg=True, eeg=False,
@@ -248,7 +248,7 @@ def process_subject(subject, jobs):
         
         # fwd_fname = res_path / "fwd" / f"{subject}-htc-{epoch_num}-fwd.fif"
         fwd_fname = res_path / "fwd" / lock / f"{subject}-htc-{epoch_num}-fwd.fif"
-        if not op.exists(fwd_fname) or overwrite:
+        if not op.exists(fwd_fname) or True:
             fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,
                                         src=mixed, bem=bem_fname,
                                         meg=True, eeg=False,

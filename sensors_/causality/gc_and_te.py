@@ -15,7 +15,7 @@ win = np.load(FIGURES_DIR / "RSA" / "sensors" / "sig_rsa.npy")
 
 pattern, random = [], []
 for subject in tqdm(subjects):
-    res_path = RESULTS_DIR / 'RSA' / 'sensors' / lock / "loocv_rdm_blocks" / subject        
+    res_path = RESULTS_DIR / 'RSA' / 'sensors' / lock / "loocv_rdm_blocks_fixed" / subject        
     behav_dir = op.join(HOME / 'raw_behavs' / subject)
     sequence = get_sequence(behav_dir)
     pat, rand = get_all_high_low_blocks(res_path, sequence)
