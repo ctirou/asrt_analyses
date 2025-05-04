@@ -11,6 +11,7 @@ from joblib import Parallel, delayed
 
 # params
 subjects = SUBJS
+subjects = ['sub03', 'sub06']
 lock = 'stim'
 analysis = 'RSA'
 data_path = DATA_DIR

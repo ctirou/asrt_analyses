@@ -13,7 +13,7 @@ analysis = 'pat_high_rdm_high'
 jobs = -1
 
 data_path = DATA_DIR
-subjects, epochs_list = SUBJS, EPOCHS
+subjects, epochs_list = ALL_SUBJS, EPOCHS
 
 times = np.linspace(-.2, .6, 82)
 timesg = np.linspace(-1.5, 1.5, 307)
@@ -99,7 +99,7 @@ fig.savefig(figures_dir / "similarity_fixed2.pdf", transparent=True)
 plt.close(fig)
 
 ### Plot similarity index x learning index corr ###
-learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices3.csv', sep="\t", index_col=0)
+learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices3-all.csv', sep="\t", index_col=0)
 fig, axes = plt.subplots(2, 5, figsize=(15, 4), sharex=True, sharey=True, layout='tight')
 for i, (ax, label, name) in enumerate(zip(axes.flat, networks, network_names)):
     # ax.axvspan(0.28, 0.51, facecolor='green', edgecolor=None, alpha=.1)

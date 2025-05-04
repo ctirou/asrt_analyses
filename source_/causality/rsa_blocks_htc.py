@@ -131,10 +131,10 @@ def process_subject(subject, jobs, verbose):
                     
             res_dir = ensured(res_path / "split_random")
             for i, _ in enumerate(Xtesting_rand):
-                if not op.exists(res_path / f"{subject}-{epoch_num}-{i+1}.npy") or overwrite:
+                if not op.exists(res_dir / f"{subject}-{epoch_num}-{i+1}.npy") or overwrite:
                     print(f"Processing {subject} - session {epoch_num} - block {i+1}")
                     rdm_rand = train_test_mahalanobis_fast(Xtraining_rand[i], Xtesting_rand[i], ytraining_rand[i], ytesting_rand[i], n_jobs=jobs)
-                    np.save(res_path / f"{subject}-{epoch_num}-{i+1}.npy", rdm_rand)
+                    np.save(res_dir / f"{subject}-{epoch_num}-{i+1}.npy", rdm_rand)
                 else:
                     print(f"File {f'{subject}-{epoch_num}-{i+1}.npy'} already exists, skipping.")
             del Xtraining_rand, Xtesting_rand, ytraining_rand, ytesting_rand
