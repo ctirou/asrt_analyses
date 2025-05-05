@@ -14,6 +14,8 @@ jobs = -1
 
 data_path = DATA_DIR
 subjects, epochs_list = ALL_SUBJS, EPOCHS
+# subjects = SUBJS
+# subjects = ['sub03', 'sub06']
 
 times = np.linspace(-.2, .6, 82)
 timesg = np.linspace(-1.5, 1.5, 307)
@@ -47,7 +49,8 @@ for network in networks:
         sequence = get_sequence(behav_dir)
         # home = Path("/Users/coum/MEGAsync/RSA")
         res_path = RESULTS_DIR / 'RSA' / 'source' / network / lock / f'{ori}_rdm_fixed' / subject
-        high, low = get_all_high_low(res_path, sequence, analysis, cv=True)    
+        high, low = get_all_high_low(res_path, sequence, analysis, cv=True)
+        # high, low = get_all_high_low_old(res_path, sequence, analysis, cv=True) 
         all_highs[network].append(high)    
         all_lows[network].append(low)
     all_highs[network] = np.array(all_highs[network])

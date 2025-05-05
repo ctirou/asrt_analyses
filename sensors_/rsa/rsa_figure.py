@@ -34,7 +34,8 @@ for subject in tqdm(subjects):
     # RSA stuff
     behav_dir = op.join(HOME / 'raw_behavs' / subject)
     sequence = get_sequence(behav_dir)
-    high, low = get_all_high_low(res_path, sequence, analysis, cv=True)    
+    # high, low = get_all_high_low(res_path, sequence, analysis, cv=True)    
+    high, low = get_all_high_low_old(res_path, sequence, analysis, cv=True)    
     all_highs.append(high)
     all_lows.append(low)
     # Decoding stuff
@@ -51,17 +52,21 @@ for trial_type in ['pattern', 'random']:
 patterns = np.array(patterns)
 randoms = np.array(randoms)
 
-all_highs = np.array(all_highs)
-all_lows = np.array(all_lows)
+all_highs = np.array(all_highs).mean(1)
+all_lows = np.array(all_lows).mean(1)
 
-high = all_highs[:, :, 1:, :].mean((1, 2)) - all_highs[:, :, 0, :].mean(axis=1)
-low = all_lows[:, :, 1:, :].mean((1, 2)) - all_lows[:, :, 0, :].mean(axis=1)
+# high = all_highs[:, :, 1:, :].mean((1, 2)) - all_highs[:, :, 0, :].mean(axis=1)
+# low = all_lows[:, :, 1:, :].mean((1, 2)) - all_lows[:, :, 0, :].mean(axis=1)
+high = all_highs[:, 1:, :].mean(1)
+low = all_lows[:, 1:, :].mean(1)
 diff_lh = low - high
 
 diff_sess = list()   
 for i in range(5):
-    rev_low = all_lows[:, :, i, :].mean(1) - all_lows[:, :, 0, :].mean(axis=1)
-    rev_high = all_highs[:, :, i, :].mean(1) - all_highs[:, :, 0, :].mean(axis=1)
+    rev_low = all_lows[:, i, :]
+    rev_high = all_highs[:, i, :]
+    # rev_low = all_lows[:, :, i, :].mean(1) - all_lows[:, :, 0, :].mean(axis=1)
+    # rev_high = all_highs[:, :, i, :].mean(1) - all_highs[:, :, 0, :].mean(axis=1)
     diff_sess.append(rev_low - rev_high)
 diff_sess = np.array(diff_sess).swapaxes(0, 1)
 

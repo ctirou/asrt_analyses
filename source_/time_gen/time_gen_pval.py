@@ -1,5 +1,5 @@
 import os
-from base import ensure_dir, gat_stats, decod_stats
+from base import ensured, gat_stats, decod_stats
 from config import *
 import os.path as op
 import matplotlib.pyplot as plt
@@ -15,8 +15,7 @@ subjects, subjects_dir = SUBJS, FREESURFER_DIR
 lock = 'stim'
 # network and custom label_names
 networks = NETWORKS + ['Cerebellum-Cortex']
-res_dir = TIMEG_DATA_DIR / 'results' / 'source' / 'max-power'
-ensure_dir(res_dir)
+res_path = ensured(TIMEG_DATA_DIR / 'results' / 'source' / 'max-power')
 overwrite = False
 
 times = np.linspace(-1.5, 1.5, 307)
@@ -27,7 +26,7 @@ def compute_spearman(t, g, vector, contrasts):
     return spearmanr(vector, contrasts[:, t, g])[0]
 
 # Load data, compute, and save correlations and pvals 
-learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices3.csv', sep="\t", index_col=0)
+learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices3-all.csv', sep="\t", index_col=0)
 
 patterns, randoms = {}, {}
 all_patterns, all_randoms = {}, {}
@@ -56,20 +55,20 @@ for network in networks:
     randoms[network] = np.array(randrand)
     
     # save time gen pvals
-    ensure_dir(res_dir / network / "pval")
-    if not op.exists(res_dir / network / "pval" / "all_pattern-pval.npy") or overwrite:
+    res_dir = ensured(res_path / network / "pval-all")
+    if not op.exists(res_dir / "all_pattern-pval.npy") or overwrite:
         pval = gat_stats(all_patterns[network] - chance, -1)
-        np.save(res_dir / network / "pval" / "all_pattern-pval.npy", pval)
-    if not op.exists(res_dir / network / "pval" / "all_random-pval.npy") or overwrite:
+        np.save(res_dir / "all_pattern-pval.npy", pval)
+    if not op.exists(res_dir / "all_random-pval.npy") or overwrite:
         pval = gat_stats(all_randoms[network] - chance, -1)
-        np.save(res_dir / network / "pval" / "all_random-pval.npy", pval)
-    if not op.exists(res_dir / network / "pval" / "all_contrast-pval.npy") or overwrite:
+        np.save(res_dir / "all_random-pval.npy", pval)
+    if not op.exists(res_dir / "all_contrast-pval.npy") or overwrite:
         pval = gat_stats(all_patterns[network] - all_randoms[network], -1)
-        np.save(res_dir / network / "pval" / "all_contrast-pval.npy", pval)
+        np.save(res_dir / "all_contrast-pval.npy", pval)
     
     # save learn df x time gen correlation and pvals
-    ensure_dir(res_dir / network / "corr")    
-    if not op.exists(res_dir / network / "corr" / "rhos_learn.npy") or overwrite:
+    res_dir = ensured(res_path / network / "corr-all")    
+    if not op.exists(res_dir / "rhos_learn.npy") or overwrite:
         contrasts = patterns[network] - randoms[network]
         contrasts = zscore(contrasts, axis=-1)  # je sais pas si zscore avant correlation pour la RSA mais c'est mieux je pense
         all_rhos = []
@@ -82,6 +81,6 @@ for network in networks:
                 rhos[t, g] = results[idx]
             all_rhos.append(rhos)
         all_rhos = np.array(all_rhos)
-        np.save(res_dir / network / "corr" / "rhos_learn.npy", all_rhos)
+        np.save(res_dir / "rhos_learn.npy", all_rhos)
         pval = gat_stats(all_rhos, -1)
-        np.save(res_dir / network / "corr" / "pval_learn-pval.npy", pval)    
+        np.save(res_dir / "pval_learn-pval.npy", pval)    
