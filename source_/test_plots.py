@@ -20,8 +20,6 @@ subjects, epochs_list = ALL_SUBJS, EPOCHS
 times = np.linspace(-.2, .6, 82)
 timesg = np.linspace(-1.5, 1.5, 307)
 
-n_parcels = 200
-n_networks = 17
 networks = NETWORKS + ['Cerebellum-Cortex']
 network_names = NETWORK_NAMES + ['Cerebellum']
 

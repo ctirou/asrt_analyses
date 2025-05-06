@@ -35,7 +35,14 @@ for subject in tqdm(subjects):
     behav_dir = op.join(HOME / 'raw_behavs' / subject)
     sequence = get_sequence(behav_dir)
     # high, low = get_all_high_low(res_path, sequence, analysis, cv=True)    
-    high, low = get_all_high_low_old(res_path, sequence, analysis, cv=True)    
+    # high, low = get_all_high_low_old(res_path, sequence, analysis, cv=True)
+    pats, rands = [], []
+    for epoch_num in range(5):
+        pats.append(np.load(res_path / f"pat-{epoch_num}.npy"))
+        rands.append(np.load(res_path / f"rand-{epoch_num}.npy"))
+    pats = np.array(pats)
+    rands = np.array(rands)
+    high, low = get_all_high_low2(pats, rands, sequence, False)
     all_highs.append(high)
     all_lows.append(low)
     # Decoding stuff
@@ -55,10 +62,10 @@ randoms = np.array(randoms)
 all_highs = np.array(all_highs).mean(1)
 all_lows = np.array(all_lows).mean(1)
 
-# high = all_highs[:, :, 1:, :].mean((1, 2)) - all_highs[:, :, 0, :].mean(axis=1)
-# low = all_lows[:, :, 1:, :].mean((1, 2)) - all_lows[:, :, 0, :].mean(axis=1)
-high = all_highs[:, 1:, :].mean(1)
-low = all_lows[:, 1:, :].mean(1)
+high = all_highs[:, 1:, :].mean(1) - all_highs[:, 0, :]
+low = all_lows[:, 1:, :].mean(1) - all_lows[:, 0, :]
+# high = all_highs[:, 1:, :].mean(1)
+# low = all_lows[:, 1:, :].mean(1)
 diff_lh = low - high
 
 diff_sess = list()   
