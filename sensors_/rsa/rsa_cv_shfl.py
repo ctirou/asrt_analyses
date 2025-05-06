@@ -28,7 +28,8 @@ def process_subject(subject, epoch_num, jobs, verbose):
     print(f"Processing {subject} - {lock} - {epoch_num}")
                 
     behav_fname = op.join(data_path, "behav/%s-%s.pkl" % (subject, epoch_num))
-    behav = pd.read_pickle(behav_fname)
+    behav = pd.read_pickle(behav_fname).reset_index(drop=True)
+    behav['trials'] = behav.index
     # read epochs
     epoch_fname = op.join(data_path, "%s/%s-%s-epo.fif" % (lock, subject, epoch_num))
     epoch = mne.read_epochs(epoch_fname, verbose=verbose)
@@ -37,23 +38,24 @@ def process_subject(subject, epoch_num, jobs, verbose):
     blocks = np.unique(behav["blocks"])
     Xtraining_pat, Xtesting_pat, ytraining_pat, ytesting_pat = [], [], [], []
     Xtraining_rand, Xtesting_rand, ytraining_rand, ytesting_rand = [], [], [], []
-    
+        
     for block in blocks:
         block = int(block)
         this_block = behav.blocks == block
-        X = data[this_block]
-        y = behav[this_block].reset_index(drop=True)
-        assert len(X) == len(y), "Data and behavior lengths do not match"
+        pat = behav.trialtypes == 1
+        rand = behav.trialtypes == 2
+        pat_this_block = this_block & pat
+        rand_this_block = this_block & rand
 
-        # Fix: Compute trialtype indices within this block only
+        ypat = behav[pat_this_block]
+        yrand = behav[rand_this_block]
+
         pattern_idx = np.where(y.trialtypes == 1)[0]
         random_idx = np.where(y.trialtypes == 2)[0]
 
-        for train_index, test_index in kf.split(X):
+        for train_index, test_index in kf.split(ypat):
 
-            # Pattern trials
-            trainxpat = np.intersect1d(train_index, pattern_idx)
-            testxpat = np.intersect1d(test_index, pattern_idx)
+            
 
             X_train, X_test = X[trainxpat], X[testxpat]
             y_train = y.iloc[trainxpat].positions
