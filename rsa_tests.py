@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from scipy.stats import ttest_1samp
 
+subjects = SUBJS
 subjects = ALL_SUBJS
 lock = 'stim'
 times = np.linspace(-0.2, 0.6, 82)
@@ -77,41 +78,53 @@ axes[1, 0].plot(times, rand.mean(0), label='random')
 axes[1, 0].set_title("random vs pattern", fontstyle='italic')
 axes[1, 0].legend(frameon=False)
 
-sig_corr = np.where((times > 0.37) & (times <= 0.52))[0]
-sig = sig_corr.copy()
+if sig.any():
+    pats_blocks = np.nanmean(all_pats_blocks[:, :, :, sig], (1, -1))
+    rands_blocks = np.nanmean(all_rands_blocks[:, :, :, sig], (1, -1))
+    diff_rp_blocks = rands_blocks - pats_blocks
 
-pats_blocks = np.nanmean(all_pats_blocks[:, :, :, sig], (1, -1))
-rands_blocks = np.nanmean(all_rands_blocks[:, :, :, sig], (1, -1))
-diff_rp_blocks = rands_blocks - pats_blocks
-
-for i in [6, 16, 26, 36]:
-    axes[2, 0].axvline(i, color='grey', linestyle='--', alpha=0.5)
-axes[2, 0].plot(np.arange(1, diff_rp_blocks.shape[1] + 1), diff_rp_blocks.mean(0), color=c2)
-axes[2, 0].set_title('40s trial bins', fontstyle='italic')
-axes[2, 0].set_xticks([i for i in range(1, 46, 2)])
-# axes[2, 0].set_xticks([6, 16, 26, 36])
-# axes[2, 0].set_xticklabels(['S1', 'S2', 'S3', 'S4'])
-for txt, xpos in zip(['S1', 'S2', 'S3', 'S4'], [6, 16, 26, 36]):
-    axes[2, 0].text(xpos, 1.25, txt, ha='center', va='top', fontsize=12, bbox=dict(facecolor='white', alpha=1, edgecolor='none'))
+    for i in [6, 16, 26, 36]:
+        axes[2, 0].axvline(i, color='grey', linestyle='--', alpha=0.5)
+    axes[2, 0].plot(np.arange(1, diff_rp_blocks.shape[1] + 1), diff_rp_blocks.mean(0), color=c2)
+    axes[2, 0].set_title('40s trial bins', fontstyle='italic')
+    axes[2, 0].set_xticks([i for i in range(1, 47, 5)])
+    # axes[2, 0].set_xticks([6, 16, 26, 36])
+    # axes[2, 0].set_xticklabels(['S1', 'S2', 'S3', 'S4'])
+    for txt, xpos in zip(['S1', 'S2', 'S3', 'S4'], [6, 16, 26, 36]):
+        axes[2, 0].text(xpos, 1.25, txt, ha='center', va='top', fontsize=12, bbox=dict(facecolor='white', alpha=1, edgecolor='none'))
 
 # w/ practice bsl
 pat = np.nanmean(all_pats[:, 1:, :], 1) - all_pats[:, 0, :]
 rand = np.nanmean(all_rands[:, 1:, :], 1) - all_rands[:, 0, :]
 diff_rp = rand - pat
 
-axes[0, 1].plot(times, diff_rp.mean(0), color=c2)
+axes[0, 1].plot(times, diff_rp.mean(0), color=c1)
 pval = decod_stats(diff_rp, -1)
 sig = pval < 0.05
 pval_uncorr = ttest_1samp(diff_rp, 0, axis=0)[1]
 sig_uncorr = pval_uncorr < 0.05
 
 axes[0, 1].fill_between(times, diff_rp.mean(0), 0, where=sig, color=c1, alpha=0.2, label='corrected')
-axes[0, 1].fill_between(times, diff_rp.mean(0), 0, where=sig_uncorr, color='grey', alpha=0.2, label='uncorrected')
+# axes[0, 1].fill_between(times, diff_rp.mean(0), 0, where=sig_uncorr, color='grey', alpha=0.2, label='uncorrected')
 axes[0, 1].set_title("no shuffle - w/ practice bsl", fontstyle='italic')
 axes[1, 1].plot(times, pat.mean(0), label='pattern')
 axes[1, 1].plot(times, rand.mean(0), label='random')
 axes[1, 1].set_title("random vs pattern", fontstyle='italic')
 axes[1, 1].legend(frameon=False)
+
+if sig.any():
+    pats_blocks = np.nanmean(all_pats_blocks[:, :, :, sig], (1, -1))
+    rands_blocks = np.nanmean(all_rands_blocks[:, :, :, sig], (1, -1))
+    diff_rp_blocks = rands_blocks - pats_blocks
+    for i in [6, 16, 26, 36]:
+        axes[2, 1].axvline(i, color='grey', linestyle='--', alpha=0.5)
+    axes[2, 1].plot(np.arange(1, diff_rp_blocks.shape[1] + 1), diff_rp_blocks.mean(0), color=c2)
+    axes[2, 1].set_title('40s trial bins', fontstyle='italic')
+    axes[2, 1].set_xticks([i for i in range(1, 47, 5)])
+    # axes[2, 0].set_xticks([6, 16, 26, 36])
+    # axes[2, 0].set_xticklabels(['S1', 'S2', 'S3', 'S4'])
+    for txt, xpos in zip(['S1', 'S2', 'S3', 'S4'], [6, 16, 26, 36]):
+        axes[2, 1].text(xpos, 1.25, txt, ha='center', va='top', fontsize=12, bbox=dict(facecolor='white', alpha=1, edgecolor='none'))
 
 # --- RSA shuffled ---
 all_highs, all_lows = [], []
@@ -133,6 +146,7 @@ for subject in tqdm(subjects):
 all_highs = np.array(all_highs).mean(1)
 all_lows = np.array(all_lows).mean(1)
 
+# w/o practice bsl
 pat = all_highs[:, 1:, :].mean(1)
 rand = all_lows[:, 1:, :].mean(1)
 diff_rp = rand - pat
@@ -147,24 +161,25 @@ sig = pval < 0.05
 pval_uncorr = ttest_1samp(diff_rp, 0, axis=0)[1]
 sig_uncorr = pval_uncorr < 0.05
 axes[0, 0].fill_between(times, diff_rp.mean(0), 0, where=sig, color=c1, alpha=0.2, label='corrected')
-axes[0, 0].fill_between(times, diff_rp.mean(0), 0, where=sig_uncorr, color='grey', alpha=0.2, label='uncorrected')
+# axes[0, 0].fill_between(times, diff_rp.mean(0), 0, where=sig_uncorr, color='grey', alpha=0.2, label='uncorrected')
 axes[0, 0].set_title("shuffled - w/o practice bsl", fontstyle='italic')
 axes[1, 0].plot(times, pat.mean(0), label='pattern')
 axes[1, 0].plot(times, rand.mean(0), label='random')
 axes[1, 0].set_title("random vs pattern", fontstyle='italic')
 axes[1, 0].legend(frameon=False)
 
+# w/ practice bsl
 pat = all_highs[:, 1:, :].mean(1) - all_highs[:, 0, :]
 rand = all_lows[:, 1:, :].mean(1) - all_lows[:, 0, :]
 diff_rp = rand - pat
 
-axes[0, 1].plot(times, diff_rp.mean(0), color=c2)
+axes[0, 1].plot(times, diff_rp.mean(0), color=c1)
 pval = decod_stats(diff_rp, -1)
 sig = pval < 0.05
 pval_uncorr = ttest_1samp(diff_rp, 0, axis=0)[1]
 sig_uncorr = pval_uncorr < 0.05
-axes[0, 1].fill_between(times, diff_rp.mean(0), 0, where=sig, color=c2, alpha=0.2, label='corrected')
-axes[0, 1].fill_between(times, diff_rp.mean(0), 0, where=sig_uncorr, color='grey', alpha=0.2, label='uncorrected')
+axes[0, 1].fill_between(times, diff_rp.mean(0), 0, where=sig, color=c1, alpha=0.2, label='corrected')
+# axes[0, 1].fill_between(times, diff_rp.mean(0), 0, where=sig_uncorr, color='grey', alpha=0.2, label='uncorrected')
 axes[0, 1].set_title("shuffled - w/ practice bsl", fontstyle='italic')
 axes[1, 1].plot(times, pat.mean(0), label='pattern')
 axes[1, 1].plot(times, rand.mean(0), label='random')
