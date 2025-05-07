@@ -42,7 +42,7 @@ for subject in tqdm(subjects):
         rands.append(np.load(res_path / f"rand-{epoch_num}.npy"))
     pats = np.array(pats)
     rands = np.array(rands)
-    high, low = get_all_high_low2(pats, rands, sequence, False)
+    high, low = get_all_high_low(pats, rands, sequence, False)
     all_highs.append(high)
     all_lows.append(low)
     # Decoding stuff

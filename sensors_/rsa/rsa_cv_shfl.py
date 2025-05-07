@@ -23,7 +23,7 @@ def process_subject(subject, epoch_num, jobs, verbose):
     
     kf = KFold(n_splits=2, shuffle=False)
     
-    res_path = ensured(RESULTS_DIR / 'RSA' / 'sensors' / lock / "cv_no_shfl" / subject)
+    res_path = ensured(RESULTS_DIR / 'RSA' / 'sensors' / lock / "kf2_no_shfl" / subject)
         
     print(f"Processing {subject} - {lock} - {epoch_num}")
                 
@@ -34,68 +34,66 @@ def process_subject(subject, epoch_num, jobs, verbose):
     epoch_fname = op.join(data_path, "%s/%s-%s-epo.fif" % (lock, subject, epoch_num))
     epoch = mne.read_epochs(epoch_fname, verbose=verbose)
     data = epoch.get_data(picks='mag', copy=True)
+    assert len(data) == len(behav), "Data and behavior lengths do not match"
     
     blocks = np.unique(behav["blocks"])
-    Xtraining_pat, Xtesting_pat, ytraining_pat, ytesting_pat = [], [], [], []
-    Xtraining_rand, Xtesting_rand, ytraining_rand, ytesting_rand = [], [], [], []
         
     for block in blocks:
         block = int(block)
-        this_block = behav.blocks == block
+
         pat = behav.trialtypes == 1
-        rand = behav.trialtypes == 2
-        pat_this_block = this_block & pat
-        rand_this_block = this_block & rand
-
+        this_block = behav.blocks == block
+        pat_this_block = pat & this_block
         ypat = behav[pat_this_block]
-        yrand = behav[rand_this_block]
-
-        pattern_idx = np.where(y.trialtypes == 1)[0]
-        random_idx = np.where(y.trialtypes == 2)[0]
-
-        for train_index, test_index in kf.split(ypat):
-
+        
+        for i, (_, test_index) in enumerate(kf.split(ypat)):
             
-
-            X_train, X_test = X[trainxpat], X[testxpat]
-            y_train = y.iloc[trainxpat].positions
-            y_test = y.iloc[testxpat].positions
-
-            Xtraining_pat.append(X_train)
-            Xtesting_pat.append(X_test)
-            ytraining_pat.append(y_train)
-            ytesting_pat.append(y_test)
-
-            # Random trials
-            trainxrand = np.intersect1d(train_index, random_idx)
-            testxrand = np.intersect1d(test_index, random_idx)
-
-            X_train, X_test = X[trainxrand], X[testxrand]
-            y_train = y.iloc[trainxrand].positions
-            y_test = y.iloc[testxrand].positions
-
-            Xtraining_rand.append(X_train)
-            Xtesting_rand.append(X_test)
-            ytraining_rand.append(y_train)
-            ytesting_rand.append(y_test)
-                
-    # Pattern per session
-    for i, _ in enumerate(Xtesting_pat):
-        if not op.exists(res_path / f"pat-{epoch_num}-{i+1}.npy") or overwrite:
-            print(f"Computing Mahalanobis for quarter {i+1} for {subject} epoch {epoch_num} pattern")
-            rdm_pat = train_test_mahalanobis_fast(Xtraining_pat[i], Xtesting_pat[i], ytraining_pat[i], ytesting_pat[i], jobs, verbose)
-            np.save(res_path / f"pat-{epoch_num}-{i+1}.npy", rdm_pat)
-        else:
-            print(f"Mahalanobis for quarter {i+1} for {subject} epoch {epoch_num} pattern already exists")
+            test_in_ypat = ypat.iloc[test_index].trials.values
+                            
+            test_idx = [i for i in behav.trials.values if i in test_in_ypat]
+            train_idx = [i for i in behav.trials.values if i not in test_in_ypat]
+            
+            ytrain = [behav.iloc[i].positions for i in train_idx]
+            ytest = [behav.iloc[i].positions for i in test_idx]
+            
+            Xtraining = data[train_idx]
+            Xtesting = data[test_idx]
+            
+            assert len(Xtraining) == len(ytrain), "Xtraining and ytrain lengths do not match"
+            assert len(Xtesting) == len(ytest), "Xtesting and ytest lengths do not match"
     
-    # Random per session
-    for i, _ in enumerate(Xtesting_rand):
-        if not op.exists(res_path / f"rand-{epoch_num}-{i+1}.npy") or overwrite:
-            print(f"Computing Mahalanobis for quarter {i+1} for {subject} epoch {epoch_num} random")
-            rdm_rand = train_test_mahalanobis_fast(Xtraining_rand[i], Xtesting_rand[i], ytraining_rand[i], ytesting_rand[i], jobs, verbose)
-            np.save(res_path / f"rand-{epoch_num}-{i+1}.npy", rdm_rand)
-        else:
-            print(f"Mahalanobis for quarter {i+1} for {subject} epoch {epoch_num} random already exists")
+            if not op.exists(res_path / f"pat-{epoch_num}-{block}-{i+1}.npy") or overwrite:
+                print(f"Computing Mahalanobis for quarter {i+1} for {subject} epoch {epoch_num} block {block} pattern")
+                rdm_pat = train_test_mahalanobis_fast(Xtraining, Xtesting, ytrain, ytest, jobs, verbose)
+                np.save(res_path / f"pat-{epoch_num}-{block}-{i+1}.npy", rdm_pat)
+            else:
+                print(f"Mahalanobis for quarter {i+1} for {subject} epoch {epoch_num} block {block} pattern already exists")
+        
+        rand = behav.trialtypes == 2
+        rand_this_block = rand & this_block
+        yrand = behav[rand_this_block]
+        
+        for i, (_, test_index) in enumerate(kf.split(yrand)):
+            test_in_yrand = yrand.iloc[test_index].trials.values
+            
+            test_idx = [i for i in behav.trials.values if i in test_in_yrand]
+            train_idx = [i for i in behav.trials.values if i not in test_in_yrand]
+            
+            ytrain = [behav.iloc[i].positions for i in train_idx]
+            ytest = [behav.iloc[i].positions for i in test_idx]
+            
+            Xtraining = data[train_idx]
+            Xtesting = data[test_idx]
+            
+            assert len(Xtraining) == len(ytrain), "Xtraining and ytrain lengths do not match"
+            assert len(Xtesting) == len(ytest), "Xtesting and ytest lengths do not match"
+            
+            if not op.exists(res_path / f"rand-{epoch_num}-{block}-{i+1}.npy") or overwrite:
+                print(f"Computing Mahalanobis for quarter {i+1} for {subject} epoch {epoch_num} block {block} random")
+                rdm_rand = train_test_mahalanobis_fast(Xtraining, Xtesting, ytrain, ytest, jobs, verbose)
+                np.save(res_path / f"rand-{epoch_num}-{block}-{i+1}.npy", rdm_rand)
+            else:
+                print(f"Mahalanobis for quarter {i+1} for {subject} epoch {epoch_num} block {block} random already exists")
             
 if is_cluster:
     # Check that SLURM_ARRAY_TASK_ID is available and use it to get the subject

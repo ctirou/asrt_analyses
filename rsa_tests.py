@@ -4,6 +4,7 @@ from config import *
 from tqdm.auto import tqdm
 import matplotlib.pyplot as plt
 import pandas as pd
+from scipy.stats import ttest_1samp
 
 subjects = ALL_SUBJS
 lock = 'stim'
@@ -22,23 +23,27 @@ c1, c2 = "#5BBCD6", "#00A08A"
 all_pats, all_rands = [], []
 all_pats_blocks, all_rands_blocks = [], []
 for subject in tqdm(subjects):
-    res_path = RESULTS_DIR / 'RSA' / 'sensors' / lock / "cv_no_shfl" / subject
+    res_path = RESULTS_DIR / 'RSA' / 'sensors' / lock / "kf2_no_shfl" / subject
     behav_dir = op.join(HOME / 'raw_behavs' / subject)
     sequence = get_sequence(behav_dir)
     pattern, random = [], []
     pattern_blocks, random_blocks = [], []
     for epoch_num in range(5):
-        blocks = [i for i in range(1, 7)] if epoch_num == 0 else [i for i in range(1, 11)]
+        blocks = [i for i in range(1, 4)] if epoch_num == 0 else [i for i in range(5 * (epoch_num - 1) + 1, epoch_num * 5 + 1)]
         pats, rands = [], []
         for block in blocks:
-            pats.append(np.load(res_path / f"pat-{epoch_num}-{block}.npy"))
-            rands.append(np.load(res_path / f"rand-{epoch_num}-{block}.npy"))
+            p, r = [], []
+            for fold in [1, 2]:
+                p.append(np.load(res_path / f"pat-{epoch_num}-{block}-{fold}.npy"))
+                r.append(np.load(res_path / f"rand-{epoch_num}-{block}-{fold}.npy"))
+            pats.append(np.array(p))
+            rands.append(np.array(r))
         pattern.append(np.nanmean(pats, 0))
         random.append(np.nanmean(rands, 0))
-        pattern_blocks.append(np.array(pats))
-        random_blocks.append(np.array(rands))
-    pattern = np.array(pattern)
-    random = np.array(random)
+        pattern_blocks.append(np.vstack(pats))
+        random_blocks.append(np.vstack(rands))
+    pattern = np.array(pattern).mean(1)
+    random = np.array(random).mean(1)
     pat, rand = get_all_high_low(pattern, random, sequence, False)
     all_pats.append(pat.mean(0))
     all_rands.append(rand.mean(0))
@@ -72,6 +77,9 @@ axes[1, 0].plot(times, rand.mean(0), label='random')
 axes[1, 0].set_title("random vs pattern", fontstyle='italic')
 axes[1, 0].legend(frameon=False)
 
+sig_corr = np.where((times > 0.37) & (times <= 0.52))[0]
+sig = sig_corr.copy()
+
 pats_blocks = np.nanmean(all_pats_blocks[:, :, :, sig], (1, -1))
 rands_blocks = np.nanmean(all_rands_blocks[:, :, :, sig], (1, -1))
 diff_rp_blocks = rands_blocks - pats_blocks
@@ -80,8 +88,11 @@ for i in [6, 16, 26, 36]:
     axes[2, 0].axvline(i, color='grey', linestyle='--', alpha=0.5)
 axes[2, 0].plot(np.arange(1, diff_rp_blocks.shape[1] + 1), diff_rp_blocks.mean(0), color=c2)
 axes[2, 0].set_title('40s trial bins', fontstyle='italic')
-axes[2, 0].set_xticks([6, 16, 26, 36])
-axes[2, 0].set_xticklabels(['S1', 'S2', 'S3', 'S4'])
+axes[2, 0].set_xticks([i for i in range(1, 46, 2)])
+# axes[2, 0].set_xticks([6, 16, 26, 36])
+# axes[2, 0].set_xticklabels(['S1', 'S2', 'S3', 'S4'])
+for txt, xpos in zip(['S1', 'S2', 'S3', 'S4'], [6, 16, 26, 36]):
+    axes[2, 0].text(xpos, 1.25, txt, ha='center', va='top', fontsize=12, bbox=dict(facecolor='white', alpha=1, edgecolor='none'))
 
 # w/ practice bsl
 pat = np.nanmean(all_pats[:, 1:, :], 1) - all_pats[:, 0, :]
@@ -91,7 +102,11 @@ diff_rp = rand - pat
 axes[0, 1].plot(times, diff_rp.mean(0), color=c2)
 pval = decod_stats(diff_rp, -1)
 sig = pval < 0.05
-axes[0, 1].fill_between(times, diff_rp.mean(0), 0, where=sig, color=c1, alpha=0.2)
+pval_uncorr = ttest_1samp(diff_rp, 0, axis=0)[1]
+sig_uncorr = pval_uncorr < 0.05
+
+axes[0, 1].fill_between(times, diff_rp.mean(0), 0, where=sig, color=c1, alpha=0.2, label='corrected')
+axes[0, 1].fill_between(times, diff_rp.mean(0), 0, where=sig_uncorr, color='grey', alpha=0.2, label='uncorrected')
 axes[0, 1].set_title("no shuffle - w/ practice bsl", fontstyle='italic')
 axes[1, 1].plot(times, pat.mean(0), label='pattern')
 axes[1, 1].plot(times, rand.mean(0), label='random')
@@ -106,8 +121,13 @@ for subject in tqdm(subjects):
     # RSA stuff
     behav_dir = op.join(HOME / 'raw_behavs' / subject)
     sequence = get_sequence(behav_dir)
-    # high, low = get_all_high_low(res_path, sequence)    
-    high, low = get_all_high_low_old(res_path, sequence)
+    pats, rands = [], []
+    for epoch_num in range(5):
+        pats.append(np.load(res_path / f"pat-{epoch_num}.npy"))
+        rands.append(np.load(res_path / f"rand-{epoch_num}.npy"))
+    pats = np.array(pats)
+    rands = np.array(rands)
+    high, low = get_all_high_low(pats, rands, sequence, False)
     all_highs.append(high)
     all_lows.append(low)
 all_highs = np.array(all_highs).mean(1)
@@ -124,7 +144,10 @@ for ax in axes.flatten():
 axes[0, 0].plot(times, diff_rp.mean(0), color=c1)
 pval = decod_stats(diff_rp, -1)
 sig = pval < 0.05
-axes[0, 0].fill_between(times, diff_rp.mean(0), 0, where=sig, color=c1, alpha=0.2)
+pval_uncorr = ttest_1samp(diff_rp, 0, axis=0)[1]
+sig_uncorr = pval_uncorr < 0.05
+axes[0, 0].fill_between(times, diff_rp.mean(0), 0, where=sig, color=c1, alpha=0.2, label='corrected')
+axes[0, 0].fill_between(times, diff_rp.mean(0), 0, where=sig_uncorr, color='grey', alpha=0.2, label='uncorrected')
 axes[0, 0].set_title("shuffled - w/o practice bsl", fontstyle='italic')
 axes[1, 0].plot(times, pat.mean(0), label='pattern')
 axes[1, 0].plot(times, rand.mean(0), label='random')
@@ -138,7 +161,10 @@ diff_rp = rand - pat
 axes[0, 1].plot(times, diff_rp.mean(0), color=c2)
 pval = decod_stats(diff_rp, -1)
 sig = pval < 0.05
-axes[0, 1].fill_between(times, diff_rp.mean(0), 0, where=sig, color=c2, alpha=0.2)
+pval_uncorr = ttest_1samp(diff_rp, 0, axis=0)[1]
+sig_uncorr = pval_uncorr < 0.05
+axes[0, 1].fill_between(times, diff_rp.mean(0), 0, where=sig, color=c2, alpha=0.2, label='corrected')
+axes[0, 1].fill_between(times, diff_rp.mean(0), 0, where=sig_uncorr, color='grey', alpha=0.2, label='uncorrected')
 axes[0, 1].set_title("shuffled - w/ practice bsl", fontstyle='italic')
 axes[1, 1].plot(times, pat.mean(0), label='pattern')
 axes[1, 1].plot(times, rand.mean(0), label='random')
@@ -161,25 +187,26 @@ for network in tqdm(networks):
     for subject in subjects: 
         # RSA stuff
         behav_dir = op.join(HOME / 'raw_behavs' / subject)
-        res_path = RESULTS_DIR / 'RSA' / 'source' / network / lock
+        res_path = RESULTS_DIR / 'RSA' / 'source' / network / lock / "kf2_no_shfl" / subject
         sequence = get_sequence(behav_dir)
         pattern, random = [], []
         for epoch_num in range(5):
-            blocks = [i for i in range(1, 7)] if epoch_num == 0 else [i for i in range(1, 11)]
+            blocks = [i for i in range(1, 4)] if epoch_num == 0 else [i for i in range(5 * (epoch_num - 1) + 1, epoch_num * 5 + 1)]
             pats, rands = [], []
             for block in blocks:
-                pats.append(np.load(res_path / "no_shfl_pattern" / subject / f"{subject}-{epoch_num}-{block}.npy"))
-                rands.append(np.load(res_path / "no_shfl_random" / subject / f"{subject}-{epoch_num}-{block}.npy"))
-            pattern.append(np.array(pats))
-            random.append(np.array(rands))
+                p, r = [], []
+                for fold in [1, 2]:
+                    p.append(np.load(res_path / f"pat-{epoch_num}-{block}-{fold}.npy"))
+                    r.append(np.load(res_path / f"rand-{epoch_num}-{block}-{fold}.npy"))
+                pats.append(np.array(p))
+                rands.append(np.array(r))
+            pattern.append(np.nanmean(pats, 0))
+            random.append(np.nanmean(rands, 0))
         pattern = np.vstack(pattern)
         random = np.vstack(random)
-        # pat, rand = get_all_high_low_blocks(pattern, random, sequence)
-        pat, rand = get_all_high_low(pattern, random, sequence)
-    
+        pat, rand = get_all_high_low(pattern, random, sequence, False)
         all_highs[network].append(pat.mean(0))
         all_lows[network].append(rand.mean(0))
-        
     all_highs[network] = np.array(all_highs[network])
     all_lows[network] = np.array(all_lows[network])
 
@@ -225,7 +252,7 @@ for i, (ax, label, name) in enumerate(zip(axes.flat, networks, network_names)):
     ax.fill_between(times, diff.mean(0) - sem, diff.mean(0) + sem, where=sig, alpha=0.5, zorder=5, color=cmap[i])
     ax.fill_between(times, diff.mean(0) - sem, 0, where=sig, alpha=0.3, zorder=5, facecolor=cmap[i])
     ax.set_title(name, fontstyle='italic')
-fig.suptitle("Shuffle – w/ practice bsl")
+fig.suptitle("No shuffle – w/ practice bsl")
 
 # --------- Shuffled ---------
 # Load RSA data
