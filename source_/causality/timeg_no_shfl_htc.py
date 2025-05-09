@@ -28,8 +28,6 @@ overwrite = False
 
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
-res_path = data_path / 'results' / 'source' / 'max-power'
-
 def process_subject(subject, jobs):
     # define classifier
     clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
@@ -47,7 +45,7 @@ def process_subject(subject, jobs):
 
     for region in ['Hippocampus', 'Thalamus', 'Cerebellum-Cortex']:
         
-        res_path = ensured(data_path / 'results' / 'source' / 'max-power' / region / lock / "kf2_no_shfl" / subject)
+        res_path = ensured(data_path / 'results' / 'source' / 'max-power' / region / "kf2_no_shfl" / subject)
                 
         for epoch_num in [0, 1, 2, 3, 4]:
             

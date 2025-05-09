@@ -42,7 +42,7 @@ def process_subject(subject, jobs):
         
         # read labels
         lh_label, rh_label = mne.read_label(label_path / f'{network}-lh.label'), mne.read_label(label_path / f'{network}-rh.label')
-        res_path = ensured(data_path / 'results' / 'source' / 'max-power' / network / lock / "kf2_no_shfl" / subject)
+        res_path = ensured(data_path / 'results' / 'source' / 'max-power' / network / "kf2_no_shfl" / subject)
         
         for epoch_num in [0, 1, 2, 3, 4]:
             
