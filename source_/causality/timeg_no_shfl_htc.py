@@ -17,7 +17,7 @@ from config import *
 from joblib import Parallel, delayed
 
 data_path = TIMEG_DATA_DIR
-subjects = SUBJS
+subjects = ALL_SUBJS
 subjects_dir = FREESURFER_DIR
 
 lock = 'stim'
@@ -34,7 +34,7 @@ def process_subject(subject, jobs):
     # define classifier
     clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
     clf = GeneralizingEstimator(clf, scoring=scoring, n_jobs=jobs)
-    kf = KFold(n_splits=4, shuffle=False)
+    kf = KFold(n_splits=2, shuffle=False)
 
     # read volume source space
     vol_src_fname =  data_path / 'src' / f"{subject}-htc-vol-src.fif"
@@ -109,8 +109,8 @@ def process_subject(subject, jobs):
                     test_idx = [i for i in behav.trials.values if i in test_in_ypat]
                     train_idx = [i for i in behav.trials.values if i not in test_in_ypat]
                     
-                    ytrain = [behav.iloc[i].positions.as_int() for i in train_idx]
-                    ytest = [behav.iloc[i].positions.as_int() for i in test_idx]
+                    ytrain = [behav.iloc[i].positions for i in train_idx]
+                    ytest = [behav.iloc[i].positions for i in test_idx]
                     
                     Xtrain = data[train_idx]
                     Xtest = data[test_idx]
