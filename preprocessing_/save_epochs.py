@@ -10,16 +10,17 @@ from base import ensure_dir
 from config import *
 import gc
 import sys
+from autoreject import get_rejection_threshold
 
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
-subjects = SUBJS + ['sub03', 'sub06']
+subjects = ALL_SUBJS
 mode_ICA = True
 generalizing = False
 filtering = True
-overwrite = True
+overwrite = False
 verbose = True
-rdm_bsling = True
+rdm_bsling = False
         
 def int_to_unicode(array):
         return ''.join([str(chr(int(ii))) for ii in array]) # permet de convertir int en unicode (pour editops)
@@ -52,6 +53,7 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
         behav_files_filter = [f for f in behav_dir if not f.startswith('.')]
         behav_files = sorted([f for f in behav_files_filter if '_eASRT_Practice' in f or '_eASRT_Epoch' in f])
         behav_sessions = [behav_files[-1]] + behav_files[:-1]
+                
         # Loop across sessions
         for session_num, (meg_session, behav_session) in enumerate(zip(meg_sessions, behav_sessions)):
                 # Read the raw data
@@ -72,12 +74,27 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                 if mode_ICA:
                         # Save a filtered version of the raw to run the ICA on
                         filt_raw = raw.copy().filter(l_freq=1., h_freq=None, n_jobs=jobs)
-                        reject = dict(mag=5e-12)
                         # Initialize the ICA asking for 30 components
-                        # ica = ICA(n_components=30, method='infomax', fit_params=dict(extended=True))
-                        ica = ICA(n_components=30, method='fastica')
+                        ica = ICA(n_components=30, method='fastica', random_state=42, verbose=verbose)
+                        ica = ICA(n_components=30, method='picard', fit_params=dict(ortho=True), random_state=42, verbose=verbose)
+                        # Find rejection thresholds
+                        try:
+                                epochs_for_thresh = mne.make_fixed_length_epochs(filt_raw, duration=2., preload=True, verbose=verbose)
+                                reject = get_rejection_threshold(epochs_for_thresh, verbose=verbose)
+                                reject = dict(mag=reject['mag'])
+                                print(f"AutoReject thresholds: {reject}")
+                                del epochs_for_thresh
+                                gc.collect()
+                        except Exception as e:
+                                print(f"AutoReject failed, falling back to default reject: {e}")
+                                reject = dict(mag=5e-12)
                         # Fit the ica on the filtered raw
-                        ica.fit(filt_raw, reject=reject)
+                        try:
+                                ica.fit(filt_raw, reject=reject)
+                        except RuntimeError as e:
+                                print(f"ICA fitting failed for {subject} {meg_session}: {e}")
+                                print("Retrying with higher reject threshold...")
+                                ica.fit(filt_raw, reject=dict(mag=1e-11))
                         # Find the bad components based on the VEOG, HEOG and hearbeat
                         veog_indices, _ = ica.find_bads_eog(filt_raw, ch_name='VEOG')
                         heog_indices, _ = ica.find_bads_eog(filt_raw, ch_name='HEOG')
@@ -88,14 +105,7 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                         ica.apply(raw)
                 if filtering:
                         raw.filter(0.1, 30, n_jobs=jobs)
-                # Select events of interest (only photodiode for good triplets and correct answers)
-                if subject == 'sub06' and meg_session == '6_EPOCH_4':
-                        events = mne.find_events(raw, shortest_event=1, verbose=verbose)
-                elif subject == 'sub08' and meg_session == '4_EPOCH_2':
-                        events = mne.find_events(raw, shortest_event=1, verbose=verbose)
-                elif subject == 'sub14' and meg_session == '3_EPOCH_1':
-                        events = mne.find_events(raw, shortest_event=1, verbose=verbose)
-                elif subject == 'sub11': # sub11 has wrong triggers so we need to read a txt file with correct events
+                if subject == 'sub11' and session_num != 0: # sub11 has wrong triggers so we need to read a txt file with correct events
                         file_path = op.join(data_path, subject, 'meg_data', meg_session, 'events_info.txt')
                         ev = open(file_path, 'r')
                         lines = ev.readlines()
@@ -109,25 +119,26 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                                 end.append(int(line.split()[column_names.index('value')]))
                         events = np.vstack([np.array(samples), np.array(start), np.array(end)]).T 
                 else:
-                        events = mne.find_events(raw, verbose=verbose)
+                        events = mne.find_events(raw, shortest_event=1, verbose=verbose) # shortest_event=1 for sub06, sub08, sub14 and possibly others
                 events_stim = list()
                 events_button = list()
-                if subject == 'sub11':
-                        triggs = [30, 32, 34]
+                if subject == 'sub11' and session_num != 0:
+                        triggs = [30, 32, 34, 36, 38, 40]
                         ranger = range(len(events)-1)
                 else:
                         triggs = [542, 544, 546, 548, 550, 552]
-                        # triggs = [542, 544, 546]
                         ranger = range(len(events))
                 for ii in ranger:
                         print(ii)
                         if events[ii, 2] in triggs and events[ii+1, 2] in [12, 14, 16, 18]:
                                 event_stim = events[ii]
-                                if subject == 'sub11':
+                                if subject == 'sub11' and session_num != 0:
                                         event_stim[0] = event_stim[0] + 97 # To re-synchronize with photodiode time-samples
-                                event_button = events[ii+1] # events[ii+2] for sub11
+                                        event_button = events[ii+2]
+                                else:
+                                        event_button = events[ii+1]
                                 # Replace photodiode values by triplet values (as in behavior)
-                                if subject != 'sub11':
+                                if subject != 'sub11' or (subject == 'sub11' and session_num == 0):
                                         if event_stim[2] == 542:
                                                 event_stim[2] = 30
                                         if event_stim[2] == 544:
@@ -185,7 +196,6 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                 stim_df = behav_df.copy()
                 button_df = behav_df.copy()
                 # Create epochs time locked on stimulus onset and button response, and baseline epochs
-                reject = dict(mag=5e-12)
                 picks = mne.pick_types(raw.info, meg=True, eeg=False, eog=False, stim=False) # by default eog is True
                 if generalizing:
                         epochs_stim = mne.Epochs(raw, events_stim, tmin=tmin, tmax=tmax, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)
@@ -202,8 +212,8 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                         epochs_stim.apply_baseline((-0.2, 0))                
                         epochs_button = mne.Epochs(raw, events_button, tmin=tmin, tmax=tmax, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)                        
                 # Free memory
-                del raw
-                gc.collect()
+                # del raw
+                # gc.collect()
                 for df, df_column, epochs in zip([stim_df, button_df], ['triplets', 'expec_triggers'], [epochs_stim, epochs_button]):
                         changes = editops(int_to_unicode(df[df_column]), int_to_unicode(epochs.events[:, 2]))
                         # Make modification
@@ -278,7 +288,7 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                 # Save behavioral data
                 behav_df = stim_df
                 behav_df.to_pickle(op.join(res_path, 'behav', f'{subject}-{session_num}.pkl'))
-                print("Final number of epochs: ", len(epochs_stim), "our of 425...")
+                print("Final number of epochs: ", len(epochs_stim), "out of 425...")
 
 if is_cluster:
     # Check that SLURM_ARRAY_TASK_ID is available and use it to get the subject
