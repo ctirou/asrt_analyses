@@ -13,7 +13,6 @@ overwrite = True
 verbose = 'error'
 
 data_path = DATA_DIR
-subjects = SUBJS
 subjects = ALL_SUBJS
 lock = 'stim'
 

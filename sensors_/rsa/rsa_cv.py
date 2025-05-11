@@ -14,6 +14,7 @@ verbose = 'error'
 data_path = DATA_DIR
 subjects = SUBJS
 subjects = ALL_SUBJS
+subjects = ['sub03', 'sub06']
 lock = 'stim'
 
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
@@ -22,7 +23,7 @@ def process_subject(subject, epoch_num, verbose):
     
     # res_path = RESULTS_DIR / 'RSA' / 'sensors' / lock / "cv_rdm" / subject
     # res_path = RESULTS_DIR / 'RSA' / 'sensors' / lock / "cv_solve_rdm" / subject
-    res_path = RESULTS_DIR / 'RSA' / 'sensors' / lock / "cv_fixed_rdm" / subject
+    res_path = RESULTS_DIR / 'RSA' / 'sensors' / lock / "cv_rdm_fixed" / subject
     ensure_dir(res_path)
         
     print(f"Processing {subject} - {lock} - {epoch_num}")
@@ -38,14 +39,14 @@ def process_subject(subject, epoch_num, verbose):
         X_pat = data[np.where(behav["trialtypes"]==1)]
         y_pat = behav[behav["trialtypes"]==1].reset_index(drop=True).positions
         assert len(X_pat) == len(y_pat), "X_pat and y_pat lengths do not match"
-        rdm_pat = cv_mahalanobis_fixed(X_pat, y_pat)
+        rdm_pat = cv_mahalanobis_parallel(X_pat, y_pat)
         np.save(res_path / f"pat-{epoch_num}.npy", rdm_pat)
     
     if not op.exists(res_path / f"rand-{epoch_num}.npy") or overwrite:
         X_rand = data[np.where(behav["trialtypes"]==2)]
         y_rand = behav[behav["trialtypes"]==2].reset_index(drop=True).positions
         assert len(X_rand) == len(y_rand), "X_rand and y_rand lengths do not match"
-        rdm_rand = cv_mahalanobis_fixed(X_rand, y_rand)
+        rdm_rand = cv_mahalanobis_parallel(X_rand, y_rand)
         np.save(res_path / f"rand-{epoch_num}.npy", rdm_rand)
             
 if is_cluster:

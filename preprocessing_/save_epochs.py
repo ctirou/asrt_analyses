@@ -6,7 +6,7 @@ from mne.preprocessing import ICA
 from Levenshtein import editops
 import pandas as pd
 import warnings
-from base import ensure_dir
+from base import ensure_dir, ensured
 from config import *
 import gc
 import sys
@@ -14,14 +14,14 @@ from autoreject import get_rejection_threshold
 
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
-subjects = ALL_SUBJS
+subjects = ALL_SUBJS + ['sub11']
 mode_ICA = True
 generalizing = False
 filtering = True
-overwrite = False
+overwrite = True
 verbose = True
-rdm_bsling = False
-        
+jobs = -1
+
 def int_to_unicode(array):
         return ''.join([str(chr(int(ii))) for ii in array]) # permet de convertir int en unicode (pour editops)
 
@@ -29,23 +29,18 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
         # Set path
         data_path = RAW_DATA_DIR
         if generalizing:
-                res_path = TIMEG_DATA_DIR / 'gen44'
-                ensure_dir(res_path)
-                tmin, tmax = -4, 4
-        elif rdm_bsling and not generalizing:
-                res_path = TIMEG_DATA_DIR / 'rdm_bsling'
-                ensure_dir(res_path)
+                res_path = ensured(TIMEG_DATA_DIR / 'gen44')
                 tmin, tmax = -4, 4
         else:
-                res_path = DATA_DIR
+                res_path = ensured(DATA_DIR / 'with_AR')
                 tmin, tmax = -0.2, 0.6
 
         meg_sessions = ['2_PRACTICE', '3_EPOCH_1', '4_EPOCH_2', '5_EPOCH_3', '6_EPOCH_4']
 
         # Create preprocessed sub-folders
-        folders = ['stim', 'button', 'behav', 'bsl']
-        for fold in folders:
-                ensure_dir(res_path / fold)
+        folders = ['stim', 'behav']
+        for fol in folders:
+                ensure_dir(res_path / fol)
         
         # Sort behav files
         path_to_behav_dir = f'{data_path}/{subject}/behav_data'
@@ -55,7 +50,7 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
         behav_sessions = [behav_files[-1]] + behav_files[:-1]
                 
         # Loop across sessions
-        for session_num, (meg_session, behav_session) in enumerate(zip(meg_sessions, behav_sessions)):
+        for session_num, meg_session, behav_session in zip([0, 1, 2, 3, 4], meg_sessions, behav_sessions):
                 # Read the raw data
                 raw_fname = op.join(data_path, subject, 'meg_data', meg_session, 'results', 'c,rfDC_EEG')
                 hs_fname = op.join(data_path, subject, "meg_data", meg_session, "hs_file")
@@ -71,23 +66,22 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                 # Channels 059 and 173 are flat in sub01, check for others before removing
                 to_drop = ['MISC 001', 'MEG 059', 'MEG 173']
                 raw.drop_channels(to_drop)
+                # Find rejection thresholds
+                filt_raw = raw.copy().filter(l_freq=1., h_freq=None, n_jobs=jobs)
+                try:
+                        epochs_for_thresh = mne.make_fixed_length_epochs(filt_raw, duration=2., preload=True, verbose=verbose)
+                        reject = get_rejection_threshold(epochs_for_thresh, verbose=verbose)
+                        print(f"AutoReject thresholds: {reject}")
+                        del epochs_for_thresh
+                        gc.collect()
+                except Exception as e:
+                        print(f"AutoReject failed, falling back to default reject: {e}")
+                        reject = dict(mag=4e-12)
                 if mode_ICA:
                         # Save a filtered version of the raw to run the ICA on
-                        filt_raw = raw.copy().filter(l_freq=1., h_freq=None, n_jobs=jobs)
                         # Initialize the ICA asking for 30 components
-                        ica = ICA(n_components=30, method='fastica', random_state=42, verbose=verbose)
+                        # ica = ICA(n_components=30, method='fastica', random_state=42, verbose=verbose)
                         ica = ICA(n_components=30, method='picard', fit_params=dict(ortho=True), random_state=42, verbose=verbose)
-                        # Find rejection thresholds
-                        try:
-                                epochs_for_thresh = mne.make_fixed_length_epochs(filt_raw, duration=2., preload=True, verbose=verbose)
-                                reject = get_rejection_threshold(epochs_for_thresh, verbose=verbose)
-                                reject = dict(mag=reject['mag'])
-                                print(f"AutoReject thresholds: {reject}")
-                                del epochs_for_thresh
-                                gc.collect()
-                        except Exception as e:
-                                print(f"AutoReject failed, falling back to default reject: {e}")
-                                reject = dict(mag=5e-12)
                         # Fit the ica on the filtered raw
                         try:
                                 ica.fit(filt_raw, reject=reject)
@@ -106,7 +100,7 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                 if filtering:
                         raw.filter(0.1, 30, n_jobs=jobs)
                 if subject == 'sub11' and session_num != 0: # sub11 has wrong triggers so we need to read a txt file with correct events
-                        file_path = op.join(data_path, subject, 'meg_data', meg_session, 'events_info.txt')
+                        file_path = data_path / subject / 'meg_data' / meg_session / 'events_info.txt'
                         ev = open(file_path, 'r')
                         lines = ev.readlines()
                         column_names = lines[0].split()
@@ -120,41 +114,33 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                         events = np.vstack([np.array(samples), np.array(start), np.array(end)]).T 
                 else:
                         events = mne.find_events(raw, shortest_event=1, verbose=verbose) # shortest_event=1 for sub06, sub08, sub14 and possibly others
-                events_stim = list()
-                events_button = list()
-                if subject == 'sub11' and session_num != 0:
-                        triggs = [30, 32, 34, 36, 38, 40]
-                        ranger = range(len(events)-1)
+                if subject == 'sub05' and session_num == 0:
+                        behav_fname = data_path / subject / 'behav_data' / behav_session
+                        log = pd.read_csv(behav_fname, sep='\t')
+                        log.columns = [col for col in log.columns if col not in ['isi_if_correct', 'isi_if_incorrect']] + [''] * len(['isi_if_correct', 'isi_if_incorrect'])
+                        # Créer l'array d'événements
+                        events_stim = np.column_stack((
+                                log['stim_pres_time'].values.astype(int) + 97, # To re-synchronize with photodiode time-samples
+                                np.zeros(len(log), dtype=int),
+                                log['triplet'].values.astype(int)))
                 else:
+                        events_stim = list()
+                        # if subject == 'sub11' and session_num != 0:
+                        #         triggs = [30, 32, 34, 36, 38, 40]
+                        #         ranger = range(len(events)-1)
+                        # else:
                         triggs = [542, 544, 546, 548, 550, 552]
                         ranger = range(len(events))
-                for ii in ranger:
-                        print(ii)
-                        if events[ii, 2] in triggs and events[ii+1, 2] in [12, 14, 16, 18]:
-                                event_stim = events[ii]
-                                if subject == 'sub11' and session_num != 0:
-                                        event_stim[0] = event_stim[0] + 97 # To re-synchronize with photodiode time-samples
-                                        event_button = events[ii+2]
-                                else:
-                                        event_button = events[ii+1]
-                                # Replace photodiode values by triplet values (as in behavior)
-                                if subject != 'sub11' or (subject == 'sub11' and session_num == 0):
-                                        if event_stim[2] == 542:
-                                                event_stim[2] = 30
-                                        if event_stim[2] == 544:
-                                                event_stim[2] = 32
-                                        if event_stim[2] == 546:
-                                                event_stim[2] = 34
-                                        if event_stim[2] == 548:
-                                                event_stim[2] = 36
-                                        if event_stim[2] == 550:
-                                                event_stim[2] = 38
-                                        if event_stim[2] == 552:
-                                                event_stim[2] = 40
-                                events_stim.append(event_stim)
-                                events_button.append(event_button)
-                events_stim = np.array(events_stim)
-                events_button = np.array(events_button)
+                        for ii in ranger:
+                                if events[ii, 2] in triggs and events[ii+1, 2] in [12, 14, 16, 18]:
+                                        event_stim = events[ii]
+                                        if subject == 'sub11' and session_num != 0:
+                                                event_stim[0] = event_stim[0] + 97 # To re-synchronize with photodiode time-samples
+                                        # Replace photodiode values by triplet values (as in behavior)
+                                        # if subject != 'sub11' or (subject == 'sub11' and session_num == 0):
+                                        event_stim[2] = {542: 30, 544: 32, 546: 34, 548: 36, 550: 38, 552: 40}.get(event_stim[2], event_stim[2])
+                                        events_stim.append(event_stim)
+                        events_stim = np.array(events_stim)                
                 # Read behav data
                 fname_behav = op.join(data_path, subject, 'behav_data', behav_session)
                 behav = open(fname_behav, 'r')
@@ -194,108 +180,49 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                                 'expec_triggers': np.array(expec_triggers), 'blocks': np.array(blocks)}
                 behav_df = pd.DataFrame(behav_dict)
                 stim_df = behav_df.copy()
-                button_df = behav_df.copy()
-                # Create epochs time locked on stimulus onset and button response, and baseline epochs
+                # Create epochs time locked on stimulus onset and baseline epochs
                 picks = mne.pick_types(raw.info, meg=True, eeg=False, eog=False, stim=False) # by default eog is True
+                reject = dict(mag=reject['mag'])
                 if generalizing:
-                        epochs_stim = mne.Epochs(raw, events_stim, tmin=tmin, tmax=tmax, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)
-                        epochs_bsl = epochs_stim.copy().crop(-.2, 0)                   
-                        epochs_button = mne.Epochs(raw, events_button, tmin=tmin, tmax=tmax, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)
-                elif rdm_bsling and not generalizing:
-                        epochs_stim = mne.Epochs(raw, events_stim, tmin=tmin, tmax=tmax, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)                   
-                        epochs_bsl = epochs_stim.copy().crop(-1.7, -1.5)
-                        epochs_stim.apply_baseline((-1.7, -1.5))
-                        epochs_button = mne.Epochs(raw, events_button, tmin=tmin, tmax=tmax, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)                    
+                        epochs = mne.Epochs(raw, events_stim, tmin=tmin, tmax=tmax, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)
                 else:
-                        epochs_stim = mne.Epochs(raw, events_stim, tmin=tmin, tmax=tmax, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)                   
-                        epochs_bsl = epochs_stim.copy().crop(-.2, 0)           
-                        epochs_stim.apply_baseline((-0.2, 0))                
-                        epochs_button = mne.Epochs(raw, events_button, tmin=tmin, tmax=tmax, baseline=None, preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)                        
+                        epochs = mne.Epochs(raw, events_stim, tmin=tmin, tmax=tmax, baseline=(-0.2, 0), preload=True, picks=picks, decim=20, reject=reject, verbose=verbose)
                 # Free memory
-                # del raw
-                # gc.collect()
-                for df, df_column, epochs in zip([stim_df, button_df], ['triplets', 'expec_triggers'], [epochs_stim, epochs_button]):
-                        changes = editops(int_to_unicode(df[df_column]), int_to_unicode(epochs.events[:, 2]))
-                        # Make modification
-                        if len(changes) !=0:
-                                del_from_epoch = list()
-                                del_from_behav = list()
-                                for change in changes:
-                                        if change[0] == 'insert':
-                                                del_from_epoch.append(change[2])
-                                        elif change[0] == 'replace':
-                                                del_from_epoch.append(change[2])
-                                                del_from_behav.append(change[1])
-                                        elif change[0] == 'delete':
-                                                del_from_behav.append(change[1])
-                                epochs_stim.drop(del_from_epoch)
-                                epochs_button.drop(del_from_epoch)
-                                epochs_bsl.drop(del_from_epoch)
-                                df.drop(df.index[del_from_behav], inplace=True)
-                # Equalize number of trials in epochs
-                changes = editops(int_to_unicode(stim_df['positions']), int_to_unicode(button_df['positions']))
+                del raw
+                gc.collect()
+                df, df_column, epochs = stim_df, 'triplets', epochs
+                changes = editops(int_to_unicode(df[df_column]), int_to_unicode(epochs.events[:, 2]))
+                # Make modification
                 if len(changes) !=0:
-                        del_from_stimdf, del_from_buttondf, del_from_stimepo, del_from_buttonepo = [], [], [], []
+                        del_from_epoch = list()
+                        del_from_behav = list()
                         for change in changes:
                                 if change[0] == 'insert':
-                                        del_from_buttondf.append(change[2])
-                                        del_from_buttonepo.append(change[2])
-                                elif change[0] == 'delete':
-                                        del_from_stimdf.append(change[1])
-                                        del_from_stimepo.append(change[1])
+                                        del_from_epoch.append(change[2])
                                 elif change[0] == 'replace':
-                                        del_from_stimdf.append(change[1])
-                                        del_from_stimepo.append(change[1])
-                                        del_from_buttondf.append(change[2])
-                                        del_from_buttonepo.append(change[2])
-                        stim_df.drop(stim_df.index[del_from_stimdf], inplace=True)
-                        button_df.drop(button_df.index[del_from_buttondf], inplace=True)
-                        epochs_stim.drop(del_from_stimepo)
-                        epochs_bsl.drop(del_from_stimepo)
-                        epochs_button.drop(del_from_buttonepo)
+                                        del_from_epoch.append(change[2])
+                                        del_from_behav.append(change[1])
+                                elif change[0] == 'delete':
+                                        del_from_behav.append(change[1])
+                        epochs.drop(del_from_epoch)
+                        df.drop(df.index[del_from_behav], inplace=True)
                 # Last check if behav and epochs have same shapes
-                changes = editops(int_to_unicode(stim_df['triplets']), int_to_unicode(epochs_stim.events[:, 2]))
+                changes = editops(int_to_unicode(stim_df['triplets']), int_to_unicode(epochs.events[:, 2]))
                 if len(changes) != 0:
                         warnings.warn("Behav file and stim epochs have different shapes.")
                 else:
                         print("Behav file and stim epochs have same shapes!")
-                changes = editops(int_to_unicode(button_df['expec_triggers']), int_to_unicode(epochs_button.events[:, 2]))
-                if len(changes) != 0:
-                        warnings.warn("Behav file and button epochs have different shapes.")
-                else:
-                        print("Behav file and button epochs have same shapes!")
-                # Apply baseline from before the stimulus in the epochs_button
-                bsl_channels = mne.pick_types(epochs_button.info, meg=True)
-                bsl_data = epochs_bsl.get_data()[:, bsl_channels, :]
-                bsl_data = np.mean(bsl_data, axis=2)
-                epochs_button._data[:, bsl_channels, :] -= bsl_data[:, :, np.newaxis]
-                # Save epochs 
-                # if rdm_bsling:
-                #         # Save epochs for pattern baselined on previous random pre-stimulus period
-                #         pattern = stim_df.trialtypes == 1
-                #         pat_epo = epochs_stim[pattern]
-                #         pat_epo.apply_baseline((-1.7, -1.5))
-                #         pat_epo.save(op.join(res_path, 'stim', f'{subject}-{session_num}-pat-epo.fif'), overwrite=overwrite)
-                #         # Save epochs for random baselined on pre-stimulus period
-                #         random = stim_df.trialtypes == 2
-                #         rand_epo = epochs_stim[random]
-                #         rand_epo.apply_baseline((-0.2, 0))
-                #         rand_epo.save(op.join(res_path, 'stim', f'{subject}-{session_num}-rand-epo.fif'), overwrite=overwrite)
-                # else:
-                epochs_stim.save(op.join(res_path, 'stim', f'{subject}-{session_num}-epo.fif'), overwrite=overwrite)
-                epochs_bsl.save(op.join(res_path, 'bsl', f'{subject}-{session_num}-epo.fif'), overwrite=overwrite)
-                epochs_button.save(op.join(res_path, 'button', f'{subject}-{session_num}-epo.fif'), overwrite=overwrite)
+                epochs.save(op.join(res_path, 'stim', f'{subject}-{session_num}-epo.fif'), overwrite=overwrite)
                 # Save behavioral data
-                behav_df = stim_df
-                behav_df.to_pickle(op.join(res_path, 'behav', f'{subject}-{session_num}.pkl'))
-                print("Final number of epochs: ", len(epochs_stim), "out of 425...")
+                stim_df.to_pickle(op.join(res_path, 'behav', f'{subject}-{session_num}.pkl'))
+                print("Final number of epochs: ", len(epochs), "out of", 255 if session_num == 0 else 425)
 
 if is_cluster:
     # Check that SLURM_ARRAY_TASK_ID is available and use it to get the subject
     try:
         subject_num = int(os.getenv("SLURM_ARRAY_TASK_ID"))
         subject = subjects[subject_num]
-        jobs = 20
+        jobs = int(os.getenv("SLURM_CPUS_PER_TASK"))
         process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs, verbose)
     except (IndexError, ValueError) as e:
         print("Error: SLURM_ARRAY_TASK_ID is not set correctly or is out of bounds.")

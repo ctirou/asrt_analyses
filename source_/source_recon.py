@@ -8,6 +8,7 @@ import sys
 
 subjects = SUBJS
 subjects = ['sub03', 'sub06']
+subjects = ['sub11']
 epochs_list = EPOCHS
 subjects_dir = FREESURFER_DIR
 # data_path, res_path = TIMEG_DATA_DIR, TIMEG_DATA_DIR

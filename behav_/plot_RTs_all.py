@@ -9,8 +9,9 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 path_data = DATA_DIR
 figures_dir = FIGURES_DIR
 
-subjects = ALL_SUBJS
 subjects = SUBJS
+subjects = ALL_SUBJS + ['sub05', 'sub11']
+subjects = ALL_SUBJS + ['sub11']
 
 pattern_RT = {f'Epoch_{i}': [] for i in range(5)}
 random_high_RT = {f'Epoch_{i}': [] for i in range(5)}

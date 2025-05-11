@@ -6,8 +6,9 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from scipy.stats import ttest_1samp
 
-subjects = SUBJS
 subjects = ALL_SUBJS
+subjects = ALL_SUBJS + ['sub11', 'sub05']
+subjects = ALL_SUBJS + ['sub11']
 lock = 'stim'
 times = np.linspace(-0.2, 0.6, 82)
 
@@ -60,7 +61,7 @@ all_rands_blocks = np.array(all_rands_blocks)
 
 fig, axes = plt.subplots(3, 2, figsize=(8, 8), sharex=False, sharey=True, layout='tight')
 for ax in axes.flatten():
-#     ax.axvspan(0, 0.2, color='grey', alpha=0.1)
+    # ax.axvspan(0, 0.2, color='grey', alpha=0.1)
     ax.axhline(0, color='grey', linestyle='-', alpha=0.5)
 
 # w/o practice bsl
@@ -79,13 +80,15 @@ axes[1, 0].set_title("random vs pattern", fontstyle='italic')
 axes[1, 0].legend(frameon=False)
 
 if sig.any():
-    pats_blocks = np.nanmean(all_pats_blocks[:, :, :, sig], (1, -1))
-    rands_blocks = np.nanmean(all_rands_blocks[:, :, :, sig], (1, -1))
+    idx = sig.copy()
+    idx = np.where((times >= 0.28) & (times <= 0.51))[0]
+    pats_blocks = np.nanmean(all_pats_blocks[:, :, :, idx], (1, -1))
+    rands_blocks = np.nanmean(all_rands_blocks[:, :, :, idx], (1, -1))
     diff_rp_blocks = rands_blocks - pats_blocks
 
     for i in [6, 16, 26, 36]:
         axes[2, 0].axvline(i, color='grey', linestyle='--', alpha=0.5)
-    axes[2, 0].plot(np.arange(1, diff_rp_blocks.shape[1] + 1), diff_rp_blocks.mean(0), color=c2)
+    axes[2, 0].plot(np.arange(1, diff_rp_blocks.shape[1] + 1), np.nanmean(diff_rp_blocks, 0), color=c2)
     axes[2, 0].set_title('40s trial bins', fontstyle='italic')
     axes[2, 0].set_xticks([i for i in range(1, 47, 5)])
     # axes[2, 0].set_xticks([6, 16, 26, 36])
@@ -94,8 +97,10 @@ if sig.any():
         axes[2, 0].text(xpos, 1.25, txt, ha='center', va='top', fontsize=12, bbox=dict(facecolor='white', alpha=1, edgecolor='none'))
 
 # w/ practice bsl
-pat = np.nanmean(all_pats[:, 1:, :], 1) - all_pats[:, 0, :]
-rand = np.nanmean(all_rands[:, 1:, :], 1) - all_rands[:, 0, :]
+# pat = np.nanmean(all_pats[:, 1:, :], 1) - all_pats[:, 0, :]
+# rand = np.nanmean(all_rands[:, 1:, :], 1) - all_rands[:, 0, :]
+pat = all_pats[:, 1:, :].mean(1) - all_pats[:, 0, :]
+rand = all_rands[:, 1:, :].mean(1) - all_rands[:, 0, :]
 diff_rp = rand - pat
 
 axes[0, 1].plot(times, diff_rp.mean(0), color=c1)
@@ -113,12 +118,14 @@ axes[1, 1].set_title("random vs pattern", fontstyle='italic')
 axes[1, 1].legend(frameon=False)
 
 if sig.any():
-    pats_blocks = np.nanmean(all_pats_blocks[:, :, :, sig], (1, -1))
-    rands_blocks = np.nanmean(all_rands_blocks[:, :, :, sig], (1, -1))
+    idx = sig
+    idx = np.where((times >= 0.28) & (times <= 0.51))[0]
+    pats_blocks = np.nanmean(all_pats_blocks[:, :, :, idx], (1, -1))
+    rands_blocks = np.nanmean(all_rands_blocks[:, :, :, idx], (1, -1))
     diff_rp_blocks = rands_blocks - pats_blocks
     for i in [6, 16, 26, 36]:
         axes[2, 1].axvline(i, color='grey', linestyle='--', alpha=0.5)
-    axes[2, 1].plot(np.arange(1, diff_rp_blocks.shape[1] + 1), diff_rp_blocks.mean(0), color=c2)
+    axes[2, 1].plot(np.arange(1, diff_rp_blocks.shape[1] + 1), np.nanmean(diff_rp_blocks, 0), color=c2)
     axes[2, 1].set_title('40s trial bins', fontstyle='italic')
     axes[2, 1].set_xticks([i for i in range(1, 47, 5)])
     # axes[2, 0].set_xticks([6, 16, 26, 36])
