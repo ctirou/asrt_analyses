@@ -4,7 +4,7 @@ from config import *
 # -----------------------------
 # Step 1: Setup paths and names
 # -----------------------------
-subject = 'sub06'
+subject = 'sub05'
 template_subject = 'fsaverage2'
 
 # Use your freesurfer subjects directory

@@ -16,7 +16,7 @@ is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
 subjects = SUBJS15
 mode_ICA = True
-generalizing = True
+generalizing = False
 filtering = True
 overwrite = False
 verbose = True
@@ -115,7 +115,7 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                         events = mne.find_events(raw, shortest_event=1, verbose=verbose) # shortest_event=1 for sub06, sub08, sub14 and possibly others
                 if subject == 'sub05' and session_num == 0:
                         # offsets = np.array([ 9400, 11000, 12400, 12500, 14000, 15500, 17000, 17100, 18600]) + 97
-                        offset = 712
+                        offset = 97
                         behav_fname = data_path / subject / 'behav_data' / behav_session
                         log = pd.read_csv(behav_fname, sep='\t')
                         log.columns = [col for col in log.columns if col not in ['isi_if_correct', 'isi_if_incorrect']] + [''] * len(['isi_if_correct', 'isi_if_incorrect'])
@@ -180,7 +180,6 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                                 'trialtypes': np.array(trialtypes), 'RTs': np.array(RTs),
                                 'expec_triggers': np.array(expec_triggers), 'blocks': np.array(blocks)}
                 behav_df = pd.DataFrame(behav_dict)
-                stim_df = behav_df.copy()
                 # Create epochs time locked on stimulus onset and baseline epochs
                 picks = mne.pick_types(raw.info, meg=True, eeg=False, eog=False, stim=False) # by default eog is True
                 reject = dict(mag=reject['mag'])
@@ -191,8 +190,7 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                 # Free memory
                 del raw
                 gc.collect()
-                df, df_column, epochs = stim_df, 'triplets', epochs
-                changes = editops(int_to_unicode(df[df_column]), int_to_unicode(epochs.events[:, 2]))
+                changes = editops(int_to_unicode(behav_df['triplets']), int_to_unicode(epochs.events[:, 2]))
                 # Make modification
                 if len(changes) !=0:
                         del_from_epoch = list()
@@ -206,16 +204,12 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                                 elif change[0] == 'delete':
                                         del_from_behav.append(change[1])
                         epochs.drop(del_from_epoch)
-                        df.drop(df.index[del_from_behav], inplace=True)
+                        behav_df.drop(behav_df.index[del_from_behav], inplace=True)
                 # Last check if behav and epochs have same shapes
-                changes = editops(int_to_unicode(stim_df['triplets']), int_to_unicode(epochs.events[:, 2]))
-                if len(changes) != 0:
-                        warnings.warn("Behav file and stim epochs have different shapes.")
-                else:
-                        print("Behav file and stim epochs have same shapes!")
+                changes = editops(int_to_unicode(behav_df['triplets']), int_to_unicode(epochs.events[:, 2]))
                 epochs.save(op.join(res_path, 'stim', f'{subject}-{session_num}-epo.fif'), overwrite=overwrite)
                 # Save behavioral data
-                df.to_pickle(op.join(res_path, 'behav', f'{subject}-{session_num}.pkl'))
+                behav_df.to_pickle(op.join(res_path, 'behav', f'{subject}-{session_num}.pkl'))
                 print("Final number of epochs: ", len(epochs), "out of", 255 if session_num == 0 else 425)
         
 if is_cluster:

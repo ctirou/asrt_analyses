@@ -116,7 +116,6 @@ for subject in subjects:
             brain = mne.viz.Brain(subject, hemi='both', subjects_dir=subjects_dir,
                                 cortex='low_contrast', background='white', volume=aseg_path)
             
-
 cuneus_lh = labels[6]
 hpc_lh = labels[76]
 # Check intersection

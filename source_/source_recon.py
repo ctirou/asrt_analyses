@@ -6,9 +6,8 @@ from config import *
 import gc
 import sys
 
-subjects = ['sub03', 'sub06']
-subjects = ['sub11']
-subjects = ALL_SUBJS
+subjects = SUBJS15
+subjects = ['sub05']
 epochs_list = EPOCHS
 subjects_dir = FREESURFER_DIR
 # data_path, res_path = TIMEG_DATA_DIR, TIMEG_DATA_DIR
