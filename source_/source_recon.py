@@ -6,9 +6,9 @@ from config import *
 import gc
 import sys
 
-subjects = SUBJS
 subjects = ['sub03', 'sub06']
 subjects = ['sub11']
+subjects = ALL_SUBJS
 epochs_list = EPOCHS
 subjects_dir = FREESURFER_DIR
 # data_path, res_path = TIMEG_DATA_DIR, TIMEG_DATA_DIR
@@ -225,7 +225,7 @@ def process_subject(subject, jobs):
         # create trans file
         # trans_fname = os.path.join(res_path, "trans", "%s-%i-trans.fif" % (subject, epoch_num))
         trans_fname = os.path.join(res_path, "trans", lock, "%s-%i-trans.fif" % (subject, epoch_num))
-        if not op.exists(trans_fname) or overwrite:
+        if not op.exists(trans_fname) or True:
             coreg = mne.coreg.Coregistration(epoch.info, subject, subjects_dir)
             coreg.fit_fiducials(verbose=verbose)
             coreg.fit_icp(n_iterations=6, verbose=verbose)

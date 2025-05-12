@@ -6,9 +6,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from scipy.stats import ttest_1samp
 
-subjects = ALL_SUBJS
-subjects = ALL_SUBJS + ['sub11', 'sub05']
-subjects = ALL_SUBJS + ['sub11']
+subjects = SUBJS14
+subjects = SUBJS15
 lock = 'stim'
 times = np.linspace(-0.2, 0.6, 82)
 
@@ -21,11 +20,11 @@ win = np.where((times >= 0.28) & (times <= 0.51))[0]
 # win = np.load(FIGURES_DIR / "RSA" / "sensors" / "sig_rsa.npy")
 c1, c2 = "#5BBCD6", "#00A08A"
 
-# --- RSA no shuffle ---
+# --- RSA no shuffle --- 40 trial bins ---
 all_pats, all_rands = [], []
 all_pats_blocks, all_rands_blocks = [], []
 for subject in tqdm(subjects):
-    res_path = RESULTS_DIR / 'RSA' / 'sensors' / lock / "kf2_no_shfl" / subject
+    res_path = RESULTS_DIR / 'RSA' / 'sensors' / "rdm_40s" / subject
     behav_dir = op.join(HOME / 'raw_behavs' / subject)
     sequence = get_sequence(behav_dir)
     pattern, random = [], []
@@ -133,10 +132,113 @@ if sig.any():
     for txt, xpos in zip(['S1', 'S2', 'S3', 'S4'], [6, 16, 26, 36]):
         axes[2, 1].text(xpos, 1.25, txt, ha='center', va='top', fontsize=12, bbox=dict(facecolor='white', alpha=1, edgecolor='none'))
 
-# --- RSA shuffled ---
+# --- RSA no shuffle --- blocks ---
+all_pats, all_rands = [], []
+all_pats_blocks, all_rands_blocks = [], []
+for subject in tqdm(subjects):
+    res_path = RESULTS_DIR / 'RSA' / 'sensors' / "rdm_blocks" / subject
+    behav_dir = op.join(HOME / 'raw_behavs' / subject)
+    sequence = get_sequence(behav_dir)
+    pattern, random = [], []
+    pattern_blocks, random_blocks = [], []
+    for epoch_num in range(5):
+        blocks = [i for i in range(1, 4)] if epoch_num == 0 else [i for i in range(5 * (epoch_num - 1) + 1, epoch_num * 5 + 1)]
+        pats, rands = [], []
+        for block in blocks:
+            pats.append(np.load(res_path / f"pat-{epoch_num}-{block}.npy"))
+            rands.append(np.load(res_path / f"rand-{epoch_num}-{block}.npy"))
+        pattern.append(np.nanmean(pats, 0))
+        random.append(np.nanmean(rands, 0))
+        pattern_blocks.append(np.array(pats))
+        random_blocks.append(np.array(rands))
+    pattern = np.array(pattern)
+    random = np.array(random)
+    pat, rand = get_all_high_low(pattern, random, sequence, False)
+    all_pats.append(pat.mean(0))
+    all_rands.append(rand.mean(0))
+    pattern_blocks = np.vstack(pattern_blocks)
+    random_blocks = np.vstack(random_blocks)
+    pat_blocks, rand_blocks = get_all_high_low(pattern_blocks, random_blocks, sequence)
+    all_pats_blocks.append(pat_blocks)
+    all_rands_blocks.append(rand_blocks)
+all_pats = np.array(all_pats)
+all_rands = np.array(all_rands)
+all_pats_blocks = np.array(all_pats_blocks)
+all_rands_blocks = np.array(all_rands_blocks)
+
+fig, axes = plt.subplots(3, 2, figsize=(8, 8), sharex=False, sharey=True, layout='tight')
+for ax in axes.flatten():
+    # ax.axvspan(0, 0.2, color='grey', alpha=0.1)
+    ax.axhline(0, color='grey', linestyle='-', alpha=0.5)
+
+# w/o practice bsl
+pat = np.nanmean(all_pats[:, 1:, :], 1)
+rand = np.nanmean(all_rands[:, 1:, :], 1)
+diff_rp = rand - pat
+
+axes[0, 0].plot(times, diff_rp.mean(0), color=c1)
+pval = decod_stats(diff_rp, -1)
+sig = pval < 0.05
+axes[0, 0].fill_between(times, diff_rp.mean(0), 0, where=sig, color=c1, alpha=0.2)
+axes[0, 0].set_title("no shuffle - w/o practice bsl", fontstyle='italic')
+axes[1, 0].plot(times, pat.mean(0), label='pattern')
+axes[1, 0].plot(times, rand.mean(0), label='random')
+axes[1, 0].set_title("random vs pattern", fontstyle='italic')
+axes[1, 0].legend(frameon=False)
+
+if sig.any():
+    idx = sig.copy()
+    idx = np.where((times >= 0.28) & (times <= 0.51))[0]
+    pats_blocks = np.nanmean(all_pats_blocks[:, :, :, idx], (1, -1))
+    rands_blocks = np.nanmean(all_rands_blocks[:, :, :, idx], (1, -1))
+    diff_rp_blocks = rands_blocks - pats_blocks
+    for i in [3, 8, 13, 18]:
+        axes[2, 0].axvline(i, color='grey', linestyle='--', alpha=0.5)
+    axes[2, 0].plot(np.arange(1, diff_rp_blocks.shape[1] + 1), np.nanmean(diff_rp_blocks, 0), color=c2)
+    axes[2, 0].set_title('Blocks', fontstyle='italic')
+    axes[2, 0].set_xticks([i for i in range(1, 24, 3)])
+    for txt, xpos in zip(['S1', 'S2', 'S3', 'S4'], [3, 8, 13, 18]):
+        axes[2, 0].text(xpos, 1.25, txt, ha='center', va='top', fontsize=12, bbox=dict(facecolor='white', alpha=1, edgecolor='none'))
+
+# w/ practice bsl
+# pat = np.nanmean(all_pats[:, 1:, :], 1) - all_pats[:, 0, :]
+# rand = np.nanmean(all_rands[:, 1:, :], 1) - all_rands[:, 0, :]
+pat = all_pats[:, 1:, :].mean(1) - all_pats[:, 0, :]
+rand = all_rands[:, 1:, :].mean(1) - all_rands[:, 0, :]
+diff_rp = rand - pat
+
+axes[0, 1].plot(times, diff_rp.mean(0), color=c1)
+pval = decod_stats(diff_rp, -1)
+sig = pval < 0.05
+pval_uncorr = ttest_1samp(diff_rp, 0, axis=0)[1]
+sig_uncorr = pval_uncorr < 0.05
+
+axes[0, 1].fill_between(times, diff_rp.mean(0), 0, where=sig, color=c1, alpha=0.2, label='corrected')
+# axes[0, 1].fill_between(times, diff_rp.mean(0), 0, where=sig_uncorr, color='grey', alpha=0.2, label='uncorrected')
+axes[0, 1].set_title("no shuffle - w/ practice bsl", fontstyle='italic')
+axes[1, 1].plot(times, pat.mean(0), label='pattern')
+axes[1, 1].plot(times, rand.mean(0), label='random')
+axes[1, 1].set_title("random vs pattern", fontstyle='italic')
+axes[1, 1].legend(frameon=False)
+
+if sig.any():
+    idx = sig
+    idx = np.where((times >= 0.28) & (times <= 0.51))[0]
+    pats_blocks = np.nanmean(all_pats_blocks[:, :, :, idx], (1, -1))
+    rands_blocks = np.nanmean(all_rands_blocks[:, :, :, idx], (1, -1))
+    diff_rp_blocks = rands_blocks - pats_blocks
+    for i in [3, 8, 13, 18]:
+        axes[2, 1].axvline(i, color='grey', linestyle='--', alpha=0.5)
+    axes[2, 1].plot(np.arange(1, diff_rp_blocks.shape[1] + 1), np.nanmean(diff_rp_blocks, 0), color=c2)
+    axes[2, 1].set_title('Blocks', fontstyle='italic')
+    axes[2, 1].set_xticks([i for i in range(1, 24, 3)])
+    for txt, xpos in zip(['S1', 'S2', 'S3', 'S4'], [3, 8, 13, 18]):
+        axes[2, 1].text(xpos, 1.25, txt, ha='center', va='top', fontsize=12, bbox=dict(facecolor='white', alpha=1, edgecolor='none'))
+
+# --- RSA shuffled --- sessions ---
 all_highs, all_lows = [], []
 for subject in tqdm(subjects):
-    res_path = RESULTS_DIR / 'RSA' / 'sensors' / lock / "cv_rdm_fixed" / subject
+    res_path = RESULTS_DIR / 'RSA' / 'sensors' / "rdm_session_shuffled" / subject
     ensure_dir(res_path)
     # RSA stuff
     behav_dir = op.join(HOME / 'raw_behavs' / subject)
@@ -194,6 +296,7 @@ axes[1, 1].set_title("random vs pattern", fontstyle='italic')
 axes[1, 1].legend(frameon=False)
 
 # --- Source ---
+subjects = SUBJS13
 networks = NETWORKS + ['Cerebellum-Cortex']
 network_names = NETWORK_NAMES + ['Cerebellum']
 threshold = 0.05

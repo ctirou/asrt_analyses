@@ -2,10 +2,16 @@ import os
 from pathlib import Path
 
 SUBJS = ['sub01', 'sub02', 'sub04', 'sub07', 'sub08', 'sub09',
-        'sub10', 'sub12', 'sub13', 'sub14', 'sub15']
+         'sub10', 'sub12', 'sub13', 'sub14', 'sub15']
 
-ALL_SUBJS = ['sub01', 'sub02', 'sub03', 'sub04', 'sub06', 'sub07', 'sub08', 
-             'sub09', 'sub10', 'sub12', 'sub13', 'sub14', 'sub15']
+SUBJS13 = ['sub01', 'sub02', 'sub03', 'sub04', 'sub06', 'sub07', 'sub08', 
+           'sub09', 'sub10', 'sub12', 'sub13', 'sub14', 'sub15']
+
+SUBJS14 = ['sub01', 'sub02', 'sub03', 'sub04', 'sub06', 'sub07', 'sub08', 
+           'sub09', 'sub10', 'sub11', 'sub12', 'sub13', 'sub14', 'sub15']
+
+SUBJS15 = ['sub01', 'sub02', 'sub03', 'sub04', 'sub05', 'sub06', 'sub07', 'sub08', 
+           'sub09', 'sub10', 'sub11', 'sub12', 'sub13', 'sub14', 'sub15']
 
 EPOCHS = ['2_PRACTICE', '3_EPOCH_1', '4_EPOCH_2', '5_EPOCH_3', '6_EPOCH_4']
 

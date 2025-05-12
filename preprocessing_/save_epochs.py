@@ -14,11 +14,11 @@ from autoreject import get_rejection_threshold
 
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
-subjects = ALL_SUBJS + ['sub11']
+subjects = SUBJS15
 mode_ICA = True
-generalizing = False
+generalizing = True
 filtering = True
-overwrite = True
+overwrite = False
 verbose = True
 jobs = -1
 
@@ -29,10 +29,10 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
         # Set path
         data_path = RAW_DATA_DIR
         if generalizing:
-                res_path = ensured(TIMEG_DATA_DIR / 'gen44')
+                res_path = ensured(TIMEG_DATA_DIR)
                 tmin, tmax = -4, 4
         else:
-                res_path = ensured(DATA_DIR / 'with_AR')
+                res_path = ensured(DATA_DIR)
                 tmin, tmax = -0.2, 0.6
 
         meg_sessions = ['2_PRACTICE', '3_EPOCH_1', '4_EPOCH_2', '5_EPOCH_3', '6_EPOCH_4']
@@ -48,7 +48,6 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
         behav_files_filter = [f for f in behav_dir if not f.startswith('.')]
         behav_files = sorted([f for f in behav_files_filter if '_eASRT_Practice' in f or '_eASRT_Epoch' in f])
         behav_sessions = [behav_files[-1]] + behav_files[:-1]
-                
         # Loop across sessions
         for session_num, meg_session, behav_session in zip([0, 1, 2, 3, 4], meg_sessions, behav_sessions):
                 # Read the raw data
@@ -66,8 +65,9 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                 # Channels 059 and 173 are flat in sub01, check for others before removing
                 to_drop = ['MISC 001', 'MEG 059', 'MEG 173']
                 raw.drop_channels(to_drop)
-                # Find rejection thresholds
+                # Save a filtered version of the raw to run the ICA on
                 filt_raw = raw.copy().filter(l_freq=1., h_freq=None, n_jobs=jobs)
+                # Find rejection thresholds
                 try:
                         epochs_for_thresh = mne.make_fixed_length_epochs(filt_raw, duration=2., preload=True, verbose=verbose)
                         reject = get_rejection_threshold(epochs_for_thresh, verbose=verbose)
@@ -78,7 +78,6 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                         print(f"AutoReject failed, falling back to default reject: {e}")
                         reject = dict(mag=4e-12)
                 if mode_ICA:
-                        # Save a filtered version of the raw to run the ICA on
                         # Initialize the ICA asking for 30 components
                         # ica = ICA(n_components=30, method='fastica', random_state=42, verbose=verbose)
                         ica = ICA(n_components=30, method='picard', fit_params=dict(ortho=True), random_state=42, verbose=verbose)
@@ -115,12 +114,14 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                 else:
                         events = mne.find_events(raw, shortest_event=1, verbose=verbose) # shortest_event=1 for sub06, sub08, sub14 and possibly others
                 if subject == 'sub05' and session_num == 0:
+                        # offsets = np.array([ 9400, 11000, 12400, 12500, 14000, 15500, 17000, 17100, 18600]) + 97
+                        offset = 712
                         behav_fname = data_path / subject / 'behav_data' / behav_session
                         log = pd.read_csv(behav_fname, sep='\t')
                         log.columns = [col for col in log.columns if col not in ['isi_if_correct', 'isi_if_incorrect']] + [''] * len(['isi_if_correct', 'isi_if_incorrect'])
                         # Créer l'array d'événements
                         events_stim = np.column_stack((
-                                log['stim_pres_time'].values.astype(int) + 97, # To re-synchronize with photodiode time-samples
+                                log['stim_pres_time'].values.astype(int) + offset, # To re-synchronize with photodiode time-samples
                                 np.zeros(len(log), dtype=int),
                                 log['triplet'].values.astype(int)))
                 else:
@@ -214,9 +215,9 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                         print("Behav file and stim epochs have same shapes!")
                 epochs.save(op.join(res_path, 'stim', f'{subject}-{session_num}-epo.fif'), overwrite=overwrite)
                 # Save behavioral data
-                stim_df.to_pickle(op.join(res_path, 'behav', f'{subject}-{session_num}.pkl'))
+                df.to_pickle(op.join(res_path, 'behav', f'{subject}-{session_num}.pkl'))
                 print("Final number of epochs: ", len(epochs), "out of", 255 if session_num == 0 else 425)
-
+        
 if is_cluster:
     # Check that SLURM_ARRAY_TASK_ID is available and use it to get the subject
     try:

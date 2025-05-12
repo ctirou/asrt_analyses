@@ -14,8 +14,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegressionCV, LogisticRegression
 from joblib import Parallel, delayed
 
-data_path = TIMEG_DATA_DIR / 'gen44'
-subjects = SUBJS + ['sub03', 'sub06']
+data_path = TIMEG_DATA_DIR
+subjects = SUBJS15
 lock = 'stim'
 folds = 10
 solver = 'lbfgs'
@@ -27,8 +27,7 @@ is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
 def process_subject(subject, jobs):    
     # define classifier
-    # clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42, n_jobs=jobs))
-    clf = make_pipeline(StandardScaler(), LogisticRegressionCV(max_iter=100000, solver=solver, class_weight="balanced", random_state=42, n_jobs=jobs))
+    clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42, n_jobs=jobs))
     clf = GeneralizingEstimator(clf, scoring=scoring, n_jobs=jobs)
     skf = StratifiedKFold(folds, shuffle=True, random_state=42)
     loo = LeaveOneOut()
@@ -40,9 +39,9 @@ def process_subject(subject, jobs):
         
         behav = pd.read_pickle(op.join(data_path, 'behav', f'{subject}-{epoch_num}.pkl'))
         epoch_fname = op.join(data_path, lock, f"{subject}-{epoch_num}-epo.fif")
-        epoch_gen = read_epochs(epoch_fname, verbose=verbose, preload=True)
+        epoch = read_epochs(epoch_fname, verbose=verbose, preload=True)
         
-        times = epoch_gen.times
+        times = epoch.times
         win = np.where((times >= -1.5) & (times <= 3))[0]        
         
         for trial_type in ['pattern', 'random']:
@@ -53,11 +52,11 @@ def process_subject(subject, jobs):
                 print(f"Processing {subject} - session {epoch_num} - {trial_type}...")
                 if trial_type == 'pattern':
                     pattern = behav.trialtypes == 1
-                    X = epoch_gen.get_data()[pattern][:, :, win]
+                    X = epoch.get_data()[pattern][:, :, win]
                     y = behav.positions[pattern]
                 elif trial_type == 'random':
                     random = behav.trialtypes == 2
-                    X = epoch_gen.get_data()[random][:, :, win]
+                    X = epoch.get_data()[random][:, :, win]
                     y = behav.positions[random]
                 y = y.reset_index(drop=True)            
                 assert X.shape[0] == y.shape[0]
@@ -70,18 +69,18 @@ def process_subject(subject, jobs):
                 print(f"Skipping {subject} - session {epoch_num} - {trial_type}...")
         
         if epoch_num != 0:
-            all_epochs.append(epoch_gen)
+            all_epochs.append(epoch)
             all_behavs.append(behav)
         
     # concatenate epochs and behav
-    for epoch in all_epochs:
-        epoch.info['dev_head_t'] = all_epochs[0].info['dev_head_t']
+    for epo in all_epochs:
+        epo.info['dev_head_t'] = all_epochs[0].info['dev_head_t']
     epochs = concatenate_epochs(all_epochs)
     
     behav_df = pd.concat(all_behavs)
     behav_data = behav_df.reset_index(drop=True)
     
-    del all_epochs, all_behavs, epoch_gen, behav, behav_df
+    del all_epochs, all_behavs, epoch, behav, behav_df
     gc.collect()
     
     for trial_type in ['pattern', 'random']:

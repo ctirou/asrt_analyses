@@ -576,7 +576,7 @@ def cv_mahalanobis_fixed(X, y, n_splits=10):
 
     return distances
 
-def cv_mahalanobis_parallel(X, y, n_jobs=-1, n_splits=10, verbose=True):
+def cv_mahalanobis_parallel(X, y, n_jobs=-1, n_splits=10, verbose=True, shuffle=True):
     """
     Parallelized Cross-validated Mahalanobis distances with tqdm_joblib and NaN safety.
 
@@ -591,7 +591,7 @@ def cv_mahalanobis_parallel(X, y, n_jobs=-1, n_splits=10, verbose=True):
         distances: ndarray (n_times, n_conditions, n_conditions)
     """
     import numpy as np
-    from sklearn.model_selection import StratifiedKFold
+    from sklearn.model_selection import StratifiedKFold, KFold
     from sklearn.covariance import LedoitWolf
     from scipy.linalg import solve
     from joblib import Parallel, delayed
@@ -602,7 +602,10 @@ def cv_mahalanobis_parallel(X, y, n_jobs=-1, n_splits=10, verbose=True):
     conditions = np.unique(y)
     n_conditions = len(conditions)
 
-    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
+    if shuffle:
+        skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
+    else:
+        skf = KFold(n_splits=n_splits, shuffle=False)    
 
     def compute_timepoint(t):
         X_t = X[:, :, t]
