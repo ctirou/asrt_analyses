@@ -24,7 +24,7 @@ def process_subject(subject, jobs, verbose):
     kf = KFold(n_splits=4, shuffle=False)
     
     # read volume source space
-    vol_src_fname =  TIMEG_DATA_DIR / 'src' / f"{subject}-htc-vol-src.fif"
+    vol_src_fname =  RESULTS_DIR / 'src' / f"{subject}-htc-vol-src.fif"
     vol_src = mne.read_source_spaces(vol_src_fname, verbose=verbose)                     
     offsets = np.cumsum([0] + [len(s["vertno"]) for s in vol_src]) # need vol src here, fwd["src"] is mixed so does not work
     del vol_src
