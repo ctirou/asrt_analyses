@@ -18,7 +18,7 @@ subjects = SUBJS15
 mode_ICA = True
 generalizing = False
 filtering = True
-overwrite = False
+overwrite = True
 verbose = True
 jobs = -1
 
@@ -38,7 +38,7 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
         meg_sessions = ['2_PRACTICE', '3_EPOCH_1', '4_EPOCH_2', '5_EPOCH_3', '6_EPOCH_4']
 
         # Create preprocessed sub-folders
-        folders = ['stim', 'behav']
+        folders = ['epochs', 'behav']
         for fol in folders:
                 ensure_dir(res_path / fol)
         
@@ -207,7 +207,7 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                         behav_df.drop(behav_df.index[del_from_behav], inplace=True)
                 # Last check if behav and epochs have same shapes
                 changes = editops(int_to_unicode(behav_df['triplets']), int_to_unicode(epochs.events[:, 2]))
-                epochs.save(op.join(res_path, 'stim', f'{subject}-{session_num}-epo.fif'), overwrite=overwrite)
+                epochs.save(op.join(res_path, 'epochs', f'{subject}-{session_num}-epo.fif'), overwrite=overwrite)
                 # Save behavioral data
                 behav_df.to_pickle(op.join(res_path, 'behav', f'{subject}-{session_num}.pkl'))
                 print("Final number of epochs: ", len(epochs), "out of", 255 if session_num == 0 else 425)

@@ -28,7 +28,7 @@ def process_subject(subject, epoch_num, jobs, verbose):
     behav = pd.read_pickle(behav_fname).reset_index(drop=True)
     behav['trials'] = behav.index
     # read epochs
-    epoch_fname = op.join(data_path, "%s/%s-%s-epo.fif" % (lock, subject, epoch_num))
+    epoch_fname = op.join(data_path / "epochs" / f"{subject}-{epoch_num}-epo.fif")
     epoch = mne.read_epochs(epoch_fname, verbose=verbose)
     data = epoch.get_data(picks='mag', copy=True)
     assert len(data) == len(behav), "Data and behavior lengths do not match"
@@ -98,7 +98,7 @@ if is_cluster:
         subject_num = int(os.getenv("SLURM_ARRAY_TASK_ID"))
         subject = subjects[subject_num]
         epoch_num = sys.argv[1]
-        jobs = int(os.getenv("SLURM_CPUS_PER_TASK", 1))
+        jobs = int(os.getenv("SLURM_CPUS_PER_TASK", 20))
         process_subject(subject, epoch_num, jobs, verbose)
     except (IndexError, ValueError) as e:
         print("Error: SLURM_ARRAY_TASK_ID is not set correctly or is out of bounds.")

@@ -10,10 +10,7 @@ import sys
 from joblib import Parallel, delayed
 
 # params
-subjects = SUBJS
-subjects = ['sub03', 'sub06']
-lock = 'stim'
-analysis = 'RSA'
+subjects = SUBJS15
 data_path = DATA_DIR
 subjects_dir = FREESURFER_DIR
 
@@ -24,12 +21,12 @@ is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 def process_subject(subject, epoch_num, jobs):
 
     networks = NETWORKS[:-2]
-    label_path = RESULTS_DIR / f'networks_200_7' / subject
+    label_path = RESULTS_DIR / 'networks_200_7' / subject
             
     # read behav
     behav = pd.read_pickle(op.join(data_path, 'behav', f'{subject}-{epoch_num}.pkl'))
     # read epoch
-    epoch_fname = op.join(data_path, lock, f"{subject}-{epoch_num}-epo.fif")
+    epoch_fname = op.join(data_path, 'epochs', f"{subject}-{epoch_num}-epo.fif")
     epoch = mne.read_epochs(epoch_fname, verbose=verbose, preload=True)
 
     data_cov = mne.compute_covariance(epoch, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
@@ -37,7 +34,7 @@ def process_subject(subject, epoch_num, jobs):
     # conpute rank
     rank = mne.compute_rank(data_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)
     # read forward solution
-    fwd_fname = RESULTS_DIR / "fwd" / lock / f"{subject}-{epoch_num}-fwd.fif" # this fwd was not generated on the rdm_bsling data
+    fwd_fname = RESULTS_DIR / "fwd" / f"{subject}-{epoch_num}-fwd.fif" # this fwd was not generated on the rdm_bsling data
     fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
     # compute source estimates
     filters = make_lcmv(epoch.info, fwd, data_cov, reg=0.05, noise_cov=noise_cov,
@@ -50,7 +47,7 @@ def process_subject(subject, epoch_num, jobs):
     
     for network in networks:
         
-        res_dir = RESULTS_DIR / "RSA" / 'source' / network / lock / 'power_rdm_fixed' / subject
+        res_dir = RESULTS_DIR / "RSA" / 'source' / network / 'rdm_sess' / subject
         ensure_dir(res_dir)
         
         if not op.exists(res_dir / f"pat-{epoch_num}.npy") or not op.exists(res_dir / f"rand-{epoch_num}.npy") or overwrite:

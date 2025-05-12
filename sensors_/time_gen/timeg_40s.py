@@ -16,8 +16,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score as acc
 
 data_path = TIMEG_DATA_DIR
-subjects = ALL_SUBJS
-lock = 'stim'
+subjects = SUBJS15
 solver = 'lbfgs'
 scoring = "accuracy"
 verbose = 'error'
@@ -32,7 +31,7 @@ def process_subject(subject, jobs):
     clf = GeneralizingEstimator(clf, scoring=scoring, n_jobs=jobs)
     kf = KFold(n_splits=2, shuffle=False)
 
-    res_path = ensured(data_path / 'results' / 'sensors' / "kf2_no_shfl" / subject)
+    res_path = ensured(data_path / 'results' / 'sensors' / "timeg_40s" / subject)
     
     for epoch_num in [0, 1, 2, 3, 4]:
         
@@ -41,12 +40,10 @@ def process_subject(subject, jobs):
         behav['trials'] = behav.index
         
         # read epoch
-        epoch_fname = op.join(data_path, lock, f"{subject}-{epoch_num}-epo.fif")
+        epoch_fname = op.join(data_path, 'epochs', f"{subject}-{epoch_num}-epo.fif")
         epoch = read_epochs(epoch_fname, verbose=verbose, preload=True)
         
-        times = epoch.times
-        idx = np.where(times >= -1.5)[0]
-        data = epoch.get_data(picks='mag', copy=True)[:, :, idx]
+        data = epoch.get_data(picks='mag', copy=True)
         assert len(behav) == len(data)
         
         del epoch
@@ -122,7 +119,7 @@ if is_cluster:
     try:
         subject_num = int(os.getenv("SLURM_ARRAY_TASK_ID"))
         subject = subjects[subject_num]
-        jobs = 20
+        jobs = int(os.getenv("SLURM_CPUS_PER_TASK", 20))
         process_subject(subject, jobs)
     except (IndexError, ValueError) as e:
         print("Error: SLURM_ARRAY_TASK_ID is not set correctly or is out of bounds.")

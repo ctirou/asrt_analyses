@@ -12,38 +12,41 @@ from sklearn.model_selection import KFold
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score as acc
-from base import ensured
+from base import ensured, get_volume_estimate_tc
 from config import *
 from joblib import Parallel, delayed
 
 data_path = TIMEG_DATA_DIR
-subjects = ALL_SUBJS
+subjects = SUBJS15
+subjects_dir = FREESURFER_DIR
+
 lock = 'stim'
 solver = 'lbfgs'
 scoring = "accuracy"
 verbose = 'error'
 overwrite = False
 
-networks = NETWORKS[:-2]
-
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
 def process_subject(subject, jobs):
-    
     # define classifier
     clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
     clf = GeneralizingEstimator(clf, scoring=scoring, n_jobs=jobs)
     kf = KFold(n_splits=2, shuffle=False)
-    
-    # network and custom label_names
-    label_path = RESULTS_DIR / 'networks_200_7' / subject    
 
-    for network in networks:
+    # read volume source space
+    vol_src_fname =  data_path / 'src' / f"{subject}-htc-vol-src.fif"
+    vol_src = mne.read_source_spaces(vol_src_fname, verbose=verbose)
+
+    offsets = np.cumsum([0] + [len(s["vertno"]) for s in vol_src]) # need vol src here, fwd["src"] is mixed so does not work
+    
+    del vol_src
+    gc.collect()
+
+    for region in ['Hippocampus', 'Thalamus', 'Cerebellum-Cortex']:
         
-        # read labels
-        lh_label, rh_label = mne.read_label(label_path / f'{network}-lh.label'), mne.read_label(label_path / f'{network}-rh.label')
-        res_path = ensured(data_path / 'results' / 'source' / 'max-power' / network / "kf2_no_shfl" / subject)
-        
+        res_path = ensured(data_path / 'results' / 'source' / region / "timeg40s" / subject)
+                
         for epoch_num in [0, 1, 2, 3, 4]:
             
             # read behav
@@ -51,7 +54,7 @@ def process_subject(subject, jobs):
             behav['trials'] = behav.index
             
             # read epoch
-            epoch_fname = op.join(data_path, lock, f"{subject}-{epoch_num}-epo.fif")
+            epoch_fname = op.join(data_path, 'epochs', f"{subject}-{epoch_num}-epo.fif")
             big_epoch = mne.read_epochs(epoch_fname, verbose=verbose, preload=True).crop(-1.5, 1.5)
                             
             filter = behav.trialtypes == 2
@@ -66,24 +69,28 @@ def process_subject(subject, jobs):
             data_cov = mne.compute_covariance(epoch, method="empirical", rank="info", verbose=verbose)
             # conpute rank
             rank = mne.compute_rank(data_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)
-            
-            # read forward solution
-            fwd_fname = TIMEG_DATA_DIR / "fwd" / f"{subject}-{epoch_num}-fwd.fif"
+
+            # compute forward solution
+            fwd_fname = data_path / "fwd" / f"{subject}-htc-{epoch_num}-fwd.fif"
             fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
-                    
+            
             # compute source estimates
             filters = make_lcmv(epoch.info, fwd, data_cov, reg=0.05, noise_cov=noise_cov,
                                 pick_ori='max-power', weight_norm="unit-noise-gain",
                                 rank=rank, reduce_rank=True, verbose=verbose)
                     
             stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
-
-            data = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs])
-            assert len(data) == len(behav), "Length mismatch"
             
+            # get data from volume source space
+            label_tc, _ = get_volume_estimate_tc(stcs, fwd, offsets, subject, subjects_dir)
+            
+            # get data from region of interest
+            labels = [label for label in label_tc.keys() if region in label]
+            data = np.concatenate([np.real(label_tc[label]) for label in labels], axis=1) # this works
+
             del epoch, noise_cov, data_cov, fwd, filters, stcs
             gc.collect()
-
+            
             blocks = np.unique(behav["blocks"])
             for block in blocks:
                 block = int(block)
@@ -145,11 +152,10 @@ def process_subject(subject, jobs):
                         np.save(res_path / f"rand-{epoch_num}-{block}-{i+1}.npy", acc_matrix)
                     else:
                         print(f"Random split {i+1} for {subject} epoch {epoch_num} block {block} already exists")
-
+                    
             del data, behav
             gc.collect()
             
-
 if is_cluster:
     try:
         subject_num = int(os.getenv("SLURM_ARRAY_TASK_ID"))
@@ -160,6 +166,5 @@ if is_cluster:
         print("Error: SLURM_ARRAY_TASK_ID is not set correctly or is out of bounds.")
         sys.exit(1)
 else:
-    lock = 'stim'
-    jobs = 15
+    jobs = -1
     Parallel(-1)(delayed(process_subject)(subject, jobs) for subject in subjects)

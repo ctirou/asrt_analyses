@@ -11,9 +11,7 @@ import sys
 from joblib import Parallel, delayed
 
 data_path = DATA_DIR
-subjects, subjects_dir = SUBJS, FREESURFER_DIR
-
-lock = 'stim'
+subjects, subjects_dir = SUBJS15, FREESURFER_DIR
 
 verbose = 'error'
 overwrite = False
@@ -25,7 +23,7 @@ ensure_dir(res_path)
 
 def process_subject(subject, epoch_num, jobs):    
     # read volume source space
-    vol_src_fname =  TIMEG_DATA_DIR / 'src' / f"{subject}-htc-vol-src.fif"
+    vol_src_fname =  DATA_DIR / 'src' / f"{subject}-htc-vol-src.fif"
     vol_src = mne.read_source_spaces(vol_src_fname, verbose=verbose)
     
     offsets = np.cumsum([0] + [len(s["vertno"]) for s in vol_src]) # need vol src here, fwd["src"] is mixed so does not work
@@ -35,7 +33,7 @@ def process_subject(subject, epoch_num, jobs):
             
     # read behav and epoch
     behav = pd.read_pickle(op.join(data_path, 'behav', f'{subject}-{epoch_num}.pkl'))
-    epoch_fname = op.join(data_path, lock, f"{subject}-{epoch_num}-epo.fif")
+    epoch_fname = op.join(data_path, 'epochs', f"{subject}-{epoch_num}-epo.fif")
     epoch = mne.read_epochs(epoch_fname, verbose=verbose, preload=True)
     
     # compute noise covariance
@@ -46,7 +44,7 @@ def process_subject(subject, epoch_num, jobs):
     rank = mne.compute_rank(data_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)
 
     # compute forward solution
-    fwd_fname = RESULTS_DIR / "fwd" / lock / f"{subject}-htc-{epoch_num}-fwd.fif"
+    fwd_fname = RESULTS_DIR / "fwd" / f"{subject}-htc-{epoch_num}-fwd.fif"
     fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
     
     # compute source estimates
@@ -64,7 +62,7 @@ def process_subject(subject, epoch_num, jobs):
     
     for region in ['Hippocampus', 'Thalamus', 'Cerebellum-Cortex']:
         
-        res_dir = res_path / region / lock / 'power_rdm_fixed' / subject
+        res_dir = res_path / region / 'rdm_sess' / subject
         ensure_dir(res_dir)
 
         # get data from regions of interest
