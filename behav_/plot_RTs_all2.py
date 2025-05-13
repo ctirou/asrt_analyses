@@ -10,7 +10,8 @@ path_data = DATA_DIR
 figures_dir = FIGURES_DIR
 
 subjects = SUBJS
-subjects = SUBJS15
+subjects = ALL_SUBJS + ['sub05', 'sub11']
+subjects = ALL_SUBJS + ['sub11']
 
 pattern_RT = {f'Epoch_{i}': [] for i in range(5)}
 random_high_RT = {f'Epoch_{i}': [] for i in range(5)}
@@ -52,10 +53,10 @@ for subject in tqdm(subjects):
                 if behav_df['triplets'][j] == 30:
                     pattern_RT[f'Epoch_{i}'].append(behav_df['RTs'][j])
                     subdict[subject][i]["pattern"].append((behav_df['RTs'][j])) 
-                elif behav_df['triplets'][j] == 34:
+                elif behav_df['triplets'][j] == 32:
                     random_high_RT[f'Epoch_{i}'].append(behav_df['RTs'][j])
                     subdict[subject][i]["random_high"].append((behav_df['RTs'][j]))
-                elif behav_df['triplets'][j] == 32:
+                elif behav_df['triplets'][j] == 34:
                     random_low_RT[f'Epoch_{i}'].append(behav_df['RTs'][j])
                     subdict[subject][i]["random_low"].append((behav_df['RTs'][j]))
             else:
@@ -153,7 +154,7 @@ for subject in subjects:
 ax.plot(sessions, mean_all, '-o', color=color4, label="All", markersize=7, alpha=.7)
 ax.plot(sessions[1:], mean_pattern, '-o', color=color1, label="Pattern pair", markersize=7, alpha=1)
 ax.plot(sessions[1:], mean_random_high, '-o', color=color2, label="Random pair", markersize=7, alpha=1)
-ax.plot(sessions, mean_random_low, '-o', color=color3, label="Random low", markersize=7, alpha=.9)
+# ax.plot(sessions, mean_random_low, '-o', color=color3, label="Random low", markersize=7, alpha=.9)
 ax.legend(loc='lower left', frameon=False, title=f"n = {n}")
 ax.set_ylabel("Reaction time (ms)", fontsize=12)
 ax.spines['top'].set_visible(False)

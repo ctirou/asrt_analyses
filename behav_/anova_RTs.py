@@ -8,12 +8,12 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.stats import ttest_rel
 import pingouin as pg
-from config import SUBJS, DATA_DIR, RESULTS_DIR
+from config import *
 path_data = DATA_DIR
 # path_data = '/Users/coum/Desktop/raws/behav'
 figures = RESULTS_DIR
 
-subjects = SUBJS
+subjects = SUBJS15
 # subjects = ['sub01', 'sub02', 'sub03', 'sub04', 'sub06', 'sub07', 'sub08', 'sub09', 'sub10', 'sub12', 'sub13', 'sub14', 'sub15']
 
 blocks = ['1','2','3','4']

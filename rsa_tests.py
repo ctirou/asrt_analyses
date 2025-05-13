@@ -8,7 +8,7 @@ from scipy.stats import ttest_1samp
 
 subjects = SUBJS14
 subjects = SUBJS15
-lock = 'stim'
+subjects = SUBJS13
 times = np.linspace(-0.2, 0.6, 82)
 
 # --- notes --- 
@@ -238,7 +238,7 @@ if sig.any():
 # --- RSA shuffled --- sessions ---
 all_highs, all_lows = [], []
 for subject in tqdm(subjects):
-    res_path = RESULTS_DIR / 'RSA' / 'sensors' / "rdm_session_shuffled" / subject
+    res_path = RESULTS_DIR / 'RSA' / 'sensors' / "rdm_sess" / subject
     ensure_dir(res_path)
     # RSA stuff
     behav_dir = op.join(HOME / 'raw_behavs' / subject)
@@ -312,7 +312,7 @@ for network in tqdm(networks):
     for subject in subjects: 
         # RSA stuff
         behav_dir = op.join(HOME / 'raw_behavs' / subject)
-        res_path = RESULTS_DIR / 'RSA' / 'source' / network / lock / "kf2_no_shfl" / subject
+        res_path = RESULTS_DIR / 'RSA' / 'source' / network / "rsa_40s" / subject
         sequence = get_sequence(behav_dir)
         pattern, random = [], []
         for epoch_num in range(5):
@@ -390,7 +390,7 @@ for network in tqdm(networks):
         # RSA stuff
         behav_dir = op.join(HOME / 'raw_behavs' / subject)
         sequence = get_sequence(behav_dir)
-        res_path = RESULTS_DIR / 'RSA' / 'source' / network / lock / 'power_rdm_fixed' / subject
+        res_path = RESULTS_DIR / 'RSA' / 'source' / network / 'rdm_sess' / subject
         pats, rands = [], []
         for epoch_num in range(5):
             pats.append(np.load(res_path / f"pat-{epoch_num}.npy"))

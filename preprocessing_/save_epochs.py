@@ -11,6 +11,7 @@ from config import *
 import gc
 import sys
 from autoreject import get_rejection_threshold
+from scipy.stats import linregress
 
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
@@ -25,7 +26,7 @@ jobs = -1
 def int_to_unicode(array):
         return ''.join([str(chr(int(ii))) for ii in array]) # permet de convertir int en unicode (pour editops)
 
-def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs, verbose):        
+def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs, verbose):      
         # Set path
         data_path = RAW_DATA_DIR
         if generalizing:
@@ -112,35 +113,39 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                                 end.append(int(line.split()[column_names.index('value')]))
                         events = np.vstack([np.array(samples), np.array(start), np.array(end)]).T 
                 else:
-                        events = mne.find_events(raw, shortest_event=1, verbose=verbose) # shortest_event=1 for sub06, sub08, sub14 and possibly others
+                        events = mne.find_events(raw, shortest_event=1, stim_channel=['STI 013', 'STI 014'], verbose=verbose) # shortest_event=1 for sub06, sub08, sub14 and possibly others
                 if subject == 'sub05' and session_num == 0:
                         # offsets = np.array([ 9400, 11000, 12400, 12500, 14000, 15500, 17000, 17100, 18600]) + 97
                         offset = 97
+                        offset = 0
                         behav_fname = data_path / subject / 'behav_data' / behav_session
                         log = pd.read_csv(behav_fname, sep='\t')
                         log.columns = [col for col in log.columns if col not in ['isi_if_correct', 'isi_if_incorrect']] + [''] * len(['isi_if_correct', 'isi_if_incorrect'])
-                        # Créer l'array d'événements
+                        # Créer l'array d'événement
                         events_stim = np.column_stack((
                                 log['stim_pres_time'].values.astype(int) + offset, # To re-synchronize with photodiode time-samples
                                 np.zeros(len(log), dtype=int),
                                 log['triplet'].values.astype(int)))
                 else:
                         events_stim = list()
-                        # if subject == 'sub11' and session_num != 0:
-                        #         triggs = [30, 32, 34, 36, 38, 40]
-                        #         ranger = range(len(events)-1)
-                        # else:
-                        triggs = [542, 544, 546, 548, 550, 552]
-                        ranger = range(len(events))
-                        for ii in ranger:
-                                if events[ii, 2] in triggs and events[ii+1, 2] in [12, 14, 16, 18]:
-                                        event_stim = events[ii]
-                                        if subject == 'sub11' and session_num != 0:
-                                                event_stim[0] = event_stim[0] + 97 # To re-synchronize with photodiode time-samples
-                                        # Replace photodiode values by triplet values (as in behavior)
-                                        # if subject != 'sub11' or (subject == 'sub11' and session_num == 0):
-                                        event_stim[2] = {542: 30, 544: 32, 546: 34, 548: 36, 550: 38, 552: 40}.get(event_stim[2], event_stim[2])
-                                        events_stim.append(event_stim)
+                        keys = [12, 14, 16, 18]
+                        if subject == 'sub11':
+                                triggs = [30, 32, 34, 36, 38, 40] # sub11 does not have 544 = photodiode for 32 (random high)
+                                for ii in range(len(events) - 2):
+                                        cond = events[ii+1, 2] in keys if events[ii, 2] == 32 else events[ii+2, 2] in triggs
+                                        if events[ii, 2] in triggs and events[ii+2, 2] in keys:
+                                                event_stim = events[ii]
+                                                # if event_stim[2] == 32:
+                                                event_stim[0] = event_stim[0] + 97 # To re-synchronize with photodiode time-samples 
+                                                event_stim[2] = {542: 30, 544: 32, 546: 34, 548: 36, 550: 38, 552: 40}.get(event_stim[2], event_stim[2])
+                                                events_stim.append(event_stim)
+                        else:
+                                triggs = [542, 544, 546, 548, 550, 552]
+                                for ii in range(len(events)):
+                                        if events[ii, 2] in triggs and events[ii+1, 2] in keys:
+                                                event_stim = events[ii]
+                                                event_stim[2] = {542: 30, 544: 32, 546: 34, 548: 36, 550: 38, 552: 40}.get(event_stim[2], event_stim[2])
+                                                events_stim.append(event_stim)
                         events_stim = np.array(events_stim)                
                 # Read behav data
                 fname_behav = op.join(data_path, subject, 'behav_data', behav_session)
@@ -155,6 +160,7 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                 trialtypes = list()
                 RTs = list()
                 corrects = list()
+                stim_pres_times = list()
                 expec_triggers = list()
                 blocks = list()
                 for line in lines[1:]:
@@ -166,6 +172,7 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                                 trialtypes.append(int(line.split()[column_names.index('trialtype')]))
                                 RTs.append(float(line.split()[column_names.index('RT')]))
                                 blocks.append(int(line.split()[column_names.index('block')]))
+                                stim_pres_times.append(int(line.split()[column_names.index('stim_pres_time')]))
                                 # add column of expected trigger in the epoch
                                 if pos == 1:
                                         expec_trigg = 12
@@ -179,6 +186,7 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                 behav_dict = {'positions': np.array(positions), 'triplets': np.array(triplets),
                                 'trialtypes': np.array(trialtypes), 'RTs': np.array(RTs),
                                 'expec_triggers': np.array(expec_triggers), 'blocks': np.array(blocks)}
+                stim_pres_times = np.array(stim_pres_times)
                 behav_df = pd.DataFrame(behav_dict)
                 # Create epochs time locked on stimulus onset and baseline epochs
                 picks = mne.pick_types(raw.info, meg=True, eeg=False, eog=False, stim=False) # by default eog is True
@@ -226,3 +234,88 @@ else:
         jobs = -1
         for subject in subjects:
                 process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs, verbose)
+                
+                
+diff_events = event_times - stim_pres_times
+
+import matplotlib.pyplot as plt
+plt.plot(diff_events, label='Difference')
+plt.xlabel('Time (s)')
+
+# Calculate and plot the linear fit
+x = np.arange(len(diff_events))
+slope, intercept, _, _, _ = linregress(x, diff_events)
+linear_fit = slope * x + intercept
+plt.plot(linear_fit, label='Linear Fit', linestyle='--', color='red')
+
+plt.ylabel('Difference between event and stim pres time (s)')
+plt.legend()
+plt.ylabel('Difference between event and stim pres time (s)')
+
+fig, ax = plt.subplots()
+ax.plot(event_times, label='Event Times epochs')
+ax.plot(stim_pres_times, label='Stim Pres Times behav')
+ax.legend()
+
+# Calculate the correct slope and intercept
+scaling_factor = np.cov(x, diff_events)[0, 1] / np.var(x)
+offset = np.mean(diff_events) - scaling_factor * np.mean(x)
+
+# Apply the linear transformation
+transformed_stim_pres_times = stim_pres_times * scaling_factor + offset
+
+# Plot the transformed stim pres times against event times
+fig, ax = plt.subplots()
+ax.plot(event_times, label='Event Times epochs')
+ax.plot(stim_pres_times, label='Stim Pres Times behav')
+ax.plot(transformed_stim_pres_times, label='Transformed Stim Pres Times behav', linestyle='--')
+ax.legend()
+plt.show()
+
+print(f"Linear transformation: stim_pres_times * {scaling_factor:.4f} + {offset:.4f}")
+
+
+A = np.outer(event_times, stim_pres_times) / np.dot(stim_pres_times, stim_pres_times)
+event_times_approx = A @ stim_pres_times
+print("Transformation matrix A:\n", A)
+print("A @ v =", event_times_approx)
+
+fig, ax = plt.subplots()
+ax.plot(event_times, label='Event Times epochs', lw=4)
+ax.plot(stim_pres_times, label='Stim Pres Times behav', lw=4)
+ax.plot(event_times_approx, label='Transformed Event Times epochs', linestyle='--')
+ax.legend()
+
+stim_pres_times = np.array(stim_pres_times)
+event_times = epochs.events[:, 0]
+
+v = stim_pres_times.copy()
+w = event_times.copy()
+
+v_prac = events_stim[:, 0]
+w_prac = events[:, 0]
+
+fig, ax = plt.subplots()
+ax.plot(v_prac, label='behav', lw=2, alpha=0.5)
+ax.plot(w_prac, label='epochs', lw=2, alpha=0.5)
+ax.legend()
+
+# Fit line: w = m*v + b
+# Using least squares
+A = np.vstack([v, np.ones_like(v)]).T
+m, b = np.linalg.lstsq(A, w, rcond=None)[0]
+
+print("Slope (m):", m)
+print("Intercept (b):", b)
+
+# Apply to a new v_i
+w_i = m * v + b
+print("Predicted w_i:", w_i)
+
+fig, ax = plt.subplots()
+ax.plot(v, label='behav', lw=2, alpha=0.5)
+ax.plot(w, label='epochs', lw=2, alpha=0.5)
+ax.plot(w_i, label="predicted epochs", ls='--', alpha=1)
+ax.legend()
+plt.show()
+
