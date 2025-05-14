@@ -9,7 +9,6 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 path_data = DATA_DIR
 figures_dir = FIGURES_DIR
 
-subjects = SUBJS
 subjects = SUBJS15
 
 pattern_RT = {f'Epoch_{i}': [] for i in range(5)}
@@ -52,10 +51,10 @@ for subject in tqdm(subjects):
                 if behav_df['triplets'][j] == 30:
                     pattern_RT[f'Epoch_{i}'].append(behav_df['RTs'][j])
                     subdict[subject][i]["pattern"].append((behav_df['RTs'][j])) 
-                elif behav_df['triplets'][j] == 34:
+                elif behav_df['triplets'][j] == 34 if subject == 'sub11' else 32: # sub11 has 34 for random_high instead of 32
                     random_high_RT[f'Epoch_{i}'].append(behav_df['RTs'][j])
                     subdict[subject][i]["random_high"].append((behav_df['RTs'][j]))
-                elif behav_df['triplets'][j] == 32:
+                elif behav_df['triplets'][j] == 34:
                     random_low_RT[f'Epoch_{i}'].append(behav_df['RTs'][j])
                     subdict[subject][i]["random_low"].append((behav_df['RTs'][j]))
             else:
@@ -94,13 +93,13 @@ for subject in tqdm(subjects):
                 
 # Save session learning indices to CSV
 learn_index_df = pd.DataFrame.from_dict(learn_index_dict, orient='index')
-if not op.exists(figures_dir / 'behav' / 'learning_indices3.csv'):
-    learn_index_df.to_csv(figures_dir / 'behav' / 'learning_indices3.csv', sep='\t')
+if not op.exists(figures_dir / 'behav' / 'learning_indices15.csv'):
+    learn_index_df.to_csv(figures_dir / 'behav' / 'learning_indices15.csv', sep='\t')
     
 # Save block learning indices to CSV
 learn_index_blocks_df = pd.DataFrame.from_dict(learn_index_blocks_d, orient='index')
-if not op.exists(figures_dir / 'behav' / 'learning_indices_blocks.csv'):
-    learn_index_blocks_df.to_csv(figures_dir / 'behav' / 'learning_indices_blocks.csv', sep='\t')
+if not op.exists(figures_dir / 'behav' / 'learning_indices_blocks15.csv'):
+    learn_index_blocks_df.to_csv(figures_dir / 'behav' / 'learning_indices_blocks15.csv', sep='\t')
 
 # Plot blocks performance
 block_labels = ['01', '02', '03'] + [str(i) for i in range(1, 21)]
@@ -119,7 +118,8 @@ ax.set_xlabel("Blocks", fontsize=12)
 #     if i not in [0, 1, 2]:
 #         ax.annotate('*', (block_labels[i], mean_li + std_li + 0.005), ha='center', color='black', fontweight='bold', fontsize=12)
 fig.suptitle('Learning index per block', fontsize=16)
-fig.savefig(figures_dir / 'behav' / 'learning_index_blocks.pdf', transparent=True)
+fig.savefig(figures_dir / 'behav' / 'learning_index_blocks15.pdf', transparent=True)
+plt.close()
 
 # Calculate means and standard errors
 mean_all = [np.mean(all_RT[f'Epoch_{i}']) for i in range(5)]
@@ -153,7 +153,7 @@ for subject in subjects:
 ax.plot(sessions, mean_all, '-o', color=color4, label="All", markersize=7, alpha=.7)
 ax.plot(sessions[1:], mean_pattern, '-o', color=color1, label="Pattern pair", markersize=7, alpha=1)
 ax.plot(sessions[1:], mean_random_high, '-o', color=color2, label="Random pair", markersize=7, alpha=1)
-ax.plot(sessions, mean_random_low, '-o', color=color3, label="Random low", markersize=7, alpha=.9)
+# ax.plot(sessions, mean_random_low, '-o', color=color3, label="Random low", markersize=7, alpha=.9)
 ax.legend(loc='lower left', frameon=False, title=f"n = {n}")
 ax.set_ylabel("Reaction time (ms)", fontsize=12)
 ax.spines['top'].set_visible(False)
@@ -162,7 +162,7 @@ ax.xaxis.set_tick_params(labelbottom=False)  # Hide x-axis tick labels
 # create new Axes on the right and on the top of the current Axes
 divider = make_axes_locatable(ax)
 # below height and pad are in inches
-axlow = divider.append_axes("bottom", 1.2, pad=0.1, sharex=ax)
+axlow = divider.append_axes("bottom", 1.2, pad=0.25, sharex=ax)
 axlow.autoscale()
 learning_indices_mean = learn_index_df.mean(axis=0)
 learning_indices_stderr = learn_index_df.sem(axis=0)
@@ -176,10 +176,10 @@ axlow.set_xlabel("Session", fontsize=12)
 # Add asterisks above all mean random values
 for i, (mean_li, std_li) in enumerate(zip(learning_indices_mean, learning_indices_stderr)):
     if i != 0:
-        axlow.annotate('*', (sessions[i], mean_li + std_li + 0.005), ha='center', color='black', fontweight='bold', fontsize=12)
+        axlow.annotate('*', (sessions[i], mean_li + std_li + 3), ha='center', color='black', fontweight='bold', fontsize=12)
 # axlow.set_ylim(bottom=0)  # Set the lower limit of the y-axis to 0 to reduce the height
 # axlow.set_ylim(0, 0.3)  # Set the lower limit of the y-axis to 0 to reduce the height
 axlow.set_ylim(0, 110)  # Set the lower limit of the y-axis to 0 to reduce the height
 
-fig.savefig(figures_dir / 'behav' / 'combined_5.pdf', transparent=True)
+fig.savefig(figures_dir / 'behav' / 'combined_15.pdf', transparent=True)
 plt.close()

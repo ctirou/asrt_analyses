@@ -63,8 +63,8 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                                 'UTL 001': 'misc'})
                 raw.rename_channels({'UTL 001': 'MISC 001',
                                 'EEG 001': 'ECG 001'})
-                # Channels 059 and 173 are flat in sub01, check for others before removing
-                to_drop = ['MISC 001', 'MEG 059', 'MEG 173']
+                # Channels 059 and 173 are flat
+                to_drop = ['MISC 001', 'MEG 059', 'MEG 173'] # MEG 028 is noisy as fuck also
                 raw.drop_channels(to_drop)
                 # Save a filtered version of the raw to run the ICA on
                 filt_raw = raw.copy().filter(l_freq=1., h_freq=None, n_jobs=jobs)
@@ -126,6 +126,33 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                                 log['stim_pres_time'].values.astype(int) + offset, # To re-synchronize with photodiode time-samples
                                 np.zeros(len(log), dtype=int),
                                 log['triplet'].values.astype(int)))
+                        fname = op.join("/Users/coum/Desktop/asrt/raws/sub05/behav_data/-Explicit_ASRT_practice.log")
+                        log2 = open(fname, 'r', encoding='utf-8')
+                        lines = log2.readlines()
+                        lines = lines[3:]
+                        events = list()
+                        times = list()
+                        column_names = lines[0].split(sep='\t')
+                        for i, line in enumerate(lines[2:]):
+                                try:
+                                        yep = str(line.split()[column_names.index('Code')])
+                                        if any(direction in yep for direction in ['Left', 'Right', 'Up', 'Down']):
+                                                events.append(str(line.split()[column_names.index('Event Type')])+ str(line.split()[column_names.index('Code')]))
+                                                times.append(int(line.split()[column_names.index('Time')]))
+                                except IndexError:
+                                        continue
+                        for i, event in enumerate(events):
+                                if event == events[i+1]:
+                                        del events[i+1]
+                                        del times[i+1]
+                                        if 'Pattern' in event:
+                                                events[i] = 30
+                                        elif 'Random' in event:
+                                                events[i] = 32
+                                        else:
+                                                events[i] = 40
+                        events = np.column_stack((np.array(times), np.zeros(len(events), dtype=int), np.array(events)))
+                                
                 else:
                         events_stim = list()
                         keys = [12, 14, 16, 18]
