@@ -4,7 +4,7 @@ import os.path as op
 import numpy as np
 from mne.beamformer import make_lcmv, apply_lcmv_epochs
 import pandas as pd
-from base import ensure_dir, get_volume_estimate_tc, cv_mahalanobis_parallel, ensured
+from base import get_volume_estimate_tc, cv_mahalanobis_parallel, ensured
 from config import *
 import gc
 import sys
@@ -61,8 +61,7 @@ def process_subject(subject, epoch_num, jobs):
     
     for region in ['Hippocampus', 'Thalamus', 'Cerebellum-Cortex']:
         
-        res_dir = res_path / region / 'rdm_sess' / subject
-        ensure_dir(res_dir)
+        res_dir = ensured(res_path / region / 'rdm_sess' / subject)
 
         # get data from regions of interest
         labels = [label for label in label_tc.keys() if region in label]

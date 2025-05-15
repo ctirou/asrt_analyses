@@ -17,8 +17,10 @@ jobs = -1
 overwrite = False
 verbose = 'error'
 
-generalizing = False
+generalizing = True
 analysis = 'for_timeg' if generalizing else 'for_rsa'
+
+is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
 # create results directories
 folders = ["src", "bem", "trans", "fwd"]
@@ -221,7 +223,7 @@ def process_subject(subject, jobs):
         # create trans file
         # trans_fname = os.path.join(res_path, "trans", "%s-%i-trans.fif" % (subject, epoch_num))
         trans_fname = os.path.join(res_path, "trans", "%s-%i-trans.fif" % (subject, epoch_num))
-        if not op.exists(trans_fname) or False:
+        if not op.exists(trans_fname) or overwrite:
             coreg = mne.coreg.Coregistration(epoch.info, subject, subjects_dir)
             coreg.fit_fiducials(verbose=verbose)
             coreg.fit_icp(n_iterations=6, verbose=verbose)
@@ -232,7 +234,7 @@ def process_subject(subject, jobs):
         # compute forward solution
         # fwd_fname = res_path / "fwd" / f"{subject}-{epoch_num}-fwd.fif"
         fwd_fname = res_path / "fwd" / analysis / f"{subject}-{epoch_num}-fwd.fif"
-        if not op.exists(fwd_fname) or True:
+        if not op.exists(fwd_fname) or overwrite:
             fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,
                                         src=src, bem=bem_fname,
                                         meg=True, eeg=False,
@@ -245,7 +247,7 @@ def process_subject(subject, jobs):
         
         # fwd_fname = res_path / "fwd" / f"{subject}-htc-{epoch_num}-fwd.fif"
         fwd_fname = res_path / "fwd" / analysis / f"{subject}-htc-{epoch_num}-fwd.fif"
-        if not op.exists(fwd_fname) or True:
+        if not op.exists(fwd_fname) or overwrite:
             fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,
                                         src=mixed, bem=bem_fname,
                                         meg=True, eeg=False,
@@ -289,6 +291,18 @@ def process_subject(subject, jobs):
             
     # del epochs, src, vol_src_hipp_thal, mixed
     # gc.collect()
-        
-for subject in subjects:
-    process_subject(subject, jobs=-1)
+
+if is_cluster:
+    # Check that SLURM_ARRAY_TASK_ID is available and use it to get the subject
+    try:
+        subject_num = int(os.getenv("SLURM_ARRAY_TASK_ID"))
+        subject = subjects[subject_num]
+        jobs = int(os.getenv("SLURM_CPUS_PER_TASK"))
+        process_subject(subject, jobs)
+    except (IndexError, ValueError) as e:
+        print("Error: SLURM_ARRAY_TASK_ID is not set correctly or is out of bounds.")
+        sys.exit(1)
+else:
+    jobs = -1
+    for subject in subjects:
+        process_subject(subject, jobs=-1)

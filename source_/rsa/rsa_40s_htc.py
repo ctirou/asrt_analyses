@@ -12,7 +12,7 @@ from joblib import Parallel, delayed
 
 # params
 subjects = SUBJS15
-data_path = DATA_DIR
+data_path = DATA_DIR / 'for_rsa'
 subjects_dir = FREESURFER_DIR
 
 verbose = 'error'
@@ -21,7 +21,7 @@ is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
 def process_subject(subject, jobs, verbose):
     
-    kf = KFold(n_splits=4, shuffle=False)
+    kf = KFold(n_splits=2, shuffle=False)
     
     # read volume source space
     vol_src_fname =  RESULTS_DIR / 'src' / f"{subject}-htc-vol-src.fif"
@@ -32,7 +32,7 @@ def process_subject(subject, jobs, verbose):
 
     for region in ['Hippocampus', 'Thalamus', 'Cerebellum-Cortex']:
         
-        res_path = ensured(RESULTS_DIR / "RSA" / 'source' / region / "rsa_40s" / subject)
+        res_path = ensured(RESULTS_DIR / "RSA" / 'source' / region / "rdm_40s" / subject)
 
         for epoch_num in range(5):
 
@@ -49,7 +49,7 @@ def process_subject(subject, jobs, verbose):
             # conpute rank
             rank = mne.compute_rank(data_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)
             # read forward solution
-            fwd_fname = RESULTS_DIR / "fwd" / f"{subject}-htc-{epoch_num}-fwd.fif" # this fwd was not generated on the rdm_bsling data
+            fwd_fname = RESULTS_DIR / "fwd" / "for_rsa" / f"{subject}-htc-{epoch_num}-fwd.fif" # this fwd was not generated on the rdm_bsling data
             fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
             # compute source estimates
             filters = make_lcmv(epoch.info, fwd, data_cov, reg=0.05, noise_cov=noise_cov,

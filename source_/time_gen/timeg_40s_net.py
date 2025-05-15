@@ -16,12 +16,12 @@ from base import ensured
 from config import *
 from joblib import Parallel, delayed
 
-data_path = TIMEG_DATA_DIR
+data_path = DATA_DIR / 'for_timeg'
 subjects = SUBJS15
 solver = 'lbfgs'
 scoring = "accuracy"
 verbose = 'error'
-overwrite = False
+overwrite = True
 
 networks = NETWORKS[:-2]
 
@@ -35,13 +35,13 @@ def process_subject(subject, jobs):
     kf = KFold(n_splits=2, shuffle=False)
     
     # network and custom label_names
-    label_path = RESULTS_DIR / 'networks_200_7' / subject    
+    label_path = RESULTS_DIR / 'networks_200_7' / subject
 
     for network in networks:
         
         # read labels
         lh_label, rh_label = mne.read_label(label_path / f'{network}-lh.label'), mne.read_label(label_path / f'{network}-rh.label')
-        res_path = ensured(data_path / 'results' / 'source' / network / "timeg_40s" / subject)
+        res_path = ensured(data_path / 'results' / 'source' / network / "scores_40s" / subject)
         
         for epoch_num in [0, 1, 2, 3, 4]:
             
@@ -67,7 +67,7 @@ def process_subject(subject, jobs):
             rank = mne.compute_rank(data_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)
             
             # read forward solution
-            fwd_fname = TIMEG_DATA_DIR / "fwd" / f"{subject}-{epoch_num}-fwd.fif"
+            fwd_fname = RESULTS_DIR / "fwd" / "for_timeg" / f"{subject}-{epoch_num}-fwd.fif"
             fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
                     
             # compute source estimates

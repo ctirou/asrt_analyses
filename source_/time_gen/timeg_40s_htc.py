@@ -16,7 +16,7 @@ from base import ensured, get_volume_estimate_tc
 from config import *
 from joblib import Parallel, delayed
 
-data_path = TIMEG_DATA_DIR
+data_path = DATA_DIR / 'for_timeg'
 subjects = SUBJS15
 subjects_dir = FREESURFER_DIR
 
@@ -45,7 +45,7 @@ def process_subject(subject, jobs):
 
     for region in ['Hippocampus', 'Thalamus', 'Cerebellum-Cortex']:
         
-        res_path = ensured(data_path / 'results' / 'source' / region / "timeg40s" / subject)
+        res_path = ensured(data_path / 'results' / 'source' / region / "scores_40s" / subject)
                 
         for epoch_num in [0, 1, 2, 3, 4]:
             
@@ -71,7 +71,7 @@ def process_subject(subject, jobs):
             rank = mne.compute_rank(data_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)
 
             # compute forward solution
-            fwd_fname = data_path / "fwd" / f"{subject}-htc-{epoch_num}-fwd.fif"
+            fwd_fname = RESULTS_DIR / "fwd" / "for_timeg" / f"{subject}-htc-{epoch_num}-fwd.fif"
             fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
             
             # compute source estimates
