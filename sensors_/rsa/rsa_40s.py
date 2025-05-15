@@ -9,10 +9,10 @@ import sys
 from joblib import Parallel, delayed
 from sklearn.model_selection import KFold
 
-data_path = DATA_DIR
+data_path = DATA_DIR / 'for_rsa3'
 subjects = SUBJS15
 lock = 'stim'
-overwrite = False
+overwrite = True
 verbose = 'error'
 
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
@@ -21,7 +21,7 @@ def process_subject(subject, epoch_num, jobs, verbose):
     
     print(f"Processing {subject} - {lock} - {epoch_num}")
     
-    res_path = ensured(RESULTS_DIR / 'RSA' / 'sensors' / "rdm_40s" / subject)
+    res_path = ensured(RESULTS_DIR / 'RSA' / 'sensors' / "rdm_40s3" / subject)
     kf = KFold(n_splits=2, shuffle=False)    
                 
     behav_fname = op.join(data_path, "behav/%s-%s.pkl" % (subject, epoch_num))

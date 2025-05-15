@@ -11,13 +11,12 @@ from config import *
 import gc
 import sys
 from autoreject import get_rejection_threshold
-from scipy.stats import linregress
 
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
 subjects = SUBJS15
 mode_ICA = True
-generalizing = False
+generalizing = True
 filtering = True
 overwrite = True
 verbose = True
@@ -30,10 +29,10 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
         # Set path
         data_path = RAW_DATA_DIR
         if generalizing:
-                res_path = ensured(TIMEG_DATA_DIR)
+                res_path = ensured(DATA_DIR / 'for_timeg')
                 tmin, tmax = -4, 4
         else:
-                res_path = ensured(DATA_DIR)
+                res_path = ensured(DATA_DIR / 'for_rsa')
                 tmin, tmax = -0.2, 0.6
 
         meg_sessions = ['2_PRACTICE', '3_EPOCH_1', '4_EPOCH_2', '5_EPOCH_3', '6_EPOCH_4']
@@ -63,8 +62,8 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                                 'UTL 001': 'misc'})
                 raw.rename_channels({'UTL 001': 'MISC 001',
                                 'EEG 001': 'ECG 001'})
-                # Channels 059 and 173 are flat
-                to_drop = ['MISC 001', 'MEG 059', 'MEG 173'] # MEG 028 is noisy as fuck also
+                # Channels 059 and 173 are flat, 028 is noisy as fuck
+                to_drop = ['MISC 001', 'MEG 059', 'MEG 173', 'MEG 028']
                 raw.drop_channels(to_drop)
                 # Save a filtered version of the raw to run the ICA on
                 filt_raw = raw.copy().filter(l_freq=1., h_freq=None, n_jobs=jobs)
@@ -113,11 +112,11 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                                 end.append(int(line.split()[column_names.index('value')]))
                         events = np.vstack([np.array(samples), np.array(start), np.array(end)]).T 
                 else:
-                        events = mne.find_events(raw, shortest_event=1, stim_channel=['STI 013', 'STI 014'], verbose=verbose) # shortest_event=1 for sub06, sub08, sub14 and possibly others
+                        events = mne.find_events(raw, shortest_event=1, verbose=verbose) # shortest_event=1 for sub06, sub08, sub14 and possibly others
                 if subject == 'sub05' and session_num == 0:
                         # offsets = np.array([ 9400, 11000, 12400, 12500, 14000, 15500, 17000, 17100, 18600]) + 97
+                        # offset = 0
                         offset = 97
-                        offset = 0
                         behav_fname = data_path / subject / 'behav_data' / behav_session
                         log = pd.read_csv(behav_fname, sep='\t')
                         log.columns = [col for col in log.columns if col not in ['isi_if_correct', 'isi_if_incorrect']] + [''] * len(['isi_if_correct', 'isi_if_incorrect'])
@@ -126,33 +125,44 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                                 log['stim_pres_time'].values.astype(int) + offset, # To re-synchronize with photodiode time-samples
                                 np.zeros(len(log), dtype=int),
                                 log['triplet'].values.astype(int)))
-                        fname = op.join("/Users/coum/Desktop/asrt/raws/sub05/behav_data/-Explicit_ASRT_practice.log")
-                        log2 = open(fname, 'r', encoding='utf-8')
-                        lines = log2.readlines()
-                        lines = lines[3:]
-                        events = list()
-                        times = list()
-                        column_names = lines[0].split(sep='\t')
-                        for i, line in enumerate(lines[2:]):
-                                try:
-                                        yep = str(line.split()[column_names.index('Code')])
-                                        if any(direction in yep for direction in ['Left', 'Right', 'Up', 'Down']):
-                                                events.append(str(line.split()[column_names.index('Event Type')])+ str(line.split()[column_names.index('Code')]))
-                                                times.append(int(line.split()[column_names.index('Time')]))
-                                except IndexError:
-                                        continue
-                        for i, event in enumerate(events):
-                                if event == events[i+1]:
-                                        del events[i+1]
-                                        del times[i+1]
-                                        if 'Pattern' in event:
-                                                events[i] = 30
-                                        elif 'Random' in event:
-                                                events[i] = 32
-                                        else:
-                                                events[i] = 40
-                        events = np.column_stack((np.array(times), np.zeros(len(events), dtype=int), np.array(events)))
-                                
+                        # # Use alternative log file to read events
+                        # fname = op.join("/Users/coum/Desktop/asrt/raws/sub05/behav_data/-Explicit_ASRT_practice.log")
+                        # log2 = open(fname, 'r', encoding='utf-8')
+                        # lines = log2.readlines()
+                        # lines = lines[3:]
+                        # events = list()
+                        # times = list()
+                        # pos = list()
+                        # column_names = lines[0].split(sep='\t')
+                        # for i, line in enumerate(lines[2:]):
+                        #         try:
+                        #                 yep = str(line.split()[column_names.index('Code')])
+                        #                 if any(direction in yep for direction in ['Left', 'Right', 'Up', 'Down']):
+                        #                         events.append(str(line.split()[column_names.index('Event Type')])+ str(line.split()[column_names.index('Code')]))
+                        #                         times.append(int(line.split()[column_names.index('Time')]) + offset)
+                        #                         if 'Left' in yep:
+                        #                                 pos.append(12)
+                        #                         elif 'Up' in yep:
+                        #                                 pos.append(14)
+                        #                         elif 'Down' in yep:
+                        #                                 pos.append(16)
+                        #                         elif 'Right' in yep:
+                        #                                 pos.append(18)
+                        #         except IndexError:
+                        #                 continue                        
+                        # for i, event in enumerate(events):
+                        #         if event == events[i+1]:
+                        #                 del events[i+1]
+                        #                 del times[i+1]
+                        #                 del pos[i+1]
+                        #                 if 'Pattern' in event:
+                        #                         events[i] = 30
+                        #                 elif 'Random' in event:
+                        #                         events[i] = 32
+                        #                 else:
+                        #                         events[i] = 40
+                        # times = [int(raw.info['sfreq'] * (t/1000)) for t in times]
+                        # events_log = np.column_stack((np.array(times), np.array(pos), np.array(events)))
                 else:
                         events_stim = list()
                         keys = [12, 14, 16, 18]
@@ -263,86 +273,102 @@ else:
                 process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs, verbose)
                 
                 
-diff_events = event_times - stim_pres_times
+# diff_events = event_times - stim_pres_times
 
-import matplotlib.pyplot as plt
-plt.plot(diff_events, label='Difference')
-plt.xlabel('Time (s)')
+# import matplotlib.pyplot as plt
+# fig, ax = plt.subplots()
+# ax.plot(events_stim[:, 0], label='Event behav')
+# ax.plot(events_log[:, 0], label='Event log')
+# diff = events_stim[:, 0] - events_log[:, 0]
+# ax.plot(diff, label='Difference')
+# ax.legend()
 
-# Calculate and plot the linear fit
-x = np.arange(len(diff_events))
-slope, intercept, _, _, _ = linregress(x, diff_events)
-linear_fit = slope * x + intercept
-plt.plot(linear_fit, label='Linear Fit', linestyle='--', color='red')
+# diff_behav, diff_log = np.diff(events_stim[:, 0]), np.diff(events_log[:, 0])
 
-plt.ylabel('Difference between event and stim pres time (s)')
-plt.legend()
-plt.ylabel('Difference between event and stim pres time (s)')
-
-fig, ax = plt.subplots()
-ax.plot(event_times, label='Event Times epochs')
-ax.plot(stim_pres_times, label='Stim Pres Times behav')
-ax.legend()
-
-# Calculate the correct slope and intercept
-scaling_factor = np.cov(x, diff_events)[0, 1] / np.var(x)
-offset = np.mean(diff_events) - scaling_factor * np.mean(x)
-
-# Apply the linear transformation
-transformed_stim_pres_times = stim_pres_times * scaling_factor + offset
-
-# Plot the transformed stim pres times against event times
-fig, ax = plt.subplots()
-ax.plot(event_times, label='Event Times epochs')
-ax.plot(stim_pres_times, label='Stim Pres Times behav')
-ax.plot(transformed_stim_pres_times, label='Transformed Stim Pres Times behav', linestyle='--')
-ax.legend()
-plt.show()
-
-print(f"Linear transformation: stim_pres_times * {scaling_factor:.4f} + {offset:.4f}")
+# fig, ax = plt.subplots()
+# diff = events_stim[:, 0] - events_log[:, 0]
+# ax.plot(diff, label='Difference')
+# # ax.plot(diff_behav, label='Difference behav')
+# # ax.plot(diff_log, label='Difference log')
+# ax.legend()
 
 
-A = np.outer(event_times, stim_pres_times) / np.dot(stim_pres_times, stim_pres_times)
-event_times_approx = A @ stim_pres_times
-print("Transformation matrix A:\n", A)
-print("A @ v =", event_times_approx)
+# plt.plot(diff_events, label='Difference')
+# plt.xlabel('Time (s)')
 
-fig, ax = plt.subplots()
-ax.plot(event_times, label='Event Times epochs', lw=4)
-ax.plot(stim_pres_times, label='Stim Pres Times behav', lw=4)
-ax.plot(event_times_approx, label='Transformed Event Times epochs', linestyle='--')
-ax.legend()
+# # Calculate and plot the linear fit
+# x = np.arange(len(diff_events))
+# slope, intercept, _, _, _ = linregress(x, diff_events)
+# linear_fit = slope * x + intercept
+# plt.plot(linear_fit, label='Linear Fit', linestyle='--', color='red')
 
-stim_pres_times = np.array(stim_pres_times)
-event_times = epochs.events[:, 0]
+# plt.ylabel('Difference between event and stim pres time (s)')
+# plt.legend()
+# plt.ylabel('Difference between event and stim pres time (s)')
 
-v = stim_pres_times.copy()
-w = event_times.copy()
+# fig, ax = plt.subplots()
+# ax.plot(event_times, label='Event Times epochs')
+# ax.plot(stim_pres_times, label='Stim Pres Times behav')
+# ax.legend()
 
-v_prac = events_stim[:, 0]
-w_prac = events[:, 0]
+# # Calculate the correct slope and intercept
+# scaling_factor = np.cov(x, diff_events)[0, 1] / np.var(x)
+# offset = np.mean(diff_events) - scaling_factor * np.mean(x)
 
-fig, ax = plt.subplots()
-ax.plot(v_prac, label='behav', lw=2, alpha=0.5)
-ax.plot(w_prac, label='epochs', lw=2, alpha=0.5)
-ax.legend()
+# # Apply the linear transformation
+# transformed_stim_pres_times = stim_pres_times * scaling_factor + offset
 
-# Fit line: w = m*v + b
-# Using least squares
-A = np.vstack([v, np.ones_like(v)]).T
-m, b = np.linalg.lstsq(A, w, rcond=None)[0]
+# # Plot the transformed stim pres times against event times
+# fig, ax = plt.subplots()
+# ax.plot(event_times, label='Event Times epochs')
+# ax.plot(stim_pres_times, label='Stim Pres Times behav')
+# ax.plot(transformed_stim_pres_times, label='Transformed Stim Pres Times behav', linestyle='--')
+# ax.legend()
+# plt.show()
 
-print("Slope (m):", m)
-print("Intercept (b):", b)
+# print(f"Linear transformation: stim_pres_times * {scaling_factor:.4f} + {offset:.4f}")
 
-# Apply to a new v_i
-w_i = m * v + b
-print("Predicted w_i:", w_i)
 
-fig, ax = plt.subplots()
-ax.plot(v, label='behav', lw=2, alpha=0.5)
-ax.plot(w, label='epochs', lw=2, alpha=0.5)
-ax.plot(w_i, label="predicted epochs", ls='--', alpha=1)
-ax.legend()
-plt.show()
+# A = np.outer(event_times, stim_pres_times) / np.dot(stim_pres_times, stim_pres_times)
+# event_times_approx = A @ stim_pres_times
+# print("Transformation matrix A:\n", A)
+# print("A @ v =", event_times_approx)
 
+# fig, ax = plt.subplots()
+# ax.plot(event_times, label='Event Times epochs', lw=4)
+# ax.plot(stim_pres_times, label='Stim Pres Times behav', lw=4)
+# ax.plot(event_times_approx, label='Transformed Event Times epochs', linestyle='--')
+# ax.legend()
+
+# stim_pres_times = np.array(stim_pres_times)
+# event_times = epochs.events[:, 0]
+
+# v = events_stim.copy()[:, 0]
+# w = events_log.copy()[:, 0]
+
+# v_prac = events_stim[:, 0]
+# w_prac = events_log[:, 0]
+
+# fig, ax = plt.subplots()
+# ax.plot(v_prac, label='behav', lw=2, alpha=0.5)
+# ax.plot(w_prac, label='epochs', lw=2, alpha=0.5)
+# ax.legend()
+
+# # Fit line: w = m*v + b
+# # Using least squares
+# A = np.vstack([v, np.ones_like(v)]).T
+# m, b = np.linalg.lstsq(A, w, rcond=None)[0]
+
+# print("Slope (m):", m)
+# print("Intercept (b):", b)
+
+# # Apply to a new v_i
+# w_i = m * v + b
+# print("Predicted w_i:", w_i)
+
+# fig, ax = plt.subplots()
+# ax.plot(v, label='behav', lw=2, alpha=0.5)
+# ax.plot(w, label='epochs', lw=2, alpha=0.5)
+# ax.plot(w_i, label="predicted epochs", ls='--', alpha=1)
+# ax.legend()
+# plt.show()

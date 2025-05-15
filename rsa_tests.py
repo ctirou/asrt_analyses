@@ -6,9 +6,9 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from scipy.stats import ttest_1samp
 
+subjects = SUBJS13
 subjects = SUBJS14
 subjects = SUBJS15
-subjects = SUBJS13
 times = np.linspace(-0.2, 0.6, 82)
 
 # --- notes --- 
@@ -43,8 +43,18 @@ for subject in tqdm(subjects):
         random.append(np.nanmean(rands, 0))
         pattern_blocks.append(np.vstack(pats))
         random_blocks.append(np.vstack(rands))
+    
+    if subject == 'sub05':
+        for i in range(2):
+            pattern[0][i] = pattern[1][0].copy()
+            random[0][i] = random[1][0].copy()
+        for i in range(6):
+            pattern_blocks[0][i] = np.mean(pattern_blocks[1][:2], 0).copy()
+            random_blocks[0][i] = np.mean(random_blocks[1][:2], 0).copy()
+            
     pattern = np.array(pattern).mean(1)
     random = np.array(random).mean(1)
+    
     pat, rand = get_all_high_low(pattern, random, sequence, False)
     all_pats.append(pat.mean(0))
     all_rands.append(rand.mean(0))
@@ -96,8 +106,6 @@ if sig.any():
         axes[2, 0].text(xpos, 1.25, txt, ha='center', va='top', fontsize=12, bbox=dict(facecolor='white', alpha=1, edgecolor='none'))
 
 # w/ practice bsl
-# pat = np.nanmean(all_pats[:, 1:, :], 1) - all_pats[:, 0, :]
-# rand = np.nanmean(all_rands[:, 1:, :], 1) - all_rands[:, 0, :]
 pat = all_pats[:, 1:, :].mean(1) - all_pats[:, 0, :]
 rand = all_rands[:, 1:, :].mean(1) - all_rands[:, 0, :]
 diff_rp = rand - pat
@@ -117,10 +125,12 @@ axes[1, 1].set_title("random vs pattern", fontstyle='italic')
 axes[1, 1].legend(frameon=False)
 
 if sig.any():
-    idx = sig
+    idx = sig 
     idx = np.where((times >= 0.28) & (times <= 0.51))[0]
-    pats_blocks = np.nanmean(all_pats_blocks[:, :, :, idx], (1, -1))
-    rands_blocks = np.nanmean(all_rands_blocks[:, :, :, idx], (1, -1))
+    bsl_pat = np.nanmean(all_pats_blocks[:, :, :6, idx], axis=(1, 2, 3))
+    bsl_rand = np.nanmean(all_rands_blocks[:, :, :6, idx], axis=(1, 2, 3))
+    pats_blocks = np.nanmean(all_pats_blocks[:, :, :, idx], (1, 3)) - bsl_pat[:, np.newaxis]
+    rands_blocks = np.nanmean(all_rands_blocks[:, :, :, idx], (1, 3)) - bsl_rand[:, np.newaxis]
     diff_rp_blocks = rands_blocks - pats_blocks
     for i in [6, 16, 26, 36]:
         axes[2, 1].axvline(i, color='grey', linestyle='--', alpha=0.5)
@@ -151,6 +161,15 @@ for subject in tqdm(subjects):
         random.append(np.nanmean(rands, 0))
         pattern_blocks.append(np.array(pats))
         random_blocks.append(np.array(rands))
+        
+    if subject == 'sub05':
+        for i in range(2):
+            pattern[0] = pattern[1].copy()
+            random[0] = random[1].copy()
+        for i in range(3):
+            pattern_blocks[0][i] = pattern_blocks[1][0].copy()
+            random_blocks[0][i] = random_blocks[1][0].copy()
+
     pattern = np.array(pattern)
     random = np.array(random)
     pat, rand = get_all_high_low(pattern, random, sequence, False)
@@ -224,8 +243,10 @@ axes[1, 1].legend(frameon=False)
 if sig.any():
     idx = sig
     idx = np.where((times >= 0.28) & (times <= 0.51))[0]
-    pats_blocks = np.nanmean(all_pats_blocks[:, :, :, idx], (1, -1))
-    rands_blocks = np.nanmean(all_rands_blocks[:, :, :, idx], (1, -1))
+    bsl_pat = np.nanmean(all_pats_blocks[:, :, :3, idx], axis=(1, 2, 3))
+    bsl_rand = np.nanmean(all_rands_blocks[:, :, :3, idx], axis=(1, 2, 3))
+    pats_blocks = np.nanmean(all_pats_blocks[:, :, :, idx], (1, -1)) - bsl_pat[:, np.newaxis]
+    rands_blocks = np.nanmean(all_rands_blocks[:, :, :, idx], (1, -1)) - bsl_rand[:, np.newaxis]
     diff_rp_blocks = rands_blocks - pats_blocks
     for i in [3, 8, 13, 18]:
         axes[2, 1].axvline(i, color='grey', linestyle='--', alpha=0.5)
@@ -247,6 +268,9 @@ for subject in tqdm(subjects):
     for epoch_num in range(5):
         pats.append(np.load(res_path / f"pat-{epoch_num}.npy"))
         rands.append(np.load(res_path / f"rand-{epoch_num}.npy"))
+    if subject == 'sub05':
+        pats[0] = pats[1].copy()
+        rands[0] = rands[1].copy()
     pats = np.array(pats)
     rands = np.array(rands)
     high, low = get_all_high_low(pats, rands, sequence, False)

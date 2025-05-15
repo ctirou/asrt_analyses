@@ -4,7 +4,8 @@ from config import *
 # -----------------------------
 # Step 1: Setup paths and names
 # -----------------------------
-subject = 'sub05'
+subjects = ['sub03', 'sub05', 'sub06']
+subject = 'sub06'
 template_subject = 'fsaverage2'
 
 # Use your freesurfer subjects directory
@@ -20,13 +21,14 @@ subj_path = os.path.join(subjects_dir, subject)
 # Step 3: Load MEG data and launch coregistration GUI
 # -----------------------------
 # Load MEG data
-data_path = DATA_DIR
-epoch_num = 4
-epoch_fname = data_path / "stim" / f"{subject}-{epoch_num}-epo.fif"
-epoch = mne.read_epochs(epoch_fname, preload=True, verbose=True)
+data_path = DATA_DIR / 'for_rsa4'
 
-# Launch coreg GUI to align head shape with fsaverage
-mne.gui.coregistration(subject=template_subject, subjects_dir=subjects_dir, inst=epoch_fname)
+for epoch_num in range(5):
+    epoch_fname = data_path / "epochs" / f"{subject}-{epoch_num}-epo.fif"
+    epoch = mne.read_epochs(epoch_fname, preload=True, verbose=True)
 
-fiducials_fname = subjects_dir / subject / 'bem' / f'{subject}-fiducials.fif'
-fiducials = mne.io.read_fiducials(fiducials_fname, verbose=True)
+    # Launch coreg GUI to align head shape with fsaverage
+    mne.gui.coregistration(subject=template_subject, subjects_dir=subjects_dir, inst=epoch_fname)
+
+# fiducials_fname = subjects_dir / subject / 'bem' / f'{subject}-fiducials.fif'
+# fiducials = mne.io.read_fiducials(fiducials_fname, verbose=True)

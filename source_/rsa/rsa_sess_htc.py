@@ -4,13 +4,13 @@ import os.path as op
 import numpy as np
 from mne.beamformer import make_lcmv, apply_lcmv_epochs
 import pandas as pd
-from base import ensure_dir, get_volume_estimate_tc, cv_mahalanobis_parallel
+from base import ensure_dir, get_volume_estimate_tc, cv_mahalanobis_parallel, ensured
 from config import *
 import gc
 import sys
 from joblib import Parallel, delayed
 
-data_path = DATA_DIR
+data_path = DATA_DIR / 'for_rsa'
 subjects, subjects_dir = SUBJS15, FREESURFER_DIR
 
 verbose = 'error'
@@ -18,8 +18,7 @@ overwrite = False
 
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
-res_path = RESULTS_DIR / 'RSA' / 'source'
-ensure_dir(res_path)
+res_path = ensured(RESULTS_DIR / 'RSA' / 'source')
 
 def process_subject(subject, epoch_num, jobs):    
     # read volume source space
@@ -44,7 +43,7 @@ def process_subject(subject, epoch_num, jobs):
     rank = mne.compute_rank(data_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)
 
     # compute forward solution
-    fwd_fname = RESULTS_DIR / "fwd" / f"{subject}-htc-{epoch_num}-fwd.fif"
+    fwd_fname = RESULTS_DIR / "fwd" / "for_rsa" / f"{subject}-htc-{epoch_num}-fwd.fif"
     fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
     
     # compute source estimates

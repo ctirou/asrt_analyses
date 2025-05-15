@@ -7,10 +7,8 @@ import gc
 import sys
 
 subjects = SUBJS15
-subjects = ['sub05']
 epochs_list = EPOCHS
 subjects_dir = FREESURFER_DIR
-# data_path, res_path = TIMEG_DATA_DIR, TIMEG_DATA_DIR
 data_path, res_path = DATA_DIR, RESULTS_DIR
 
 lock = 'stim'
@@ -19,17 +17,16 @@ jobs = -1
 overwrite = False
 verbose = 'error'
 
+generalizing = False
+analysis = 'for_timeg' if generalizing else 'for_rsa'
+
 # create results directories
-folders = ["src", "vol_src", "bem", "trans", "fwd"]
+folders = ["src", "bem", "trans", "fwd"]
 for f in folders:
-    # if f in folders[-2:]:
-    if f in folders[-3:]:
-        path = op.join(res_path, f, lock)
-        ensure_dir(path)
+    if f == folders[-1]:
+        ensure_dir(os.path.join(res_path, f, analysis))
     else:
         ensure_dir(os.path.join(res_path, f))
-
-# best_labels = [('Left-' + l.replace('-lh', '')) if '-lh' in l else ('Right-' + l.replace('-rh', '')) if '-rh' in l else l for l in VOLUME_LABELS]    
 
 def process_subject(subject, jobs):
     # bem model
@@ -217,14 +214,14 @@ def process_subject(subject, jobs):
     for epoch_num in range(5):
         print(f"Processing {subject} {epoch_num}...")
         
-        epoch_fname = op.join(data_path, lock, f"{subject}-{epoch_num}-epo.fif")
+        epoch_fname = op.join(data_path, analysis, "epochs", f"{subject}-{epoch_num}-epo.fif")
         epoch = mne.read_epochs(epoch_fname, preload=False, verbose=verbose)
         # all_epochs.append(epoch)
         
         # create trans file
         # trans_fname = os.path.join(res_path, "trans", "%s-%i-trans.fif" % (subject, epoch_num))
-        trans_fname = os.path.join(res_path, "trans", lock, "%s-%i-trans.fif" % (subject, epoch_num))
-        if not op.exists(trans_fname) or True:
+        trans_fname = os.path.join(res_path, "trans", "%s-%i-trans.fif" % (subject, epoch_num))
+        if not op.exists(trans_fname) or False:
             coreg = mne.coreg.Coregistration(epoch.info, subject, subjects_dir)
             coreg.fit_fiducials(verbose=verbose)
             coreg.fit_icp(n_iterations=6, verbose=verbose)
@@ -234,7 +231,7 @@ def process_subject(subject, jobs):
         
         # compute forward solution
         # fwd_fname = res_path / "fwd" / f"{subject}-{epoch_num}-fwd.fif"
-        fwd_fname = res_path / "fwd" / lock / f"{subject}-{epoch_num}-fwd.fif"
+        fwd_fname = res_path / "fwd" / analysis / f"{subject}-{epoch_num}-fwd.fif"
         if not op.exists(fwd_fname) or True:
             fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,
                                         src=src, bem=bem_fname,
@@ -247,7 +244,7 @@ def process_subject(subject, jobs):
         # fwd_fname = op.join(res_path, "fwd", lock, f"{subject}-hipp-thal-{epoch_num}-fwd.fif")
         
         # fwd_fname = res_path / "fwd" / f"{subject}-htc-{epoch_num}-fwd.fif"
-        fwd_fname = res_path / "fwd" / lock / f"{subject}-htc-{epoch_num}-fwd.fif"
+        fwd_fname = res_path / "fwd" / analysis / f"{subject}-htc-{epoch_num}-fwd.fif"
         if not op.exists(fwd_fname) or True:
             fwd = mne.make_forward_solution(epoch.info, trans=trans_fname,
                                         src=mixed, bem=bem_fname,

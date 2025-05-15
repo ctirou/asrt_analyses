@@ -8,27 +8,25 @@ from config import *
 import sys
 from joblib import Parallel, delayed
 
-overwrite = False
+overwrite = True
 verbose = 'error'
 
-data_path = DATA_DIR
+data_path = DATA_DIR / 'for_rsa3'
 subjects = SUBJS15
-
-lock = 'stim'
 
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
 def process_subject(subject, epoch_num, verbose):
     
-    res_path = RESULTS_DIR / 'RSA' / 'sensors' / "rdm_sess" / subject
+    res_path = RESULTS_DIR / 'RSA' / 'sensors' / "rdm_sess3" / subject
     ensure_dir(res_path)
         
-    print(f"Processing {subject} - {lock} - {epoch_num}")
+    print(f"Processing {subject} - {epoch_num}")
                 
     behav_fname = op.join(data_path, "behav/%s-%s.pkl" % (subject, epoch_num))
     behav = pd.read_pickle(behav_fname)
     # read epochs
-    epoch_fname = op.join(data_path, "%s/%s-%s-epo.fif" % (lock, subject, epoch_num))
+    epoch_fname = op.join(data_path, "epochs", "%s-%s-epo.fif" % (subject, epoch_num))
     epoch = mne.read_epochs(epoch_fname, verbose=verbose)
     data = epoch.get_data(picks='mag', copy=True)
     

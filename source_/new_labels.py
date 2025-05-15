@@ -1,6 +1,6 @@
 import os.path as op
 import mne
-from base import ensure_dir, remove_common_vertex
+from base import ensure_dir, remove_common_vertex, ensured
 from config import *
 import pandas as pd
 
@@ -125,20 +125,19 @@ print(f"Intersection between cuneus_lh and hippocampus_lh: {intersection}")
 
 new_hpc_lh = remove_common_vertex(cuneus_lh, hpc_lh)
 
-for subject in subjects:    
+for subject in ['sub03', 'sub06']:    
     
     n_networks = "7"
     n_parcels = "200"
     parc = f"Schaefer2018_{n_parcels}Parcels_{n_networks}Networks"
     hemi = "both"
     # network_names = schaefer_7 if n_networks == "7" else schaefer_17    
-    network_names = NETWORKS
+    network_names = NETWORKS[:-2]
     
     res_path = data_path / 'results' / f"networks_{n_parcels}_{n_networks}"
     ensure_dir(res_path / subject)
     
-    res_path = FREESURFER_DIR / subject / 'label' / 'n7'
-    ensure_dir(res_path)
+    res_path = ensured(RESULTS_DIR / f"networks_{n_parcels}_{n_networks}" / subject)
 
     for i, network in enumerate(network_names):
         
@@ -153,16 +152,15 @@ for subject in subjects:
         if isinstance(big_label, mne.BiHemiLabel):
             # Save left hemisphere
             if big_label.lh is not None:
-                big_label.lh.save(res_path / f'lh.{network}.label')
+                big_label.lh.save(res_path / f'{network}-lh.label')
             # Save right hemisphere
             if big_label.rh is not None:
-                big_label.rh.save(res_path / f'rh.{network}.label')
+                big_label.rh.save(res_path / f'{network}-rh.label')
         else:
             big_label.save(res_path / f'{network}.label')
 
         # parc_fname = f"Shaefer2018_{n_parcels}_{n_networks}.{network}"
         # mne.write_labels_to_annot(labels=labels, subject=subject, parc=parc_fname, subjects_dir=subjects_dir, hemi=hemi, sort=True, overwrite=True, verbose=verbose)
-        
         
 # Get aseg labels
 subject = "sub01"

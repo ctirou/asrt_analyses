@@ -4,7 +4,7 @@ import sys
 import pandas as pd
 import numpy as np
 import gc
-from base import ensure_dir
+from base import ensure_dir, ensured
 from config import *
 from mne import read_epochs, concatenate_epochs
 from mne.decoding import cross_val_multiscore, GeneralizingEstimator
@@ -14,7 +14,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from joblib import Parallel, delayed
 
-data_path = TIMEG_DATA_DIR
+data_path = DATA_DIR / 'for_timeg'
 subjects = SUBJS15
 folds = 10
 solver = 'lbfgs'
@@ -40,29 +40,31 @@ def process_subject(subject, jobs):
         epoch_fname = op.join(data_path, "epochs", f"{subject}-{epoch_num}-epo.fif")
         epoch = read_epochs(epoch_fname, verbose=verbose, preload=True)
         
-        for trial_type in ['pattern', 'random']:
-            res_dir = TIMEG_DATA_DIR / 'results' / 'sensors' / f'{trial_type}_sess'
-            ensure_dir(res_dir)
-        
-            if not op.exists(res_dir / f"{subject}-{epoch_num}-scores.npy") or overwrite:
-                print(f"Processing {subject} - session {epoch_num} - {trial_type}...")
-                if trial_type == 'pattern':
-                    pattern = behav.trialtypes == 1
-                    X = epoch.get_data()[pattern]
-                    y = behav.positions[pattern]
-                elif trial_type == 'random':
-                    random = behav.trialtypes == 2
-                    X = epoch.get_data()[random]
-                    y = behav.positions[random]
-                y = y.reset_index(drop=True)            
-                assert X.shape[0] == y.shape[0]
-                gc.collect()
-                
-                cv = loo if any(np.unique(y, return_counts=True)[1] < 10) else skf
-                scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=verbose, n_jobs=jobs)
-                np.save(res_dir / f"{subject}-{epoch_num}-scores.npy", scores.mean(0))
-            else:
-                print(f"Skipping {subject} - session {epoch_num} - {trial_type}...")
+        res_dir = ensured(DATA_DIR / 'TIMEG' / 'sensors' / 'scores_sess' / subject)
+    
+        print(f"Processing {subject} - session {epoch_num} - pattern...")
+        if not op.exists(res_dir / f"pat-{epoch_num}.npy") or overwrite:
+            pattern = behav.trialtypes == 1
+            X = epoch.get_data()[pattern]
+            y = behav.positions[pattern]
+            y = y.reset_index(drop=True)
+            assert X.shape[0] == y.shape[0]
+            gc.collect()
+            cv = loo if any(np.unique(y, return_counts=True)[1] < 10) else skf
+            scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=verbose, n_jobs=jobs)
+            np.save(res_dir / f"pat-{epoch_num}.npy", scores.mean(0))
+
+        print(f"Processing {subject} - session {epoch_num} - random...")                
+        if not op.exists(res_dir / f"rand-{epoch_num}.npy") or overwrite:
+            random = behav.trialtypes == 2
+            X = epoch.get_data()[random]
+            y = behav.positions[random]
+            y = y.reset_index(drop=True)            
+            assert X.shape[0] == y.shape[0]
+            gc.collect()
+            cv = loo if any(np.unique(y, return_counts=True)[1] < 10) else skf
+            scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=verbose, n_jobs=jobs)
+            np.save(res_dir / f"rand-{epoch_num}.npy", scores.mean(0))
         
         if epoch_num != 0:
             all_epochs.append(epoch)
@@ -79,31 +81,34 @@ def process_subject(subject, jobs):
     del all_epochs, all_behavs, epoch, behav, behav_df
     gc.collect()
     
-    for trial_type in ['pattern', 'random']:
-        res_dir = TIMEG_DATA_DIR / 'results' / 'sensors' / f'{trial_type}_sess'
-        ensure_dir(res_dir)
-        
-        if not op.exists(res_dir / f"{subject}-all-scores.npy") or overwrite:
-            print(f"Processing {subject} - all - {trial_type}...") 
-            if trial_type == 'pattern':
-                pattern = behav_data.trialtypes == 1
-                X = epochs.get_data()[pattern]
-                y = behav_data.positions[pattern]
-            elif trial_type == 'random':
-                random = behav_data.trialtypes == 2
-                X = epochs.get_data()[random]
-                y = behav_data.positions[random]
-            y = y.reset_index(drop=True)            
-            assert X.shape[0] == y.shape[0]
-            
-            cv = loo if any(np.unique(y, return_counts=True)[1] < 10) else skf
-            scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=verbose, n_jobs=jobs)
-            np.save(res_dir / f"{subject}-all-scores.npy", scores.mean(0))
-            del X, y, scores
-            gc.collect()
-        else:
-            print(f"Skipping {subject} - all - {trial_type}...")
+    res_dir = ensured(DATA_DIR / 'TIMEG' / 'sensors' / 'scores_sess' / subject)
     
+    print(f"Processing {subject} - session all - pattern...")
+    if not op.exists(res_dir / "pat-all.npy") or overwrite:
+        pattern = behav_data.trialtypes == 1
+        X = epochs.get_data()[pattern]
+        y = behav_data.positions[pattern]
+        y = y.reset_index(drop=True)
+        assert X.shape[0] == y.shape[0]
+        cv = loo if any(np.unique(y, return_counts=True)[1] < 10) else skf
+        scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=verbose, n_jobs=jobs)
+        np.save(res_dir / "pat-all.npy", scores.mean(0))
+        del X, y, scores
+        gc.collect()
+    
+    print(f"Processing {subject} - session all - random...")
+    if not op.exists(res_dir / "rand-all.npy") or overwrite:
+        random = behav_data.trialtypes == 2
+        X = epochs.get_data()[random]
+        y = behav_data.positions[random]
+        y = y.reset_index(drop=True)            
+        assert X.shape[0] == y.shape[0]
+        cv = loo if any(np.unique(y, return_counts=True)[1] < 10) else skf
+        scores = cross_val_multiscore(clf, X, y, cv=cv, verbose=verbose, n_jobs=jobs)
+        np.save(res_dir / "rand-all.npy", scores.mean(0))
+        del X, y, scores
+        gc.collect()
+
     del epochs, behav_data
     gc.collect()
 

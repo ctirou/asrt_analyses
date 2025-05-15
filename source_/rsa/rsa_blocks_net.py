@@ -13,7 +13,7 @@ from joblib import Parallel, delayed
 subjects = SUBJS
 lock = 'stim'
 analysis = 'RSA'
-data_path = DATA_DIR
+data_path = DATA_DIR / 'for_rsa'
 subjects_dir = FREESURFER_DIR
 
 verbose = 'error'
@@ -28,7 +28,7 @@ def process_subject(subject, jobs, verbose):
     
     for network in networks:
     
-        res_path = ensured(RESULTS_DIR / "RSA" / 'source' / network / lock)
+        res_path = ensured(RESULTS_DIR / "RSA" / 'source' / network / "rdm_blocks")
         lh_label, rh_label = mne.read_label(label_path / f'{network}-lh.label'), mne.read_label(label_path / f'{network}-rh.label')
         
         all_Xtraining_pat, all_Xtesting_pat = [], []
@@ -42,7 +42,7 @@ def process_subject(subject, jobs, verbose):
             # read behav
             behav = pd.read_pickle(op.join(data_path, 'behav', f'{subject}-{epoch_num}.pkl'))
             # read epoch
-            epoch_fname = op.join(data_path, lock, f"{subject}-{epoch_num}-epo.fif")
+            epoch_fname = op.join(data_path, "epochs", f"{subject}-{epoch_num}-epo.fif")
             epoch = mne.read_epochs(epoch_fname, verbose=verbose, preload=True)
 
             data_cov = mne.compute_covariance(epoch, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
@@ -50,7 +50,7 @@ def process_subject(subject, jobs, verbose):
             # conpute rank
             rank = mne.compute_rank(data_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)
             # read forward solution
-            fwd_fname = RESULTS_DIR / "fwd" / lock / f"{subject}-{epoch_num}-fwd.fif" # this fwd was not generated on the rdm_bsling data
+            fwd_fname = RESULTS_DIR / "fwd" / "for_rsa" / f"{subject}-{epoch_num}-fwd.fif" # this fwd was not generated on the rdm_bsling data
             fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
             # compute source estimates
             filters = make_lcmv(epoch.info, fwd, data_cov, reg=0.05, noise_cov=noise_cov,

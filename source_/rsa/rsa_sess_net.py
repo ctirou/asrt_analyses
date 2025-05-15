@@ -11,7 +11,7 @@ from joblib import Parallel, delayed
 
 # params
 subjects = SUBJS15
-data_path = DATA_DIR
+data_path = DATA_DIR / 'for_rsa'
 subjects_dir = FREESURFER_DIR
 
 verbose = 'error'
@@ -34,7 +34,7 @@ def process_subject(subject, epoch_num, jobs):
     # conpute rank
     rank = mne.compute_rank(data_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)
     # read forward solution
-    fwd_fname = RESULTS_DIR / "fwd" / f"{subject}-{epoch_num}-fwd.fif" # this fwd was not generated on the rdm_bsling data
+    fwd_fname = RESULTS_DIR / "fwd" / 'for_rsa' / f"{subject}-{epoch_num}-fwd.fif" # this fwd was not generated on the rdm_bsling data
     fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
     # compute source estimates
     filters = make_lcmv(epoch.info, fwd, data_cov, reg=0.05, noise_cov=noise_cov,
@@ -47,8 +47,7 @@ def process_subject(subject, epoch_num, jobs):
     
     for network in networks:
         
-        res_dir = RESULTS_DIR / "RSA" / 'source' / network / 'rdm_sess' / subject
-        ensure_dir(res_dir)
+        res_dir = ensured(RESULTS_DIR / "RSA" / 'source' / network / 'rdm_sess' / subject)
         
         if not op.exists(res_dir / f"pat-{epoch_num}.npy") or not op.exists(res_dir / f"rand-{epoch_num}.npy") or overwrite:
             # read labels
