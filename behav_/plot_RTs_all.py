@@ -6,7 +6,7 @@ from config import *
 from tqdm.auto import tqdm
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-path_data = DATA_DIR
+path_data = DATA_DIR / 'for_rsa'
 figures_dir = FIGURES_DIR
 
 subjects = SUBJS15
@@ -51,7 +51,7 @@ for subject in tqdm(subjects):
                 if behav_df['triplets'][j] == 30:
                     pattern_RT[f'Epoch_{i}'].append(behav_df['RTs'][j])
                     subdict[subject][i]["pattern"].append((behav_df['RTs'][j])) 
-                elif behav_df['triplets'][j] == 34 if subject == 'sub11' else 32: # sub11 has 34 for random_high instead of 32
+                elif behav_df['triplets'][j] == 34 if (subject == 'sub11' and i !=0) else 32: # sub11 has 34 for random_high instead of 32
                     random_high_RT[f'Epoch_{i}'].append(behav_df['RTs'][j])
                     subdict[subject][i]["random_high"].append((behav_df['RTs'][j]))
                 elif behav_df['triplets'][j] == 34:

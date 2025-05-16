@@ -86,64 +86,66 @@ def process_subject(subject, jobs):
             blocks = np.unique(behav["blocks"])
             for block in blocks:
                 block = int(block)
-
-                pat = behav.trialtypes == 1
-                this_block = behav.blocks == block
-                pat_this_block = pat & this_block
-                ypat = behav[pat_this_block]
                 
-                for i, (_, test_index) in enumerate(kf.split(ypat)):
-                    
-                    test_in_ypat = ypat.iloc[test_index].trials.values
-                                    
-                    test_idx = [i for i in behav.trials.values if i in test_in_ypat]
-                    train_idx = [i for i in behav.trials.values if i not in test_in_ypat]
-                    
-                    ytrain = [behav.iloc[i].positions for i in train_idx]
-                    ytest = [behav.iloc[i].positions for i in test_idx]
-                    
-                    Xtrain = data[train_idx]
-                    Xtest = data[test_idx]
-                    
-                    assert len(Xtrain) == len(ytrain), "Xtrain and ytrain lengths do not match"
-                    assert len(Xtest) == len(ytest), "Xtest and ytest lengths do not match"
-                    
-                    clf.fit(Xtrain, ytrain)
-                    if not op.exists(res_path / f"pat-{epoch_num}-{block}-{i+1}.npy") or overwrite:
-                        ypred = clf.predict(Xtest)
-                        print(f"Scoring pattern split {i+1} for {subject} epoch {epoch_num}")
-                        acc_matrix = np.apply_along_axis(lambda x: acc(ytest, x), 0, ypred)
-                        np.save(res_path / f"pat-{epoch_num}-{block}-{i+1}.npy", acc_matrix)
-                    else:
-                        print(f"Pattern split {i+1} for {subject} epoch {epoch_num} block {block} already exists")
+                if not op.exists(res_path / f"pat-{epoch_num}-{block}-2.npy") or not op.exists(res_path / f"rand-{epoch_num}-{block}-2.npy") or overwrite:
 
-                rand = behav.trialtypes == 2
-                rand_this_block = rand & this_block
-                yrand = behav[rand_this_block]
-                
-                for i, (_, test_index) in enumerate(kf.split(yrand)):
-                    test_in_yrand = yrand.iloc[test_index].trials.values
+                    pat = behav.trialtypes == 1
+                    this_block = behav.blocks == block
+                    pat_this_block = pat & this_block
+                    ypat = behav[pat_this_block]
                     
-                    test_idx = [i for i in behav.trials.values if i in test_in_yrand]
-                    train_idx = [i for i in behav.trials.values if i not in test_in_yrand]
+                    for i, (_, test_index) in enumerate(kf.split(ypat)):
+                        
+                        test_in_ypat = ypat.iloc[test_index].trials.values
+                                        
+                        test_idx = [i for i in behav.trials.values if i in test_in_ypat]
+                        train_idx = [i for i in behav.trials.values if i not in test_in_ypat]
+                        
+                        ytrain = [behav.iloc[i].positions for i in train_idx]
+                        ytest = [behav.iloc[i].positions for i in test_idx]
+                        
+                        Xtrain = data[train_idx]
+                        Xtest = data[test_idx]
+                        
+                        assert len(Xtrain) == len(ytrain), "Xtrain and ytrain lengths do not match"
+                        assert len(Xtest) == len(ytest), "Xtest and ytest lengths do not match"
+                        
+                        clf.fit(Xtrain, ytrain)
+                        if not op.exists(res_path / f"pat-{epoch_num}-{block}-{i+1}.npy") or overwrite:
+                            ypred = clf.predict(Xtest)
+                            print(f"Scoring pattern split {i+1} for {subject} epoch {epoch_num}")
+                            acc_matrix = np.apply_along_axis(lambda x: acc(ytest, x), 0, ypred)
+                            np.save(res_path / f"pat-{epoch_num}-{block}-{i+1}.npy", acc_matrix)
+                        else:
+                            print(f"Pattern split {i+1} for {subject} epoch {epoch_num} block {block} already exists")
+
+                    rand = behav.trialtypes == 2
+                    rand_this_block = rand & this_block
+                    yrand = behav[rand_this_block]
                     
-                    ytrain = [behav.iloc[i].positions for i in train_idx]
-                    ytest = [behav.iloc[i].positions for i in test_idx]
-                    
-                    Xtrain = data[train_idx]
-                    Xtest = data[test_idx]
-                    
-                    assert len(Xtrain) == len(ytrain), "Xtrain and ytrain lengths do not match"
-                    assert len(Xtest) == len(ytest), "Xtest and ytest lengths do not match"
-                    
-                    clf.fit(Xtrain, ytrain)
-                    if not op.exists(res_path / f"rand-{epoch_num}-{block}-{i+1}.npy") or overwrite:
-                        ypred = clf.predict(Xtest)
-                        print(f"Scoring random split {i+1} for {subject} epoch {epoch_num}")
-                        acc_matrix = np.apply_along_axis(lambda x: acc(ytest, x), 0, ypred)
-                        np.save(res_path / f"rand-{epoch_num}-{block}-{i+1}.npy", acc_matrix)
-                    else:
-                        print(f"Random split {i+1} for {subject} epoch {epoch_num} block {block} already exists")
+                    for i, (_, test_index) in enumerate(kf.split(yrand)):
+                        test_in_yrand = yrand.iloc[test_index].trials.values
+                        
+                        test_idx = [i for i in behav.trials.values if i in test_in_yrand]
+                        train_idx = [i for i in behav.trials.values if i not in test_in_yrand]
+                        
+                        ytrain = [behav.iloc[i].positions for i in train_idx]
+                        ytest = [behav.iloc[i].positions for i in test_idx]
+                        
+                        Xtrain = data[train_idx]
+                        Xtest = data[test_idx]
+                        
+                        assert len(Xtrain) == len(ytrain), "Xtrain and ytrain lengths do not match"
+                        assert len(Xtest) == len(ytest), "Xtest and ytest lengths do not match"
+                        
+                        clf.fit(Xtrain, ytrain)
+                        if not op.exists(res_path / f"rand-{epoch_num}-{block}-{i+1}.npy") or overwrite:
+                            ypred = clf.predict(Xtest)
+                            print(f"Scoring random split {i+1} for {subject} epoch {epoch_num}")
+                            acc_matrix = np.apply_along_axis(lambda x: acc(ytest, x), 0, ypred)
+                            np.save(res_path / f"rand-{epoch_num}-{block}-{i+1}.npy", acc_matrix)
+                        else:
+                            print(f"Random split {i+1} for {subject} epoch {epoch_num} block {block} already exists")
 
             del data, behav
             gc.collect()

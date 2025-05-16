@@ -6,12 +6,10 @@ from config import *
 from tqdm.auto import tqdm
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-path_data = DATA_DIR
+path_data = HOME / 'raw_behavs'
 figures_dir = FIGURES_DIR
 
-subjects = SUBJS
-subjects = ALL_SUBJS + ['sub05', 'sub11']
-subjects = ALL_SUBJS + ['sub11']
+subjects = SUBJS15
 
 pattern_RT = {f'Epoch_{i}': [] for i in range(5)}
 random_high_RT = {f'Epoch_{i}': [] for i in range(5)}
@@ -28,37 +26,46 @@ learn_index_blocks_d = {}
 
 for subject in tqdm(subjects):
     
+    # Sort behav files
+    path_to_behav_dir = path_data / subject
+    behav_dir = os.listdir(path_to_behav_dir)
+    behav_files_filter = [f for f in behav_dir if not f.startswith('.')]
+    behav_files = sorted([f for f in behav_files_filter if '_eASRT_Practice' in f or '_eASRT_Epoch' in f])
+    behav_sessions = [behav_files[-1]] + behav_files[:-1]
+    
     subdict[subject] = {}
     learn_index_dict[subject] = {}
-    
     learn_index_blocks_d[subject] = {}
     
-    for i in range(5):
+    for i, behav_session in enumerate(behav_sessions):
         
         subdict[subject][i] = {"all": [],
                                "pattern": [], 
                                "random_high": [],
                                "random_low": []}
         
-        fname_behav = op.join(path_data, 'behav', f'{subject}-{i}.pkl')
-        behav_df = pd.read_pickle(fname_behav)
+        behav_fname = path_data / subject / behav_session
+        behav_df = pd.read_csv(behav_fname, sep='\t')
         behav_df.reset_index(inplace=True)
-        
+        if i == 0:
+            behav_df.columns = [col for col in behav_df.columns if col not in ['isi_if_correct', 'isi_if_incorrect']] + [''] * len(['isi_if_correct', 'isi_if_incorrect'])
+
         patterns, randoms = [], []
         
-        for j, k in enumerate(behav_df['RTs']):
-            if behav_df['triplets'][j] in [30, 32, 34]:
-                all_RT[f'Epoch_{i}'].append(behav_df['RTs'][j])
-                subdict[subject][i]["all"].append((behav_df['RTs'][j])) 
-                if behav_df['triplets'][j] == 30:
-                    pattern_RT[f'Epoch_{i}'].append(behav_df['RTs'][j])
-                    subdict[subject][i]["pattern"].append((behav_df['RTs'][j])) 
-                elif behav_df['triplets'][j] == 32:
-                    random_high_RT[f'Epoch_{i}'].append(behav_df['RTs'][j])
-                    subdict[subject][i]["random_high"].append((behav_df['RTs'][j]))
-                elif behav_df['triplets'][j] == 34:
-                    random_low_RT[f'Epoch_{i}'].append(behav_df['RTs'][j])
-                    subdict[subject][i]["random_low"].append((behav_df['RTs'][j]))
+        for j, k in enumerate(behav_df['RT']):
+            if behav_df['triplet'][j] in [30, 32, 34]:
+                if behav_df['talalat'][j] == 1:
+                    all_RT[f'Epoch_{i}'].append(behav_df['RT'][j])
+                    subdict[subject][i]["all"].append((behav_df['RT'][j])) 
+                    if behav_df['triplet'][j] == 30:
+                        pattern_RT[f'Epoch_{i}'].append(behav_df['RT'][j])
+                        subdict[subject][i]["pattern"].append((behav_df['RT'][j])) 
+                    elif behav_df['triplet'][j] == 32: # sub11 has 34 for random_high instead of 32
+                        random_high_RT[f'Epoch_{i}'].append(behav_df['RT'][j])
+                        subdict[subject][i]["random_high"].append((behav_df['RT'][j]))
+                    elif behav_df['triplet'][j] == 34:
+                        random_low_RT[f'Epoch_{i}'].append(behav_df['RT'][j])
+                        subdict[subject][i]["random_low"].append((behav_df['RT'][j]))
             else:
                 continue
         
@@ -74,7 +81,7 @@ for subject in tqdm(subjects):
         learning_index = np.mean(randoms) - np.mean(patterns)
         learn_index_dict[subject][i] = learning_index if i != 0 else 0
         
-        nblocks = np.unique(behav_df.blocks)
+        nblocks = np.unique(behav_df.block)
         for block in nblocks:
             
             idx = "0" + str(block) if i == 0 else str(block)
@@ -82,26 +89,26 @@ for subject in tqdm(subjects):
             learn_index_blocks_d[subject][idx] = 0
             
             pat, rand = [], []
-            for j, _ in enumerate(behav_df.RTs):
-                if behav_df.blocks[j] == block and behav_df.triplets[j] == 30:
+            for j, _ in enumerate(behav_df.RT):
+                if behav_df.block[j] == block and behav_df.triplet[j] == 30:
                     # learn_index_blocks_d[subject][idx]['pattern'].append(behav_df.RTs[j])
-                    pat.append(behav_df.RTs[j])
-                elif behav_df.blocks[j] == block and behav_df.triplets[j] == 32:
+                    pat.append(behav_df.RT[j])
+                elif behav_df.block[j] == block and behav_df.triplet[j] == 32:
                     # learn_index_blocks_d[subject][idx]['random_high'].append(behav_df.RTs[j])
-                    rand.append(behav_df.RTs[j])
+                    rand.append(behav_df.RT[j])
             
             index = np.mean(rand) - np.mean(pat)
             learn_index_blocks_d[subject][idx] = index if idx not in ['01', '02', '03'] else 0
                 
 # Save session learning indices to CSV
 learn_index_df = pd.DataFrame.from_dict(learn_index_dict, orient='index')
-if not op.exists(figures_dir / 'behav' / 'learning_indices3.csv'):
-    learn_index_df.to_csv(figures_dir / 'behav' / 'learning_indices3.csv', sep='\t')
+if not op.exists(figures_dir / 'behav' / 'learning_indices15.csv'):
+    learn_index_df.to_csv(figures_dir / 'behav' / 'learning_indices15.csv', sep='\t')
     
 # Save block learning indices to CSV
 learn_index_blocks_df = pd.DataFrame.from_dict(learn_index_blocks_d, orient='index')
-if not op.exists(figures_dir / 'behav' / 'learning_indices_blocks.csv'):
-    learn_index_blocks_df.to_csv(figures_dir / 'behav' / 'learning_indices_blocks.csv', sep='\t')
+if not op.exists(figures_dir / 'behav' / 'learning_indices_blocks15.csv'):
+    learn_index_blocks_df.to_csv(figures_dir / 'behav' / 'learning_indices_blocks15.csv', sep='\t')
 
 # Plot blocks performance
 block_labels = ['01', '02', '03'] + [str(i) for i in range(1, 21)]
@@ -163,7 +170,7 @@ ax.xaxis.set_tick_params(labelbottom=False)  # Hide x-axis tick labels
 # create new Axes on the right and on the top of the current Axes
 divider = make_axes_locatable(ax)
 # below height and pad are in inches
-axlow = divider.append_axes("bottom", 1.2, pad=0.1, sharex=ax)
+axlow = divider.append_axes("bottom", 1.2, pad=0.25, sharex=ax)
 axlow.autoscale()
 learning_indices_mean = learn_index_df.mean(axis=0)
 learning_indices_stderr = learn_index_df.sem(axis=0)
@@ -177,10 +184,10 @@ axlow.set_xlabel("Session", fontsize=12)
 # Add asterisks above all mean random values
 for i, (mean_li, std_li) in enumerate(zip(learning_indices_mean, learning_indices_stderr)):
     if i != 0:
-        axlow.annotate('*', (sessions[i], mean_li + std_li + 0.005), ha='center', color='black', fontweight='bold', fontsize=12)
+        axlow.annotate('*', (sessions[i], mean_li + std_li + 3), ha='center', color='black', fontweight='bold', fontsize=12)
 # axlow.set_ylim(bottom=0)  # Set the lower limit of the y-axis to 0 to reduce the height
 # axlow.set_ylim(0, 0.3)  # Set the lower limit of the y-axis to 0 to reduce the height
 axlow.set_ylim(0, 110)  # Set the lower limit of the y-axis to 0 to reduce the height
 
-fig.savefig(figures_dir / 'behav' / 'combined_5.pdf', transparent=True)
+fig.savefig(figures_dir / 'behav' / 'combined_15.pdf', transparent=True)
 plt.close()

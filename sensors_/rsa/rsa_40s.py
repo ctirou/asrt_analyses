@@ -9,7 +9,7 @@ import sys
 from joblib import Parallel, delayed
 from sklearn.model_selection import KFold
 
-data_path = DATA_DIR / 'for_rsa3'
+data_path = DATA_DIR / 'for_rsa'
 subjects = SUBJS15
 lock = 'stim'
 overwrite = True
@@ -21,7 +21,7 @@ def process_subject(subject, epoch_num, jobs, verbose):
     
     print(f"Processing {subject} - {lock} - {epoch_num}")
     
-    res_path = ensured(RESULTS_DIR / 'RSA' / 'sensors' / "rdm_40s3" / subject)
+    res_path = ensured(RESULTS_DIR / 'RSA' / 'sensors' / "rdm_40s" / subject)
     kf = KFold(n_splits=2, shuffle=False)    
                 
     behav_fname = op.join(data_path, "behav/%s-%s.pkl" % (subject, epoch_num))

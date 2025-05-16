@@ -26,7 +26,7 @@ def compute_spearman(t, g, vector, contrasts):
     return spearmanr(vector, contrasts[:, t, g])[0]
 
 # Load data, compute, and save correlations and pvals 
-learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices3-all.csv', sep="\t", index_col=0)
+learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices15-all.csv', sep="\t", index_col=0)
 
 patterns, randoms = {}, {}
 all_patterns, all_randoms = {}, {}

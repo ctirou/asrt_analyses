@@ -145,11 +145,9 @@ for network in tqdm(networks):
         pattern[network] = []
         random[network] = []
     for subject in subjects:
-        # pat = np.load(RESULTS_DIR / 'RSA' / 'source' / network / lock / 'max-power' / 'pattern' / f"{subject}-scores.npy")
         pat = np.load(TIMEG_DATA_DIR / 'results' / 'source' / 'max-power' / network / 'pattern' / f"{subject}-all-scores.npy")
         pat_diag = np.diag(pat)[time_filter]
         pattern[network].append(pat_diag)
-        # rand = np.load(RESULTS_DIR / 'RSA' / 'source' / network / lock / 'max-power' / 'random' / f"{subject}-scores.npy")
         rand = np.load(TIMEG_DATA_DIR / 'results' / 'source' / 'max-power' / network / 'random' / f"{subject}-all-scores.npy")
         rand_diag = np.diag(rand)[time_filter]
         random[network].append(rand_diag)
@@ -209,7 +207,7 @@ fig.savefig(figures_dir / "decoding-rand.pdf", transparent=True)
 plt.close(fig)
 
 # Temporal generalization
-res_dir = TIMEG_DATA_DIR / 'results' / 'source' / 'max-power'
+res_dir = TIMEG_DATA_DIR / 'results' / 'source'
 patterns, randoms = {}, {}
 all_patterns, all_randoms = {}, {}
 all_diags = {}
@@ -265,8 +263,8 @@ for ax, network, name in zip(axes.flatten(), networks, network_names):
                         linestyles='--', linewidths=1)
     ax.axvline(0, color="k", alpha=.5)
     ax.axhline(0, color="k", alpha=.5)
-fig.savefig(figures_dir / "timeg-pattern.pdf", transparent=True)
-plt.close(fig)
+# fig.savefig(figures_dir / "timeg-pattern.pdf", transparent=True)
+# plt.close(fig)
 
 # Random
 fig, axes = plt.subplots(2, 5, figsize=(20, 4), sharex=True, sharey=True, layout='constrained')
@@ -288,8 +286,8 @@ for ax, network, name in zip(axes.flatten(), networks, network_names):
                         linestyles='--', linewidths=1)
     ax.axvline(0, color="k", alpha=.5)
     ax.axhline(0, color="k", alpha=.5)
-fig.savefig(figures_dir / "timeg-random.pdf", transparent=True)
-plt.close(fig)
+# fig.savefig(figures_dir / "timeg-random.pdf", transparent=True)
+# plt.close(fig)
 
 # Contrast
 fig, axes = plt.subplots(2, 5, figsize=(20, 4), sharex=True, sharey=True, layout='constrained')
@@ -312,29 +310,29 @@ for ax, network, name in zip(axes.flatten(), networks, network_names):
                         linestyles='--', linewidths=1)
     ax.axvline(0, color="k", alpha=.5)
     ax.axhline(0, color="k", alpha=.5)
-fig.savefig(figures_dir / "timeg-contrast.pdf", transparent=True)
-plt.close(fig)
+# fig.savefig(figures_dir / "timeg-contrast.pdf", transparent=True)
+# plt.close(fig)
 
-# Correlation with learning
-fig, axes = plt.subplots(2, 5, figsize=(20, 4), sharex=True, sharey=True, layout='constrained')
-for ax, network, name in zip(axes.flatten(), networks, network_names):
-    rhos = np.load(res_dir / network / "corr" / "rhos_learn.npy")
-    pval = np.load(res_dir / network / "corr" / "pval_learn-pval.npy")
-    sig = pval < threshold
-    im = ax.imshow(
-        rhos.mean(0),
-        interpolation="lanczos",
-        origin="lower",
-        cmap=cmap1,
-        extent=timesg[[0, -1, 0, -1]],
-        aspect=0.5,
-        vmin=-.2,
-        vmax=.2)
-    ax.set_title(f"{name}", style='italic')
-    xx, yy = np.meshgrid(timesg, timesg, copy=False, indexing='xy')
-    ax.contour(xx, yy, sig, colors=c1, levels=[0],
-                        linestyles='solid', linewidths=1)
-    ax.axvline(0, color="k")
-    ax.axhline(0, color="k")
-fig.savefig(figures_dir / "timeg-corr.pdf", transparent=True)
-plt.close(fig)
+# # Correlation with learning
+# fig, axes = plt.subplots(2, 5, figsize=(20, 4), sharex=True, sharey=True, layout='constrained')
+# for ax, network, name in zip(axes.flatten(), networks, network_names):
+#     rhos = np.load(res_dir / network / "corr" / "rhos_learn.npy")
+#     pval = np.load(res_dir / network / "corr" / "pval_learn-pval.npy")
+#     sig = pval < threshold
+#     im = ax.imshow(
+#         rhos.mean(0),
+#         interpolation="lanczos",
+#         origin="lower",
+#         cmap=cmap1,
+#         extent=timesg[[0, -1, 0, -1]],
+#         aspect=0.5,
+#         vmin=-.2,
+#         vmax=.2)
+#     ax.set_title(f"{name}", style='italic')
+#     xx, yy = np.meshgrid(timesg, timesg, copy=False, indexing='xy')
+#     ax.contour(xx, yy, sig, colors=c1, levels=[0],
+#                         linestyles='solid', linewidths=1)
+#     ax.axvline(0, color="k")
+#     ax.axhline(0, color="k")
+# fig.savefig(figures_dir / "timeg-corr.pdf", transparent=True)
+# plt.close(fig)
