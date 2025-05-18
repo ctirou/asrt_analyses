@@ -61,7 +61,7 @@ def process_subject(subject, epoch_num, jobs):
     
     for region in ['Hippocampus', 'Thalamus', 'Cerebellum-Cortex']:
         
-        res_dir = ensured(res_path / region / 'rdm_sess' / subject)
+        res_dir = ensured(res_path / region / 'rdm_skf' / subject)
 
         # get data from regions of interest
         labels = [label for label in label_tc.keys() if region in label]

@@ -9,28 +9,20 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import make_pipeline
 from sklearn.model_selection import StratifiedKFold, LeaveOneOut
 import pandas as pd
-from base import ensure_dir, get_volume_estimate_tc
+from base import ensured, get_volume_estimate_tc
 from config import *
 import gc
 import sys
 
-# stim disp = 500 ms
-# RSI = 750 ms in task
-data_path = TIMEG_DATA_DIR
-subjects, subjects_dir = SUBJS, FREESURFER_DIR
+data_path = DATA_DIR / 'for_timeg'
+subjects, subjects_dir = SUBJS15, FREESURFER_DIR
 folds = 10
 solver = 'lbfgs'
 scoring = "accuracy"
-
-lock = 'stim'
-
 verbose = 'error'
 overwrite = False
 
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
-
-res_path = data_path / 'results' / 'source' / 'max-power'
-ensure_dir(res_path)
 
 def process_subject(subject, jobs):
     # define classifier
@@ -40,7 +32,7 @@ def process_subject(subject, jobs):
     loo = LeaveOneOut()
     
     # read volume source space
-    vol_src_fname =  data_path / 'src' / f"{subject}-htc-vol-src.fif"
+    vol_src_fname =  RESULTS_DIR / 'src' / f"{subject}-htc-vol-src.fif"
     vol_src = mne.read_source_spaces(vol_src_fname, verbose=verbose)
     
     offsets = np.cumsum([0] + [len(s["vertno"]) for s in vol_src]) # need vol src here, fwd["src"] is mixed so does not work
@@ -55,7 +47,7 @@ def process_subject(subject, jobs):
         # read behav
         behav = pd.read_pickle(op.join(data_path, 'behav', f'{subject}-{epoch_num}.pkl'))
         # read epoch
-        epoch_fname = op.join(data_path, lock, f"{subject}-{epoch_num}-epo.fif")
+        epoch_fname = op.join(data_path, "epochs", f"{subject}-{epoch_num}-epo.fif")
         big_epoch = mne.read_epochs(epoch_fname, verbose=verbose, preload=True).crop(-1.5, 1.5)
                         
         filter = behav.trialtypes == 2
@@ -72,7 +64,7 @@ def process_subject(subject, jobs):
         rank = mne.compute_rank(data_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)
 
         # compute forward solution
-        fwd_fname = data_path / "fwd" / f"{subject}-htc-{epoch_num}-fwd.fif"
+        fwd_fname = RESULTS_DIR / "fwd" / 'for_timeg' / f"{subject}-htc-{epoch_num}-fwd.fif"
         fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
         
         # compute source estimates
@@ -96,37 +88,38 @@ def process_subject(subject, jobs):
             labels = [label for label in label_tc.keys() if region in label]
             stcs_data = np.concatenate([np.real(label_tc[label]) for label in labels], axis=1) # this works
             
-            for trial_type in ['pattern', 'random']:
+            res_path = ensured(RESULTS_DIR / 'TIMEG' / 'source' / region / "scores_skf" / subject)
+            
+            if not os.path.exists(res_path / f"pat-{epoch_num}.npy") or overwrite:
+                print("Processing", subject, epoch_num, "pattern", region)
+                pattern = behav.trialtypes == 1
+                X = stcs_data[pattern]
+                y = behav.positions[pattern]
+                y = y.reset_index(drop=True)
+                assert X.shape[0] == y.shape[0], "Length mismatch"
+                cv = loo if any(np.unique(y, return_counts=True)[1] < 10) else skf
+                scores = cross_val_multiscore(clf, X, y, cv=cv, n_jobs=jobs, verbose=verbose)                    
+                np.save(op.join(res_path, f"pat-{epoch_num}.npy"), scores.mean(0))
+                del X, y, scores
+                gc.collect()
+            else:
+                print("Skipping", subject, epoch_num, "pattern", region)
                 
-                res_dir = res_path / region / trial_type
-                ensure_dir(res_dir)
-                
-                if not os.path.exists(res_dir / f"{subject}-{epoch_num}-scores.npy") or overwrite:
-                    print("Processing", subject, epoch_num, trial_type, region)
-                    
-                    if trial_type == 'pattern':
-                        pattern = behav.trialtypes == 1
-                        X = stcs_data[pattern]
-                        y = behav.positions[pattern]
+            if not os.path.exists(res_path / f"rand-{epoch_num}.npy") or overwrite:
+                print("Processing", subject, epoch_num, "random", region)
+                random = behav.trialtypes == 2
+                X = stcs_data[random]
+                y = behav.positions[random]
+                y = y.reset_index(drop=True)
+                assert X.shape[0] == y.shape[0], "Length mismatch"
+                cv = loo if any(np.unique(y, return_counts=True)[1] < 10) else skf
+                scores = cross_val_multiscore(clf, X, y, cv=cv, n_jobs=jobs, verbose=verbose)                    
+                np.save(op.join(res_path, f"rand-{epoch_num}-scores.npy"), scores.mean(0))
+                del X, y, scores
+                gc.collect()
+            else:
+                print("Skipping", subject, epoch_num, "random", region)
 
-                    elif trial_type == 'random':
-                        random = behav.trialtypes == 2
-                        X = stcs_data[random]
-                        y = behav.positions[random]
-                    
-                    y = y.reset_index(drop=True)
-                    assert X.shape[0] == y.shape[0], "Length mismatch"
-                    
-                    cv = loo if any(np.unique(y, return_counts=True)[1] < 10) else skf
-                    scores = cross_val_multiscore(clf, X, y, cv=cv, n_jobs=jobs, verbose=verbose)                    
-                    np.save(op.join(res_dir, f"{subject}-{epoch_num}-scores.npy"), scores.mean(0))
-                    
-                    del X, y, scores
-                    gc.collect()
-            
-                else:
-                    print("Skipping", subject, epoch_num, trial_type, region)
-            
             del labels, stcs_data
             gc.collect()
                 
@@ -145,40 +138,44 @@ def process_subject(subject, jobs):
     
         labels = [label for label in label_tc.keys() if region in label]
         stcs_data = np.concatenate([np.real(label_tc[label]) for label in labels], axis=1) # this works
-    
-        for trial_type in ['pattern', 'random']:
-            res_dir = res_path / region / trial_type
-            ensure_dir(res_dir)
+        
+        res_path = ensured(RESULTS_DIR / 'TIMEG' / 'source' / region / "scores_skf" / subject)
+        
+        if not op.exists(res_path / "pat-all.npy") or overwrite:
+            print("Processing", subject, 'all', "pattern", region)
+            pattern = behav_data.trialtypes == 1
+            X = stcs_data[pattern]
+            y = behav_data.positions[pattern]
+            y = y.reset_index(drop=True)
+            assert X.shape[0] == y.shape[0]
+            cv = loo if any(np.unique(y, return_counts=True)[1] < 10) else skf
+            scores = cross_val_multiscore(clf, X, y, cv=cv, n_jobs=jobs, verbose=True)
+            np.save(op.join(res_path, "pat-all.npy"), scores.mean(0))
+            del X, y, scores
+            gc.collect()
+        else:
+            print("Skipping", subject, 'all', "pattern", region)          
 
-            if not op.exists(res_dir / f"{subject}-all-scores.npy") or overwrite:
-                print("Processing", subject, 'all', trial_type, region)
-                if trial_type == 'pattern':
-                    pattern = behav_data.trialtypes == 1
-                    X = stcs_data[pattern]
-                    y = behav_data.positions[pattern]
-                elif trial_type == 'random':
-                    random = behav_data.trialtypes == 2
-                    X = stcs_data[random]
-                    y = behav_data.positions[random]
-                y = y.reset_index(drop=True)
-                assert X.shape[0] == y.shape[0]
-                
-                cv = loo if any(np.unique(y, return_counts=True)[1] < 10) else skf
-                scores = cross_val_multiscore(clf, X, y, cv=cv, n_jobs=jobs, verbose=True)
-                np.save(op.join(res_dir, f"{subject}-all-scores.npy"), scores.mean(0))
-                
-                del X, y, scores
-                gc.collect()
-            
-            else:
-                print("Skipping", subject, 'all', trial_type, region)
+        if not op.exists(res_path / "rand-all.npy") or overwrite:
+            print("Processing", subject, 'all', "random", region)
+            random = behav_data.trialtypes == 2
+            X = stcs_data[random]
+            y = behav_data.positions[random]
+            y = y.reset_index(drop=True)
+            assert X.shape[0] == y.shape[0]
+            cv = loo if any(np.unique(y, return_counts=True)[1] < 10) else skf
+            scores = cross_val_multiscore(clf, X, y, cv=cv, n_jobs=jobs, verbose=True)
+            np.save(op.join(res_path, "rand-all.npy"), scores.mean(0))
+            del X, y, scores
+            gc.collect()
+        else:
+            print("Skipping", subject, 'all', "random", region)          
                 
         del labels, stcs_data
         gc.collect()
                 
 if is_cluster:
     jobs = 20
-    # Check that SLURM_ARRAY_TASK_ID is available and use it to get the subject
     try:
         subject_num = int(os.getenv("SLURM_ARRAY_TASK_ID"))
         subject = subjects[subject_num]

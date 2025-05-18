@@ -160,9 +160,10 @@ if sig.any():
         axes[2, 1].text(xpos, 1.25, txt, ha='center', va='top', fontsize=12, bbox=dict(facecolor='white', alpha=1, edgecolor='none'))
 
 # --- RSA shuffled --- sessions ---
+subjects = SUBJS15
 all_highs, all_lows = [], []
 for subject in tqdm(subjects):
-    res_path = RESULTS_DIR / 'RSA' / 'sensors' / "rdm_sess" / subject
+    res_path = RESULTS_DIR / 'RSA' / 'sensors' / "rdm_skf" / subject
     ensure_dir(res_path)
     # RSA stuff
     behav_dir = op.join(HOME / 'raw_behavs' / subject)
@@ -179,8 +180,8 @@ for subject in tqdm(subjects):
     high, low = get_all_high_low(pats, rands, sequence, False)
     
     if subject == 'sub05':
-        high[:, 0] = all_pats_bins[4, 6].copy()
-        low[:, 0] = all_rands_bins[4, 6].copy()
+        high[:, 0] = all_pats_bins[4, 6:7].mean(1).copy()
+        low[:, 0] = all_rands_bins[4, 6:7].mean(1).copy()
     
     all_highs.append(high)
     all_lows.append(low)

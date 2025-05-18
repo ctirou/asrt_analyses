@@ -47,7 +47,7 @@ def process_subject(subject, epoch_num, jobs):
     
     for network in networks:
         
-        res_dir = ensured(RESULTS_DIR / "RSA" / 'source' / network / 'rdm_sess' / subject)
+        res_dir = ensured(RESULTS_DIR / "RSA" / 'source' / network / 'rdm_skf' / subject)
         
         if not op.exists(res_dir / f"pat-{epoch_num}.npy") or not op.exists(res_dir / f"rand-{epoch_num}.npy") or overwrite:
             # read labels
