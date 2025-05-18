@@ -12,36 +12,32 @@ from scipy.stats import zscore
 from matplotlib import colors
 
 # analysis = "pat_bsl_filtered_3300_3160"
-data_path = TIMEG_DATA_DIR
-subjects = SUBJS + ['sub03', 'sub06']
-
-lock = 'stim'
+subjects = SUBJS15
 jobs = -1
 overwrite = False
 
 def compute_spearman(t, g, vector, contrasts):
     return spear(vector, contrasts[:, t, g])[0]
 
-times = np.linspace(-1.5, 4, 559)
+times = np.linspace(-4, 4, 813)
 
-figure_dir = FIGURES_DIR / "time_gen" / "sensors" / lock
-ensure_dir(figure_dir)
+figure_dir = ensured(FIGURES_DIR / "time_gen" / "sensors")
 
-res_dir = data_path / 'results' / 'sensors' / lock
+res_dir = RESULTS_DIR / 'TIMEG' / 'sensors' / "scores_skf"
 
 # load patterns and randoms time-generalization on all epochs
 all_patterns, all_randoms = [], []
 patterns, randoms = [], []
 for subject in tqdm(subjects):
-    # pattern = np.load(op.join(res_dir, "pattern_logRegCv", f"{subject}-all-scores.npy"))
-    # all_patterns.append(pattern)
-    # random = np.load(op.join(res_dir, "random_logRegCv", f"{subject}-all-scores.npy"))
-    # all_randoms.append(random)
+    pattern = np.load(res_dir / subject / "pat-all.npy")
+    all_patterns.append(pattern)
+    random = np.load(res_dir / subject / "rand-all.npy")
+    all_randoms.append(random)
     
     pat, rand = [], []
     for i in range(5):
-        pat.append(np.load(res_dir / 'pattern' / f"{subject}-{i}-scores.npy"))
-        rand.append(np.load(res_dir / 'random' / f"{subject}-{i}-scores.npy"))
+        pat.append(np.load(res_dir / subject / f"pat-{i}.npy"))
+        rand.append(np.load(res_dir / subject / f"rand-{i}.npy"))
     
     patterns.append(np.array(pat))
     randoms.append(np.array(rand))
@@ -49,36 +45,40 @@ for subject in tqdm(subjects):
 all_patterns, all_randoms = np.array(all_patterns), np.array(all_randoms)
 patterns, randoms = np.array(patterns), np.array(randoms)
 
-learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices3.csv', sep="\t", index_col=0)
+learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices15.csv', sep="\t", index_col=0)
 chance = .25
 threshold = .05
 
+idx = np.where((times >= -1.5) & (times <= 3))[0]
 ensure_dir(res_dir / "pval")
 if not op.exists(res_dir / "pval" / "all_pattern-pval.npy") or overwrite:
     print('Computing pval for all patterns')
-    pval = gat_stats(all_patterns - chance, jobs)
+    pval = gat_stats(all_patterns[:, idx][:, :, idx] - chance, jobs)
     np.save(res_dir / "pval" / "all_pattern-pval.npy", pval)
 if not op.exists(res_dir / "pval" / "all_random-pval.npy") or overwrite:
     print('Computing pval for all randoms')
-    pval = gat_stats(all_randoms - chance, jobs)
+    pval = gat_stats(all_randoms[:, idx][:, :, idx] - chance, jobs)
     np.save(res_dir / "pval" / "all_random-pval.npy", pval)
 if not op.exists(res_dir / "pval" / "all_contrast-pval.npy") or overwrite:
     print('Computing pval for all contrasts')
     contrasts = all_patterns - all_randoms
-    pval = gat_stats(contrasts, jobs)
+    pval = gat_stats(contrasts[:, idx][:, :, idx], jobs)
     np.save(res_dir / "pval" / "all_contrast-pval.npy", pval)
 
+filt = np.where((times >= -1.5) & (times <= 3))[0]
 # save learn df x time gen correlation and pvals
+ensure_dir(res_dir / "corr")
 if not op.exists(res_dir / "corr" / "rhos_learn.npy") or overwrite:
     contrasts = patterns - randoms
-    contrasts = zscore(contrasts, axis=-1)  # je sais pas si zscore avant correlation pour la RSA mais c'est mieux je pense
+    contrasts = contrasts[:, :, filt][:, :, :, filt]
+    contrasts = zscore(contrasts, axis=-1)
     all_rhos = []
     for sub in range(len(subjects)):
         rhos = np.empty((times.shape[0], times.shape[0]))
         vector = learn_index_df.iloc[sub]  # vector to correlate with
         contrast = contrasts[sub]
-        results = Parallel(n_jobs=-1)(delayed(compute_spearman)(t, g, vector, contrast) for t in range(len(times)) for g in range(len(times)))
-        for idx, (t, g) in enumerate([(t, g) for t in range(len(times)) for g in range(len(times))]):
+        results = Parallel(n_jobs=-1)(delayed(compute_spearman)(t, g, vector, contrast) for t in range(len(times[filt])) for g in range(len(times[filt])))
+        for idx, (t, g) in enumerate([(t, g) for t in range(len(times[filt])) for g in range(len(times[filt]))]):
             rhos[t, g] = results[idx]
         all_rhos.append(rhos)
     all_rhos = np.array(all_rhos)
@@ -110,17 +110,17 @@ cmap2 = "coolwarm"
 cmap3 = "viridis"
 cmap4 = "cividis"
 
-idx = np.where(times <= 3)[0]
+idx = np.where((times >= -1.5) & (times <= 3))[0]
 
 plt.rcParams.update({'font.size': 12, 'font.family': 'serif', 'font.serif': 'Arial'})
 
 fig, axs = plt.subplots(2, 1, sharex=True, layout='constrained', figsize=(7, 6))
 norm = colors.Normalize(vmin=0.18, vmax=0.32)
 images = []
-# for ax, data, title in zip(axs.flat, [all_patterns, all_randoms], ["pattern", "random"]):
-for ax, data, title in zip(axs.flat, [patterns, randoms], ["pattern", "random"]):
-    # images.append(ax.imshow(data[:, idx][:, :, idx].mean(0), 
-    images.append(ax.imshow(data[:, :, idx][:, :, :, idx].mean((0, 1)), 
+for ax, data, title in zip(axs.flat, [all_patterns, all_randoms], ["pattern", "random"]):
+# for ax, data, title in zip(axs.flat, [patterns, randoms], ["pattern", "random"]):
+    images.append(ax.imshow(data[:, idx][:, :, idx].mean(0), 
+    # images.append(ax.imshow(data[:, :, idx][:, :, :, idx].mean((0, 1)), 
                             norm=norm,
                             interpolation="lanczos",
                             origin="lower",
@@ -134,10 +134,10 @@ for ax, data, title in zip(axs.flat, [patterns, randoms], ["pattern", "random"])
     ax.axvline(0, color="k")
     ax.axhline(0, color="k")
     xx, yy = np.meshgrid(times[idx], times[idx], copy=False, indexing='xy')
-    # pval = np.load(res_dir / "pval" / f"all_{title.lower()}-pval.npy")
-    # sig = pval < threshold
-    # ax.contour(xx, yy, sig[idx][:, idx], colors='black', levels=[0],
-    #                     linestyles='--', linewidths=1, alpha=.5)
+    pval = np.load(res_dir / "pval" / f"all_{title.lower()}-pval.npy")
+    sig = pval < threshold
+    ax.contour(xx, yy, sig, colors='black', levels=[0],
+                        linestyles='--', linewidths=1, alpha=.5)
     if title == "random":
         ax.set_xlabel("Testing time (s)", fontsize=13)
 cbar = fig.colorbar(images[0], ax=axs, orientation='vertical', fraction=.1, ticks=[0.18, 0.32])
@@ -149,6 +149,7 @@ plt.close()
 ### plot contrast ###
 contrasts = all_patterns - all_randoms
 pval_cont = np.load(res_dir / "pval" / "all_contrast-pval.npy")
+
 rhos = np.load(res_dir / "corr" / "rhos_learn.npy")
 pval_rhos = np.load(res_dir / "corr" / "pval_learn-pval.npy")
 # plt.rcParams.update({'font.size': 12, 'font.family': 'serif', 'font.serif': 'Arial'})
@@ -161,7 +162,7 @@ pval_rhos = np.load(res_dir / "corr" / "pval_learn-pval.npy")
 # plt.fill_between(times, diag.mean(0), 0, where=sig, alpha=0.5)
 
 fig, axs = plt.subplots(2, 1, figsize=(7, 6), sharex=True, layout='constrained')
-# norm = colors.Normalize(vmin=-0.1, vmax=0.1)
+norm = colors.Normalize(vmin=-0.1, vmax=0.1)
 images = []
 for ax, data, title, pval, vmin, vmax in zip(axs.flat, [contrasts, rhos], \
     ["Contrast (Pattern - Random)", "Contrast and learning correlation"], [pval_cont, pval_rhos], [-0.05, -0.2], [0.05, 0.2]):
@@ -197,8 +198,46 @@ for ax, data, title, pval, vmin, vmax in zip(axs.flat, [contrasts, rhos], \
     ax.add_patch(rect)
     cbar = fig.colorbar(im, ax=ax, orientation='vertical', fraction=.1, ticks=[vmin, vmax])
     cbar.set_label(label, rotation=270, fontsize=13)
+
 fig.savefig(figure_dir / "contrast_corr2.pdf", transparent=True)
 plt.close()
+
+fig, ax = plt.subplots(1, 1, figsize=(7, 6), sharex=True, layout='constrained')
+norm = colors.Normalize(vmin=-0.1, vmax=0.1)
+images = []
+data, title, pval, vmin, vmax = contrasts, "Contrast (Pattern - Random)", pval_cont, -0.05, 0.05
+cmap = 'coolwarm'
+im = ax.imshow(data[:, idx][:, :, idx].mean(0), 
+                        # norm=norm,
+                        vmin=vmin,
+                        vmax=vmax,
+                        interpolation="lanczos",
+                        origin="lower",
+                        cmap=cmap,
+                        extent=times[idx][[0, -1, 0, -1]],
+                        aspect=0.5)
+ax.set_ylabel("Training time (s)", fontsize=13)
+ax.set_xticks(np.arange(-1, 3, .5))
+ax.set_yticks(np.arange(-1, 3, .5))
+ax.set_title(title, fontsize=16)
+ax.axvline(0, color="k")
+ax.axhline(0, color="k")
+xx, yy = np.meshgrid(times[idx], times[idx], copy=False, indexing='xy')
+sig = pval < threshold
+ax.contour(xx, yy, sig, colors='black', levels=[0],
+                    linestyles='--', linewidths=1, alpha=.5)
+if ax == axs.flat[-1]:
+    ax.set_xlabel("Testing time (s)", fontsize=13)
+    label = "Spearman's\nrho"
+else:
+    label = "Difference in\naccuracy"
+# Draw an empty rectangle centered on -0.25
+# rectcolor = 'black' if ax == axs.flat[0] else 'red'
+# rect = plt.Rectangle([-0.75, -0.75], 0.72, 0.68, fill=False, edgecolor=rectcolor, linestyle='-', lw=2)
+# ax.add_patch(rect)
+cbar = fig.colorbar(im, ax=ax, orientation='vertical', fraction=.1, ticks=[vmin, vmax])
+cbar.set_label(label, rotation=270, fontsize=13)
+
 
 vmin, vmax = -0.2, 0.2
 all_rhos = np.load(res_dir / "corr" / "rhos_rsa.npy")

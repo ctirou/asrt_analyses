@@ -14,7 +14,7 @@ times = np.linspace(-0.2, 0.6, 82)
 # 3. plot the mean value per block/2
 
 # win = np.where(times >= 0.2)[0]
-win = np.where((times >= 0.28) & (times <= 0.51))[0]
+win = np.where((times >= 0.3) & (times <= 0.5))[0]
 # win = np.load(FIGURES_DIR / "RSA" / "sensors" / "sig_rsa.npy")
 c1, c2 = "#5BBCD6", "#00A08A"
 
@@ -236,7 +236,6 @@ threshold = 0.05
 chance = 0.25
 cmap = ['#0173B2', '#DE8F05', '#029E73', '#D55E00', '#CC78BC', '#CA9161', '#FBAFE4', '#ECE133', '#56B4E9', '#76B041']
 
-# --------- No shuffle ---------
 # --- RSA no shuffle --- 40 trial bins ---
 all_pats, all_rands = {}, {}
 all_pats_blocks, all_rands_blocks = {}, {}
@@ -325,7 +324,7 @@ for i, (ax, label, name) in enumerate(zip(axes.flat, networks, network_names)):
 fig.suptitle("No shuffle – w/ practice bsl")
 
 # mean blocks
-idx = np.where((times >= 0.28) & (times <= 0.51))[0]
+idx = np.where((times >= 0.3) & (times <= 0.5))[0]
 fig, axes = plt.subplots(2, 5, figsize=(15, 4), sharex=True, sharey=True, layout='tight')
 for i, (ax, label) in enumerate(zip(axes.flat, dict_sig.keys())):
     ax.axhline(0, color='grey', ls="--", alpha=.5)
@@ -338,3 +337,71 @@ for i, (ax, label) in enumerate(zip(axes.flat, dict_sig.keys())):
     ax.plot(x, np.nanmean(diff, 0), alpha=1, label='Random - Pattern', zorder=10)
     ax.set_title(label, fontstyle='italic')
 fig.suptitle("Blocks – w/ practice bsl")
+
+# --------- Shuffled ---------
+# Load RSA data
+all_highs, all_lows = {}, {}
+for network in tqdm(networks):
+    if not network in all_highs:
+        all_highs[network] = []
+        all_lows[network] = []
+    for subject in subjects:        
+        # RSA stuff
+        behav_dir = op.join(HOME / 'raw_behavs' / subject)
+        sequence = get_sequence(behav_dir)
+        res_path = RESULTS_DIR / 'RSA' / 'source' / network / 'rdm_skf' / subject
+        pats, rands = [], []
+        for epoch_num in range(5):
+            pats.append(np.load(res_path / f"pat-{epoch_num}.npy"))
+            rands.append(np.load(res_path / f"rand-{epoch_num}.npy"))
+        pats = np.array(pats)
+        rands = np.array(rands)
+        high, low = get_all_high_low(pats, rands, sequence, False)
+        all_highs[network].append(high.mean(0))
+        all_lows[network].append(low.mean(0))
+    all_highs[network] = np.array(all_highs[network])
+    all_lows[network] = np.array(all_lows[network])
+    
+# --- w/o practice bsl ---
+fig, axes = plt.subplots(2, 5, figsize=(15, 4), sharex=True, sharey=True, layout='tight')
+for i, (ax, label, name) in enumerate(zip(axes.flat, networks, network_names)):
+    ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
+    ax.axhline(0, color='grey', alpha=.5)
+    diff = np.nanmean(all_lows[label][:, 1:, :], 1) - np.nanmean(all_highs[label][:, 1:, :], 1)
+    pval = decod_stats(diff, -1)
+    sig = pval < threshold
+    # Main plot
+    ax.plot(times, diff.mean(0), alpha=1, label='Random - Pattern', zorder=10, color='C7')
+    # Plot significant regions separately
+    for start, end in contiguous_regions(sig):
+        ax.plot(times[start:end], diff.mean(0)[start:end], alpha=1, zorder=10, color=cmap[i])
+    sem = np.std(diff, axis=0) / np.sqrt(len(subjects))
+    ax.fill_between(times, diff.mean(0) - sem, diff.mean(0) + sem, alpha=0.2, zorder=5, facecolor='C7')
+    # Highlight significant regions
+    ax.fill_between(times, diff.mean(0) - sem, diff.mean(0) + sem, where=sig, alpha=0.5, zorder=5, color=cmap[i])
+    ax.fill_between(times, diff.mean(0) - sem, 0, where=sig, alpha=0.3, zorder=5, facecolor=cmap[i])
+    ax.set_title(name, fontstyle='italic')
+fig.suptitle("Shuffled – w/o practice bsl")
+
+# --- w/ practice bsl ---
+fig, axes = plt.subplots(2, 5, figsize=(15, 4), sharex=True, sharey=True, layout='tight')
+for i, (ax, label, name) in enumerate(zip(axes.flat, networks, network_names)):
+    ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
+    ax.axhline(0, color='grey', alpha=.5)
+    low = np.nanmean(all_lows[label][:, 1:, :], 1) - all_lows[label][:, 0, :]
+    high = np.nanmean(all_highs[label][:, 1:, :], 1) - all_highs[label][:, 0, :]
+    diff = low - high
+    pval = decod_stats(diff, -1)
+    sig = pval < threshold
+    # Main plot
+    ax.plot(times, diff.mean(0), alpha=1, label='Random - Pattern', zorder=10, color='C7')
+    # Plot significant regions separately
+    for start, end in contiguous_regions(sig):
+        ax.plot(times[start:end], diff.mean(0)[start:end], alpha=1, zorder=10, color=cmap[i])
+    sem = np.std(diff, axis=0) / np.sqrt(len(subjects))
+    ax.fill_between(times, diff.mean(0) - sem, diff.mean(0) + sem, alpha=0.2, zorder=5, facecolor='C7')
+    # Highlight significant regions
+    ax.fill_between(times, diff.mean(0) - sem, diff.mean(0) + sem, where=sig, alpha=0.5, zorder=5, color=cmap[i])
+    ax.fill_between(times, diff.mean(0) - sem, 0, where=sig, alpha=0.3, zorder=5, facecolor=cmap[i])
+    ax.set_title(name, fontstyle='italic')
+fig.suptitle("Shuffled – w/ practice bsl")

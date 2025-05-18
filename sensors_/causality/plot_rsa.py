@@ -5,7 +5,7 @@ from tqdm.auto import tqdm
 import matplotlib.pyplot as plt
 import pandas as pd
 
-subjects = ALL_SUBJS
+subjects = SUBJS15
 lock = 'stim'
 
 times = np.linspace(-0.2, 0.6, 82)
