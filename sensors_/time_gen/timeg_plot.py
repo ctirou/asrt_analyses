@@ -143,8 +143,8 @@ for ax, data, title in zip(axs.flat, [all_patterns, all_randoms], ["pattern", "r
 cbar = fig.colorbar(images[0], ax=axs, orientation='vertical', fraction=.1, ticks=[0.18, 0.32])
 cbar.set_label("\nAccuracy", rotation=270, fontsize=13)
 
-fig.savefig(figure_dir / "pattern_random.pdf", transparent=True)
-plt.close()
+# fig.savefig(figure_dir / "pattern_random.pdf", transparent=True)
+# plt.close()
 
 ### plot contrast ###
 contrasts = all_patterns - all_randoms
@@ -199,8 +199,8 @@ for ax, data, title, pval, vmin, vmax in zip(axs.flat, [contrasts, rhos], \
     cbar = fig.colorbar(im, ax=ax, orientation='vertical', fraction=.1, ticks=[vmin, vmax])
     cbar.set_label(label, rotation=270, fontsize=13)
 
-fig.savefig(figure_dir / "contrast_corr2.pdf", transparent=True)
-plt.close()
+# fig.savefig(figure_dir / "contrast_corr2.pdf", transparent=True)
+# plt.close()
 
 fig, ax = plt.subplots(1, 1, figsize=(7, 6), sharex=True, layout='constrained')
 norm = colors.Normalize(vmin=-0.1, vmax=0.1)
@@ -237,7 +237,6 @@ else:
 # ax.add_patch(rect)
 cbar = fig.colorbar(im, ax=ax, orientation='vertical', fraction=.1, ticks=[vmin, vmax])
 cbar.set_label(label, rotation=270, fontsize=13)
-
 
 vmin, vmax = -0.2, 0.2
 all_rhos = np.load(res_dir / "corr" / "rhos_rsa.npy")
