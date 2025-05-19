@@ -13,8 +13,9 @@ times = np.linspace(-0.2, 0.6, 82)
 # 1. find out why changes between get_all_high_low and get_all_high_low_blocks
 # 3. plot the mean value per block/2
 
-# win = np.where(times >= 0.2)[0]
+# win = np.where((times >= 0.28) & (times <= 0.51))[0]
 win = np.where((times >= 0.3) & (times <= 0.5))[0]
+# win = np.where(times >= 0.2)[0]
 # win = np.load(FIGURES_DIR / "RSA" / "sensors" / "sig_rsa.npy")
 c1, c2 = "#5BBCD6", "#00A08A"
 
@@ -57,8 +58,8 @@ for subject in tqdm(subjects):
                 pattern_blocks[i][j] = np.mean(pattern_blocks[3], 0).copy()
                 random_blocks[i][j] = np.mean(random_blocks[3], 0).copy()
         for i in range(6):
-            pattern_bins[0][i] = np.mean(pattern_bins[1][:5], 0).copy()
-            random_bins[0][i] = np.mean(random_bins[1][:5], 0).copy()
+            pattern_bins[0][i] = np.mean(pattern_bins[1][:6], 0).copy()
+            random_bins[0][i] = np.mean(random_bins[1][:6], 0).copy()
             
     pattern = np.array(pattern).mean(1)
     random = np.array(random).mean(1)
@@ -271,7 +272,19 @@ for network in tqdm(networks):
                 
             pattern.append(np.nanmean(pats, 0))
             random.append(np.nanmean(rands, 0))
-                
+        
+        if subject == 'sub05':
+            for i in range(2):
+                pattern[0][i] = pattern[1][0].copy()
+                random[0][i] = random[1][0].copy()
+            for i in range(3):
+                for j in range(2):
+                    pattern_blocks[i][j] = np.mean(pattern_blocks[3], 0).copy()
+                    random_blocks[i][j] = np.mean(random_blocks[3], 0).copy()
+            for i in range(6):
+                pattern_bins[0][i] = np.mean(pattern_bins[1][:6], 0).copy()
+                random_bins[0][i] = np.mean(random_bins[1][:6], 0).copy()
+
         pattern = np.array(pattern).mean(1)
         random = np.array(random).mean(1)
         pat, rand = get_all_high_low(pattern, random, sequence, False)
@@ -325,18 +338,33 @@ fig.suptitle("No shuffle – w/ practice bsl")
 
 # mean blocks
 idx = np.where((times >= 0.3) & (times <= 0.5))[0]
-fig, axes = plt.subplots(2, 5, figsize=(15, 4), sharex=True, sharey=True, layout='tight')
-for i, (ax, label) in enumerate(zip(axes.flat, dict_sig.keys())):
+fig, axes = plt.subplots(2, 5, figsize=(15, 4), sharey=True, layout='tight')
+for i, (ax, label) in enumerate(zip(axes.flat, networks)):
     ax.axhline(0, color='grey', ls="--", alpha=.5)
-    bsl_pat = np.nanmean(all_pats_blocks[label][:, :2, idx], axis=(1, 2))
-    bsl_rand = np.nanmean(all_rands_blocks[label][:, :2, idx], axis=(1, 2))
+    bsl_pat = np.nanmean(all_pats_blocks[label][:, :3, idx], axis=(1, 2))
+    bsl_rand = np.nanmean(all_rands_blocks[label][:, :3, idx], axis=(1, 2))
     mean_pat = np.nanmean(all_pats_blocks[label][:, :, idx], axis=(-1)) - bsl_pat[:, np.newaxis]
     mean_rand = np.nanmean(all_rands_blocks[label][:, :, idx], axis=(-1)) - bsl_rand[:, np.newaxis]
     diff =  mean_rand - mean_pat
     x = np.arange(1, diff.shape[1] + 1)
-    ax.plot(x, np.nanmean(diff, 0), alpha=1, label='Random - Pattern', zorder=10)
+    ax.plot(x, np.nanmean(diff, 0), alpha=1, label='Random - Pattern', zorder=10, color=cmap[i])
     ax.set_title(label, fontstyle='italic')
 fig.suptitle("Blocks – w/ practice bsl")
+
+# mean bins
+idx = np.where((times >= 0.3) & (times <= 0.5))[0]
+fig, axes = plt.subplots(2, 5, figsize=(15, 4), sharey=True, layout='tight')
+for i, (ax, label) in enumerate(zip(axes.flat, networks)):
+    ax.axhline(0, color='grey', ls="--", alpha=.5)
+    bsl_pat = np.nanmean(all_pats_bins[label][:, :6, idx], axis=(1, 2))
+    bsl_rand = np.nanmean(all_rands_bins[label][:, :6, idx], axis=(1, 2))
+    mean_pat = np.nanmean(all_pats_bins[label][:, :, idx], axis=(-1)) - bsl_pat[:, np.newaxis]
+    mean_rand = np.nanmean(all_rands_bins[label][:, :, idx], axis=(-1)) - bsl_rand[:, np.newaxis]
+    diff =  mean_rand - mean_pat
+    x = np.arange(1, diff.shape[1] + 1)
+    ax.plot(x, np.nanmean(diff, 0), alpha=1, label='Random - Pattern', zorder=10, color=cmap[i])
+    ax.set_title(label, fontstyle='italic')
+fig.suptitle("Bins – w/ practice bsl")
 
 # --------- Shuffled ---------
 # Load RSA data
@@ -354,9 +382,15 @@ for network in tqdm(networks):
         for epoch_num in range(5):
             pats.append(np.load(res_path / f"pat-{epoch_num}.npy"))
             rands.append(np.load(res_path / f"rand-{epoch_num}.npy"))
+        
         pats = np.array(pats)
         rands = np.array(rands)
         high, low = get_all_high_low(pats, rands, sequence, False)
+
+        if subject == 'sub05':
+            high[:, 0] = all_pats_bins[label][4, 6:7].mean(1).copy()
+            low[:, 0] = all_rands_bins[label][4, 6:7].mean(1).copy()
+
         all_highs[network].append(high.mean(0))
         all_lows[network].append(low.mean(0))
     all_highs[network] = np.array(all_highs[network])

@@ -246,7 +246,34 @@ ax.set_xticklabels([str(i) for i in range(1, 24)])
 for i in range(diag_block.shape[0]):
     ax.plot(blocks, diag_block[i], alpha=0.5, color=cmap(i))
 ax.plot(blocks, diag_block.mean(0), lw=3, color='#00A08A', label='Mean')
-ax.set_ylabel('Mean RSA effect')
+ax.legend(frameon=False)
+ax.set_title('Predictive effect per block', fontstyle='italic')
+
+# mean box
+idx_timeg = np.where((times >= -0.5) & (times < 0))[0]
+box_block = []
+contrast_blocks = all_pats_blocks - all_rands_blocks
+for sub in range(len(subjects)):
+    tg = []
+    for block in range(23):
+        data = contrast_blocks[sub, block, idx_timeg, :][:, idx_timeg]
+        tg.append(data.mean())
+    box_block.append(np.array(tg))
+box_block = np.array(box_block)
+
+blocks = [i for i in range(23)]
+cmap = plt.cm.get_cmap('tab20', len(subjects))
+fig, ax = plt.subplots(1, 1, figsize=(7, 5), sharex=True, layout='tight')
+ax.axvspan(0, 2, color='grey', alpha=0.1)
+# ax.axvline(3, color='grey', linestyle='--', alpha=0.3)
+ax.spines['top'].set_visible(False)
+ax.spines['right'].set_visible(False)
+ax.axhline(0, color='grey', linestyle='-', alpha=0.5)
+ax.set_xticks(blocks)
+ax.set_xticklabels([str(i) for i in range(1, 24)])
+for i in range(box_block.shape[0]):
+    ax.plot(blocks, box_block[i], alpha=0.5, color=cmap(i))
+ax.plot(blocks, box_block.mean(0), lw=3, color='#00A08A', label='Mean')
 ax.legend(frameon=False)
 ax.set_title('Predictive effect per block', fontstyle='italic')
 
@@ -261,6 +288,18 @@ for sub in range(len(subjects)):
         tg.append(data[idx_timeg].mean())
     diag_bins.append(np.array(tg))
 diag_bins = np.array(diag_bins)
+
+# mean box
+idx_timeg = np.where((times >= -0.5) & (times < 0))[0]
+box_bins = []
+contrast_blocks = all_pats_blocks - all_rands_blocks
+for sub in range(len(subjects)):
+    tg = []
+    for block in range(23):
+        data = contrast[sub, block, idx_timeg, :][:, idx_timeg]
+        tg.append(data.mean())
+    box_bins.append(np.array(tg))
+box_bins = np.array(box_bins)
 
 blocks = [i for i in range(46)]
 cmap = plt.cm.get_cmap('tab20', len(subjects))
