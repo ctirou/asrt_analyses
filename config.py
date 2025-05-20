@@ -4,6 +4,9 @@ from pathlib import Path
 SUBJS = ['sub01', 'sub02', 'sub04', 'sub07', 'sub08', 'sub09',
          'sub10', 'sub12', 'sub13', 'sub14', 'sub15']
 
+SUBJS12 = ['sub01', 'sub02', 'sub04', 'sub07', 'sub08', 'sub09',
+           'sub10', 'sub11', 'sub12', 'sub13', 'sub14', 'sub15']
+
 SUBJS13 = ['sub01', 'sub02', 'sub03', 'sub04', 'sub06', 'sub07', 'sub08', 
            'sub09', 'sub10', 'sub12', 'sub13', 'sub14', 'sub15']
 

@@ -50,25 +50,25 @@ chance = .25
 threshold = .05
 
 idx = np.where((times >= -1.5) & (times <= 3))[0]
-ensure_dir(res_dir / "pval")
-if not op.exists(res_dir / "pval" / "all_pattern-pval.npy") or overwrite:
+ensure_dir(res_dir / "pval-all")
+if not op.exists(res_dir / "pval-all" / "all_pattern-pval.npy") or overwrite:
     print('Computing pval for all patterns')
     pval = gat_stats(all_patterns[:, idx][:, :, idx] - chance, jobs)
-    np.save(res_dir / "pval" / "all_pattern-pval.npy", pval)
-if not op.exists(res_dir / "pval" / "all_random-pval.npy") or overwrite:
+    np.save(res_dir / "pval-all" / "all_pattern-pval.npy", pval)
+if not op.exists(res_dir / "pval-all" / "all_random-pval.npy") or overwrite:
     print('Computing pval for all randoms')
     pval = gat_stats(all_randoms[:, idx][:, :, idx] - chance, jobs)
-    np.save(res_dir / "pval" / "all_random-pval.npy", pval)
-if not op.exists(res_dir / "pval" / "all_contrast-pval.npy") or overwrite:
+    np.save(res_dir / "pval-all" / "all_random-pval.npy", pval)
+if not op.exists(res_dir / "pval-all" / "all_contrast-pval.npy") or overwrite:
     print('Computing pval for all contrasts')
     contrasts = all_patterns - all_randoms
     pval = gat_stats(contrasts[:, idx][:, :, idx], jobs)
-    np.save(res_dir / "pval" / "all_contrast-pval.npy", pval)
+    np.save(res_dir / "pval-all" / "all_contrast-pval.npy", pval)
 
 filt = np.where((times >= -1.5) & (times <= 3))[0]
 # save learn df x time gen correlation and pvals
-ensure_dir(res_dir / "corr")
-if not op.exists(res_dir / "corr" / "rhos_learn.npy") or overwrite:
+ensure_dir(res_dir / "corr-all")
+if not op.exists(res_dir / "corr-all" / "rhos_learn.npy") or overwrite:
     contrasts = patterns - randoms
     contrasts = contrasts[:, :, filt][:, :, :, filt]
     contrasts = zscore(contrasts, axis=-1)
@@ -82,7 +82,8 @@ if not op.exists(res_dir / "corr" / "rhos_learn.npy") or overwrite:
             rhos[t, g] = results[idx]
         all_rhos.append(rhos)
     all_rhos = np.array(all_rhos)
-    np.save(res_dir / "corr" / "rhos_learn.npy", all_rhos)
+    np.save(res_dir / "corr-all" / "rhos_learn.npy", all_rhos)
+    all_rhos = np.load(res_dir / "corr-all" / "rhos_learn.npy")
     pval = gat_stats(all_rhos, -1)
     np.save(res_dir / "corr" / "pval_learn-pval.npy", pval)
 
@@ -134,7 +135,7 @@ for ax, data, title in zip(axs.flat, [all_patterns, all_randoms], ["pattern", "r
     ax.axvline(0, color="k")
     ax.axhline(0, color="k")
     xx, yy = np.meshgrid(times[idx], times[idx], copy=False, indexing='xy')
-    pval = np.load(res_dir / "pval" / f"all_{title.lower()}-pval.npy")
+    pval = np.load(res_dir / "pval-all" / f"all_{title.lower()}-pval.npy")
     sig = pval < threshold
     ax.contour(xx, yy, sig, colors='black', levels=[0],
                         linestyles='--', linewidths=1, alpha=.5)
@@ -143,15 +144,15 @@ for ax, data, title in zip(axs.flat, [all_patterns, all_randoms], ["pattern", "r
 cbar = fig.colorbar(images[0], ax=axs, orientation='vertical', fraction=.1, ticks=[0.18, 0.32])
 cbar.set_label("\nAccuracy", rotation=270, fontsize=13)
 
-# fig.savefig(figure_dir / "pattern_random.pdf", transparent=True)
-# plt.close()
+fig.savefig(figure_dir / "pattern_random.pdf", transparent=True)
+plt.close()
 
 ### plot contrast ###
 contrasts = all_patterns - all_randoms
-pval_cont = np.load(res_dir / "pval" / "all_contrast-pval.npy")
+pval_cont = np.load(res_dir / "pval-all" / "all_contrast-pval.npy")
 
-rhos = np.load(res_dir / "corr" / "rhos_learn.npy")
-pval_rhos = np.load(res_dir / "corr" / "pval_learn-pval.npy")
+rhos = np.load(res_dir / "corr-all" / "rhos_learn.npy")
+pval_rhos = np.load(res_dir / "corr-all" / "pval_learn-pval.npy")
 # plt.rcParams.update({'font.size': 12, 'font.family': 'serif', 'font.serif': 'Arial'})
 
 # diag = np.array([np.diag(coco) for coco in rhos])
@@ -199,8 +200,8 @@ for ax, data, title, pval, vmin, vmax in zip(axs.flat, [contrasts, rhos], \
     cbar = fig.colorbar(im, ax=ax, orientation='vertical', fraction=.1, ticks=[vmin, vmax])
     cbar.set_label(label, rotation=270, fontsize=13)
 
-# fig.savefig(figure_dir / "contrast_corr2.pdf", transparent=True)
-# plt.close()
+fig.savefig(figure_dir / "contrast_corr.pdf", transparent=True)
+plt.close()
 
 fig, ax = plt.subplots(1, 1, figsize=(7, 6), sharex=True, layout='constrained')
 norm = colors.Normalize(vmin=-0.1, vmax=0.1)

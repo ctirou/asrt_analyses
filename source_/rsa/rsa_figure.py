@@ -21,9 +21,8 @@ analysis = 'pat_high_rdm_high'
 jobs = -1
 
 data_path = DATA_DIR
-subjects, epochs_list = SUBJS, EPOCHS
+subjects, epochs_list = SUBJS15, EPOCHS
 subjects_dir = FREESURFER_DIR
-trial_type = 'all'
 
 # get times
 times = np.linspace(-0.2, 0.6, 82)
@@ -33,62 +32,59 @@ timesg = np.linspace(-1.5, 1.5, 307)
 networks = NETWORKS + ['Cerebellum-Cortex']
 network_names = NETWORK_NAMES + ['Cerebellum']
 
-figures_dir = FIGURES_DIR / "RSA" / "source" / lock
-ensure_dir(figures_dir)
-
-decoding = {}
-
-pattern = {}
-random = {}
-time_filter = np.where((timesg >= -0.2) & (timesg <= 0.6))[0]
+figures_dir = ensured(FIGURES_DIR / "RSA" / "source")
+# --------- Shuffled ---------
+# Load RSA data
+filt = np.where((timesg >= -0.2) & (timesg <= 0.6))[0]
 all_highs, all_lows = {}, {}
 diff_sess = {}
-for network in networks:
-    print(f"Processing {network}...")
-    if not network in decoding:
-        decoding[network] = []
-        
-        pattern[network] = []
-        random[network] = []
-        
-        all_highs[network] = []
-        all_lows[network] = []
+pattern, random = {}, {}
+for network in tqdm(networks):
+    if not network in all_highs:
+        all_highs[network], all_lows[network] = [], []
         diff_sess[network] = []
-    
+        pattern[network], random[network] = [], []
     for subject in subjects:        
-        
-        ### Decoding ###
-        # Pattern                
-        pat = np.load(TIMEG_DATA_DIR / 'results' / 'source' / 'max-power' / network / 'pattern' / f"{subject}-all-scores.npy")
-        pat = np.diag(pat)[time_filter]
-        pattern[network].append(pat)
-        # Random
-        rand = np.load(TIMEG_DATA_DIR / 'results' / 'source' / 'max-power' / network / 'random' / f"{subject}-all-scores.npy")
-        rand = np.diag(rand)[time_filter]
-        random[network].append(rand)
-        
         # RSA stuff
-        behav_dir = op.join(HOME / "raw_behavs" / subject)
+        behav_dir = op.join(HOME / 'raw_behavs' / subject)
         sequence = get_sequence(behav_dir)
-        res_path = RESULTS_DIR / 'RSA' / 'source' / network / lock / 'power_rdm_fixed' / subject
-        high, low = get_all_high_low(res_path, sequence, analysis, cv=True)    
-        all_highs[network].append(high)    
+        res_path = RESULTS_DIR / 'RSA' / 'source' / network / 'rdm_skf' / subject
+        pats, rands = [], []
+        for epoch_num in range(5):
+            pats.append(np.load(res_path / f"pat-{epoch_num}.npy"))
+            rands.append(np.load(res_path / f"rand-{epoch_num}.npy"))
+        pats = np.array(pats)
+        rands = np.array(rands)
+        high, low = get_all_high_low(pats, rands, sequence, False)
+        high, low = np.array(high).mean(0), np.array(low).mean(0)
+        if subject == 'sub05':
+            pat_b1 = np.load(res_path / "pat-b1.npy")
+            high[0] = pat_b1.copy()
+            rand_b1 = np.load(res_path / "rand-b1.npy")
+            low[0] = rand_b1.copy()
+        
+        all_highs[network].append(high)
         all_lows[network].append(low)
-    
-    pattern[network] = np.array(pattern[network])
-    random[network] = np.array(random[network])
-    
+        # Decoding stuff
+        res_path = RESULTS_DIR / 'TIMEG' / 'source' / network / 'scores_skf' / subject
+        pat = np.diag(np.load(res_path / "pat-all.npy"))[filt]
+        rand = np.diag(np.load(res_path / "rand-all.npy"))[filt]
+        pattern[network].append(pat)
+        random[network].append(rand)
     all_highs[network] = np.array(all_highs[network])
     all_lows[network] = np.array(all_lows[network])
     
     # plot diff session by session
     for i in range(5):
-        low = all_lows[network][:, :, i, :].mean(1) - all_lows[network][:, :, 0, :].mean(1)
-        high = all_highs[network][:, :, i, :].mean(1) - all_highs[network][:, :, 0, :].mean(1)
-        diff_sess[network].append(low - high)
+        low_sess = all_lows[network][:, i, :] - all_lows[network][:, 0, :]
+        high_sess = all_highs[network][:, i, :] - all_highs[network][:, 0, :]
+        diff_sess[network].append(low_sess - high_sess)
     diff_sess[network] = np.array(diff_sess[network]).swapaxes(0, 1)
     
-learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices3.csv', sep="\t", index_col=0)
+    pattern[network] = np.array(pattern[network])
+    random[network] = np.array(random[network])
+
+learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices15.csv', sep="\t", index_col=0)
 chance = 25
 threshold = .05
 
@@ -178,7 +174,6 @@ for i, (label, name, sideA, sideB) in enumerate(zip(networks, network_names, \
     #         labels = ['Left-Cerebellum-Cortex', 'Right-Cerebellum-Cortex']
     #     brain.add_volume_labels(aseg='aseg', labels=labels, colors=cmap[i], alpha=.85, legend=False)
     
-    
     # brain.set_data_smoothing(50)
     # Capture snapshots for the desired views 
     brain.show_view('lateral', distance="auto")
@@ -245,8 +240,8 @@ for i, (label, name, j, k) in enumerate(zip(networks, network_names,  \
 for i, (label, name, j) in enumerate(zip(networks, network_names, ['B', 'E', 'H', 'K', 'N', 'Q', 'T', 'W', 'Z', 'AC'])):
     plot_onset(axd[j])
     axd[j].axhline(0, color='grey', alpha=.5)
-    high = all_highs[label][:, :, 1:, :].mean((1, 2)) - all_highs[label][:, :, 0, :].mean(1)
-    low = all_lows[label][:, :, 1:, :].mean((1, 2)) - all_lows[label][:, :, 0, :].mean(axis=1)
+    high = all_highs[label][:, 1:, :].mean(1) - all_highs[label][:, 0, :]
+    low = all_lows[label][:, 1:, :].mean(1) - all_lows[label][:, 0, :]
     diff = low - high
     p_values = decod_stats(diff, jobs)
     sig = p_values < threshold
@@ -269,7 +264,7 @@ for i, (label, name, j) in enumerate(zip(networks, network_names, ['B', 'E', 'H'
         axd[j].set_xlabel('Time (s)', fontsize=11)
     if j == 'B':
         axd[j].set_title(f'Similarity index')
-    axd[j].set_ylim(-.5, 1.5)
+    axd[j].set_ylim(-1.5, 1.5)
 
 ### Plot subject x learning index correlation ###
 for i, (label, name, j) in enumerate(zip(networks, network_names, ['C', 'F', 'I', 'L', 'O', 'R', 'U', 'X', 'AA', 'AD'])):
@@ -309,75 +304,5 @@ for i, (label, name, j) in enumerate(zip(networks, network_names, ['C', 'F', 'I'
     axd[j].set_ylim(-.5, .5)
     axd[j].set_yticks([-1, 0, 1])
 
-fig.savefig(figures_dir / f"{lock}-test-rsa_fixed.pdf", transparent=True)
-# fig.savefig(figures_dir / f"{lock}-rsa.pdf", transparent=True)
+fig.savefig(figures_dir / "rsa-final.pdf", transparent=True)
 plt.close()
-
-# # Set parameters
-# network = "Vis"
-# subdir = 'n7'
-# # Visualization parameters
-# brain_kwargs = dict(alpha=.5, background="white", cortex="low_contrast")
-# # Initialize Brain object
-# brain = mne.viz.Brain(subject=subject, hemi='both', surf='inflated', 
-#                        subjects_dir=subjects_dir, **brain_kwargs)
-# # Add labels
-# for hemi in ['lh', 'rh']:
-#     brain.add_label(f'{network}', color=cmap[0], hemi=hemi, borders=False, alpha=.85, subdir='n7')
-# # Add volume labels
-# brain.add_volume_labels(aseg='aseg', labels=['Left-Hippocampus', 'Right-Hippocampus'], colors=cmap[i], alpha=1, legend=False)
-# # Capture snapshots for the desired views
-# brain.show_view('lateral')
-# lateral_img = brain.screenshot()
-# brain.show_view('caudal')
-# caudal_img = brain.screenshot()
-# brain.close()
-# # Display images side by side using Matplotlib
-# fig, axes = plt.subplots(1, 2, figsize=(12, 6))
-# axes[0].imshow(lateral_img)
-# axes[0].axis('off')
-# axes[0].set_title('Visual\nNetwork', fontsize=14)
-# axes[1].imshow(caudal_img)
-# axes[1].axis('off')
-# plt.show()
-
-fig, axes = plt.subplots(2, 5, figsize=(20, 5), sharex=True, sharey=True, layout='tight')
-for i, (label, ax) in enumerate(zip(networks, axes.flatten())):
-    ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
-    ax.axhline(0, color='grey', alpha=.5)
-    practice = all_lows[label][:, :, 0, :].mean((0, 1)) - all_highs[label][:, :, 0, :].mean((0, 1))
-    ax.plot(times, practice, color='black', label='prac')
-    for j in range(1, 5):
-        ax.plot(times, diff_sess[label][:, j, :].mean(0), label=f"{j}")
-    ax.set_title(network_names[i])
-    if i == 0:
-        ax.legend(ncol=3, frameon=False, loc="upper left")
-fig.suptitle('Source space RSA', fontstyle='italic')
-
-win = np.where((times >= -0.28) & (times <= 0.51))[0]
-fig, axes = plt.subplots(2, 5, figsize=(20, 5), sharex=True, sharey=True, layout='tight')
-for i, (label, ax) in enumerate(zip(networks, axes.flatten())):
-    ax.set_title(network_names[i])
-    slopes, intercepts = [], []
-    alltime = []
-    for sub, _ in enumerate(subjects):
-        prac = all_lows[label][sub, :, 0, win].mean((0, -1)) - all_highs[label][sub, :, 0, win].mean((0, -1))
-        per_sub = [diff_sess[label][sub, sess, win].mean(-1) for sess in range(1, 5)]
-        aller = np.array([prac] + per_sub)
-        ax.plot([i for i in range(5)], aller, alpha=0.5)
-        # ax.plot([i for i in range(5)], aller, color=cmap[i], alpha=0.5)        
-        slope, intercept = np.polyfit([0, 1, 2, 3, 4], aller, 1)
-        slopes.append(slope)
-        intercepts.append(intercept)
-        alltime.append(aller)
-    alltime = np.array(alltime)
-    ax.plot([i for i in range(5)], alltime.mean(0), color='black', alpha=1, linewidth=4)
-    ax.plot([i for i in range(5)], np.poly1d(np.polyfit(range(5), alltime.mean(0), 1))(range(5)), color='red', linestyle='--', alpha=1, label='linear fit', linewidth=2)
-    
-    
-    slopes = np.mean(slopes)
-    intercepts = np.mean(intercepts)
-    # ax.plot([0, 4], [intercepts, slopes * 4 + intercepts], color='black', alpha=1, label='linear fit')
-    ax.legend(frameon=False, loc="lower right", title=f'Slope: {slopes:.2f}')
-
-    

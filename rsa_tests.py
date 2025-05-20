@@ -181,8 +181,13 @@ for subject in tqdm(subjects):
     high, low = get_all_high_low(pats, rands, sequence, False)
     
     if subject == 'sub05':
-        high[:, 0] = all_pats_bins[4, 6:7].mean(1).copy()
-        low[:, 0] = all_rands_bins[4, 6:7].mean(1).copy()
+        pat_block1 = all_pats_bins[4, 6:8].mean(0).copy()
+        high[:, 0] = pat_block1.copy()
+        np.save(res_path / "pat-b1.npy", pat_block1)
+        
+        rand_block1 = all_rands_bins[4, 6:8].mean(0).copy()
+        low[:, 0] = rand_block1.copy()
+        np.save(res_path / "rand-b1.npy", rand_block1)
     
     all_highs.append(high)
     all_lows.append(low)
@@ -386,44 +391,29 @@ for network in tqdm(networks):
         pats = np.array(pats)
         rands = np.array(rands)
         high, low = get_all_high_low(pats, rands, sequence, False)
+        high, low = high.mean(0), low.mean(0)
 
         if subject == 'sub05':
-            high[:, 0] = all_pats_bins[label][4, 6:7].mean(1).copy()
-            low[:, 0] = all_rands_bins[label][4, 6:7].mean(1).copy()
+            pat_block1 = all_pats_bins[network][4, 6:8].mean(0).copy()
+            np.save(res_path / "pat-b1.npy", pat_block1)
+            high[0] = pat_block1.copy()
 
-        all_highs[network].append(high.mean(0))
-        all_lows[network].append(low.mean(0))
+            rand_block1 = all_rands_bins[network][4, 6:8].mean(0).copy()
+            np.save(res_path / "rand-b1.npy", rand_block1)
+            low[0] = rand_block1.copy()
+
+        all_highs[network].append(high)
+        all_lows[network].append(low)
     all_highs[network] = np.array(all_highs[network])
     all_lows[network] = np.array(all_lows[network])
     
-# --- w/o practice bsl ---
-fig, axes = plt.subplots(2, 5, figsize=(15, 4), sharex=True, sharey=True, layout='tight')
-for i, (ax, label, name) in enumerate(zip(axes.flat, networks, network_names)):
-    ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
-    ax.axhline(0, color='grey', alpha=.5)
-    diff = np.nanmean(all_lows[label][:, 1:, :], 1) - np.nanmean(all_highs[label][:, 1:, :], 1)
-    pval = decod_stats(diff, -1)
-    sig = pval < threshold
-    # Main plot
-    ax.plot(times, diff.mean(0), alpha=1, label='Random - Pattern', zorder=10, color='C7')
-    # Plot significant regions separately
-    for start, end in contiguous_regions(sig):
-        ax.plot(times[start:end], diff.mean(0)[start:end], alpha=1, zorder=10, color=cmap[i])
-    sem = np.std(diff, axis=0) / np.sqrt(len(subjects))
-    ax.fill_between(times, diff.mean(0) - sem, diff.mean(0) + sem, alpha=0.2, zorder=5, facecolor='C7')
-    # Highlight significant regions
-    ax.fill_between(times, diff.mean(0) - sem, diff.mean(0) + sem, where=sig, alpha=0.5, zorder=5, color=cmap[i])
-    ax.fill_between(times, diff.mean(0) - sem, 0, where=sig, alpha=0.3, zorder=5, facecolor=cmap[i])
-    ax.set_title(name, fontstyle='italic')
-fig.suptitle("Shuffled – w/o practice bsl")
-
 # --- w/ practice bsl ---
 fig, axes = plt.subplots(2, 5, figsize=(15, 4), sharex=True, sharey=True, layout='tight')
 for i, (ax, label, name) in enumerate(zip(axes.flat, networks, network_names)):
     ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
     ax.axhline(0, color='grey', alpha=.5)
-    low = np.nanmean(all_lows[label][:, 1:, :], 1) - all_lows[label][:, 0, :]
-    high = np.nanmean(all_highs[label][:, 1:, :], 1) - all_highs[label][:, 0, :]
+    low = np.mean(all_lows[label][:, 1:, :], 1) - all_lows[label][:, 0, :]
+    high = np.mean(all_highs[label][:, 1:, :], 1) - all_highs[label][:, 0, :]
     diff = low - high
     pval = decod_stats(diff, -1)
     sig = pval < threshold

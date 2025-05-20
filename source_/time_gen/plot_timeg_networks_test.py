@@ -1,5 +1,5 @@
 import os
-from base import ensure_dir, gat_stats, decod_stats
+from base import ensured
 from config import *
 import os.path as op
 import matplotlib.pyplot as plt
@@ -14,15 +14,15 @@ from tqdm.auto import tqdm
 from mne.viz import Brain
 from scipy.ndimage import gaussian_filter1d
 
-data_path = TIMEG_DATA_DIR
-subjects, subjects_dir = SUBJS, FREESURFER_DIR
+data_path = DATA_DIR / 'for_timeg'
+
+subjects, subjects_dir = SUBJS15, FREESURFER_DIR
 
 lock = 'stim'
 # network and custom label_names
 n_parcels = 200
 n_networks = 7
-figures_dir = FIGURES_DIR / "time_gen" / "source" / lock
-ensure_dir(figures_dir)
+figures_dir = ensured(FIGURES_DIR / "time_gen" / "source")
 overwrite = False
 
 networks = NETWORKS + ['Cerebellum-Cortex']
@@ -30,11 +30,11 @@ network_names = NETWORK_NAMES + ['Cerebellum']
 times = np.linspace(-1.5, 1.5, 307)
 chance = .25
 threshold = .05
-res_dir = TIMEG_DATA_DIR / 'results' / 'source' / 'max-power'
+res_dir = RESULTS_DIR / 'TIMEG' / 'source'
 
 
 # Load data, compute, and save correlations and pvals 
-learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices.csv', sep="\t", index_col=0)
+learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices15.csv', sep="\t", index_col=0)
 diags = {}
 all_diags = {}
 patterns, randoms = {}, {}
@@ -54,16 +54,16 @@ for network in tqdm(networks):
         
         for j in [0, 1, 2, 3, 4]:
             
-            pat = np.load(res_dir / network / 'pattern' / f"{subject}-{j}-scores.npy")
-            rand = np.load(res_dir / network / 'random' / f"{subject}-{j}-scores.npy")
+            pat = np.load(res_dir / network / 'scores_skf' / subject / f"pat-{j}.npy")
+            rand = np.load(res_dir / network / 'scores_skf' / subject / f"rand-{j}.npy")
             patpat.append(np.array(pat))
             randrand.append(np.array(rand))
             
             d = np.array(pat) - np.array(rand)
             dd.append(np.diag(d))
     
-        all_pat.append(np.load(res_dir / network / 'pattern' / f"{subject}-all-scores.npy"))
-        all_rand.append(np.load(res_dir / network / 'random' / f"{subject}-all-scores.npy"))
+        all_pat.append(np.load(res_dir / network / 'scores_skf' / subject / "pat-all.npy"))
+        all_rand.append(np.load(res_dir / network / 'scores_skf' / subject / "rand-all.npy"))
         
         diag = np.array(all_pat) - np.array(all_rand)
         all_diag.append(np.diag(diag[i]))
@@ -170,9 +170,9 @@ for network, pattern_idx in zip(networks, ['a1', 'b1', 'c1', 'd1', 'e1', 'f1', '
     axes[pattern_idx].axhline(0, color="k", alpha=.5)
     
     xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
-    pval = np.load(res_dir / network / "pval" / "all_pattern-pval.npy")
+    pval = np.load(res_dir / network / "pval-skf" / "all_pattern-pval.npy")
     sig = pval < threshold
-    axes[pattern_idx].contour(xx, yy, sig, colors=sig_color, levels=[0], linestyles='-', linewidths=1)
+    axes[pattern_idx].contour(xx, yy, sig, colors=sig_color, levels=[0], linestyles='--', linewidths=0.5)
     axes[pattern_idx].set_ylabel("Training time (s)")
     if pattern_idx == 'k1':
         axes[pattern_idx].set_xlabel("Testing time (s)")
@@ -206,9 +206,9 @@ for network, random_idx in zip(networks, ['a2', 'b2', 'c2', 'd2', 'e2', 'f2', 'g
     axes[random_idx].set_yticklabels([])
     
     xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
-    pval = np.load(res_dir / network / "pval" / "all_random-pval.npy")
+    pval = np.load(res_dir / network / "pval-skf" / "all_random-pval.npy")
     sig = pval < threshold
-    axes[random_idx].contour(xx, yy, sig, colors=sig_color, levels=[0], linestyles='-', linewidths=1)
+    axes[random_idx].contour(xx, yy, sig, colors=sig_color, levels=[0], linestyles='--', linewidths=0.5)
     
     if random_idx == 'a2':
         axes[random_idx].set_title("Random")
@@ -237,9 +237,9 @@ for network, contrast_idx in zip(networks, ['a3', 'b3', 'c3', 'd3', 'e3', 'f3', 
     axes[contrast_idx].set_yticklabels([])
     
     xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
-    pval = np.load(res_dir / network / "pval" / "all_contrast-pval.npy")
+    pval = np.load(res_dir / network / "pval-skf" / "all_contrast-pval.npy")
     sig = pval < threshold
-    axes[contrast_idx].contour(xx, yy, sig, colors=sig_color, levels=[0], linestyles='solid', linewidths=1)
+    axes[contrast_idx].contour(xx, yy, sig, colors=sig_color, levels=[0], linestyles='--', linewidths=0.5)
         
     if contrast_idx == 'a3':
         axes[contrast_idx].set_title("Contrast (Pattern - Random)")
@@ -279,7 +279,7 @@ c2 = '#5BBCD6'  # Orange
 mean_net_significance = [ttest_1samp(data, 0)[1] < alpha for data in mean_net_sess]
 
 # axes['d'].grid(axis='y', linestyle='--', alpha=0.3)
-ymin = -0.04
+ymin = -0.03
 ymax = 0.03
 x = np.arange(len(networks))
 spacing = 0.35
@@ -338,7 +338,7 @@ axes['l'].set_aspect(0.5)
 #     if key is None:
 #         ax.set_visible(False)
 
-fig.savefig(figures_dir / "pattern_random_contrast-9.pdf", transparent=True)
+fig.savefig(figures_dir / "timeg-final.pdf", transparent=True)
 plt.close()
 
 fns = []

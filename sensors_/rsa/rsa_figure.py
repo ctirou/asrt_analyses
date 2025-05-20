@@ -8,8 +8,7 @@ from tqdm.auto import tqdm
 from base import *
 from config import *
 
-subjects = SUBJS
-subjects = ALL_SUBJS
+subjects = SUBJS15
 data_path = DATA_DIR
 metric = 'mahalanobis'
 
@@ -22,45 +21,60 @@ times = np.linspace(-0.2, 0.6, 82)
 figures_dir = FIGURES_DIR / "RSA" / "sensors"
 ensure_dir(figures_dir)
 
+timesg = np.linspace(-4, 4, 813)
+filt = np.where((timesg > -0.21) & (timesg <= 0.6))[0]
+
 all_highs, all_lows = [], []
 patterns, randoms = [], []
+# Decoding stuff
 all_decoding = {}
-
+all_decoding['pattern'] = []
+all_decoding['random'] = []
 for subject in tqdm(subjects):
     
-    res_path = RESULTS_DIR / 'RSA' / 'sensors' / lock / "cv_rdm_fixed" / subject
+    res_path = RESULTS_DIR / 'RSA' / 'sensors' / "rdm_skf" / subject
     ensure_dir(res_path)
         
     # RSA stuff
     behav_dir = op.join(HOME / 'raw_behavs' / subject)
     sequence = get_sequence(behav_dir)
-    # high, low = get_all_high_low(res_path, sequence, analysis, cv=True)    
-    # high, low = get_all_high_low_old(res_path, sequence, analysis, cv=True)
     pats, rands = [], []
     for epoch_num in range(5):
         pats.append(np.load(res_path / f"pat-{epoch_num}.npy"))
         rands.append(np.load(res_path / f"rand-{epoch_num}.npy"))
     pats = np.array(pats)
     rands = np.array(rands)
+    
     high, low = get_all_high_low(pats, rands, sequence, False)
+        
+    high = np.array(high).mean(0)
+    low = np.array(low).mean(0)
+
+    if subject == 'sub05':
+        pat_bsl = np.load(res_path / "pat-b1.npy")
+        rand_bsl = np.load(res_path / "rand-b1.npy")
+        high[0] = pat_bsl
+        low[0] = rand_bsl
+    
     all_highs.append(high)
     all_lows.append(low)
+    
     # Decoding stuff
-    for trial_type in ['pattern', 'random']:
-        res_path = RESULTS_DIR / 'RSA' / 'sensors' / lock / 'decoding' / trial_type / "no-bsling"
-        # res_path = RESULTS_DIR / 'RSA' / 'sensors' / lock / 'decoding' / trial_type
-        if not trial_type in all_decoding:
-            all_decoding[trial_type] = []
-        all_decoding[trial_type].append(np.load(res_path / f"{subject}-scores.npy"))
+    res_path = RESULTS_DIR / 'TIMEG' / 'sensors' / 'scores_skf' / subject
+    pat = np.diag(np.load(res_path / "pat-all.npy"))[filt]
+    rand = np.diag(np.load(res_path / "rand-all.npy"))[filt]
+    
+    all_decoding['pattern'].append(pat)
+    all_decoding['random'].append(rand)
 
 for trial_type in ['pattern', 'random']:
-    all_decoding[trial_type] = np.array(all_decoding[trial_type]) * 100    
+    all_decoding[trial_type] = np.array(all_decoding[trial_type]) * 100
 
 patterns = np.array(patterns)
 randoms = np.array(randoms)
 
-all_highs = np.array(all_highs).mean(1)
-all_lows = np.array(all_lows).mean(1)
+all_highs = np.array(all_highs)
+all_lows = np.array(all_lows)
 
 high = all_highs[:, 1:, :].mean(1) - all_highs[:, 0, :]
 low = all_lows[:, 1:, :].mean(1) - all_lows[:, 0, :]
@@ -70,14 +84,14 @@ diff_lh = low - high
 
 diff_sess = list()   
 for i in range(5):
-    rev_low = all_lows[:, i, :]
-    rev_high = all_highs[:, i, :]
-    # rev_low = all_lows[:, :, i, :].mean(1) - all_lows[:, :, 0, :].mean(axis=1)
-    # rev_high = all_highs[:, :, i, :].mean(1) - all_highs[:, :, 0, :].mean(axis=1)
+    # rev_low = all_lows[:, i, :]
+    # rev_high = all_highs[:, i, :]
+    rev_low = all_lows[:, i, :] - all_lows[:, 0, :]
+    rev_high = all_highs[:, i, :] - all_highs[:, 0, :]
     diff_sess.append(rev_low - rev_high)
 diff_sess = np.array(diff_sess).swapaxes(0, 1)
 
-learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices3-all.csv', sep="\t", index_col=0)
+learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices15.csv', sep="\t", index_col=0)
 chance = 25
 threshold = 0.05
 
@@ -122,7 +136,6 @@ for ax in axd.values():
         else:
             ax.axvline(0, color='black')
 ### A ### Decoding
-# Plot for subplot A
 axd['A'].axhline(chance, color='grey', alpha=0.5)
 for trial_type, color in zip(['pattern', 'random'], [cpat, crdm]):
     decoding = all_decoding[trial_type]
@@ -138,14 +151,14 @@ for trial_type, color in zip(['pattern', 'random'], [cpat, crdm]):
     # Highlight significant regions
     axd['A'].fill_between(times, decoding.mean(0) - sem, chance, where=sig, alpha=0.1, facecolor=color)
 
-axd['A'].text(0.1, 44, '$Stimulus$', fontsize=11, ha='center')
-axd['A'].text(0.6, 26, '$Chance$', fontsize=11, ha='center', va='top')
+axd['A'].text(0.1, 45.7, '$Stimulus$', fontsize=11, ha='center')
+axd['A'].text(0.6, 26.25, '$Chance$', fontsize=11, ha='center', va='top')
 axd['A'].set_ylabel('Accuracy (%)', fontsize=11)
 axd['A'].text(np.mean(times[sig]), 27, '*', fontsize=25, ha='center', va='center', color=cpat, weight='bold')
 axd['A'].text(np.mean(times[sig]), 26, '*', fontsize=25, ha='center', va='center', color=crdm, weight='bold')
 axd['A'].legend(loc='upper left', frameon=False)
 axd['A'].set_xlabel('Time (s)', fontsize=11)
-axd['A'].set_ylim(None, 45)
+axd['A'].set_ylim(None, 47)
 axd['A'].set_title(f'Decoding performance of stimuli', fontsize=13)
 axd['A'].yaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter('%.1f'))
 
@@ -196,7 +209,7 @@ axd['B2'].yaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter('%.2f')
 axd['B2'].set_xlabel('Time (s)', fontsize=11)
 axd['B2'].set_title(f'Similarity index time course', fontsize=13)
 
-# Plot for subplot D
+# Correlation with learning index
 diff_sess = zscore(diff_sess, axis=1)
 axd['D'].axhline(0, color="grey", alpha=0.5)
 all_rhos = np.array([[spear(learn_index_df.iloc[sub, :], diff_sess[sub, :, t])[0] for t in range(len(times))] for sub in range(len(subjects))])
@@ -217,7 +230,7 @@ axd['D'].text(np.mean(times[sig]), 0.1, '*', fontsize=25, ha='center', va='cente
 axd['D'].set_title(f'Similarity index and learning correlation time course', fontsize=13)
 
 cmap = plt.cm.get_cmap('tab20', len(subjects))
-# idx_rsa = np.where((times >= 0.3) & (times <= 0.5))[0]
+idx_rsa = np.where((times >= 0.3) & (times <= 0.5))[0]
 mdiff = diff_sess[:, :, idx_rsa].mean(2)
 np.save(figures_dir / "mean_rsa.npy", mdiff)
 
@@ -248,15 +261,15 @@ pval = ttest_1samp(rhos, 0)[1]
 ptext = f"p = {pval:.2f}" if pval > 0.001 else "p < 0.001"
 axd['C'].legend(frameon=False, title=ptext, loc='upper left')
 
-plt.savefig(figures_dir /  f"{lock}-rsa4.pdf", transparent=True)
+plt.savefig(figures_dir /  "rsa-final.pdf", transparent=True)
 plt.close()
 
-fig, ax = plt.subplots(1, 1, figsize=(12, 4), layout='tight')
-ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, zorder=-1, alpha=.1)
-ax.axhline(0, color='grey', alpha=0.5)
-practice = all_lows[:, :, 0, :].mean(axis=1) - all_highs[:, :, 0, :].mean(axis=1)
-ax.plot(times, practice.mean(0), label='prac', color='black')
-for j in range(1, 5):
-    ax.plot(times, diff_sess[:, j, :].mean(0), label=j)
-ax.legend(ncol=2, frameon=False)
-ax.set_title('Sensor space RSA', fontstyle='italic')
+# fig, ax = plt.subplots(1, 1, figsize=(12, 4), layout='tight')
+# ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, zorder=-1, alpha=.1)
+# ax.axhline(0, color='grey', alpha=0.5)
+# practice = all_lows[:, 0, :] - all_highs[:, 0, :]
+# ax.plot(times, practice.mean(0), label='prac', color='black')
+# for j in range(1, 5):
+#     ax.plot(times, diff_sess[:, j, :].mean(0), label=j)
+# ax.legend(ncol=2, frameon=False)
+# ax.set_title('Sensor space RSA', fontstyle='italic')
