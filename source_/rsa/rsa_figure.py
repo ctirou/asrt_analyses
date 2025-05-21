@@ -13,11 +13,6 @@ from cycler import cycler
 import seaborn as sns
 # from surfer import Brain
 
-lock = 'stim'
-# analysis = 'usual'
-analysis = 'pat_high_rdm_high'
-# analysis = 'pat_high_rdm_low'
-# analysis = 'rdm_high_rdm_low'
 jobs = -1
 
 data_path = DATA_DIR
@@ -28,7 +23,6 @@ subjects_dir = FREESURFER_DIR
 times = np.linspace(-0.2, 0.6, 82)
 timesg = np.linspace(-1.5, 1.5, 307)
 
-# labels = (SURFACE_LABELS + VOLUME_LABELS) if lock == 'stim' else (SURFACE_LABELS_RT + VOLUME_LABELS_RT)
 networks = NETWORKS + ['Cerebellum-Cortex']
 network_names = NETWORK_NAMES + ['Cerebellum']
 
@@ -91,10 +85,7 @@ threshold = .05
 def plot_onset(ax):
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
-    if lock == 'stim':
-        ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
-    else:
-        ax.axvline(0, color='black', label='Button press')
+    ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
         
 def plot_with_br_title(fig, axd, design, title, row_idx, fontsize=14):
     """Add a central title for a specific row of 'br' plots."""
@@ -236,7 +227,8 @@ for i, (label, name, j, k) in enumerate(zip(networks, network_names,  \
         axd[l].yaxis.set_major_locator(plt.MaxNLocator(nbins=2, prune='both'))
         axd[l].set_ylim(23, 50)
         
-### Plot similarity index ###    
+### Plot similarity index ###
+win = np.where((times >= 0.3) & (times <= 0.5))[0] 
 for i, (label, name, j) in enumerate(zip(networks, network_names, ['B', 'E', 'H', 'K', 'N', 'Q', 'T', 'W', 'Z', 'AC'])):
     plot_onset(axd[j])
     axd[j].axhline(0, color='grey', alpha=.5)
@@ -258,13 +250,19 @@ for i, (label, name, j) in enumerate(zip(networks, network_names, ['B', 'E', 'H'
     axd[j].set_ylabel('Sim. index', fontsize=11)
     axd[j].yaxis.set_major_formatter(FormatStrFormatter('%.1f'))
     axd[j].xaxis.set_major_formatter(FuncFormatter(lambda x, pos: f'{x:.1f}'))
-    axd[j].xaxis.set_major_locator(plt.MultipleLocator(0.2))
+    axd[j].xaxis.set_major_locator(plt.MultipleLocator(0.5))
     # axd[j].set_xticklabels([])
     if j == 'AC':
         axd[j].set_xlabel('Time (s)', fontsize=11)
     if j == 'B':
         axd[j].set_title(f'Similarity index')
-    axd[j].set_ylim(-1.5, 1.5)
+    axd[j].set_ylim(-2, 2)
+    
+    mdiff = diff[:, win].mean(1)
+    mdiff_sig = ttest_1samp(mdiff, 0)[1] < 0.05
+    if mdiff_sig:
+        axd[j].fill_between(times[win], 1.5, 1.6, facecolor=cmap[i], edgecolor=None, alpha=1)
+        axd[j].text(0.4, 1.7, '*', fontsize=20, ha='center', va='center', color=cmap[i], weight='bold')
 
 ### Plot subject x learning index correlation ###
 for i, (label, name, j) in enumerate(zip(networks, network_names, ['C', 'F', 'I', 'L', 'O', 'R', 'U', 'X', 'AA', 'AD'])):
@@ -304,5 +302,5 @@ for i, (label, name, j) in enumerate(zip(networks, network_names, ['C', 'F', 'I'
     axd[j].set_ylim(-.5, .5)
     axd[j].set_yticks([-1, 0, 1])
 
-fig.savefig(figures_dir / "rsa-final.pdf", transparent=True)
+fig.savefig(figures_dir / "rsa-final-alt.pdf", transparent=True)
 plt.close()
