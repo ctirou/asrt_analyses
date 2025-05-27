@@ -109,6 +109,7 @@ axes[1, 0].legend(frameon=False)
 if sig.any():
     idx = sig.copy()
     idx = np.where((times >= 0.28) & (times <= 0.51))[0]
+    idx = np.where((times >= 0.3) & (times <= 0.5))[0]
     pats_bins = np.nanmean(all_pats_bins[:, :, idx], (-1))
     rands_bins = np.nanmean(all_rands_bins[:, :, idx], (-1))
     diff_rp_bins = rands_bins - pats_bins
