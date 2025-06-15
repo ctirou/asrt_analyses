@@ -9,7 +9,7 @@ import seaborn as sns
 from scipy.stats import ttest_rel
 import pingouin as pg
 from config import *
-path_data = DATA_DIR
+path_data = DATA_DIR / 'for_rsa'
 # path_data = '/Users/coum/Desktop/raws/behav'
 figures = RESULTS_DIR
 

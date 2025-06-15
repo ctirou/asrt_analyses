@@ -5,6 +5,7 @@ from tqdm.auto import tqdm
 import matplotlib.pyplot as plt
 import pandas as pd
 from scipy.stats import ttest_1samp
+from scipy.ndimage import gaussian_filter1d
 
 subjects = SUBJS15
 times = np.linspace(-0.2, 0.6, 82)
@@ -160,7 +161,60 @@ if sig.any():
     # axes[2, 0].set_xticklabels(['S1', 'S2', 'S3', 'S4'])
     for txt, xpos in zip(['S1', 'S2', 'S3', 'S4'], [6, 16, 26, 36]):
         axes[2, 1].text(xpos, 1.25, txt, ha='center', va='top', fontsize=12, bbox=dict(facecolor='white', alpha=1, edgecolor='none'))
+        
+# --- RSA no shuffle --- blocks ---
+subjects = SUBJS15
+all_pats, all_rands = [], []
+all_pats_blocks, all_rands_blocks = [], []
+for subject in tqdm(subjects):
+    res_path = RESULTS_DIR / 'RSA' / 'sensors' / "rdm_blocks" / subject
+    # read behav        
+    behav_dir = op.join(HOME / 'raw_behavs' / subject)
+    sequence = get_sequence(behav_dir)
+    pattern_blocks, random_blocks = [], []
+    for epoch_num in range(5):
+        blocks = [i for i in range(1, 4)] if epoch_num == 0 else [i for i in range(5 * (epoch_num - 1) + 1, epoch_num * 5 + 1)]
+        pats, rands = [], []
+        for block in blocks:
+            pattern_blocks.append(np.load(res_path / f"pat-{epoch_num}-{block}.npy"))
+            random_blocks.append(np.load(res_path / f"rand-{epoch_num}-{block}.npy"))
+    
+    if subject == 'sub05':
+        pat_bsl = np.load(res_path / "pat-1-1.npy")
+        rand_bsl = np.load(res_path / "rand-1-1.npy")
+        for i in range(3):
+            pattern_blocks[i] = pat_bsl.copy()
+            random_blocks[i] = rand_bsl.copy()
+        
+    pattern_blocks = np.array(pattern_blocks)
+    random_blocks = np.array(random_blocks)
+    
+    high, low = get_all_high_low(pattern_blocks, random_blocks, sequence, False)
+    all_pats.append(high.mean(0))
+    all_rands.append(low.mean(0))
 
+all_pats = np.array(all_pats)
+all_rands = np.array(all_rands)
+
+bsl_pat = np.nanmean(all_pats[:, :3, :], 1)
+bsl_rand = np.nanmean(all_rands[:, :3, :], 1)
+
+pat = all_pats - bsl_pat[:, np.newaxis, :]
+rand = all_rands - bsl_rand[:, np.newaxis, :]
+diff_rp = rand - pat
+
+fig, ax = plt.subplots(figsize=(8, 4))
+blocks = np.arange(1, 24)
+idx = np.where((times >= 0.3) & (times <= 0.5))[0]
+idx = np.where((times >= 0.3) & (times <= 0.6))[0]
+ax.axvline(3, color='grey', linestyle='-', alpha=0.5)
+ax.axhline(0, color='grey', linestyle='-', alpha=0.5)
+ax.plot(blocks, np.nanmean(diff_rp[:, :, idx], axis=(0, -1)))
+# Smooth the mean curve for visualization
+smoothed = gaussian_filter1d(np.nanmean(diff_rp[:, :, idx], axis=(0, -1)), sigma=1.5)
+ax.plot(blocks, smoothed, color='red', linestyle='--', label='Smoothed')
+ax.legend()
+    
 # --- RSA shuffled --- sessions ---
 subjects = SUBJS15
 all_highs, all_lows = [], []

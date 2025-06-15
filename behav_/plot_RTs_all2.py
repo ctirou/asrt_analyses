@@ -104,7 +104,12 @@ for subject in tqdm(subjects):
 learn_index_df = pd.DataFrame.from_dict(learn_index_dict, orient='index')
 if not op.exists(figures_dir / 'behav' / 'learning_indices15.csv'):
     learn_index_df.to_csv(figures_dir / 'behav' / 'learning_indices15.csv', sep='\t')
-    
+
+from scipy.stats import ttest_1samp
+for session in range(5):
+    t_stat, p_value = ttest_1samp(learn_index_df.iloc[:, session], 0)
+    print(f"Session {session} - t-statistic: {t_stat:.3f}, p-value: {p_value:.5f}")
+
 # Save block learning indices to CSV
 learn_index_blocks_df = pd.DataFrame.from_dict(learn_index_blocks_d, orient='index')
 if not op.exists(figures_dir / 'behav' / 'learning_indices_blocks15.csv'):
@@ -183,7 +188,7 @@ axlow.set_xticklabels(['Practice', '1', '2', '3', '4'])
 axlow.set_xlabel("Session", fontsize=12)
 # Add asterisks above all mean random values
 for i, (mean_li, std_li) in enumerate(zip(learning_indices_mean, learning_indices_stderr)):
-    if i != 0:
+    if i not in [0, 1]:
         axlow.annotate('*', (sessions[i], mean_li + std_li + 3), ha='center', color='black', fontweight='bold', fontsize=12)
 # axlow.set_ylim(bottom=0)  # Set the lower limit of the y-axis to 0 to reduce the height
 # axlow.set_ylim(0, 0.3)  # Set the lower limit of the y-axis to 0 to reduce the height

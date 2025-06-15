@@ -167,21 +167,25 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                         events_stim = list()
                         keys = [12, 14, 16, 18]
                         if subject == 'sub11':
-                                triggs = [30, 32, 34, 36, 38, 40] # sub11 does not have 544 = photodiode for 32 (random high)
+                                # triggs = [30, 32, 34, 36, 38, 40] # sub11 does not have 544 = photodiode for 32 (random high)
+                                triggs = [30, 32, 34] # sub11 does not have 544 = photodiode for 32 (random high)
                                 for ii in range(len(events) - 2):
                                         cond = events[ii+1, 2] in keys if events[ii, 2] == 32 else events[ii+2, 2] in triggs
                                         if events[ii, 2] in triggs and events[ii+2, 2] in keys:
                                                 event_stim = events[ii]
                                                 # if event_stim[2] == 32:
                                                 event_stim[0] = event_stim[0] + 97 # To re-synchronize with photodiode time-samples 
-                                                event_stim[2] = {542: 30, 544: 32, 546: 34, 548: 36, 550: 38, 552: 40}.get(event_stim[2], event_stim[2])
+                                                # event_stim[2] = {542: 30, 544: 32, 546: 34, 548: 36, 550: 38, 552: 40}.get(event_stim[2], event_stim[2])
+                                                event_stim[2] = {542: 30, 544: 32, 546: 34}.get(event_stim[2], event_stim[2])
                                                 events_stim.append(event_stim)
                         else:
-                                triggs = [542, 544, 546, 548, 550, 552]
+                                # triggs = [542, 544, 546, 548, 550, 552]
+                                triggs = [542, 544, 546]
                                 for ii in range(len(events)):
                                         if events[ii, 2] in triggs and events[ii+1, 2] in keys:
                                                 event_stim = events[ii]
-                                                event_stim[2] = {542: 30, 544: 32, 546: 34, 548: 36, 550: 38, 552: 40}.get(event_stim[2], event_stim[2])
+                                                # event_stim[2] = {542: 30, 544: 32, 546: 34, 548: 36, 550: 38, 552: 40}.get(event_stim[2], event_stim[2])
+                                                event_stim[2] = {542: 30, 544: 32, 546: 34}.get(event_stim[2], event_stim[2])
                                                 events_stim.append(event_stim)
                         events_stim = np.array(events_stim)                
                 # Read behav data
