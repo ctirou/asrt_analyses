@@ -15,8 +15,8 @@ from base import ensured
 from config import *
 from joblib import Parallel, delayed
 
-data_path = TIMEG_DATA_DIR
-subjects = SUBJS
+data_path = DATA_DIR / 'for_timeg'
+subjects = SUBJS15
 lock = 'stim'
 solver = 'lbfgs'
 scoring = "accuracy"
@@ -26,8 +26,6 @@ overwrite = True
 networks = NETWORKS[:-2]
 
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
-
-res_path = data_path / 'results' / 'source' / 'max-power'
 
 def process_subject(subject, jobs):
     # define classifier
@@ -40,19 +38,16 @@ def process_subject(subject, jobs):
         
         # read labels
         lh_label, rh_label = mne.read_label(label_path / f'{network}-lh.label'), mne.read_label(label_path / f'{network}-rh.label')
-        
-        all_Xtraining_pat, all_Xtesting_pat = [], []
-        all_ytraining_pat, all_ytesting_pat = [], []
-
-        all_Xtraining_rand, all_Xtesting_rand = [], []
-        all_ytraining_rand, all_ytesting_rand = [], []
+        res_path = ensured(RESULTS_DIR / 'TIMEG' / 'source' / network / "scores_blocks" / subject)
 
         for epoch_num in [0, 1, 2, 3, 4]:
             
             # read behav
-            behav = pd.read_pickle(op.join(data_path, 'behav', f'{subject}-{epoch_num}.pkl'))
+            behav = pd.read_pickle(op.join(data_path, 'behav', f'{subject}-{epoch_num}.pkl')).reset_index(drop=True)
+            behav['trials'] = behav.index
+            
             # read epoch
-            epoch_fname = op.join(data_path, lock, f"{subject}-{epoch_num}-epo.fif")
+            epoch_fname = op.join(data_path, 'epochs', f"{subject}-{epoch_num}-epo.fif")
             big_epoch = mne.read_epochs(epoch_fname, verbose=verbose, preload=True).crop(-1.5, 1.5)
                             
             filter = behav.trialtypes == 2
@@ -69,7 +64,7 @@ def process_subject(subject, jobs):
             rank = mne.compute_rank(data_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)
             
             # read forward solution
-            fwd_fname = TIMEG_DATA_DIR / "fwd" / f"{subject}-{epoch_num}-fwd.fif"
+            fwd_fname = RESULTS_DIR / "fwd" / "for_timeg" / f"{subject}-{epoch_num}-fwd.fif"
             fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
                     
             # compute source estimates
@@ -82,118 +77,65 @@ def process_subject(subject, jobs):
             del epoch, noise_cov, data_cov, fwd, filters
             gc.collect()
 
-            stcs_data = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs])
-            assert len(stcs_data) == len(behav), "Length mismatch"
+            data = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs])
+            assert len(data) == len(behav), "Length mismatch"
             
             del stcs
             gc.collect()
             
-            blocks = np.unique(behav["blocks"])
+            blocks = np.unique(behav["blocks"])        
             
-            Xtraining_pat, Xtesting_pat, ytraining_pat, ytesting_pat = [], [], [], []
-            Xtraining_rand, Xtesting_rand, ytraining_rand, ytesting_rand = [], [], [], []
-                        
             for block in blocks:
-                
+                block = int(block)
                 this_block = behav.blocks == block
                 out_blocks = behav.blocks != block
                 
-                pattern = behav.trialtypes == 1
-                X_train = stcs_data[out_blocks & pattern]
-                y_train = behav[out_blocks & pattern].positions
-                y_train = y_train.reset_index(drop=True)
+                # pattern trials
+                pat = behav.trialtypes == 1
+                pat_this_block = pat & this_block
+                pat_out_blocks = pat & out_blocks
+                yob = behav[pat_out_blocks]
+                ytb = behav[pat_this_block]
+                Xtrain = data[yob.trials.values]
+                ytrain = yob.positions
+                Xtest = data[ytb.trials.values]
+                ytest = ytb.positions
+                assert len(Xtrain) == len(ytrain), "Xtrain and ytrain lengths do not match"
+                assert len(Xtest) == len(ytest), "Xtest and ytest lengths do not match"
                 
-                X_test = stcs_data[this_block & pattern]
-                y_test = behav[this_block & pattern].positions
-                y_test = y_test.reset_index(drop=True)
-                
-                Xtraining_pat.append(X_train)
-                Xtesting_pat.append(X_test)
-                ytraining_pat.append(y_train)
-                ytesting_pat.append(y_test)
+                clf.fit(Xtrain, ytrain)
+                if not op.exists(res_path / f"pat-{epoch_num}-{block}.npy") or overwrite:
+                    ypred = clf.predict(Xtest)
+                    print(f"Scoring pattern for {subject} epoch {epoch_num} block {block}")
+                    acc_matrix = np.apply_along_axis(lambda x: acc(ytest, x), 0, ypred)
+                    np.save(res_path / f"pat-{epoch_num}-{block}.npy", acc_matrix)
+                else:
+                    print(f"Pattern for {subject} epoch {epoch_num} block {block} already exists")
 
-                if epoch_num != 0:
-                    all_Xtraining_pat.append(X_train)
-                    all_Xtesting_pat.append(X_test)
-                    all_ytraining_pat.append(y_train)
-                    all_ytesting_pat.append(y_test)
+                # random trials        
+                rand = behav.trialtypes == 2
+                rand_this_block = rand & this_block
+                rand_out_blocks = rand & out_blocks
+                yob = behav[rand_out_blocks]
+                ytb = behav[rand_this_block]
+                Xtrain = data[yob.trials.values]
+                ytrain = yob.positions
+                Xtest = data[ytb.trials.values]
+                ytest = ytb.positions
+                assert len(Xtrain) == len(ytrain), "Xtrain and ytrain lengths do not match"
+                assert len(Xtest) == len(ytest), "Xtest and ytest lengths do not match"
                 
-                random = behav.trialtypes == 2                
-                X_train = stcs_data[out_blocks & random]
-                y_train = behav[out_blocks & random].positions
-                y_train = y_train.reset_index(drop=True)
-                
-                X_test = stcs_data[this_block & random]
-                y_test = behav[this_block & random].positions
-                y_test = y_test.reset_index(drop=True)
-                                            
-                Xtraining_rand.append(X_train)
-                Xtesting_rand.append(X_test)
-                ytraining_rand.append(y_train)
-                ytesting_rand.append(y_test)
-                
-                if epoch_num != 0:
-                    all_Xtraining_rand.append(X_train)
-                    all_Xtesting_rand.append(X_test)
-                    all_ytraining_rand.append(y_train)
-                    all_ytesting_rand.append(y_test)
+                clf.fit(Xtrain, ytrain)
+                if not op.exists(res_path / f"rand-{epoch_num}-{block}.npy") or overwrite:
+                    ypred = clf.predict(Xtest)
+                    print(f"Scoring random for {subject} epoch {epoch_num} block {block}")
+                    acc_matrix = np.apply_along_axis(lambda x: acc(ytest, x), 0, ypred)
+                    np.save(res_path / f"rand-{epoch_num}-{block}.npy", acc_matrix)
+                else:
+                    print(f"Random for {subject} epoch {epoch_num} block {block} already exists")
             
-            del stcs_data, behav
+            del data, behav
             gc.collect()
-            
-            # Fit on epoch data and test on block - pattern
-            print("Fitting on epoch data and testing on block - pattern")
-            res_dir = ensured(res_path / network / "split_pattern")
-            Xtraining_pat = np.concatenate(Xtraining_pat)
-            ytraining_pat = np.concatenate(ytraining_pat)            
-            clf.fit(Xtraining_pat, ytraining_pat)
-            for i, _ in enumerate(Xtesting_pat):
-                if not op.exists(res_dir / f"{subject}-{epoch_num}-{i+1}.npy") or overwrite:
-                    ypred = clf.predict(Xtesting_pat[i])
-                    print("Scoring...")
-                    acc_matrix = np.apply_along_axis(lambda x: acc(ytesting_pat[i], x), 0, ypred)
-                    np.save(res_dir / f"{subject}-{epoch_num}-{i+1}.npy", acc_matrix)
-
-            # Fit on epoch data and test on block - random
-            print("Fitting on epoch data and testing on block - random")
-            res_dir = ensured(res_path / network / "split_random")
-            Xtraining_rand = np.concatenate(Xtraining_rand)
-            ytraining_rand = np.concatenate(ytraining_rand)
-            clf.fit(Xtraining_rand, ytraining_rand)
-            for i, _ in enumerate(Xtesting_rand):
-                if not op.exists(res_dir / f"{subject}-{epoch_num}-{i+1}.npy") or overwrite:
-                    ypred = clf.predict(Xtesting_rand[i])
-                    print("Scoring...")
-                    acc_matrix = np.apply_along_axis(lambda x: acc(ytesting_rand[i], x), 0, ypred)
-                    np.save(res_dir / f"{subject}-{epoch_num}-{i+1}.npy", acc_matrix)
-                    
-        # Train on all data and test on block - pattern
-        print("Fitting on all data and testing on block - pattern")
-        res_dir = ensured(res_path / network / "split_all_pattern")
-        all_Xtraining_pat = np.concatenate(all_Xtraining_pat)
-        all_ytraining_pat = np.concatenate(all_ytraining_pat)
-        assert len(all_Xtraining_pat) == len(all_ytraining_pat), "Length mismatch in pattern"
-        clf.fit(all_Xtraining_pat, all_ytraining_pat)
-        for i, _ in enumerate(all_Xtesting_pat):
-            if not op.exists(res_dir / f"{subject}-{i+1}.npy") or overwrite:
-                print("Scoring pattern on block", i, network)
-                ypred = clf.predict(all_Xtesting_pat[i])
-                acc_matrix = np.apply_along_axis(lambda x: acc(all_ytesting_pat[i], x), 0, ypred)
-                np.save(res_dir / f"{subject}-{i+1}.npy", acc_matrix)
-        
-        # Train on all data and test on block - random
-        print("Fitting on all data and testing on block - random")
-        res_dir = ensured(res_path / network / "split_all_random")
-        all_Xtraining_rand = np.concatenate(all_Xtraining_rand)
-        all_ytraining_rand = np.concatenate(all_ytraining_rand)
-        assert len(all_Xtraining_rand) == len(all_ytraining_rand), "Length mismatch in random"
-        clf.fit(all_Xtraining_rand, all_ytraining_rand)
-        for i, _ in enumerate(all_Xtesting_rand):
-            if not op.exists(res_dir / f"{subject}-{i+1}.npy") or overwrite:
-                print("Scoring random on block", i+1, network)
-                ypred = clf.predict(all_Xtesting_rand[i])
-                acc_matrix = np.apply_along_axis(lambda x: acc(all_ytesting_rand[i], x), 0, ypred)
-                np.save(res_dir / f"{subject}-{i+1}.npy", acc_matrix)
 
 if is_cluster:
     try:
@@ -205,6 +147,5 @@ if is_cluster:
         print("Error: SLURM_ARRAY_TASK_ID is not set correctly or is out of bounds.")
         sys.exit(1)
 else:
-    lock = 'stim'
-    jobs = 15
+    jobs = 1
     Parallel(-1)(delayed(process_subject)(subject, jobs) for subject in subjects)

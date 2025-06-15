@@ -8,7 +8,7 @@ from config import *
 import sys
 from joblib import Parallel, delayed
 
-data_path = DATA_DIR / 'for_rsa3'
+data_path = DATA_DIR / 'for_rsa'
 subjects = SUBJS15
 overwrite = True
 verbose = True
@@ -19,7 +19,7 @@ def process_subject(subject, epoch_num, jobs, verbose):
     
     print(f"Processing {subject} - {epoch_num}")
     
-    res_path = ensured(RESULTS_DIR / 'RSA' / 'sensors' / "rdm_blocks3" / subject)
+    res_path = ensured(RESULTS_DIR / 'RSA' / 'sensors' / "rdm_blocks" / subject)
     
     # read behav        
     behav_fname = op.join(data_path, "behav/%s-%s.pkl" % (subject, epoch_num))

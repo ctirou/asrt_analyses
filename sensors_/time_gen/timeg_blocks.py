@@ -10,7 +10,6 @@ from base import ensured
 from mne import read_epochs
 from mne.decoding import GeneralizingEstimator
 from sklearn.pipeline import make_pipeline
-from sklearn.model_selection import KFold
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score as acc
@@ -52,11 +51,11 @@ def process_subject(subject, jobs):
         
         for block in blocks:
             block = int(block)
+            this_block = behav.blocks == block
+            out_blocks = behav.blocks != block
             
             # pattern trials
             pat = behav.trialtypes == 1
-            this_block = behav.blocks == block
-            out_blocks = behav.blocks != block
             pat_this_block = pat & this_block
             pat_out_blocks = pat & out_blocks
             yob = behav[pat_out_blocks]
@@ -79,8 +78,6 @@ def process_subject(subject, jobs):
 
             # random trials        
             rand = behav.trialtypes == 2
-            this_block = behav.blocks == block
-            out_blocks = behav.blocks != block
             rand_this_block = rand & this_block
             rand_out_blocks = rand & out_blocks
             yob = behav[rand_out_blocks]
