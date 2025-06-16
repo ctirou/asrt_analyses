@@ -42,7 +42,9 @@ for subject in tqdm(subjects):
         subdict[subject][i] = {"all": [],
                                "pattern": [], 
                                "random_high": [],
-                               "random_low": []}
+                               "random_low": [],
+                               'one': [],
+                               'two': []}
         
         behav_fname = path_data / subject / behav_session
         behav_df = pd.read_csv(behav_fname, sep='\t')
@@ -65,7 +67,7 @@ for subject in tqdm(subjects):
                         subdict[subject][i]["random_high"].append((behav_df['RT'][j]))
                     elif behav_df['triplet'][j] == 34:
                         random_low_RT[f'Epoch_{i}'].append(behav_df['RT'][j])
-                        subdict[subject][i]["random_low"].append((behav_df['RT'][j]))
+                        subdict[subject][i]["random_low"].append((behav_df['RT'][j]))        
             else:
                 continue
         
@@ -73,7 +75,7 @@ for subject in tqdm(subjects):
         subdict[subject][i]["pattern"] = np.mean(subdict[subject][i]["pattern"]) if subdict[subject][i]["pattern"] else np.nan
         subdict[subject][i]["random_high"] = np.mean(subdict[subject][i]["random_high"]) if subdict[subject][i]["random_high"] else np.nan
         subdict[subject][i]["random_low"] = np.mean(subdict[subject][i]["random_low"]) if subdict[subject][i]["random_low"] else np.nan
-
+        
         patterns.append(np.mean(subdict[subject][i]["pattern"]))
         randoms.append(np.mean(subdict[subject][i]["random_high"]))
         
@@ -89,16 +91,22 @@ for subject in tqdm(subjects):
             learn_index_blocks_d[subject][idx] = 0
             
             pat, rand = [], []
+            one, two = [], []
             for j, _ in enumerate(behav_df.RT):
-                if behav_df.block[j] == block and behav_df.triplet[j] == 30:
-                    # learn_index_blocks_d[subject][idx]['pattern'].append(behav_df.RTs[j])
-                    pat.append(behav_df.RT[j])
-                elif behav_df.block[j] == block and behav_df.triplet[j] == 32:
-                    # learn_index_blocks_d[subject][idx]['random_high'].append(behav_df.RTs[j])
-                    rand.append(behav_df.RT[j])
+                if behav_df.block[j] == block:
+                    if behav_df.triplet[j] == 30:
+                        pat.append(behav_df.RT[j])
+                    elif behav_df.triplet[j] == 32:
+                        rand.append(behav_df.RT[j])
+                    if i == 0:
+                        if behav_df.trialtype[j] == 1:
+                            one.append(behav_df.RT[j])
+                        elif behav_df.trialtype[j] == 2:
+                            two.append(behav_df.RT[j])
             
             index = np.mean(rand) - np.mean(pat)
-            learn_index_blocks_d[subject][idx] = index if idx not in ['01', '02', '03'] else 0
+            prac_index = np.mean(two) - np.mean(one) if i == 0 else 0
+            learn_index_blocks_d[subject][idx] = index if idx not in ['01', '02', '03'] else prac_index
                 
 # Save session learning indices to CSV
 learn_index_df = pd.DataFrame.from_dict(learn_index_dict, orient='index')
@@ -106,6 +114,7 @@ if not op.exists(figures_dir / 'behav' / 'learning_indices15.csv'):
     learn_index_df.to_csv(figures_dir / 'behav' / 'learning_indices15.csv', sep='\t')
 
 from scipy.stats import ttest_1samp
+from scipy.ndimage import gaussian_filter1d
 for session in range(5):
     t_stat, p_value = ttest_1samp(learn_index_df.iloc[:, session], 0)
     print(f"Session {session} - t-statistic: {t_stat:.3f}, p-value: {p_value:.5f}")
@@ -113,7 +122,7 @@ for session in range(5):
 # Save block learning indices to CSV
 learn_index_blocks_df = pd.DataFrame.from_dict(learn_index_blocks_d, orient='index')
 if not op.exists(figures_dir / 'behav' / 'learning_indices_blocks15.csv'):
-    learn_index_blocks_df.to_csv(figures_dir / 'behav' / 'learning_indices_blocks15.csv', sep='\t')
+    learn_index_blocks_df.to_csv(figures_dir / 'behav' / 'learning_indices_blocks.csv', sep=',')
 
 # Plot blocks performance
 block_labels = ['01', '02', '03'] + [str(i) for i in range(1, 21)]
@@ -123,6 +132,14 @@ learning_indices_mean = learn_index_blocks_df.mean(axis=0)
 learning_indices_stderr = learn_index_blocks_df.sem(axis=0)
 bar_width = 0.5  # Adjust the width of the bars
 ax.bar(block_labels, learning_indices_mean, yerr=learning_indices_stderr, alpha=0.7, capsize=5, color="#46ACC8", width=bar_width)
+# Plot a smooth curve over the bar plot using a moving average
+
+# Calculate Gaussian-smoothed curve for smoothing
+sigma = 1  # Standard deviation for Gaussian kernel; adjust for more/less smoothing
+smooth_mean = gaussian_filter1d(learning_indices_mean, sigma=sigma, mode='nearest')
+
+ax.plot(block_labels, smooth_mean, color='red', linewidth=2, label='Smoothed')
+ax.legend(frameon=False)
 ax.set_ylabel("Learning index", fontsize=12)
 ax.spines['top'].set_visible(False)
 ax.spines['right'].set_visible(False)
@@ -133,6 +150,7 @@ ax.set_xlabel("Blocks", fontsize=12)
 #         ax.annotate('*', (block_labels[i], mean_li + std_li + 0.005), ha='center', color='black', fontweight='bold', fontsize=12)
 fig.suptitle('Learning index per block', fontsize=16)
 fig.savefig(figures_dir / 'behav' / 'learning_index_blocks.pdf', transparent=True)
+plt.close(fig)
 
 # Calculate means and standard errors
 mean_all = [np.mean(all_RT[f'Epoch_{i}']) for i in range(5)]
