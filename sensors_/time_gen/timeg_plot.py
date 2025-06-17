@@ -44,7 +44,7 @@ for subject in tqdm(subjects):
 all_patterns, all_randoms = np.array(all_patterns), np.array(all_randoms)
 patterns, randoms = np.array(patterns), np.array(randoms)
 
-learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices15.csv', sep="\t", index_col=0)
+learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices.csv', sep="\t", index_col=0)
 chance = .25
 threshold = .05
 

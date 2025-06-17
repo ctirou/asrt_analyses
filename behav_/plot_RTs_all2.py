@@ -193,13 +193,13 @@ ax.xaxis.set_tick_params(labelbottom=False)  # Hide x-axis tick labels
 # create new Axes on the right and on the top of the current Axes
 divider = make_axes_locatable(ax)
 # below height and pad are in inches
-axlow = divider.append_axes("bottom", 1.2, pad=0.25, sharex=ax)
+axlow = divider.append_axes("bottom", 1.2, pad=0.4, sharex=ax)
 axlow.autoscale()
 learning_indices_mean = learn_index_df.mean(axis=0)
 learning_indices_stderr = learn_index_df.sem(axis=0)
 bar_width = 0.5  # Adjust the width of the bars
 axlow.bar(sessions, learning_indices_mean, yerr=learning_indices_stderr, alpha=0.7, capsize=5, color="#029E73", width=bar_width)
-axlow.set_ylabel("Learning index", fontsize=12)
+axlow.set_ylabel("Learning index (ms)", fontsize=12)
 axlow.spines['top'].set_visible(False)
 axlow.spines['right'].set_visible(False)
 axlow.set_xticklabels(['Practice', '1', '2', '3', '4'])
@@ -207,10 +207,10 @@ axlow.set_xlabel("Session", fontsize=12)
 # Add asterisks above all mean random values
 for i, (mean_li, std_li) in enumerate(zip(learning_indices_mean, learning_indices_stderr)):
     if i not in [0, 1]:
-        axlow.annotate('*', (sessions[i], mean_li + std_li + 3), ha='center', color='black', fontweight='bold', fontsize=12)
+        axlow.annotate('**', (sessions[i], mean_li + std_li + 3), ha='center', color='black', fontweight='bold', fontsize=14)
 # axlow.set_ylim(bottom=0)  # Set the lower limit of the y-axis to 0 to reduce the height
 # axlow.set_ylim(0, 0.3)  # Set the lower limit of the y-axis to 0 to reduce the height
 axlow.set_ylim(0, 110)  # Set the lower limit of the y-axis to 0 to reduce the height
 
-fig.savefig(figures_dir / 'behav' / 'combined_15.pdf', transparent=True)
+fig.savefig(figures_dir / 'behav' / 'combined.pdf', transparent=True)
 plt.close()
