@@ -137,7 +137,7 @@ for ax in axd.values():
             ax.axvline(0, color='black')
 ### A ### Decoding
 axd['A'].axhline(chance, color='grey', alpha=0.5)
-for trial_type, color in zip(['pattern', 'random'], [cpat, crdm]):
+for trial_type, color, ypos in zip(['pattern', 'random'], [cpat, crdm], [23, 22]):
     decoding = all_decoding[trial_type]
     p_values = decod_stats(decoding - chance, -1)
     sig = p_values < 0.05
@@ -150,16 +150,16 @@ for trial_type, color in zip(['pattern', 'random'], [cpat, crdm]):
     # axd['A'].fill_between(times, decoding.mean(0) - sem, decoding.mean(0) + sem, where=sig, alpha=0.3, zorder=10, facecolor=color, label=f'{trial_type.capitalize()}')
     # Highlight significant regions
     axd['A'].fill_between(times, decoding.mean(0) - sem, chance, where=sig, alpha=0.1, facecolor=color)
-
+    axd['A'].fill_between(times[sig], ypos, ypos+0.2, facecolor=color, alpha=1, zorder=10)
 axd['A'].text(0.1, 45.7, '$Stimulus$', fontsize=11, ha='center')
 axd['A'].text(0.6, 26.25, '$Chance$', fontsize=11, ha='center', va='top')
 axd['A'].set_ylabel('Accuracy (%)', fontsize=11)
-axd['A'].text(np.mean(times[sig]), 27, '*', fontsize=25, ha='center', va='center', color=cpat, weight='bold')
-axd['A'].text(np.mean(times[sig]), 26, '*', fontsize=25, ha='center', va='center', color=crdm, weight='bold')
+axd['A'].text(0.63, 22.65, '*', fontsize=25, ha='right', va='center', color=cpat, weight='bold')
+axd['A'].text(0.63, 21.65, '*', fontsize=25, ha='right', va='center', color=crdm, weight='bold')
 axd['A'].legend(loc='upper left', frameon=False)
 axd['A'].set_xlabel('Time (s)', fontsize=11)
 axd['A'].set_ylim(None, 47)
-axd['A'].set_title(f'Decoding performance of stimuli', fontsize=13)
+axd['A'].set_title('Decoding performance of stimuli', fontsize=13)
 axd['A'].yaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter('%.1f'))
 
 ### B1 ### cvMD
@@ -191,25 +191,27 @@ axd['B1'].set_title(f'Mahalanobis distance within pairs', fontsize=13)
 axd['B2'].axhline(0, color='grey', alpha=0.5)
 p_values = decod_stats(diff_lh, -1)
 sig = p_values < 0.05
-idx_rsa = np.where(sig)[0] # to compute mean later
-np.save(figures_dir / 'sig_rsa.npy', idx_rsa)
+axd['B2'].plot(times, diff_lh.mean(0), alpha=1, zorder=10, color='C7')
 sem = np.std(diff_lh, axis=0) / np.sqrt(len(subjects))
+axd['B2'].fill_between(times, diff_lh.mean(0) - sem, diff_lh.mean(0) + sem, alpha=0.2, zorder=5, facecolor='C7')
+# Plot significant regions separately
+for start, end in contiguous_regions(sig):
+    axd['B2'].plot(times[start:end], diff_lh.mean(0)[start:end], alpha=1, zorder=10, color=c2)
+idx_rsa = np.where(sig)[0] # to compute mean later
+# np.save(figures_dir / 'sig_rsa.npy', idx_rsa)
 # Plot the entire line in the default color
-axd['B2'].plot(times, diff_lh.mean(0), alpha=1, zorder=10, color=c2)
 # Fill the entire area with a semi-transparent color
-axd['B2'].fill_between(times, diff_lh.mean(0) - sem, diff_lh.mean(0) + sem, alpha=0.2, zorder=5, facecolor=c2)
 # Overlay significant regions with the specified color
-axd['B2'].fill_between(times, diff_lh.mean(0) - sem, 0, where=sig, alpha=0.1, zorder=10, facecolor=c2)
-# Highlight significant regions
-# axd['B2'].fill_between(times, diff_lh.mean(0) - sem, 0, where=sig, alpha=0.2, zorder=5, facecolor=c2)
+axd['B2'].fill_between(times, diff_lh.mean(0) - sem, diff_lh.mean(0) + sem, where=sig, alpha=0.4, zorder=5, facecolor=c2)
+axd['B2'].fill_between(times, diff_lh.mean(0) - sem, 0, where=sig, alpha=0.3, zorder=5, facecolor=c2)
 # axd['B2'].legend(frameon=False, loc="upper left")
 axd['B2'].text(np.mean(times[sig]), 0.1, '*', fontsize=25, ha='center', va='center', color=c2, weight='bold')
 axd['B2'].set_ylabel('Similarity index', fontsize=11)
 axd['B2'].yaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter('%.2f'))
 axd['B2'].set_xlabel('Time (s)', fontsize=11)
-axd['B2'].set_title(f'Similarity index time course', fontsize=13)
+axd['B2'].set_title('Similarity index time course', fontsize=13)
 
-# Correlation with learning index
+### D ### Correlation with learning index
 diff_sess = zscore(diff_sess, axis=1)
 axd['D'].axhline(0, color="grey", alpha=0.5)
 all_rhos = np.array([[spear(learn_index_df.iloc[sub, :], diff_sess[sub, :, t])[0] for t in range(len(times))] for sub in range(len(subjects))])
@@ -217,24 +219,26 @@ sem = np.std(all_rhos, axis=0) / np.sqrt(len(subjects))
 p_values = decod_stats(all_rhos, -1)
 sig = p_values < 0.05
 # Plot the entire line in the default color
-axd['D'].plot(times, all_rhos.mean(0), alpha=1, zorder=10, color=c6)
+axd['D'].plot(times, all_rhos.mean(0), alpha=1, zorder=10, color='C7')
 # Fill the entire area with a semi-transparent color
-axd['D'].fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, alpha=0.2, zorder=5, facecolor=c6)
+axd['D'].fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, alpha=0.2, zorder=5, facecolor='C7')
 # Overlay significant regions with the specified color
+for start, end in contiguous_regions(sig):
+    axd['D'].plot(times[start:end], all_rhos.mean(0)[start:end], alpha=1, zorder=10, color=c6)
 # Highlight significant regions
-axd['D'].fill_between(times, all_rhos.mean(0) - sem, 0, where=sig, alpha=0.1, zorder=5, facecolor=c6)
+axd['D'].fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, where=sig, alpha=0.4, zorder=10, facecolor=c6)
+axd['D'].fill_between(times, all_rhos.mean(0) - sem, 0, where=sig, alpha=0.3, zorder=5, facecolor=c6)
 axd['D'].set_ylabel("Spearman's rho", fontsize=11)
 axd['D'].set_xlabel('Time (s)', fontsize=11)
 axd['D'].text(np.mean(times[sig]), 0.1, '*', fontsize=25, ha='center', va='center', color=c6, weight='bold')
 # axd['D'].legend(frameon=False, loc="lower right")
 axd['D'].set_title(f'Similarity index and learning correlation time course', fontsize=13)
-
 cmap = plt.cm.get_cmap('tab20', len(subjects))
-idx_rsa = np.where((times >= 0.3) & (times <= 0.5))[0]
-mdiff = diff_sess[:, :, idx_rsa].mean(2)
-np.save(figures_dir / "mean_rsa.npy", mdiff)
 
 ### C2 ### Learning index fit
+idx_rsa = np.where((times >= 0.3) & (times <= 0.6))[0]
+mdiff = diff_sess[:, :, idx_rsa].mean(2)
+np.save(figures_dir / "mean_rsa.npy", mdiff)
 slopes, intercepts = [], []
 # Plot for individual subjects
 for sub, subject in enumerate(subjects):
@@ -248,20 +252,19 @@ rangee = np.linspace(mdiff.min(), mdiff.max(), 100)
 mean_slope = np.mean(slopes)
 mean_intercept = np.mean(intercepts)
 axd['C'].plot(rangee, mean_slope * rangee + mean_intercept, color='black', lw=4, label='Mean fit')
-
 axd['C'].set_xlabel('Mean similarity index', fontsize=11)
 axd['C'].set_ylabel('Learning index', fontsize=11)
 axd['C'].set_title(f'Similarity index and learning fit', fontsize=13)
-
 rhos = []
 for sub in range(len(subjects)):
     r, p = spear(mdiff[sub], learn_index_df.iloc[sub])
     rhos.append(r)
 pval = ttest_1samp(rhos, 0)[1]
+print(f"Spearman's rho: {np.mean(rhos):.2f}, p-value: {pval:.3f}")
 ptext = f"p = {pval:.2f}" if pval > 0.001 else "p < 0.001"
 axd['C'].legend(frameon=False, title=ptext, loc='upper left')
 
-plt.savefig(figures_dir /  "rsa-final.pdf", transparent=True)
+plt.savefig(figures_dir /  "rsa-final_v2.pdf", transparent=True)
 plt.close()
 
 # fig, ax = plt.subplots(1, 1, figsize=(12, 4), layout='tight')
