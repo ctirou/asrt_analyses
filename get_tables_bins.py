@@ -479,11 +479,10 @@ networks = NETWORKS + ['Cerebellum-Cortex']
 network_names = NETWORK_NAMES + ['Cerebellum']
 timesg = np.linspace(-1.5, 1.5, 307)
 idx_timeg = np.where((timesg >= -0.5) & (timesg < 0))[0]
-pats_blocks, rands_blocks = {}, {}
 cont_blocks = {}
 for network in tqdm(networks):
+    pats_blocks, rands_blocks = [], []
     if not network in pats_blocks:
-        pats_blocks[network], rands_blocks[network] = [], []
         cont_blocks[network] = []
     for subject in subjects:
         res_path = RESULTS_DIR / 'TIMEG' / 'source' / network / 'scores_blocks' / subject
@@ -499,11 +498,9 @@ for network in tqdm(networks):
             for i in range(3):
                 pattern[i] = pat_bsl.copy()
                 random[i] = rand_bsl.copy()
-        pats_blocks[network].append(np.array(pattern))
-        rands_blocks[network].append(np.array(random))
-    pats_blocks[network] = np.array(pats_blocks[network])
-    rands_blocks[network] = np.array(rands_blocks[network])
-    contrast = pats_blocks[network] - rands_blocks[network]
+        pats_blocks.append(np.array(pattern))
+        rands_blocks.append(np.array(random))
+    contrast = np.array(pats_blocks) - np.array(rands_blocks)
     box_blocks = []
     for sub in range(len(subjects)):
         tg = []

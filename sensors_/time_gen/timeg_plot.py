@@ -14,6 +14,7 @@ from matplotlib import colors
 subjects = SUBJS15
 jobs = -1
 overwrite = False
+session_on = True
 
 def compute_spearman(t, g, vector, contrasts):
     return spear(vector, contrasts[:, t, g])[0]
@@ -32,37 +33,60 @@ for subject in tqdm(subjects):
     all_patterns.append(pattern)
     random = np.load(res_dir / subject / "rand-all.npy")
     all_randoms.append(random)
-    
     pat, rand = [], []
     for i in range(5):
         pat.append(np.load(res_dir / subject / f"pat-{i}.npy"))
         rand.append(np.load(res_dir / subject / f"rand-{i}.npy"))
-    
     patterns.append(np.array(pat))
     randoms.append(np.array(rand))
-
 all_patterns, all_randoms = np.array(all_patterns), np.array(all_randoms)
 patterns, randoms = np.array(patterns), np.array(randoms)
 
-learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices.csv', sep="\t", index_col=0)
+learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices15.csv', sep="\t", index_col=0)
 chance = .25
 threshold = .05
+threshold = .01
 
 idx = np.where((times >= -1.5) & (times <= 3))[0]
-ensure_dir(res_dir / "pval-all")
-if not op.exists(res_dir / "pval-all" / "all_pattern-pval.npy") or overwrite:
+res_path = ensured(res_dir / "pval-all")
+if not op.exists(res_path/ "all_pattern-pval.npy") or overwrite:
     print('Computing pval for all patterns')
     pval = gat_stats(all_patterns[:, idx][:, :, idx] - chance, jobs)
-    np.save(res_dir / "pval-all" / "all_pattern-pval.npy", pval)
-if not op.exists(res_dir / "pval-all" / "all_random-pval.npy") or overwrite:
+    np.save(res_path/ "all_pattern-pval.npy", pval)
+if not op.exists(res_path/ "all_random-pval.npy") or overwrite:
     print('Computing pval for all randoms')
     pval = gat_stats(all_randoms[:, idx][:, :, idx] - chance, jobs)
-    np.save(res_dir / "pval-all" / "all_random-pval.npy", pval)
-if not op.exists(res_dir / "pval-all" / "all_contrast-pval.npy") or overwrite:
+    np.save(res_path/ "all_random-pval.npy", pval)
+if not op.exists(res_path/ "all_contrast-pval.npy") or overwrite:
     print('Computing pval for all contrasts')
     contrasts = all_patterns - all_randoms
     pval = gat_stats(contrasts[:, idx][:, :, idx], jobs)
-    np.save(res_dir / "pval-all" / "all_contrast-pval.npy", pval)
+    np.save(res_path/ "all_contrast-pval.npy", pval)
+
+if session_on:
+    for i in range(5):
+        # Patterns
+        if not op.exists(res_path/ f"pat-{i}-pval.npy") or overwrite:
+            print(f'Computing pval for patterns session {i}')
+            pval = gat_stats(patterns[:, i, idx][:, :, idx] - chance, jobs)
+            np.save(res_path/ f"pat-{i}-pval.npy", pval)
+        else:
+            print(f'Pattern session {i} already exists')
+        # Randoms
+        if not op.exists(res_path/ f"rand-{i}-pval.npy") or overwrite:
+            print(f'Computing pval for randoms session {i}')
+            pval = gat_stats(randoms[:, i, idx][:, :, idx] - chance, jobs)
+            np.save(res_path/ f"rand-{i}-pval.npy", pval)
+        else:
+            print(f'Random session {i} already exists')
+        # Contrast
+        if not op.exists(res_path/ f"con-{i}-pval.npy") or overwrite:
+            print(f'Computing pval for contrasts session {i}')
+            contrasts = patterns[:, i, idx][:, :, idx] - randoms[:, i, idx][:, :, idx]
+            pval = gat_stats(contrasts, jobs)
+            np.save(res_path/ f"con-{i}-pval.npy", pval)
+        else:
+            print(f'Contrast session {i} already exists')
 
 filt = np.where((times >= -1.5) & (times <= 3))[0]
 # save learn df x time gen correlation and pvals
@@ -106,12 +130,7 @@ if not op.exists(res_dir / "corr-all" / "rhos_rsa.npy") or overwrite:
     np.save(res_dir / "corr-all" / "pval_rsa-pval.npy", pval)
 
 cmap1 = "RdBu_r"
-cmap2 = "magma_r"
 cmap2 = "coolwarm"
-cmap3 = "viridis"
-cmap4 = "cividis"
-
-idx = np.where((times >= -1.5) & (times <= 3))[0]
 
 plt.rcParams.update({'font.size': 12, 'font.family': 'serif', 'font.serif': 'Arial'})
 
@@ -135,7 +154,7 @@ for ax, data, title in zip(axs.flat, [all_patterns, all_randoms], ["pattern", "r
     ax.axvline(0, color="k")
     ax.axhline(0, color="k")
     xx, yy = np.meshgrid(times[idx], times[idx], copy=False, indexing='xy')
-    pval = np.load(res_dir / "pval-all" / f"all_{title.lower()}-pval.npy")
+    pval = np.load(res_path/ f"all_{title.lower()}-pval.npy")
     sig = pval < threshold
     ax.contour(xx, yy, sig, colors='black', levels=[0],
                         linestyles='--', linewidths=1, alpha=.5)
@@ -150,7 +169,7 @@ plt.close()
 ### plot contrast ###
 contrasts = all_patterns - all_randoms
 contrasts = contrasts[:, idx][:, :, idx]
-pval_cont = np.load(res_dir / "pval-all" / "all_contrast-pval.npy")
+pval_cont = np.load(res_path/ "all_contrast-pval.npy")
 
 rhos = np.load(res_dir / "corr-all" / "rhos_learn.npy")
 pval_rhos = np.load(res_dir / "corr-all" / "pval_learn-pval.npy")
@@ -161,7 +180,6 @@ images = []
 for ax, data, title, pval, vmin, vmax in zip(axs.flat, [contrasts, rhos], \
     ["Contrast (Pattern - Random)", "Contrast and learning correlation"], [pval_cont, pval_rhos], [-0.05, -0.2], [0.05, 0.2]):
     cmap = 'coolwarm' if ax == axs.flat[0] else "BrBG"
-        
     im = ax.imshow(data.mean(0), 
                             # norm=norm,
                             vmin=vmin,
@@ -188,11 +206,13 @@ for ax, data, title, pval, vmin, vmax in zip(axs.flat, [contrasts, rhos], \
         label = "Difference in\naccuracy"
     # Draw an empty rectangle centered on -0.25
     rectcolor = 'black' if ax == axs.flat[0] else 'red'
-    rect = plt.Rectangle([-0.75, -0.75], 0.72, 0.68, fill=False, edgecolor=rectcolor, linestyle='-', lw=2)
+    rect = plt.Rectangle([-0.75, -0.75], 0.72, 0.68, fill=False, edgecolor=rectcolor, linestyle='--', lw=2)
     ax.add_patch(rect)
+    if ax == axs.flat[0]:
+        rect1 = plt.Rectangle([-0.75, 0.05], 0.72, 0.68, fill=False, edgecolor='white', linestyle='--', lw=2)
+        ax.add_patch(rect1)
     cbar = fig.colorbar(im, ax=ax, orientation='vertical', fraction=.1, ticks=[vmin, vmax])
     cbar.set_label(label, rotation=270, fontsize=13)
-
 fig.savefig(figure_dir / "contrast_corr-final.pdf", transparent=True)
 plt.close()
 
@@ -240,76 +260,150 @@ ax1.legend(frameon=False, title=textstr, loc="lower right")
 fig.savefig(figure_dir / "learn_corr-final.pdf", transparent=True)
 plt.close()
 
-all_highs, all_lows = [], []
-for subject in tqdm(subjects):
-    res_path = ensured(RESULTS_DIR / 'RSA' / 'sensors' / "rdm_skf" / subject)
-    # RSA stuff
-    behav_dir = op.join(HOME / 'raw_behavs' / subject)
-    sequence = get_sequence(behav_dir)
-    pats, rands = [], []
-    for epoch_num in range(5):
-        pats.append(np.load(res_path / f"pat-{epoch_num}.npy"))
-        rands.append(np.load(res_path / f"rand-{epoch_num}.npy"))
-    pats = np.array(pats)
-    rands = np.array(rands)
-    high, low = get_all_high_low(pats, rands, sequence, False)
-    high = np.array(high).mean(0)
-    low = np.array(low).mean(0)
-    if subject == 'sub05':
-        pat_bsl = np.load(res_path / "pat-b1.npy")
-        rand_bsl = np.load(res_path / "rand-b1.npy")
-        high[0] = pat_bsl
-        low[0] = rand_bsl
-    all_highs.append(high)
-    all_lows.append(low)
-all_highs = np.array(all_highs)
-all_lows = np.array(all_lows)
-high = all_highs[:, 1:, :].mean(1) - all_highs[:, 0, :]
-low = all_lows[:, 1:, :].mean(1) - all_lows[:, 0, :]
-diff_lh = low - high
-diff_sess = list()   
-for i in range(5):
-    rev_low = all_lows[:, i, :] - all_lows[:, 0, :]
-    rev_high = all_highs[:, i, :] - all_highs[:, 0, :]
-    diff_sess.append(rev_low - rev_high)
-diff_sess = np.array(diff_sess).swapaxes(0, 1)
+# all_highs, all_lows = [], []
+# for subject in tqdm(subjects):
+#     res_path = ensured(RESULTS_DIR / 'RSA' / 'sensors' / "rdm_skf" / subject)
+#     # RSA stuff
+#     behav_dir = op.join(HOME / 'raw_behavs' / subject)
+#     sequence = get_sequence(behav_dir)
+#     pats, rands = [], []
+#     for epoch_num in range(5):
+#         pats.append(np.load(res_path / f"pat-{epoch_num}.npy"))
+#         rands.append(np.load(res_path / f"rand-{epoch_num}.npy"))
+#     pats = np.array(pats)
+#     rands = np.array(rands)
+#     high, low = get_all_high_low(pats, rands, sequence, False)
+#     high = np.array(high).mean(0)
+#     low = np.array(low).mean(0)
+#     if subject == 'sub05':
+#         pat_bsl = np.load(res_path / "pat-b1.npy")
+#         rand_bsl = np.load(res_path / "rand-b1.npy")
+#         high[0] = pat_bsl
+#         low[0] = rand_bsl
+#     all_highs.append(high)
+#     all_lows.append(low)
+# all_highs = np.array(all_highs)
+# all_lows = np.array(all_lows)
+# high = all_highs[:, 1:, :].mean(1) - all_highs[:, 0, :]
+# low = all_lows[:, 1:, :].mean(1) - all_lows[:, 0, :]
+# diff_lh = low - high
+# diff_sess = list()   
+# for i in range(5):
+#     rev_low = all_lows[:, i, :] - all_lows[:, 0, :]
+#     rev_high = all_highs[:, i, :] - all_highs[:, 0, :]
+#     diff_sess.append(rev_low - rev_high)
+# diff_sess = np.array(diff_sess).swapaxes(0, 1)
 
-# correlation between rsa and time generalization
-times_rsa = np.linspace(-0.2, 0.6, 82)
-idx_rsa = np.where((times_rsa >= .3) & (times_rsa <= .5))[0]
-# idx_rsa = np.load("/Users/coum/MEGAsync/figures/RSA/sensors/sig_rsa.npy")
-idx_timeg = np.where((times >= -0.5) & (times < 0))[0]
-rsa = diff_sess.copy()[:, :, idx_rsa].mean(2)
-slopes, intercepts = [], []
-rhos = []
-# rsa = mean_rsa.copy()
-for sub in range(len(subjects)):
-    r, p = spear(timeg[sub], rsa[sub])
-    rhos.append(r)    
-pval = ttest_1samp(rhos, 0)[1]
+# # correlation between rsa and time generalization
+# times_rsa = np.linspace(-0.2, 0.6, 82)
+# idx_rsa = np.where((times_rsa >= .3) & (times_rsa <= .5))[0]
+# # idx_rsa = np.load("/Users/coum/MEGAsync/figures/RSA/sensors/sig_rsa.npy")
+# idx_timeg = np.where((times >= -0.5) & (times < 0))[0]
+# rsa = diff_sess.copy()[:, :, idx_rsa].mean(2)
+# slopes, intercepts = [], []
+# rhos = []
+# # rsa = mean_rsa.copy()
+# for sub in range(len(subjects)):
+#     r, p = spear(timeg[sub], rsa[sub])
+#     rhos.append(r)    
+# pval = ttest_1samp(rhos, 0)[1]
 
-fig, ax2 = plt.subplots(1, 1, figsize=(6, 3), layout='constrained')
-# Plot for individual subjects
-for sub, subject in enumerate(subjects):
-    slope, intercept = np.polyfit(timeg[sub], rsa[sub], 1)
-    ax2.scatter(timeg[sub], rsa[sub], alpha=0.3)
-    ax2.plot(timeg[sub], slope * timeg[sub] + intercept, alpha=0.6)
-    slopes.append(slope)
-    intercepts.append(intercept)
-# Plot the mean fit line over the full range of timeg
-timeg_range = np.linspace(timeg.min(), timeg.max(), 100)
-mean_slope = np.mean(slopes)
-mean_intercept = np.mean(intercepts)
-ax2.plot(timeg_range, mean_slope * timeg_range + mean_intercept, color='black', lw=4, label='Mean fit')
-ax2.set_xlabel('Average pre-stimulus contrast', fontsize=13)
-ax2.set_ylabel('Similarity index', fontsize=13)
-ax2.spines['top'].set_visible(False)
-ax2.spines['right'].set_visible(False)
-# textstr = "$p$ < 0.001" if pval < 0.001 else f'$p$ = {pval:.2e}'
-textstr = "$p$ < 0.001" if pval < 0.001 else f'$p$ = {round(pval, 2)}'
-ax2.legend(frameon=False, title=textstr, loc="lower right")
-# ax2.set_title("Correlation between mean predictive activity and mean representational similarity", fontsize=16)
-# fig.suptitle("Correlation between mean predictive activity\nand mean representational similarity", y=0.95, fontsize=16)
-ax2.set_title("Predictive activity and representational change fit", fontsize=16)
-fig.savefig(figure_dir / "rsa_corr-final.pdf", transparent=True)
-plt.close()
+# fig, ax2 = plt.subplots(1, 1, figsize=(6, 3), layout='constrained')
+# # Plot for individual subjects
+# for sub, subject in enumerate(subjects):
+#     slope, intercept = np.polyfit(timeg[sub], rsa[sub], 1)
+#     ax2.scatter(timeg[sub], rsa[sub], alpha=0.3)
+#     ax2.plot(timeg[sub], slope * timeg[sub] + intercept, alpha=0.6)
+#     slopes.append(slope)
+#     intercepts.append(intercept)
+# # Plot the mean fit line over the full range of timeg
+# timeg_range = np.linspace(timeg.min(), timeg.max(), 100)
+# mean_slope = np.mean(slopes)
+# mean_intercept = np.mean(intercepts)
+# ax2.plot(timeg_range, mean_slope * timeg_range + mean_intercept, color='black', lw=4, label='Mean fit')
+# ax2.set_xlabel('Average pre-stimulus contrast', fontsize=13)
+# ax2.set_ylabel('Similarity index', fontsize=13)
+# ax2.spines['top'].set_visible(False)
+# ax2.spines['right'].set_visible(False)
+# # textstr = "$p$ < 0.001" if pval < 0.001 else f'$p$ = {pval:.2e}'
+# textstr = "$p$ < 0.001" if pval < 0.001 else f'$p$ = {round(pval, 2)}'
+# ax2.legend(frameon=False, title=textstr, loc="lower right")
+# # ax2.set_title("Correlation between mean predictive activity and mean representational similarity", fontsize=16)
+# # fig.suptitle("Correlation between mean predictive activity\nand mean representational similarity", y=0.95, fontsize=16)
+# ax2.set_title("Predictive activity and representational change fit", fontsize=16)
+# fig.savefig(figure_dir / "rsa_corr-final.pdf", transparent=True)
+# plt.close() 
+
+# ----- Plot sessions ----- #
+
+# Patterns
+fig, axs = plt.subplots(1, 5, figsize=(20, 4), sharex=True, sharey=True, layout='tight')
+norm = colors.Normalize(vmin=0.18, vmax=0.32)
+images = []
+for i, ax in enumerate(axs.flat):
+    pval = np.load(res_path/ f"pat-{i}-pval.npy")
+    images.append(ax.imshow(patterns[:, i, idx][:, :, idx].mean(0), 
+                            norm=norm,
+                            interpolation="lanczos",
+                            origin="lower",
+                            cmap=cmap1,
+                            extent=times[idx][[0, -1, 0, -1]],
+                            aspect=0.5))
+    ax.set_title(f"Session {i+1}", fontsize=10, fontstyle="italic")
+    xx, yy = np.meshgrid(times[idx], times[idx], copy=False, indexing='xy')
+    sig = pval < threshold
+    ax.contour(xx, yy, sig, colors='black', levels=[0],
+                        linestyles='--', linewidths=1)
+    ax.axvline(0, color="k", alpha=.5)
+    ax.axhline(0, color="k", alpha=.5)
+cbar = fig.colorbar(images[0], ax=axs[-1], orientation='vertical', fraction=.1, ticks=[0.18, 0.32])
+cbar.set_label("\nAccuracy", rotation=270, fontsize=13)
+fig.suptitle("Pattern", fontsize=12)
+
+# Randoms
+fig, axs = plt.subplots(1, 5, figsize=(20, 4), sharex=True, sharey=True, layout='tight')
+images = []
+for i, ax in enumerate(axs.flat):
+    pval = np.load(res_path/ f"rand-{i}-pval.npy")
+    images.append(ax.imshow(randoms[:, i, idx][:, :, idx].mean(0), 
+                            norm=norm,
+                            interpolation="lanczos",
+                            origin="lower",
+                            cmap=cmap1,
+                            extent=times[idx][[0, -1, 0, -1]],
+                            aspect=0.5))
+    ax.set_title(f"Session {i+1}", fontsize=10, fontstyle="italic")
+    xx, yy = np.meshgrid(times[idx], times[idx], copy=False, indexing='xy')
+    sig = pval < threshold
+    ax.contour(xx, yy, sig, colors='black', levels=[0],
+                        linestyles='--', linewidths=1)
+    ax.axvline(0, color="k", alpha=.5)
+    ax.axhline(0, color="k", alpha=.5)
+cbar = fig.colorbar(images[0], ax=axs[-1], orientation='vertical', fraction=.1, ticks=[0.18, 0.32])
+cbar.set_label("\nAccuracy", rotation=270, fontsize=13)
+fig.suptitle("Random", fontsize=12)
+
+# Contrast
+fig, axs = plt.subplots(1, 5, figsize=(20, 4), sharex=True, sharey=True, layout='tight')
+norm = colors.Normalize(vmin=-0.1, vmax=0.1)
+images = []
+for i, ax in enumerate(axs.flat):
+    pval = np.load(res_path/ f"con-{i}-pval.npy")
+    contrasts = patterns - randoms
+    images.append(ax.imshow(contrasts[:, i, idx][:, :, idx].mean(0), 
+                            norm=norm,
+                            interpolation="lanczos",
+                            origin="lower",
+                            cmap=cmap2,
+                            extent=times[idx][[0, -1, 0, -1]],
+                            aspect=0.5))
+    ax.set_title(f"Session {i+1}", fontsize=10, fontstyle="italic")
+    xx, yy = np.meshgrid(times[idx], times[idx], copy=False, indexing='xy')
+    sig = pval < threshold
+    ax.contour(xx, yy, sig, colors='black', levels=[0],
+                        linestyles='--', linewidths=1)
+    ax.axvline(0, color="k", alpha=.5)
+    ax.axhline(0, color="k", alpha=.5)
+cbar = fig.colorbar(images[-1], ax=axs[-1], orientation='vertical', fraction=.1, ticks=[-0.1, 0.1])
+cbar.set_label("\nDifference in accuracy", rotation=270, fontsize=13)
+fig.suptitle("Contrast (Pattern - Random)", fontsize=12)

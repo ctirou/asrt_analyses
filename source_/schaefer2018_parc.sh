@@ -21,9 +21,9 @@ source $FREESURFER_HOME/SetUpFreeSurfer.sh
 n_parcels=200
 n_networks=7
 
-# subjects=("sub01" "sub02" "sub04" "sub07" "sub08" "sub09" "sub10" "sub12" "sub13" "sub14" "sub15")
+subjects=("sub01" "sub02" "sub04" "sub07" "sub08" "sub09" "sub10" "sub12" "sub13" "sub14" "sub15")
 
-subject="sub11"
+# subject="sub11"
 
 for subject in "${subjects[@]}"; do
     echo "### Processing $subject... ###"
