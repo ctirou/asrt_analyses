@@ -6,12 +6,11 @@ import numpy as np
 import gc
 import mne
 from mne.decoding import GeneralizingEstimator
-from mne.beamformer import make_lcmv, apply_lcmv_epochs
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score as acc
-from base import ensured
+from base import ensured, get_train_test_blocks_net
 from config import *
 from joblib import Parallel, delayed
 
@@ -48,41 +47,12 @@ def process_subject(subject, jobs):
             
             # read epoch
             epoch_fname = op.join(data_path, 'epochs', f"{subject}-{epoch_num}-epo.fif")
-            big_epoch = mne.read_epochs(epoch_fname, verbose=verbose, preload=True).crop(-1.5, 1.5)
-                            
-            filter = behav.trialtypes == 2
-            noise_epoch = big_epoch[filter]
-            noise_cov = mne.compute_covariance(noise_epoch, tmin=-0.2, tmax=0, method="empirical", rank="info", verbose=verbose)
-            epoch = big_epoch.copy().crop(-1.5, 1.5)
-            
-            del big_epoch, noise_epoch
-            gc.collect()
-            
-            # compute data covariance matrix
-            data_cov = mne.compute_covariance(epoch, method="empirical", rank="info", verbose=verbose)
-            # conpute rank
-            rank = mne.compute_rank(data_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)
+            epoch = mne.read_epochs(epoch_fname, verbose=verbose, preload=True).crop(-1.5, 1.5)
             
             # read forward solution
             fwd_fname = RESULTS_DIR / "fwd" / "for_timeg" / f"{subject}-{epoch_num}-fwd.fif"
             fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
-                    
-            # compute source estimates
-            filters = make_lcmv(epoch.info, fwd, data_cov, reg=0.05, noise_cov=noise_cov,
-                                pick_ori='max-power', weight_norm="unit-noise-gain",
-                                rank=rank, reduce_rank=True, verbose=verbose)
-                    
-            stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
-
-            del epoch, noise_cov, data_cov, fwd, filters
-            gc.collect()
-
-            data = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs])
-            assert len(data) == len(behav), "Length mismatch"
-            
-            del stcs
-            gc.collect()
-            
+                                
             blocks = np.unique(behav["blocks"])        
             
             for block in blocks:
@@ -90,40 +60,8 @@ def process_subject(subject, jobs):
                 this_block = behav.blocks == block
                 out_blocks = behav.blocks != block
                 
-                # pattern trials
-                pat = behav.trialtypes == 1
-                pat_this_block = pat & this_block
-                pat_out_blocks = pat & out_blocks
-                yob = behav[pat_out_blocks]
-                ytb = behav[pat_this_block]
-                Xtrain = data[yob.trials.values]
-                ytrain = yob.positions
-                Xtest = data[ytb.trials.values]
-                ytest = ytb.positions
-                assert len(Xtrain) == len(ytrain), "Xtrain and ytrain lengths do not match"
-                assert len(Xtest) == len(ytest), "Xtest and ytest lengths do not match"
-                
-                clf.fit(Xtrain, ytrain)
-                if not op.exists(res_path / f"pat-{epoch_num}-{block}.npy") or overwrite:
-                    ypred = clf.predict(Xtest)
-                    print(f"Scoring pattern for {subject} epoch {epoch_num} block {block}")
-                    acc_matrix = np.apply_along_axis(lambda x: acc(ytest, x), 0, ypred)
-                    np.save(res_path / f"pat-{epoch_num}-{block}.npy", acc_matrix)
-                else:
-                    print(f"Pattern for {subject} epoch {epoch_num} block {block} already exists")
-
-                # random trials        
-                rand = behav.trialtypes == 2
-                rand_this_block = rand & this_block
-                rand_out_blocks = rand & out_blocks
-                yob = behav[rand_out_blocks]
-                ytb = behav[rand_this_block]
-                Xtrain = data[yob.trials.values]
-                ytrain = yob.positions
-                Xtest = data[ytb.trials.values]
-                ytest = ytb.positions
-                assert len(Xtrain) == len(ytrain), "Xtrain and ytrain lengths do not match"
-                assert len(Xtest) == len(ytest), "Xtest and ytest lengths do not match"
+                Xtrain, ytrain, Xtest, ytest = get_train_test_blocks_net(epoch, fwd, behav, lh_label, rh_label, \
+                    'random', this_block, out_blocks, verbose=verbose)
                 
                 clf.fit(Xtrain, ytrain)
                 if not op.exists(res_path / f"rand-{epoch_num}-{block}.npy") or overwrite:
@@ -133,10 +71,28 @@ def process_subject(subject, jobs):
                     np.save(res_path / f"rand-{epoch_num}-{block}.npy", acc_matrix)
                 else:
                     print(f"Random for {subject} epoch {epoch_num} block {block} already exists")
-            
-            del data, behav
-            gc.collect()
 
+                del Xtrain, ytrain, Xtest, ytest
+                gc.collect()
+                
+                Xtrain, ytrain, Xtest, ytest = get_train_test_blocks_net(epoch, fwd, behav, lh_label, rh_label, \
+                    'pattern', this_block, out_blocks, verbose=verbose)
+                                
+                clf.fit(Xtrain, ytrain)
+                if not op.exists(res_path / f"pat-{epoch_num}-{block}.npy") or overwrite:
+                    ypred = clf.predict(Xtest)
+                    print(f"Scoring pattern for {subject} epoch {epoch_num} block {block}")
+                    acc_matrix = np.apply_along_axis(lambda x: acc(ytest, x), 0, ypred)
+                    np.save(res_path / f"pat-{epoch_num}-{block}.npy", acc_matrix)
+                else:
+                    print(f"Pattern for {subject} epoch {epoch_num} block {block} already exists")
+                
+                del Xtrain, ytrain, Xtest, ytest
+                gc.collect()
+            
+            del epoch, fwd
+            gc.collect()
+            
 if is_cluster:
     try:
         subject_num = int(os.getenv("SLURM_ARRAY_TASK_ID"))
