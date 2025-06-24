@@ -24,6 +24,7 @@ overwrite = True
 
 networks = NETWORKS[:-2]
 
+pick_ori = sys.argv[1]
 pick_ori = 'vector'
 # pick_ori = 'max-power'
 

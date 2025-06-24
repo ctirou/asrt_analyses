@@ -24,7 +24,8 @@ scoring = "accuracy"
 verbose = 'error'
 overwrite = True
 
-pick_ori = 'vector'
+pick_ori = sys.argv[1]
+# pick_ori = 'vector'
 # pick_ori = 'max-power'
 
 analysis = 'scores_blocks' + '_maxp' if pick_ori == 'max-power' else 'scores_blocks' + '_vect'
@@ -71,7 +72,7 @@ def process_subject(subject, jobs):
                 out_blocks = behav.blocks != block
                 
                 # random trials
-                stcs_train, ytrain, stcs_test, ytest = get_train_test_blocks_htc(epoch, fwd, behav, 'random', this_block, out_blocks, verbose=verbose)
+                stcs_train, ytrain, stcs_test, ytest = get_train_test_blocks_htc(epoch, fwd, behav, pick_ori, 'random', this_block, out_blocks, verbose=verbose)
                 label_tc_train, _ = get_volume_estimate_tc(stcs_train, fwd, offsets, subject, subjects_dir)
                 labels = [label for label in label_tc_train.keys() if region in label]
                 Xtrain = np.concatenate([np.real(label_tc_train[label]) for label in labels], axis=1)
@@ -96,7 +97,7 @@ def process_subject(subject, jobs):
                 gc.collect()
                 
                 # pattern trials
-                stcs_train, ytrain, stcs_test, ytest = get_train_test_blocks_htc(epoch, fwd, behav, 'pattern', this_block, out_blocks, verbose=verbose)
+                stcs_train, ytrain, stcs_test, ytest = get_train_test_blocks_htc(epoch, fwd, behav, pick_ori, 'pattern', this_block, out_blocks, verbose=verbose)
                 label_tc_train, _ = get_volume_estimate_tc(stcs_train, fwd, offsets, subject, subjects_dir)
                 labels = [label for label in label_tc_train.keys() if region in label]
                 Xtrain = np.concatenate([np.real(label_tc_train[label]) for label in labels], axis=1)
