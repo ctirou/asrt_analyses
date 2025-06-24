@@ -25,10 +25,13 @@ overwrite = True
 networks = NETWORKS[:-2]
 
 pick_ori = sys.argv[1]
-pick_ori = 'vector'
+# pick_ori = 'vector'
 # pick_ori = 'max-power'
 
+use_resting = sys.argv[2]
+
 analysis = 'scores_blocks' + '_maxp' if pick_ori == 'max-power' else 'scores_blocks' + '_vect'
+analysis += '_rs' if use_resting == 'True' else '_0200'
 
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
@@ -38,6 +41,8 @@ def process_subject(subject, jobs):
     clf = GeneralizingEstimator(clf, scoring=scoring, n_jobs=jobs)
     # network and custom label_names
     label_path = RESULTS_DIR / 'networks_200_7' / subject
+    
+    print(f"Processing subject {subject} with pick_ori={pick_ori} and use_resting={use_resting}")
 
     for network in networks:
         
@@ -63,11 +68,9 @@ def process_subject(subject, jobs):
             
             for block in blocks:
                 block = int(block)
-                this_block = behav.blocks == block
-                out_blocks = behav.blocks != block
                 
-                Xtrain, ytrain, Xtest, ytest = get_train_test_blocks_net(epoch, fwd, behav, pick_ori, lh_label, rh_label, \
-                    'random', this_block, out_blocks, verbose=verbose)
+                Xtrain, ytrain, Xtest, ytest = get_train_test_blocks_net(data_path, subject, epoch, fwd, behav, pick_ori, lh_label, rh_label, \
+                    'random', block, use_resting, verbose=verbose)
                 
                 clf.fit(Xtrain, ytrain)
                 if not op.exists(res_path / f"rand-{epoch_num}-{block}.npy") or overwrite:
@@ -81,8 +84,8 @@ def process_subject(subject, jobs):
                 del Xtrain, ytrain, Xtest, ytest
                 gc.collect()
                 
-                Xtrain, ytrain, Xtest, ytest = get_train_test_blocks_net(epoch, fwd, behav, pick_ori, lh_label, rh_label, \
-                    'pattern', this_block, out_blocks, verbose=verbose)
+                Xtrain, ytrain, Xtest, ytest = get_train_test_blocks_net(data_path, subject, epoch, fwd, behav, pick_ori, lh_label, rh_label, \
+                    'pattern', block, use_resting, verbose=verbose)
                                 
                 clf.fit(Xtrain, ytrain)
                 if not op.exists(res_path / f"pat-{epoch_num}-{block}.npy") or overwrite:
