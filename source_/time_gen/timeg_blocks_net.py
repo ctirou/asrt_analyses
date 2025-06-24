@@ -24,6 +24,11 @@ overwrite = True
 
 networks = NETWORKS[:-2]
 
+pick_ori = 'vector'
+# pick_ori = 'max-power'
+
+analysis = 'scores_blocks' + '_maxp' if pick_ori == 'max-power' else 'scores_blocks' + '_vect'
+
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
 def process_subject(subject, jobs):
@@ -37,7 +42,7 @@ def process_subject(subject, jobs):
         
         # read labels
         lh_label, rh_label = mne.read_label(label_path / f'{network}-lh.label'), mne.read_label(label_path / f'{network}-rh.label')
-        res_path = ensured(RESULTS_DIR / 'TIMEG' / 'source' / network / "scores_blocks" / subject)
+        res_path = ensured(RESULTS_DIR / 'TIMEG' / 'source' / network / analysis / subject)
 
         for epoch_num in [0, 1, 2, 3, 4]:
             
@@ -60,7 +65,7 @@ def process_subject(subject, jobs):
                 this_block = behav.blocks == block
                 out_blocks = behav.blocks != block
                 
-                Xtrain, ytrain, Xtest, ytest = get_train_test_blocks_net(epoch, fwd, behav, lh_label, rh_label, \
+                Xtrain, ytrain, Xtest, ytest = get_train_test_blocks_net(epoch, fwd, behav, pick_ori, lh_label, rh_label, \
                     'random', this_block, out_blocks, verbose=verbose)
                 
                 clf.fit(Xtrain, ytrain)
@@ -75,7 +80,7 @@ def process_subject(subject, jobs):
                 del Xtrain, ytrain, Xtest, ytest
                 gc.collect()
                 
-                Xtrain, ytrain, Xtest, ytest = get_train_test_blocks_net(epoch, fwd, behav, lh_label, rh_label, \
+                Xtrain, ytrain, Xtest, ytest = get_train_test_blocks_net(epoch, fwd, behav, pick_ori, lh_label, rh_label, \
                     'pattern', this_block, out_blocks, verbose=verbose)
                                 
                 clf.fit(Xtrain, ytrain)
