@@ -26,15 +26,13 @@ verbose = 'error'
 overwrite = False
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
-analysis = 'scores_skf'
-
-# use_resting = sys.argv[1]
-# use_vector = sys.argv[2]
+use_vector = sys.argv[1]
 use_resting = False
-use_vector = True
+# use_vector = True
 
-analysis = analysis + '_rs' if use_resting else analysis + '_0200'
-analysis = analysis + '_vect' if use_vector else analysis + '_maxp'
+analysis = 'scores_skf'
+analysis += '_rs' if use_resting else analysis + '_0200'
+analysis += '_vect' if use_vector == 'True' else analysis + '_maxp'
     
 networks = NETWORKS[:-2]
 
@@ -50,7 +48,7 @@ def process_subject(subject, jobs):
     all_epochs = []
     all_behavs = []
     
-    for epoch_num in [0, 1, 2, 3, 4]:
+    for epoch_num in [1, 2, 3, 4]:
         # read behav
         behav = pd.read_pickle(op.join(data_path, 'behav', f'{subject}-{epoch_num}.pkl'))
         # read epoch
@@ -76,7 +74,7 @@ def process_subject(subject, jobs):
     if use_resting:
         noise_cov = mne.read_cov(data_path / 'noise_cov' / f"{subject}-cov.fif", verbose=verbose)
     
-    pick_ori = 'vector' if use_vector else 'max-power'    
+    pick_ori = 'vector' if use_vector == 'True' else 'max-power'    
     
     for network in networks:
         lh_label, rh_label = mne.read_label(label_path / f'{network}-lh.label'), mne.read_label(label_path / f'{network}-rh.label')
@@ -86,14 +84,14 @@ def process_subject(subject, jobs):
         random_epochs = epochs[random.index]
 
         # random trials
-        if not os.path.exists(res_path / f"rand-{epoch_num}.npy") or overwrite:
+        if not os.path.exists(res_path / "rand-all.npy") or overwrite:
         
             acc_matrices = list()
             for i, (train_idx, test_idx) in enumerate(skf.split(random_epochs, random.positions)):
 
-                print(f"Processing {subject} epoch {epoch_num} random {network} split {i+1}")
+                print(f"Processing {subject} random {network} split {i+1}")
                 
-                # get training data
+                # training data
                 if not use_resting:
                     ensure_dir(res_path / 'noise_cov')
                     noise_cov = mne.compute_covariance(random_epochs[train_idx], tmin=-0.2, tmax=0, method="empirical", rank="info", verbose=verbose)
@@ -106,20 +104,16 @@ def process_subject(subject, jobs):
                                     rank=rank, reduce_rank=True, verbose=verbose)
                 stcs_train = apply_lcmv_epochs(random_epochs[train_idx], filters=filters, verbose=verbose)
                 Xtrain = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs_train])
-                
-                if use_vector:
+                if use_vector == 'True':
                     Xtrain = svd(Xtrain)
-                
                 ytrain = random.positions[train_idx].reset_index(drop=True)
                 assert Xtrain.shape[0] == ytrain.shape[0], "Length mismatch"
                                 
-                # get testing data
+                # testing data
                 stcs_test = apply_lcmv_epochs(random_epochs[test_idx], filters=filters, verbose=verbose)
                 Xtest = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs_test])
-                
-                if use_vector:
+                if use_vector == 'True':
                     Xtest = svd(Xtest)
-                
                 ytest = random.positions[test_idx].reset_index(drop=True)
                 assert Xtest.shape[0] == ytest.shape[0], "Length mismatch"                
                 
@@ -128,7 +122,7 @@ def process_subject(subject, jobs):
                 acc_matrix = np.apply_along_axis(lambda x: acc(ytest, x), 0, ypred)
                 acc_matrices.append(acc_matrix)
 
-            np.save(res_path / f"rand-{epoch_num}.npy", np.array(acc_matrices).mean(0))
+            np.save(res_path / "rand-all.npy", np.array(acc_matrices).mean(0))
             
             del acc_matrices, Xtrain, ytrain, Xtest, ytest, stcs_train, stcs_test
             gc.collect()
@@ -140,15 +134,15 @@ def process_subject(subject, jobs):
         pattern_epochs = epoch[pattern.index]
 
         # pattern trials
-        if not os.path.exists(res_path / f"pat-{epoch_num}.npy"):
+        if not os.path.exists(res_path / "pat-all.npy") or overwrite:
             
             acc_matrices = list()
             for i, (train_idx, test_idx) in enumerate(skf.split(pattern_epochs, pattern.positions)):
 
-                print(f"Processing {subject} epoch {epoch_num} pattern {network} split {i+1}")
+                print(f"Processing {subject} pattern {network} split {i+1}")
                 
                 # get training data - pattern trials
-                if use_resting:
+                if not use_resting:
                     noise_cov = mne.read_cov(res_path / 'noise_cov' / f'{epoch_num}-{i+1}-noise-cov.fif', verbose=verbose)
                 
                 data_cov = mne.compute_covariance(pattern_epochs[train_idx], method="empirical", rank="info", verbose=verbose)
@@ -158,16 +152,15 @@ def process_subject(subject, jobs):
                                     rank=rank, reduce_rank=True, verbose=verbose)
                 stcs_train = apply_lcmv_epochs(pattern_epochs[train_idx], filters=filters, verbose=verbose)
                 Xtrain = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs_train])
-                if use_vector:
+                if use_vector == 'True':
                     Xtrain = svd(Xtrain)
-                
                 ytrain = pattern.positions[train_idx].reset_index(drop=True)
                 assert Xtrain.shape[0] == ytrain.shape[0], "Length mismatch"
                                 
                 # get testing data - pattern trials
                 stcs_test = apply_lcmv_epochs(pattern_epochs[test_idx], filters=filters, verbose=verbose)
                 Xtest = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs_test])
-                if use_vector:
+                if use_vector == 'True':
                     Xtest = svd(Xtest)
                 
                 ytest = pattern.positions[test_idx].reset_index(drop=True)
@@ -178,7 +171,7 @@ def process_subject(subject, jobs):
                 acc_matrix = np.apply_along_axis(lambda x: acc(ytest, x), 0, ypred)
                 acc_matrices.append(acc_matrix)
 
-            np.save(res_path / f"pat-{epoch_num}.npy", np.array(acc_matrices).mean(0))
+            np.save(res_path / "pat-all.npy", np.array(acc_matrices).mean(0))
                             
             del acc_matrices, Xtrain, ytrain, Xtest, ytest, stcs_train, stcs_test
             gc.collect()
