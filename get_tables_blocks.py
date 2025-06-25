@@ -235,15 +235,23 @@ df.to_csv(FIGURES_DIR / "time_gen" / "sensors" / "timeg_blocks_sensors.csv", ind
 data_path = DATA_DIR / 'for_timeg'
 networks = NETWORKS + ['Cerebellum-Cortex']
 network_names = NETWORK_NAMES + ['Cerebellum']
+# networks = NETWORKS[:-2]
+# network_names = NETWORK_NAMES[:-2]
 timesg = np.linspace(-1.5, 1.5, 307)
 idx_timeg = np.where((timesg >= -0.5) & (timesg < 0))[0]
 cont_blocks = {}
+pat_blocks = {}
+rand_blocks = {}
 for network in tqdm(networks):
     pats_blocks, rands_blocks = [], []
-    if not network in pats_blocks:
+    if not network in pat_blocks:
         cont_blocks[network] = []
+        pat_blocks[network] = []
+        rand_blocks[network] = []
     for subject in subjects:
         res_path = RESULTS_DIR / 'TIMEG' / 'source' / network / 'scores_blocks' / subject
+        res_path = RESULTS_DIR / 'TIMEG' / 'source' / network / 'scores_blocks_vect_0200' / subject
+        res_path = RESULTS_DIR / 'TIMEG' / 'source' / network / 'scores_blocks_maxp_0200' / subject
         pattern, random = [], []
         for epoch_num in range(5):
             blocks = [i for i in range(1, 4)] if epoch_num == 0 else [i for i in range(5 * (epoch_num - 1) + 1, epoch_num * 5 + 1)]
@@ -258,18 +266,32 @@ for network in tqdm(networks):
                 random[i] = rand_bsl.copy()
         pats_blocks.append(np.array(pattern))
         rands_blocks.append(np.array(random))
-    contrast = np.array(pats_blocks) - np.array(rands_blocks)
-    box_blocks = []
+    pats_blocks, rands_blocks = np.array(pats_blocks), np.array(rands_blocks)
+    contrast = pats_blocks - rands_blocks
+    # mean box
+    box_blocks_c = []
+    box_blocks_p = []
+    box_blocks_r = []
     for sub in range(len(subjects)):
-        tg = []
+        tg_p, tg_r = [], []
+        tg_c = []
         for block in range(23):
-            # data is a square matrix of shape (len(idx_tg), len(idx_tg))
-            # data = contrast[sub, block, idx_timeg, :][:, idx_timeg]
-            data = np.diag(contrast[sub, block])[idx_timeg]
-            tg.append(data.mean())
-        box_blocks.append(np.array(tg))
-    cont_blocks[network] = np.array(box_blocks)
-# plot
+            # contrast
+            data_c = contrast[sub, block, idx_timeg, :][:, idx_timeg]
+            tg_c.append(data_c.mean())
+            # pattern
+            data_p = pats_blocks[sub, block, idx_timeg, :][:, idx_timeg]
+            tg_p.append(data_p.mean())
+            # random
+            data_r = rands_blocks[sub, block, idx_timeg, :][:, idx_timeg]
+            tg_r.append(data_r.mean())
+        box_blocks_c.append(np.array(tg_c))
+        box_blocks_p.append(np.array(tg_p))
+        box_blocks_r.append(np.array(tg_r))
+    cont_blocks[network] = np.array(box_blocks_c)
+    pat_blocks[network] = np.array(box_blocks_p)
+    rand_blocks[network] = np.array(box_blocks_r)
+# plot contrast
 blocks = np.arange(1, 24)
 fig, axes = plt.subplots(2, 5, figsize=(15, 5), sharey=True, layout='tight')
 for i, (ax, network) in enumerate(zip(axes.flatten(), networks)):
@@ -291,9 +313,55 @@ for i, (ax, network) in enumerate(zip(axes.flatten(), networks)):
     # Only set xlabel for axes in the bottom row
     if ax.get_subplotspec().is_last_row():
         ax.set_xlabel('Block')
-fig.suptitle('PA source - blocks', fontsize=14)
-fig.savefig(FIGURES_DIR / "time_gen" / "source" / "timeg_blocks_source.pdf", transparent=True)
-plt.close(fig)
+fig.suptitle('PA source - contrast blocks', fontsize=14)
+# fig.savefig(FIGURES_DIR / "time_gen" / "source" / "timeg_blocks_source.pdf", transparent=True)
+# plt.close(fig)
+# plot pattern
+fig, axes = plt.subplots(2, 5, figsize=(15, 5), sharey=True, layout='tight')
+for i, (ax, network) in enumerate(zip(axes.flatten(), networks)):
+    ax.axvspan(1, 3, color='orange', alpha=0.1)
+    # Highlight each group of 5 blocks after practice
+    for start in range(4, 24, 5):
+        end = min(start + 4, 23)
+        ax.axvspan(start, end, color='green', alpha=0.1)
+    ax.axhline(0.25, color='grey', linestyle='-', alpha=0.5)
+    ax.plot(blocks, pat_blocks[network].mean(0))
+    # Smooth the mean curve for visualization
+    smoothed = gaussian_filter1d(pat_blocks[network].mean(0), sigma=1.5)
+    ax.plot(blocks, smoothed, color='red', linestyle='--', label='smoothed')
+    ax.set_xticks(np.arange(1, 24, 4))
+    # ax.grid(True, linestyle='-', alpha=0.3)
+    ax.set_title(network_names[i], fontstyle='italic')
+    if i == 0:
+        ax.legend()
+    # Only set xlabel for axes in the bottom row
+    if ax.get_subplotspec().is_last_row():
+        ax.set_xlabel('Block')
+fig.suptitle('PA source - pattern blocks', fontsize=14)
+# plot raandom
+fig, axes = plt.subplots(2, 5, figsize=(15, 5), sharey=True, layout='tight')
+for i, (ax, network) in enumerate(zip(axes.flatten(), networks)):
+    ax.axvspan(1, 3, color='orange', alpha=0.1)
+    # Highlight each group of 5 blocks after practice
+    for start in range(4, 24, 5):
+        end = min(start + 4, 23)
+        ax.axvspan(start, end, color='green', alpha=0.1)
+    ax.axhline(0.25, color='grey', linestyle='-', alpha=0.5)
+    ax.plot(blocks, rand_blocks[network].mean(0))
+    # Smooth the mean curve for visualization
+    smoothed = gaussian_filter1d(rand_blocks[network].mean(0), sigma=1.5)
+    ax.plot(blocks, smoothed, color='red', linestyle='--', label='smoothed')
+    ax.set_xticks(np.arange(1, 24, 4))
+    # ax.grid(True, linestyle='-', alpha=0.3)
+    ax.set_title(network_names[i], fontstyle='italic')
+    if i == 0:
+        ax.legend()
+    # Only set xlabel for axes in the bottom row
+    if ax.get_subplotspec().is_last_row():
+        ax.set_xlabel('Block')
+fig.suptitle('PA source - random blocks', fontsize=14)
+    
+    
 # save table
 rows = list()
 for i, network in enumerate(networks):

@@ -11,13 +11,12 @@ epochs_list = EPOCHS
 subjects_dir = FREESURFER_DIR
 data_path, res_path = DATA_DIR, RESULTS_DIR
 
-lock = 'stim'
 jobs = -1
 
 overwrite = False
-verbose = 'error'
+verbose = True
 
-generalizing = True
+generalizing = False
 analysis = 'for_timeg' if generalizing else 'for_rsa'
 
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
@@ -211,14 +210,14 @@ def process_subject(subject, jobs):
     # del src, vol_src_lh, vol_src_rh, vol_src_others, vol_src
     # gc.collect()
     
-    # all_epochs = list()
+    all_epochs = list()
     
     for epoch_num in range(5):
         print(f"Processing {subject} {epoch_num}...")
         
         epoch_fname = op.join(data_path, analysis, "epochs", f"{subject}-{epoch_num}-epo.fif")
         epoch = mne.read_epochs(epoch_fname, preload=False, verbose=verbose)
-        # all_epochs.append(epoch)
+        all_epochs.append(epoch)
         
         # create trans file
         # trans_fname = os.path.join(res_path, "trans", "%s-%i-trans.fif" % (subject, epoch_num))
@@ -243,7 +242,6 @@ def process_subject(subject, jobs):
                                         verbose=verbose)
             mne.write_forward_solution(fwd_fname, fwd, overwrite=True, verbose=verbose)
             del fwd        
-        # fwd_fname = op.join(res_path, "fwd", lock, f"{subject}-hipp-thal-{epoch_num}-fwd.fif")
         
         # fwd_fname = res_path / "fwd" / f"{subject}-htc-{epoch_num}-fwd.fif"
         fwd_fname = res_path / "fwd" / analysis / f"{subject}-htc-{epoch_num}-fwd.fif"
@@ -260,37 +258,47 @@ def process_subject(subject, jobs):
         del epoch
         gc.collect()
     
-    # print(f"Processing {subject} {lock} all...")    
-    # for epoch in all_epochs:
-    #     epoch.info['dev_head_t'] = all_epochs[0].info['dev_head_t']
-    # epochs = mne.concatenate_epochs(all_epochs, verbose=verbose)
+    for epoch in all_epochs:
+        epoch.info['dev_head_t'] = all_epochs[0].info['dev_head_t']
+    epochs = mne.concatenate_epochs(all_epochs, verbose=verbose)
     
-    # del all_epochs
-    # gc.collect()
+    del all_epochs
+    gc.collect()
     
-    # # create trans file
-    # trans_fname = op.join(res_path, "trans", lock, "%s-all-trans.fif" % (subject))
-    # if not op.exists(trans_fname) or overwrite:
-    #     coreg = mne.coreg.Coregistration(epochs.info, subject, subjects_dir)
-    #     coreg.fit_fiducials(verbose=verbose)
-    #     coreg.fit_icp(n_iterations=6, verbose=verbose)
-    #     coreg.omit_head_shape_points(distance=5.0/1000)
-    #     coreg.fit_icp(n_iterations=100, verbose=verbose)
-    #     mne.write_trans(trans_fname, coreg.trans, overwrite=True, verbose=verbose)
+    # create trans file
+    trans_fname = op.join(res_path, "trans", "%s-all-trans.fif" % (subject))
+    if not op.exists(trans_fname) or overwrite:
+        coreg = mne.coreg.Coregistration(epochs.info, subject, subjects_dir)
+        coreg.fit_fiducials(verbose=verbose)
+        coreg.fit_icp(n_iterations=6, verbose=verbose)
+        coreg.omit_head_shape_points(distance=5.0/1000)
+        coreg.fit_icp(n_iterations=100, verbose=verbose)
+        mne.write_trans(trans_fname, coreg.trans, overwrite=True, verbose=verbose)
     
-    # fwd_fname = op.join(res_path, "fwd", lock, f"{subject}-hipp-thal-all-fwd.fif")
-    # if not op.exists(fwd_fname) or overwrite:
-    #     fwd = mne.make_forward_solution(epochs.info, trans=trans_fname,
-    #                                 src=src, bem=bem_fname,
-    #                                 meg=True, eeg=False,
-    #                                 mindist=5.0,
-    #                                 n_jobs=jobs,
-    #                                 verbose=verbose)
-    #     mne.write_forward_solution(fwd_fname, fwd, overwrite=True, verbose=verbose)
-    #     del fwd
+    fwd_fname = res_path / "fwd" / analysis / f"{subject}-all-fwd.fif"
+    if not op.exists(fwd_fname) or overwrite:
+        fwd = mne.make_forward_solution(epochs.info, trans=trans_fname,
+                                    src=src, bem=bem_fname,
+                                    meg=True, eeg=False,
+                                    mindist=5.0,
+                                    n_jobs=jobs,
+                                    verbose=verbose)
+        mne.write_forward_solution(fwd_fname, fwd, overwrite=True, verbose=verbose)
+        del fwd
+    
+    fwd_fname = res_path / "fwd" / analysis / f"{subject}-htc-all-fwd.fif"
+    if not op.exists(fwd_fname) or overwrite:
+        fwd = mne.make_forward_solution(epochs.info, trans=trans_fname,
+                                    src=mixed, bem=bem_fname,
+                                    meg=True, eeg=False,
+                                    mindist=5.0,
+                                    n_jobs=jobs,
+                                    verbose=verbose)
+        mne.write_forward_solution(fwd_fname, fwd, overwrite=True, verbose=verbose)
+        del fwd
             
-    # del epochs, src, vol_src_hipp_thal, mixed
-    # gc.collect()
+    del epochs, src, mixed
+    gc.collect()
 
 if is_cluster:
     # Check that SLURM_ARRAY_TASK_ID is available and use it to get the subject
