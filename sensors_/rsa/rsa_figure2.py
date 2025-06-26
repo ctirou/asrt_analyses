@@ -32,7 +32,7 @@ all_decoding['pattern'] = []
 all_decoding['random'] = []
 for subject in tqdm(subjects):
     
-    res_path = RESULTS_DIR / 'RSA' / 'sensors' / "rdm_skf" / subject
+    res_path = RESULTS_DIR / 'RSA' / 'sensors' / "rdm_skf_new" / subject
     ensure_dir(res_path)
         
     # RSA stuff
@@ -44,17 +44,17 @@ for subject in tqdm(subjects):
         rands.append(np.load(res_path / f"rand-{epoch_num}.npy"))
     pats = np.array(pats)
     rands = np.array(rands)
+
+    if subject == 'sub05':
+        pat_bsl = np.load(res_path / "pat-1-1.npy")
+        rand_bsl = np.load(res_path / "rand-1-1.npy")
+        pats[0] = pat_bsl
+        rands[0] = rand_bsl
     
     high, low = get_all_high_low(pats, rands, sequence, False)
         
     high = np.array(high).mean(0)
     low = np.array(low).mean(0)
-
-    if subject == 'sub05':
-        pat_bsl = np.load(res_path / "pat-b1.npy")
-        rand_bsl = np.load(res_path / "rand-b1.npy")
-        high[0] = pat_bsl
-        low[0] = rand_bsl
     
     all_highs.append(high)
     all_lows.append(low)
@@ -173,6 +173,11 @@ idx_rsa = np.where(sig)[0] # to compute mean later
 # Overlay significant regions with the specified color
 axd['C'].fill_between(times, diff_lh.mean(0) - sem, diff_lh.mean(0) + sem, where=sig, alpha=0.4, zorder=5, facecolor=c2)
 axd['C'].fill_between(times, diff_lh.mean(0) - sem, 0, where=sig, alpha=0.3, zorder=5, facecolor=c2)
+win = np.where((times >= 0.3) & (times <= 0.5))[0]
+mdiff = diff_lh[:, win].mean(1)
+mdiff_sig = ttest_1samp(mdiff, 0)[1] < 0.05
+if mdiff_sig:
+    axd['C'].fill_between(times[win], -0.60, -0.61, alpha=0.3, zorder=5, facecolor=c2)
 # axd['C'].legend(frameon=False, loc="upper left")
 axd['C'].text(np.mean(times[sig]), 0.1, '*', fontsize=25, ha='center', va='center', color=c2, weight='bold')
 axd['C'].set_ylabel('Similarity index', fontsize=11)

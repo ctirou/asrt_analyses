@@ -13,7 +13,8 @@ subjects = SUBJS15
 results = []
 
 # Loop over analyses
-for analysis in ['for_timeg', 'for_rsa']:
+# for analysis in ['for_timeg', 'for_rsa']:
+for analysis in ['for_timeg_new', 'for_rsa_new']:
     
     data_path = Path(DATA_DIR) / analysis
 

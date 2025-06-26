@@ -242,6 +242,8 @@ idx_timeg = np.where((timesg >= -0.5) & (timesg < 0))[0]
 cont_blocks = {}
 pat_blocks = {}
 rand_blocks = {}
+data_type  = "scores_blocks_maxp_0200"
+data_type  = "scores_blocks_vect_0200"
 for network in tqdm(networks):
     pats_blocks, rands_blocks = [], []
     if not network in pat_blocks:
@@ -249,9 +251,8 @@ for network in tqdm(networks):
         pat_blocks[network] = []
         rand_blocks[network] = []
     for subject in subjects:
-        res_path = RESULTS_DIR / 'TIMEG' / 'source' / network / 'scores_blocks' / subject
-        res_path = RESULTS_DIR / 'TIMEG' / 'source' / network / 'scores_blocks_vect_0200' / subject
-        res_path = RESULTS_DIR / 'TIMEG' / 'source' / network / 'scores_blocks_maxp_0200' / subject
+        # res_path = RESULTS_DIR / 'TIMEG' / 'source' / network / 'scores_blocks' / subject
+        res_path = RESULTS_DIR / 'TIMEG' / 'source' / network / data_type / subject
         pattern, random = [], []
         for epoch_num in range(5):
             blocks = [i for i in range(1, 4)] if epoch_num == 0 else [i for i in range(5 * (epoch_num - 1) + 1, epoch_num * 5 + 1)]
@@ -313,7 +314,7 @@ for i, (ax, network) in enumerate(zip(axes.flatten(), networks)):
     # Only set xlabel for axes in the bottom row
     if ax.get_subplotspec().is_last_row():
         ax.set_xlabel('Block')
-fig.suptitle('PA source - contrast blocks', fontsize=14)
+fig.suptitle(f'PA source - contrast blocks - {data_type}', fontsize=14)
 # fig.savefig(FIGURES_DIR / "time_gen" / "source" / "timeg_blocks_source.pdf", transparent=True)
 # plt.close(fig)
 # plot pattern

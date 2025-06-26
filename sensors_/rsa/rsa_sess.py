@@ -11,14 +11,14 @@ from joblib import Parallel, delayed
 overwrite = True
 verbose = 'error'
 
-data_path = DATA_DIR / 'for_rsa'
+data_path = DATA_DIR / 'for_rsa_new'
 subjects = SUBJS15
 
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
 def process_subject(subject, epoch_num, verbose):
     
-    res_path = RESULTS_DIR / 'RSA' / 'sensors' / "rdm_skf" / subject
+    res_path = RESULTS_DIR / 'RSA' / 'sensors' / "rdm_skf_new" / subject
     ensure_dir(res_path)
         
     print(f"Processing {subject} - {epoch_num}")
