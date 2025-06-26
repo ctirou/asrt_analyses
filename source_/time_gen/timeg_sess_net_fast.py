@@ -1,4 +1,5 @@
 import os
+import os.path as op
 import numpy as np
 import pandas as pd
 import mne
@@ -31,8 +32,11 @@ use_resting = False
 # use_vector = True
 
 analysis = 'scores_skf'
-analysis += '_rs' if use_resting else analysis + '_0200'
-analysis += '_vect' if use_vector == 'True' else analysis + '_maxp'
+# analysis += '_rs' if use_resting else analysis + '_0200'
+if use_vector == 'True':
+    analysis += '_vect_0200'
+else:
+    analysis += '_maxp_0200'
     
 networks = NETWORKS[:-2]
 
@@ -64,6 +68,9 @@ def process_subject(subject, jobs):
     behavs = pd.concat(all_behavs, ignore_index=True)
     assert len(epochs) == len(behavs), "Length mismatch between epochs and behavs"
     
+    del all_epochs, all_behavs
+    gc.collect()    
+
     # read forward solution
     fwd_fname = RESULTS_DIR / "fwd" / 'for_timeg' / f"{subject}-all-fwd.fif"
     fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
@@ -80,7 +87,7 @@ def process_subject(subject, jobs):
         lh_label, rh_label = mne.read_label(label_path / f'{network}-lh.label'), mne.read_label(label_path / f'{network}-rh.label')
         res_path = ensured(RESULTS_DIR / 'TIMEG' / 'source' / network / analysis / subject)
         
-        random = behavs[behav.trialtypes == 2].reset_index(drop=True)
+        random = behavs[behavs.trialtypes == 2].reset_index(drop=True)
         random_epochs = epochs[random.index]
 
         # random trials
@@ -130,8 +137,8 @@ def process_subject(subject, jobs):
         del random_epochs, random
         gc.collect()
 
-        pattern = behav[behav.trialtypes == 1].reset_index(drop=True)
-        pattern_epochs = epoch[pattern.index]
+        pattern = behavs[behavs.trialtypes == 1].reset_index(drop=True)
+        pattern_epochs = epochs[pattern.index]
 
         # pattern trials
         if not os.path.exists(res_path / "pat-all.npy") or overwrite:

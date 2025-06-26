@@ -2,12 +2,12 @@ import mne
 import os
 import os.path as op
 import numpy as np
-from mne.decoding import cross_val_multiscore, GeneralizingEstimator
+from mne.decoding import GeneralizingEstimator
 from mne.beamformer import make_lcmv, apply_lcmv_epochs
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import make_pipeline
-from sklearn.model_selection import StratifiedKFold, LeaveOneOut
+from sklearn.model_selection import StratifiedKFold
 import pandas as pd
 from base import *
 from config import *
@@ -27,11 +27,17 @@ use_vector = sys.argv[1]
 # use_vector = True
 
 analysis = 'scores_skf'
-analysis += '_vect_0200' if use_vector == 'True' else analysis + '_maxp_0200'
+if use_vector == 'True':
+    analysis += '_vect_0200'
+else:
+    analysis += '_maxp_0200'
 
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
 def process_subject(subject, jobs):
+    
+    print(f"Processing subject {subject} with analysis {analysis}...")
+    
     # define classifier
     clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
     clf = GeneralizingEstimator(clf, scoring=scoring, n_jobs=jobs)
@@ -70,19 +76,19 @@ def process_subject(subject, jobs):
     epochs = mne.concatenate_epochs(all_epochs)
     behavs = pd.concat(all_behavs, ignore_index=True)
     assert len(epochs) == len(behavs), "Length mismatch between epochs and behavs"
+    
+    del all_epochs, all_behavs
+    gc.collect()
 
     label_tc, _ = get_volume_estimate_tc(all_stcs, fwd, offsets, subject, subjects_dir)
     
     pick_ori = 'vector' if use_vector == 'True' else 'max-power'
-    
-    del all_behavs, all_epochs    
-    gc.collect()
-    
+        
     for region in ['Hippocampus', 'Thalamus', 'Cerebellum-Cortex']:
             
         res_path = ensured(RESULTS_DIR / 'TIMEG' / 'source' / region / analysis / subject)
         
-        random = behavs[behav.trialtypes == 2].reset_index(drop=True)
+        random = behavs[behavs.trialtypes == 2].reset_index(drop=True)
         random_epochs = epochs[random.index]
         
         ensure_dir(res_path / 'noise_cov')
@@ -104,8 +110,7 @@ def process_subject(subject, jobs):
                 stcs = apply_lcmv_epochs(random_epochs[train_idx], filters=filters, verbose=verbose)
                 label_tc, _ = get_volume_estimate_tc(stcs, fwd, offsets, subject, subjects_dir)
                 labels = [label for label in label_tc.keys() if region in label]
-                stcs_train = np.concatenate([np.real(label_tc[label]) for label in labels], axis=1) # this works
-                Xtrain = np.array([np.real(stc.in_label(label).data) for stc in stcs_train for label in labels])
+                Xtrain = np.concatenate([np.real(label_tc[label]) for label in labels], axis=1) # this works
                 if use_vector == 'True':
                     Xtrain = svd(Xtrain)
                 ytrain = random.positions[train_idx].reset_index(drop=True)
@@ -115,8 +120,7 @@ def process_subject(subject, jobs):
                 stcs = apply_lcmv_epochs(random_epochs[test_idx], filters=filters, verbose=verbose)
                 label_tc, _ = get_volume_estimate_tc(stcs, fwd, offsets, subject, subjects_dir)
                 labels = [label for label in label_tc.keys() if region in label]
-                stcs_test = np.concatenate([np.real(label_tc[label]) for label in labels], axis=1) # this works
-                Xtest = np.array([np.real(stc.in_label(label).data) for stc in stcs_test for label in labels])
+                Xtest = np.concatenate([np.real(label_tc[label]) for label in labels], axis=1) # this works
                 if use_vector == 'True':
                     Xtest = svd(Xtest)
                 ytest = random.positions[test_idx].reset_index(drop=True)
@@ -127,7 +131,7 @@ def process_subject(subject, jobs):
                 acc_matrix = np.apply_along_axis(lambda x: acc(ytest, x), 0, ypred)
                 acc_matrices.append(acc_matrix)
                 
-                del Xtrain, ytrain, Xtest, ytest, stcs, stcs_train, stcs_test, label_tc
+                del Xtrain, ytrain, Xtest, ytest, stcs, label_tc
                 gc.collect()
 
             np.save(res_path / "rand-all.npy", np.array(acc_matrices).mean(0))
@@ -137,7 +141,7 @@ def process_subject(subject, jobs):
         else:
             print("Skipping", subject, 'all', "pattern", region)
             
-        pattern = behavs[behav.trialtypes == 1].reset_index(drop=True)
+        pattern = behavs[behavs.trialtypes == 1].reset_index(drop=True)
         pattern_epochs = epochs[pattern.index]
         
         if not op.exists(res_path / "pat-all.npy") or overwrite:
@@ -157,8 +161,7 @@ def process_subject(subject, jobs):
                 stcs = apply_lcmv_epochs(pattern_epochs[train_idx], filters=filters, verbose=verbose)
                 label_tc, _ = get_volume_estimate_tc(stcs, fwd, offsets, subject, subjects_dir)
                 labels = [label for label in label_tc.keys() if region in label]
-                stcs_train = np.concatenate([np.real(label_tc[label]) for label in labels], axis=1) # this works
-                Xtrain = np.array([np.real(stc.in_label(label).data) for stc in stcs_train for label in labels])
+                Xtrain = np.concatenate([np.real(label_tc[label]) for label in labels], axis=1) # this works
                 if use_vector == 'True':
                     Xtrain = svd(Xtrain)
                 ytrain = pattern.positions[train_idx].reset_index(drop=True)
@@ -168,8 +171,7 @@ def process_subject(subject, jobs):
                 stcs = apply_lcmv_epochs(pattern_epochs[test_idx], filters=filters, verbose=verbose)
                 label_tc, _ = get_volume_estimate_tc(stcs, fwd, offsets, subject, subjects_dir)
                 labels = [label for label in label_tc.keys() if region in label]
-                stcs_test = np.concatenate([np.real(label_tc[label]) for label in labels], axis=1) # this works
-                Xtest = np.array([np.real(stc.in_label(label).data) for stc in stcs_test for label in labels])
+                Xtest = np.concatenate([np.real(label_tc[label]) for label in labels], axis=1) # this works
                 if use_vector == 'True':
                     Xtest = svd(Xtest)
                 ytest = pattern.positions[test_idx].reset_index(drop=True)
@@ -180,7 +182,7 @@ def process_subject(subject, jobs):
                 acc_matrix = np.apply_along_axis(lambda x: acc(ytest, x), 0, ypred)
                 acc_matrices.append(acc_matrix)
 
-                del Xtrain, ytrain, Xtest, ytest, stcs, stcs_train, stcs_test, label_tc
+                del Xtrain, ytrain, Xtest, ytest, stcs, label_tc
                 gc.collect()
 
             np.save(res_path / "pat-all.npy", np.array(acc_matrices).mean(0))
