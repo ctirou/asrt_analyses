@@ -21,71 +21,57 @@ times = np.linspace(-0.2, 0.6, 82)
 figures_dir = FIGURES_DIR / "RSA" / "sensors"
 ensure_dir(figures_dir)
 
-timesg = np.linspace(-4, 4, 813)
-filt = np.where((timesg > -0.21) & (timesg <= 0.6))[0]
-
+all_patterns, all_randoms = [], []
 all_highs, all_lows = [], []
-patterns, randoms = [], []
-# Decoding stuff
-all_decoding = {}
-all_decoding['pattern'] = []
-all_decoding['random'] = []
 for subject in tqdm(subjects):
-    
-    res_path = RESULTS_DIR / 'RSA' / 'sensors' / "rdm_skf_new" / subject
+    res_path = RESULTS_DIR / 'RSA' / 'sensors' / "rdm_skf_new2" / subject
     ensure_dir(res_path)
-        
     # RSA stuff
     behav_dir = op.join(HOME / 'raw_behavs' / subject)
     sequence = get_sequence(behav_dir)
+    pats, rands = [], []
+    for session_type in ['prac', 'learn']:
+        pats.append(np.load(res_path / f"pat-{session_type}.npy"))
+        rands.append(np.load(res_path / f"rand-{session_type}.npy"))    
+    pats = np.array(pats)
+    rands = np.array(rands)
+    if subject == 'sub05':
+        pats[0] = np.load(res_path / "pat-1-1.npy")
+        rands[0] = np.load(res_path / "rand-1-1.npy")
+    high, low = get_all_high_low(pats, rands, sequence, False)
+    high = np.array(high).mean(0)
+    low = np.array(low).mean(0)
+    all_patterns.append(high)
+    all_randoms.append(low)
+    # per session
+    res_path = RESULTS_DIR / 'RSA' / 'sensors' / "rdm_skf_new" / subject
     pats, rands = [], []
     for epoch_num in range(5):
         pats.append(np.load(res_path / f"pat-{epoch_num}.npy"))
         rands.append(np.load(res_path / f"rand-{epoch_num}.npy"))
     pats = np.array(pats)
     rands = np.array(rands)
-
     if subject == 'sub05':
-        pat_bsl = np.load(res_path / "pat-1-1.npy")
-        rand_bsl = np.load(res_path / "rand-1-1.npy")
-        pats[0] = pat_bsl
-        rands[0] = rand_bsl
-    
+        pats[0] = np.load(res_path / "pat-1-1.npy")
+        rands[0] = np.load(res_path / "rand-1-1.npy")
     high, low = get_all_high_low(pats, rands, sequence, False)
-        
     high = np.array(high).mean(0)
     low = np.array(low).mean(0)
-    
     all_highs.append(high)
     all_lows.append(low)
-    
-    # Decoding stuff
-    res_path = RESULTS_DIR / 'TIMEG' / 'sensors' / 'scores_skf' / subject
-    pat = np.diag(np.load(res_path / "pat-all.npy"))[filt]
-    rand = np.diag(np.load(res_path / "rand-all.npy"))[filt]
-    
-    all_decoding['pattern'].append(pat)
-    all_decoding['random'].append(rand)
 
-for trial_type in ['pattern', 'random']:
-    all_decoding[trial_type] = np.array(all_decoding[trial_type]) * 100
+all_patterns = np.array(all_patterns)
+all_randoms = np.array(all_randoms)
 
-patterns = np.array(patterns)
-randoms = np.array(randoms)
+high = all_patterns[:, 1, :] - all_patterns[:, 0, :]
+low = all_randoms[:, 1, :] - all_randoms[:, 0, :]
+
+diff_lh = low - high
 
 all_highs = np.array(all_highs)
 all_lows = np.array(all_lows)
-
-high = all_highs[:, 1:, :].mean(1) - all_highs[:, 0, :]
-low = all_lows[:, 1:, :].mean(1) - all_lows[:, 0, :]
-# high = all_highs[:, 1:, :].mean(1)
-# low = all_lows[:, 1:, :].mean(1)
-diff_lh = low - high
-
 diff_sess = list()   
 for i in range(5):
-    # rev_low = all_lows[:, i, :]
-    # rev_high = all_highs[:, i, :]
     rev_low = all_lows[:, i, :] - all_lows[:, 0, :]
     rev_high = all_highs[:, i, :] - all_highs[:, 0, :]
     diff_sess.append(rev_low - rev_high)
@@ -152,8 +138,9 @@ axd['A'].fill_between(times, low.mean(0) - sem_low, low.mean(0) + sem_low, alpha
 # axd['A'].fill_between(times, low.mean(0) - sem, low.mean(0) + sem, where=sig, alpha=0.3, zorder=5, facecolor=c4)    
 axd['A'].legend(frameon=False, loc='upper left')
 axd['A'].set_ylabel('cvMD', fontsize=11)
-axd['A'].set_ylim(-0.7, 0.7)
-axd['A'].text(0.1, 0.55, '$Stimulus$', fontsize=11, ha='center')
+# axd['A'].set_ylim(-0.7, 0.7)
+axd['A'].text(0.1, 0.7, '$Stimulus$', fontsize=11, ha='center')
+axd['A'].set_xlabel('Time (s)', fontsize=11)
 axd['A'].set_title(f'Mahalanobis distance within pairs', fontsize=13)
 
 ### B2 ### Similarity index
@@ -173,11 +160,11 @@ idx_rsa = np.where(sig)[0] # to compute mean later
 # Overlay significant regions with the specified color
 axd['C'].fill_between(times, diff_lh.mean(0) - sem, diff_lh.mean(0) + sem, where=sig, alpha=0.4, zorder=5, facecolor=c2)
 axd['C'].fill_between(times, diff_lh.mean(0) - sem, 0, where=sig, alpha=0.3, zorder=5, facecolor=c2)
-win = np.where((times >= 0.3) & (times <= 0.5))[0]
+win = np.where((times >= 0.3) & (times <= 0.55))[0]
 mdiff = diff_lh[:, win].mean(1)
 mdiff_sig = ttest_1samp(mdiff, 0)[1] < 0.05
 if mdiff_sig:
-    axd['C'].fill_between(times[win], -0.60, -0.61, alpha=0.3, zorder=5, facecolor=c2)
+    axd['C'].fill_between(times[win], -0.60, -0.63, alpha=1, zorder=5, facecolor=c2)
 # axd['C'].legend(frameon=False, loc="upper left")
 axd['C'].text(np.mean(times[sig]), 0.1, '*', fontsize=25, ha='center', va='center', color=c2, weight='bold')
 axd['C'].set_ylabel('Similarity index', fontsize=11)
@@ -249,4 +236,3 @@ plt.close()
 # for j in range(1, 5):
 #     ax.plot(times, diff_sess[:, j, :].mean(0), label=j)
 # ax.legend(ncol=2, frameon=False)
-# ax.set_title('Sensor space RSA', fontstyle='italic')
