@@ -23,7 +23,7 @@ times = np.linspace(-4, 4, 813)
 
 figure_dir = ensured(FIGURES_DIR / "time_gen" / "sensors")
 
-res_dir = RESULTS_DIR / 'TIMEG' / 'sensors' / "scores_skf"
+res_dir = RESULTS_DIR / 'TIMEG' / 'sensors' / "scores_skf_new"
 
 # load patterns and randoms time-generalization on all epochs
 all_patterns, all_randoms = [], []
@@ -110,24 +110,6 @@ if not op.exists(res_dir / "corr-all" / "rhos_learn.npy") or overwrite:
     pval = gat_stats(all_rhos, -1)
     np.save(res_dir / "corr-all" / "pval_learn-pval.npy", pval)
 
-mean_rsa = np.load("/Users/coum/MEGAsync/figures/RSA/sensors/mean_rsa.npy")
-if not op.exists(res_dir / "corr-all" / "rhos_rsa.npy") or overwrite:
-    contrasts = patterns - randoms
-    contrasts = zscore(contrasts, axis=-1)  # je sais pas si zscore avant correlation pour la RSA mais c'est mieux je pense
-    contrasts = contrasts[:, :, filt][:, :, :, filt]
-    all_rhos = []
-    for sub in range(len(subjects)):
-        rhos= np.empty((times[filt].shape[0], times[filt].shape[0]))
-        vector = mean_rsa[sub]
-        contrast = contrasts[sub]
-        results = Parallel(n_jobs=-1)(delayed(compute_spearman)(t, g, vector, contrast) for t in range(len(times[filt])) for g in range(len(times[filt])))
-        for idx, (t, g) in enumerate([(t, g) for t in range(len(times[filt])) for g in range(len(times[filt]))]):
-            rhos[t, g] = results[idx]
-        all_rhos.append(rhos)
-    all_rhos = np.array(all_rhos)
-    np.save(res_dir / "corr-all" / "rhos_rsa.npy", all_rhos)
-    pval = gat_stats(all_rhos, -1)
-    np.save(res_dir / "corr-all" / "pval_rsa-pval.npy", pval)
 
 cmap1 = "RdBu_r"
 cmap2 = "coolwarm"

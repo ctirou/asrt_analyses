@@ -84,7 +84,6 @@ for i, subject in enumerate(subjects):
 df = pd.DataFrame(rows)
 df.to_csv(FIGURES_DIR / "RSA" / "sensors" / "rsa_blocks_sensors.csv", index=False, sep=",")
 
-
 # RSA source --- blocks ---
 networks = NETWORKS + ['Cerebellum-Cortex']
 network_names = NETWORK_NAMES + ['Cerebellum']
@@ -163,7 +162,6 @@ df = pd.DataFrame(rows)
 df.to_csv(FIGURES_DIR / "RSA" / "source" / "rsa_blocks_source.csv", index=False, sep=",")
     
 # --- Temporal generalization sensors --- blocks ---
-data_path = DATA_DIR / 'for_timeg'
 subjects = SUBJS15
 jobs = -1
 times = np.linspace(-4, 4, 813)
@@ -171,7 +169,7 @@ filt = np.where((times >= -1.5) & (times <= 3))[0]
 times_filt = times[filt]
 pats_blocks, rands_blocks = [], []
 for subject in tqdm(subjects):
-    res_path = RESULTS_DIR / 'TIMEG' / 'sensors' / 'scores_blocks' / subject
+    res_path = RESULTS_DIR / 'TIMEG' / 'sensors' / 'scores_blocks_new' / subject
     pattern, random = [], []
     for epoch_num in range(5):
         blocks = [i for i in range(1, 4)] if epoch_num == 0 else [i for i in range(5 * (epoch_num - 1) + 1, epoch_num * 5 + 1)]
@@ -232,7 +230,6 @@ df = pd.DataFrame(rows)
 df.to_csv(FIGURES_DIR / "time_gen" / "sensors" / "timeg_blocks_sensors.csv", index=False, sep=",")
 
 # Temporal generalization source --- blocks ---
-data_path = DATA_DIR / 'for_timeg'
 networks = NETWORKS + ['Cerebellum-Cortex']
 network_names = NETWORK_NAMES + ['Cerebellum']
 # networks = NETWORKS[:-2]
@@ -242,8 +239,8 @@ idx_timeg = np.where((timesg >= -0.5) & (timesg < 0))[0]
 cont_blocks = {}
 pat_blocks = {}
 rand_blocks = {}
-data_type  = "scores_blocks_maxp_0200"
-data_type  = "scores_blocks_vect_0200"
+# data_type  = "scores_blocks_maxp_0200"
+data_type  = "scores_blocks_vect_0200_new"
 for network in tqdm(networks):
     pats_blocks, rands_blocks = [], []
     if not network in pat_blocks:

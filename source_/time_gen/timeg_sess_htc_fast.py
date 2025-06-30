@@ -49,9 +49,6 @@ def process_subject(subject, jobs):
     
     offsets = np.cumsum([0] + [len(s["vertno"]) for s in vol_src]) # need vol src here, fwd["src"] is mixed so does not work
 
-    all_behavs = list()
-    all_stcs = list()
-    
     del vol_src
     gc.collect()
 
@@ -79,8 +76,6 @@ def process_subject(subject, jobs):
     
     del all_epochs, all_behavs
     gc.collect()
-
-    label_tc, _ = get_volume_estimate_tc(all_stcs, fwd, offsets, subject, subjects_dir)
     
     pick_ori = 'vector' if use_vector == 'True' else 'max-power'
         

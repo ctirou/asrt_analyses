@@ -35,6 +35,7 @@ use_resting = False
 
 analysis = 'scores_blocks' + '_maxp' if pick_ori == 'max-power' else 'scores_blocks' + '_vect'
 analysis += '_rs' if use_resting == 'True' else '_0200'
+analysis += '_new'
 
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
@@ -82,7 +83,7 @@ def process_subject(subject, jobs):
                     del Xtrain, ytrain, Xtest, ytest
                     gc.collect()
                 else:
-                    print(f"Random for {subject} epoch {epoch_num} block {block} already exists")
+                    print(f"Random for {subject} epoch {epoch_num} block {block} in {network} already exists")
                 
                 if not op.exists(res_path / f"pat-{epoch_num}-{block}.npy") or overwrite:
                     Xtrain, ytrain, Xtest, ytest = get_train_test_blocks_net(data_path, subject, epoch, fwd, behav, pick_ori, lh_label, rh_label, \
@@ -104,7 +105,7 @@ def process_subject(subject, jobs):
                     del Xtrain, ytrain, Xtest, ytest
                     gc.collect()
                 else:
-                    print(f"Pattern for {subject} epoch {epoch_num} block {block} already exists")
+                    print(f"Pattern for {subject} epoch {epoch_num} block {block} in {network} already exists")
                 
             del epoch, fwd
             gc.collect()
@@ -121,3 +122,7 @@ if is_cluster:
 else:
     jobs = 1
     Parallel(-1)(delayed(process_subject)(subject, jobs) for subject in subjects)
+    
+    jobs = -1
+    for subject in subjects:
+        process_subject(subject, jobs)
