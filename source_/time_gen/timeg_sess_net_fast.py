@@ -17,26 +17,26 @@ from sklearn.metrics import accuracy_score as acc
 
 # params
 subjects = SUBJS15
-data_path = DATA_DIR / 'for_timeg'
+data_path = DATA_DIR / 'for_timeg_new'
 subjects_dir = FREESURFER_DIR
 
 solver = 'lbfgs'
 scoring = "accuracy"
 folds = 10
 verbose = 'error'
-overwrite = False
+overwrite = True
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
-use_vector = sys.argv[1]
 use_resting = False
-# use_vector = True
+use_vector = True
 
 analysis = 'scores_skf'
 # analysis += '_rs' if use_resting else analysis + '_0200'
-if use_vector == 'True':
+if use_vector:
     analysis += '_vect_0200'
 else:
     analysis += '_maxp_0200'
+analysis += '_new'
     
 networks = NETWORKS[:-2]
 
@@ -81,7 +81,7 @@ def process_subject(subject, jobs):
     if use_resting:
         noise_cov = mne.read_cov(data_path / 'noise_cov' / f"{subject}-cov.fif", verbose=verbose)
     
-    pick_ori = 'vector' if use_vector == 'True' else 'max-power'    
+    pick_ori = 'vector' if use_vector   else 'max-power'    
     
     for network in networks:
         lh_label, rh_label = mne.read_label(label_path / f'{network}-lh.label'), mne.read_label(label_path / f'{network}-rh.label')
@@ -99,10 +99,9 @@ def process_subject(subject, jobs):
                 print(f"Processing {subject} random {network} split {i+1}")
                 
                 # training data
-                if not use_resting:
-                    ensure_dir(res_path / 'noise_cov')
-                    noise_cov = mne.compute_covariance(random_epochs[train_idx], tmin=-0.2, tmax=0, method="empirical", rank="info", verbose=verbose)
-                    mne.write_cov(res_path / 'noise_cov' / f'{epoch_num}-{i+1}-noise-cov.fif', noise_cov, overwrite=True, verbose=verbose)
+                ensure_dir(res_path / 'noise_cov')
+                noise_cov = mne.compute_covariance(random_epochs[train_idx], tmin=-0.2, tmax=0, method="empirical", rank="info", verbose=verbose)
+                mne.write_cov(res_path / 'noise_cov' / f'{epoch_num}-{i+1}-noise-cov.fif', noise_cov, overwrite=True, verbose=verbose)
 
                 data_cov = mne.compute_covariance(random_epochs[train_idx], method="empirical", rank="info", verbose=verbose)
                 rank = mne.compute_rank(data_cov, info=random_epochs[train_idx].info, rank=None, tol_kind='relative', verbose=verbose)
@@ -149,8 +148,7 @@ def process_subject(subject, jobs):
                 print(f"Processing {subject} pattern {network} split {i+1}")
                 
                 # get training data - pattern trials
-                if not use_resting:
-                    noise_cov = mne.read_cov(res_path / 'noise_cov' / f'{epoch_num}-{i+1}-noise-cov.fif', verbose=verbose)
+                noise_cov = mne.read_cov(res_path / 'noise_cov' / f'{epoch_num}-{i+1}-noise-cov.fif', verbose=verbose)
                 
                 data_cov = mne.compute_covariance(pattern_epochs[train_idx], method="empirical", rank="info", verbose=verbose)
                 rank = mne.compute_rank(data_cov, info=pattern_epochs[train_idx].info, rank=None, tol_kind='relative', verbose=verbose)

@@ -41,16 +41,16 @@ def process_subject(subject, jobs):
 
     for network in networks:
         res_dir = ensured(RESULTS_DIR / "RSA" / 'source' / network / 'rdm_skf' / subject)
+        ensure_dir(res_dir / "noise_cov")
         lh_label, rh_label = mne.read_label(label_path / f'{network}-lh.label'), mne.read_label(label_path / f'{network}-rh.label')
         cvMD_rand = list()
-        
         if not op.exists(res_dir / "rand-prac.npy") or overwrite:
-            for train_idx, test_idx in skf.split(random_epochs, random.positions):
+            for i, (train_idx, test_idx) in enumerate(skf.split(random_epochs, random.positions)):
                 X_train, X_test = random_epochs[train_idx], random_epochs[test_idx]
                 y_train, y_test = random.positions.iloc[train_idx], random.positions.iloc[test_idx]
                 data_cov = mne.compute_covariance(X_train, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
                 noise_cov = mne.compute_covariance(X_train, tmin=-.2, tmax=0, method="empirical", rank="info", verbose=verbose)
-                mne.write_cov(res_dir / 'noise_cov' / f'{subject}-prac-noise-cov.fif', noise_cov, overwrite=True, verbose=verbose)
+                mne.write_cov(res_dir / 'noise_cov' / f'{subject}-prac-{i}-noise-cov.fif', noise_cov, overwrite=True, verbose=verbose)
                 # conpute rank
                 rank = mne.compute_rank(data_cov, info=X_train.info, rank=None, tol_kind='relative', verbose=verbose)
                 # compute source estimates
@@ -67,19 +67,22 @@ def process_subject(subject, jobs):
                 
                 dist = train_test_mahalanobis_fast(Xtrain, Xtest, y_train, y_test, n_jobs=jobs)
                 cvMD_rand.append(dist)
-            cvMD = np.array(cvMD).mean(0)
+            cvMD = np.array(cvMD_rand).mean(0)
             np.save(res_dir / "rand-prac.npy", cvMD)
             print("Saved random RDM for", subject, network)
+            del cvMD_rand, Xtrain, Xtest, y_train, y_test, stcs_train, stcs_test
+            gc.collect()
         else:
             print("Random RDM already exists for", subject, network)
 
         cvMD_pat = list()
         if not op.exists(res_dir / "pat-prac.npy") or overwrite:
-            for train_idx, test_idx in skf.split(pattern_epochs, pattern.positions):
+            for i, (train_idx, test_idx) in enumerate(skf.split(pattern_epochs, pattern.positions)):
                 X_train, X_test = pattern_epochs[train_idx], pattern_epochs[test_idx]
                 y_train, y_test = pattern.positions.iloc[train_idx], pattern.positions.iloc[test_idx]
                 data_cov = mne.compute_covariance(X_train, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
-                noise_cov = mne.compute_covariance(X_train, tmin=-.2, tmax=0, method="empirical", rank="info", verbose=verbose)
+                noise_cov = mne.read_cov(res_dir / 'noise_cov' / f'{subject}-prac-{i}-noise-cov.fif', verbose=verbose)
+                
                 # conpute rank
                 rank = mne.compute_rank(data_cov, info=X_train.info, rank=None, tol_kind='relative', verbose=verbose)
                 # compute source estimates
@@ -99,11 +102,11 @@ def process_subject(subject, jobs):
             cvMD = np.array(cvMD_pat).mean(0)
             np.save(res_dir / "pat-prac.npy", cvMD)
             print("Saved pattern RDM for", subject, network)
+            del cvMD_pat, Xtrain, Xtest, y_train, y_test, stcs_train, stcs_test
+            gc.collect()
         else:
             print("Pattern RDM already exists for", subject, network)
 
-        del cvMD_pat, cvMD_rand, Xtrain, Xtest, y_train, y_test, stcs_train, stcs_test
-        gc.collect()
 
     # now the learning epochs
     all_epochs = []
@@ -136,11 +139,12 @@ def process_subject(subject, jobs):
         cvMD_rand = list()
         
         if not op.exists(res_dir / "rand-learn.npy") or overwrite:
-            for train_idx, test_idx in skf.split(random_epochs, random.positions):
+            for i, (train_idx, test_idx) in enumerate(skf.split(random_epochs, random.positions)):
                 X_train, X_test = random_epochs[train_idx], random_epochs[test_idx]
                 y_train, y_test = random.positions.iloc[train_idx], random.positions.iloc[test_idx]
                 data_cov = mne.compute_covariance(X_train, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
                 noise_cov = mne.compute_covariance(X_train, tmin=-.2, tmax=0, method="empirical", rank="info", verbose=verbose)
+                mne.write_cov(res_dir / 'noise_cov' / f'{subject}-learn-{i}-noise-cov.fif', noise_cov, overwrite=True, verbose=verbose)
                 # conpute rank
                 rank = mne.compute_rank(data_cov, info=X_train.info, rank=None, tol_kind='relative', verbose=verbose)
                 # compute source estimates
@@ -160,11 +164,11 @@ def process_subject(subject, jobs):
             cvMD = np.array(cvMD_rand).mean(0)
             np.save(res_dir / "rand-learn.npy", cvMD)
             print("Saved random RDM for", subject, network)
+            del cvMD_rand, Xtrain, Xtest, y_train, y_test, stcs_train, stcs_test
+            gc.collect()
         else:
             print("Random RDM already exists for", subject, network)
 
-        del cvMD_rand, Xtrain, Xtest, y_train, y_test, stcs_train, stcs_test
-        gc.collect()
 
     # pattern
     for network in networks:
@@ -173,11 +177,11 @@ def process_subject(subject, jobs):
         cvMD_pat = list()
         
         if not op.exists(res_dir / "pat-learn.npy") or overwrite:
-            for train_idx, test_idx in skf.split(pattern_epochs, pattern.positions):
+            for i, (train_idx, test_idx) in enumerate(skf.split(pattern_epochs, pattern.positions)):
                 X_train, X_test = pattern_epochs[train_idx], pattern_epochs[test_idx]
                 y_train, y_test = pattern.positions.iloc[train_idx], pattern.positions.iloc[test_idx]
                 data_cov = mne.compute_covariance(X_train, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
-                noise_cov = mne.compute_covariance(X_train, tmin=-.2, tmax=0, method="empirical", rank="info", verbose=verbose)
+                noise_cov = mne.read_cov(res_dir / 'noise_cov' / f'{subject}-learn-{i}-noise-cov.fif', verbose=verbose)
                 # conpute rank
                 rank = mne.compute_rank(data_cov, info=X_train.info, rank=None, tol_kind='relative', verbose=verbose)
                 # compute source estimates
@@ -197,27 +201,26 @@ def process_subject(subject, jobs):
             cvMD = np.array(cvMD_pat).mean(0)
             np.save(res_dir / "pat-learn.npy", cvMD)
             print("Saved pattern RDM for", subject, network)
+            del cvMD_pat, Xtrain, Xtest, y_train, y_test, stcs_train, stcs_test
+            gc.collect()
         else:
             print("Pattern RDM already exists for", subject, network)
 
-        del cvMD_pat, Xtrain, Xtest, y_train, y_test, stcs_train, stcs_test
-        gc.collect()
 
     del fwd, epoch, behav
     gc.collect()
     
 if is_cluster:
-    epoch_num = str(sys.argv[1])
-    jobs = 20
+    jobs = int(os.getenv("SLURM_CPUS_PER_TASK"))
     try:
         subject_num = int(os.getenv("SLURM_ARRAY_TASK_ID"))
         subject = subjects[subject_num]
-        process_subject(subject, epoch_num, jobs)
+        process_subject(subject, jobs)
     except (IndexError, ValueError) as e:
         print("Error: SLURM_ARRAY_TASK_ID is not set correctly or is out of bounds.")
         sys.exit(1)
 else:
-    Parallel(-1)(delayed(process_subject)(subject, epoch_num, 1) for subject in subjects for epoch_num in range(5))
-    jobs = -1
-    for subject in subjects:
-        process_subject(subject, jobs)
+    Parallel(-1)(delayed(process_subject)(subject, 1) for subject in subjects)
+    # jobs = -1
+    # for subject in subjects:
+    #     process_subject(subject, jobs)
