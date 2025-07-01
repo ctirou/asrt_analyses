@@ -23,20 +23,12 @@ subjects_dir = FREESURFER_DIR
 solver = 'lbfgs'
 scoring = "accuracy"
 folds = 10
-verbose = 'error'
-overwrite = True
+verbose = True
+overwrite = False
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
-use_resting = False
-use_vector = True
-
-analysis = 'scores_skf'
-# analysis += '_rs' if use_resting else analysis + '_0200'
-if use_vector:
-    analysis += '_vect_0200'
-else:
-    analysis += '_maxp_0200'
-analysis += '_new'
+pick_ori = 'vector'
+analysis = 'scores_skf_vect_0200_new'
     
 networks = NETWORKS[:-2]
 
@@ -77,11 +69,7 @@ def process_subject(subject, jobs):
     
     # network and custom label_names
     label_path = RESULTS_DIR / 'networks_200_7' / subject
-    
-    if use_resting:
-        noise_cov = mne.read_cov(data_path / 'noise_cov' / f"{subject}-cov.fif", verbose=verbose)
-    
-    pick_ori = 'vector' if use_vector   else 'max-power'    
+        
     
     for network in networks:
         lh_label, rh_label = mne.read_label(label_path / f'{network}-lh.label'), mne.read_label(label_path / f'{network}-rh.label')
@@ -110,17 +98,15 @@ def process_subject(subject, jobs):
                                     rank=rank, reduce_rank=True, verbose=verbose)
                 stcs_train = apply_lcmv_epochs(random_epochs[train_idx], filters=filters, verbose=verbose)
                 Xtrain = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs_train])
-                if use_vector == 'True':
-                    Xtrain = svd(Xtrain)
-                ytrain = random.positions[train_idx].reset_index(drop=True)
+                Xtrain = svd(Xtrain)
+                ytrain = random.positions[train_idx]
                 assert Xtrain.shape[0] == ytrain.shape[0], "Length mismatch"
                                 
                 # testing data
                 stcs_test = apply_lcmv_epochs(random_epochs[test_idx], filters=filters, verbose=verbose)
                 Xtest = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs_test])
-                if use_vector == 'True':
-                    Xtest = svd(Xtest)
-                ytest = random.positions[test_idx].reset_index(drop=True)
+                Xtest = svd(Xtest)
+                ytest = random.positions[test_idx]
                 assert Xtest.shape[0] == ytest.shape[0], "Length mismatch"                
                 
                 clf.fit(Xtrain, ytrain)
@@ -157,18 +143,15 @@ def process_subject(subject, jobs):
                                     rank=rank, reduce_rank=True, verbose=verbose)
                 stcs_train = apply_lcmv_epochs(pattern_epochs[train_idx], filters=filters, verbose=verbose)
                 Xtrain = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs_train])
-                if use_vector == 'True':
-                    Xtrain = svd(Xtrain)
-                ytrain = pattern.positions[train_idx].reset_index(drop=True)
+                Xtrain = svd(Xtrain)
+                ytrain = pattern.positions[train_idx]
                 assert Xtrain.shape[0] == ytrain.shape[0], "Length mismatch"
                                 
                 # get testing data - pattern trials
                 stcs_test = apply_lcmv_epochs(pattern_epochs[test_idx], filters=filters, verbose=verbose)
                 Xtest = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs_test])
-                if use_vector == 'True':
-                    Xtest = svd(Xtest)
-                
-                ytest = pattern.positions[test_idx].reset_index(drop=True)
+                Xtest = svd(Xtest)
+                ytest = pattern.positions[test_idx]
                 assert Xtest.shape[0] == ytest.shape[0], "Length mismatch"
                 
                 clf.fit(Xtrain, ytrain)

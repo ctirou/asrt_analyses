@@ -20,17 +20,12 @@ subjects, subjects_dir = SUBJS15, FREESURFER_DIR
 folds = 10
 solver = 'lbfgs'
 scoring = "accuracy"
-verbose = 'error'
-overwrite = True
+verbose = True
+overwrite = False
 
 use_vector = True
 
-analysis = 'scores_skf'
-if use_vector == 'True':
-    analysis += '_vect_0200'
-else:
-    analysis += '_maxp_0200'
-analysis += '_new'
+analysis = 'scores_skf_vect_0200_new'
 
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
@@ -107,9 +102,8 @@ def process_subject(subject, jobs):
                 label_tc, _ = get_volume_estimate_tc(stcs, fwd, offsets, subject, subjects_dir)
                 labels = [label for label in label_tc.keys() if region in label]
                 Xtrain = np.concatenate([np.real(label_tc[label]) for label in labels], axis=1) # this works
-                if use_vector:
-                    Xtrain = svd(Xtrain)
-                ytrain = random.positions[train_idx].reset_index(drop=True)
+                Xtrain = svd(Xtrain)
+                ytrain = random.positions[train_idx]
                 assert Xtrain.shape[0] == ytrain.shape[0], "Shape mismatch between training data and labels"
 
                 # testing data
@@ -117,9 +111,8 @@ def process_subject(subject, jobs):
                 label_tc, _ = get_volume_estimate_tc(stcs, fwd, offsets, subject, subjects_dir)
                 labels = [label for label in label_tc.keys() if region in label]
                 Xtest = np.concatenate([np.real(label_tc[label]) for label in labels], axis=1) # this works
-                if use_vector:
-                    Xtest = svd(Xtest)
-                ytest = random.positions[test_idx].reset_index(drop=True)
+                Xtest = svd(Xtest)
+                ytest = random.positions[test_idx]
                 assert Xtest.shape[0] == ytest.shape[0], "Shape mismatch between testing data and labels"
                 
                 clf.fit(Xtrain, ytrain)
@@ -158,9 +151,8 @@ def process_subject(subject, jobs):
                 label_tc, _ = get_volume_estimate_tc(stcs, fwd, offsets, subject, subjects_dir)
                 labels = [label for label in label_tc.keys() if region in label]
                 Xtrain = np.concatenate([np.real(label_tc[label]) for label in labels], axis=1) # this works
-                if use_vector:
-                    Xtrain = svd(Xtrain)
-                ytrain = pattern.positions[train_idx].reset_index(drop=True)
+                Xtrain = svd(Xtrain)
+                ytrain = pattern.positions[train_idx]
                 assert Xtrain.shape[0] == ytrain.shape[0], "Shape mismatch between training data and labels"
 
                 # testing data
@@ -168,9 +160,8 @@ def process_subject(subject, jobs):
                 label_tc, _ = get_volume_estimate_tc(stcs, fwd, offsets, subject, subjects_dir)
                 labels = [label for label in label_tc.keys() if region in label]
                 Xtest = np.concatenate([np.real(label_tc[label]) for label in labels], axis=1) # this works
-                if use_vector:
-                    Xtest = svd(Xtest)
-                ytest = pattern.positions[test_idx].reset_index(drop=True)
+                Xtest = svd(Xtest)
+                ytest = pattern.positions[test_idx]
                 assert Xtest.shape[0] == ytest.shape[0], "Shape mismatch between testing data and labels"
 
                 clf.fit(Xtrain, ytrain)
@@ -200,4 +191,4 @@ if is_cluster:
 else:
     jobs = -1
     for subject in subjects:
-        process_subject(subject, jobs)            
+        process_subject(subject, jobs)
