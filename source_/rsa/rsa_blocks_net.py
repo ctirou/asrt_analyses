@@ -5,7 +5,6 @@ import pandas as pd
 import mne
 from base import *
 from config import *
-from mne.beamformer import make_lcmv, apply_lcmv_epochs
 import gc
 import sys
 from joblib import Parallel, delayed
@@ -18,7 +17,7 @@ data_path = DATA_DIR / 'for_rsa'
 subjects_dir = FREESURFER_DIR
 
 verbose = 'error'
-overwrite = True
+overwrite = False
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
 networks = NETWORKS[:-2]
@@ -33,7 +32,7 @@ def process_subject(subject, jobs, verbose):
         
         print(f"Processing subject {subject} in network {network}")
 
-        res_path = ensured(RESULTS_DIR / "RSA" / 'source' / network / "rdm_blocks_vect_0200" / subject)
+        res_path = ensured(RESULTS_DIR / "RSA" / 'source' / network / analysis / subject)
         lh_label, rh_label = mne.read_label(label_path / f'{network}-lh.label'), mne.read_label(label_path / f'{network}-rh.label')
         
         for epoch_num in range(5):
@@ -55,54 +54,30 @@ def process_subject(subject, jobs, verbose):
             for block in blocks:
                 block = int(block)
                 
-                Xtrain, ytrain, Xtest, ytest = get_train_test_blocks_net(data_path, subject, epoch, fwd, behav, 'vector', lh_label, rh_label, \
-                    'random', block, False, verbose=verbose)
-
-                # pattern trials
-                pat = behav.trialtypes == 1
-                this_block = behav.blocks == block
-                out_blocks = behav.blocks != block
-                pat_this_block = pat & this_block
-                pat_out_blocks = pat & out_blocks
-                yob = behav[pat_out_blocks]
-                ytb = behav[pat_this_block]
-                Xtrain = data[yob.trials.values]
-                ytrain = yob.positions
-                Xtest = data[ytb.trials.values]
-                ytest = ytb.positions
-                assert len(Xtrain) == len(ytrain), "Xtrain and ytrain lengths do not match"
-                assert len(Xtest) == len(ytest), "Xtest and ytest lengths do not match"
-                if not op.exists(res_path / f"pat-{epoch_num}-{block}.npy") or overwrite:
-                    print(f"Computing Mahalanobis for {subject} epoch {epoch_num} block {block} pattern")
-                    rdm_pat = train_test_mahalanobis_fast(Xtrain, Xtest, ytrain, ytest, jobs, verbose)
-                    np.save(res_path / f"pat-{epoch_num}-{block}.npy", rdm_pat)
-                else:
-                    print(f"Mahalanobis for {subject} epoch {epoch_num} block {block} pattern already exists")
-                
-                # random trials        
-                rand = behav.trialtypes == 2
-                this_block = behav.blocks == block
-                out_blocks = behav.blocks != block
-                rand_this_block = rand & this_block
-                rand_out_blocks = rand & out_blocks
-                yob = behav[rand_out_blocks]
-                ytb = behav[rand_this_block]
-                Xtrain = data[yob.trials.values]
-                ytrain = yob.positions
-                Xtest = data[ytb.trials.values]
-                ytest = ytb.positions
-                assert len(Xtrain) == len(ytrain), "Xtrain and ytrain lengths do not match"
-                assert len(Xtest) == len(ytest), "Xtest and ytest lengths do not match"
+                # random trials
                 if not op.exists(res_path / f"rand-{epoch_num}-{block}.npy") or overwrite:
-                    print(f"Computing Mahalanobis for {subject} epoch {epoch_num} block {block} random")
+                    print(f"Processing Mahalanobis for {subject} epoch {epoch_num} block {block} random")
+                    Xtrain, ytrain, Xtest, ytest = get_train_test_blocks_net(data_path, subject, epoch, fwd, behav, 'vector', lh_label, rh_label, \
+                        'random', block, False, verbose=verbose)
                     rdm_rand = train_test_mahalanobis_fast(Xtrain, Xtest, ytrain, ytest, jobs, verbose)
                     np.save(res_path / f"rand-{epoch_num}-{block}.npy", rdm_rand)
+                    del Xtrain, ytrain, Xtest, ytest, rdm_rand
+                    gc.collect()
                 else:
                     print(f"Mahalanobis for {subject} epoch {epoch_num} block {block} random already exists")
 
-            del data, behav
-            gc.collect()
-
+                # pattern trials
+                if not op.exists(res_path / f"pat-{epoch_num}-{block}.npy") or overwrite:
+                    print(f"Processing Mahalanobis for {subject} epoch {epoch_num} block {block} pattern")
+                    Xtrain, ytrain, Xtest, ytest = get_train_test_blocks_net(data_path, subject, epoch, fwd, behav, 'vector', lh_label, rh_label, \
+                        'pattern', block, False, verbose=verbose)
+                    rdm_pat = train_test_mahalanobis_fast(Xtrain, Xtest, ytrain, ytest, jobs, verbose)
+                    np.save(res_path / f"pat-{epoch_num}-{block}.npy", rdm_pat)
+                    del Xtrain, ytrain, Xtest, ytest, rdm_pat
+                    gc.collect()
+                else:
+                    print(f"Mahalanobis for {subject} epoch {epoch_num} block {block} pattern already exists")
+                
 if is_cluster:
     # Check that SLURM_ARRAY_TASK_ID is available and use it to get the subject
     try:
