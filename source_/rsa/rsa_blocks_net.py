@@ -23,14 +23,17 @@ is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
 networks = NETWORKS[:-2]
 
+analysis = 'rdm_blocks_vect_0200'
+
 def process_subject(subject, jobs, verbose):
 
     label_path = RESULTS_DIR / 'networks_200_7' / subject
     
     for network in networks:
-    
-        res_path = ensured(RESULTS_DIR / "RSA" / 'source' / network / "rdm_blocks" / subject)
         
+        print(f"Processing subject {subject} in network {network}")
+
+        res_path = ensured(RESULTS_DIR / "RSA" / 'source' / network / "rdm_blocks_vect_0200" / subject)
         lh_label, rh_label = mne.read_label(label_path / f'{network}-lh.label'), mne.read_label(label_path / f'{network}-rh.label')
         
         for epoch_num in range(5):
@@ -43,30 +46,18 @@ def process_subject(subject, jobs, verbose):
             epoch_fname = op.join(data_path, "epochs", f"{subject}-{epoch_num}-epo.fif")
             epoch = mne.read_epochs(epoch_fname, verbose=verbose, preload=True)
 
-            data_cov = mne.compute_covariance(epoch, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
-            noise_cov = mne.compute_covariance(epoch, tmin=-.2, tmax=0, method="empirical", rank="info", verbose=verbose)
-            # conpute rank
-            rank = mne.compute_rank(data_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)
             # read forward solution
             fwd_fname = RESULTS_DIR / "fwd" / "for_rsa" / f"{subject}-{epoch_num}-fwd.fif" # this fwd was not generated on the rdm_bsling data
             fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
-            # compute source estimates
-            filters = make_lcmv(epoch.info, fwd, data_cov, reg=0.05, noise_cov=noise_cov,
-                                pick_ori='max-power', weight_norm="unit-noise-gain",
-                                rank=rank, reduce_rank=True, verbose=verbose)
-            stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
-            
-            data = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs])
-            assert len(data) == len(behav), "Length mismatch"
-
-            del stcs, noise_cov, data_cov, fwd, filters, epoch
-            gc.collect()
             
             blocks = np.unique(behav["blocks"])
                 
             for block in blocks:
                 block = int(block)
                 
+                Xtrain, ytrain, Xtest, ytest = get_train_test_blocks_net(data_path, subject, epoch, fwd, behav, 'vector', lh_label, rh_label, \
+                    'random', block, False, verbose=verbose)
+
                 # pattern trials
                 pat = behav.trialtypes == 1
                 this_block = behav.blocks == block

@@ -428,6 +428,9 @@ fig.suptitle("Bins – w/ practice bsl")
 
 # --------- Shuffled ---------
 # Load RSA data
+# networks = networks[:-3]  # Exclude 'Cerebellum-Cortex' for now
+# subjects = [sub for sub in SUBJS15 if sub != 'sub05']  # Exclude sub05 for now
+# subjects = SUBJS15
 all_highs, all_lows = {}, {}
 for network in tqdm(networks):
     if not network in all_highs:
@@ -437,25 +440,25 @@ for network in tqdm(networks):
         # RSA stuff
         behav_dir = op.join(HOME / 'raw_behavs' / subject)
         sequence = get_sequence(behav_dir)
-        res_path = RESULTS_DIR / 'RSA' / 'source' / network / 'rdm_skf' / subject
+        res_path = RESULTS_DIR / 'RSA' / 'source' / network / 'rdm_skf_vect' / subject
         pats, rands = [], []
-        for epoch_num in range(5):
-            pats.append(np.load(res_path / f"pat-{epoch_num}.npy"))
-            rands.append(np.load(res_path / f"rand-{epoch_num}.npy"))
-        
+        pats.append(np.load(res_path / "pat-prac.npy"))
+        rands.append(np.load(res_path / "rand-prac.npy"))
+        pats.append(np.load(res_path / "pat-learn.npy"))
+        rands.append(np.load(res_path / "rand-learn.npy"))
         pats = np.array(pats)
         rands = np.array(rands)
         high, low = get_all_high_low(pats, rands, sequence, False)
         high, low = high.mean(0), low.mean(0)
 
-        if subject == 'sub05':
-            pat_block1 = all_pats_bins[network][4, 6:8].mean(0).copy()
-            np.save(res_path / "pat-b1.npy", pat_block1)
-            high[0] = pat_block1.copy()
+        # if subject == 'sub05':
+        #     pat_block1 = all_pats_bins[network][4, 6:8].mean(0).copy()
+        #     np.save(res_path / "pat-b1.npy", pat_block1)
+        #     high[0] = pat_block1.copy()
 
-            rand_block1 = all_rands_bins[network][4, 6:8].mean(0).copy()
-            np.save(res_path / "rand-b1.npy", rand_block1)
-            low[0] = rand_block1.copy()
+        #     rand_block1 = all_rands_bins[network][4, 6:8].mean(0).copy()
+        #     np.save(res_path / "rand-b1.npy", rand_block1)
+        #     low[0] = rand_block1.copy()
 
         all_highs[network].append(high)
         all_lows[network].append(low)
@@ -467,9 +470,9 @@ fig, axes = plt.subplots(2, 5, figsize=(15, 4), sharex=True, sharey=True, layout
 for i, (ax, label, name) in enumerate(zip(axes.flat, networks, network_names)):
     ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
     ax.axhline(0, color='grey', alpha=.5)
-    low = np.mean(all_lows[label][:, 1:, :], 1) - all_lows[label][:, 0, :]
-    high = np.mean(all_highs[label][:, 1:, :], 1) - all_highs[label][:, 0, :]
-    diff = low - high
+    low = all_lows[label][:, 1, :] - all_lows[label][:, 0, :]
+    high = all_highs[label][:, 1, :] - all_highs[label][:, 0, :]
+    diff = high - low
     pval = decod_stats(diff, -1)
     sig = pval < threshold
     # Main plot
@@ -483,4 +486,10 @@ for i, (ax, label, name) in enumerate(zip(axes.flat, networks, network_names)):
     ax.fill_between(times, diff.mean(0) - sem, diff.mean(0) + sem, where=sig, alpha=0.5, zorder=5, color=cmap[i])
     ax.fill_between(times, diff.mean(0) - sem, 0, where=sig, alpha=0.3, zorder=5, facecolor=cmap[i])
     ax.set_title(name, fontstyle='italic')
-fig.suptitle("Shuffled – w/ practice bsl")
+    win = np.where((times >= 0.3) & (times <= 0.55))[0]
+    mdiff = diff[:, win].mean(1)
+    mdiff_sig = ttest_1samp(mdiff, 0)[1] < 0.05
+    if mdiff_sig:
+        # ax.axvspan(times[win][0], times[win][-1], facecolor=cmap[i], edgecolor=None, alpha=0.2, zorder=5)
+        ax.fill_between(times[win], 1.4, 1.5, facecolor=cmap[i], edgecolor=None, alpha=1, zorder=5, where=times[win])
+        # ax.text((0.3+0.55)/2, 1.2, '*', fontsize=20, ha='center', va='center', color=cmap[i], weight='bold')

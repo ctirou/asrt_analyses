@@ -42,7 +42,7 @@ def process_subject(subject, jobs):
     pattern = behav[behav.trialtypes == 1].reset_index(drop=True)
     pattern_epochs = epoch[pattern.index]
     
-    fwd_fname = RESULTS_DIR / "fwd" / 'for_rsa' / f"{subject}-0-fwd.fif"
+    fwd_fname = RESULTS_DIR / "fwd" / 'for_rsa' / f"{subject}-htc-0-fwd.fif"
     fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
     
     for region in ['Hippocampus', 'Thalamus', 'Cerebellum-Cortex']:
@@ -146,7 +146,7 @@ def process_subject(subject, jobs):
     pattern = behavs[behavs.trialtypes == 1].reset_index(drop=True)
     pattern_epochs = epochs[pattern.index]
     
-    fwd_fname = RESULTS_DIR / "fwd" / 'for_rsa' / f"{subject}-all-fwd.fif"
+    fwd_fname = RESULTS_DIR / "fwd" / 'for_rsa' / f"{subject}-htc-all-fwd.fif"
     fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
     
     for region in ['Hippocampus', 'Thalamus', 'Cerebellum-Cortex']:

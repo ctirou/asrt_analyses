@@ -359,7 +359,6 @@ for i, (ax, network) in enumerate(zip(axes.flatten(), networks)):
         ax.set_xlabel('Block')
 fig.suptitle('PA source - random blocks', fontsize=14)
     
-    
 # save table
 rows = list()
 for i, network in enumerate(networks):
