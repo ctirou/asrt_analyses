@@ -49,12 +49,12 @@ bsl_rand = np.nanmean(all_rands[:, :3, :], 1)
 pat = all_pats - bsl_pat[:, np.newaxis, :]
 rand = all_rands - bsl_rand[:, np.newaxis, :]
 diff_rp = rand - pat
+
 # plot
-fig, ax = plt.subplots(figsize=(10, 4))
+fig, ax = plt.subplots(figsize=(10, 4), layout='tight')
 blocks = np.arange(1, 24)
-# idx = np.where((times >= 0.3) & (times <= 0.5))[0]
 idx = np.where((times >= 0.3) & (times <= 0.6))[0]
-ax.axvspan(1, 3, color='orange', alpha=0.1,  )
+ax.axvspan(1, 3, color='orange', alpha=0.1)
 # Highlight each group of 5 blocks after practice
 for start in range(4, 24, 5):
     end = min(start + 4, 23)
@@ -63,14 +63,16 @@ ax.axhline(0, color='grey', linestyle='-', alpha=0.5)
 ax.plot(blocks, np.nanmean(diff_rp[:, :, idx], axis=(0, -1)))
 # Smooth the mean curve for visualization
 smoothed = gaussian_filter1d(np.nanmean(diff_rp[:, :, idx], axis=(0, -1)), sigma=1.5)
-ax.plot(blocks, smoothed, color='red', linestyle='--', label='smoothed')
+ax.plot(blocks, smoothed, color='red', linestyle='--', label='Gaussian smoothed')
 ax.set_xticks(np.arange(1, 24, 4))
-# ax.grid(True, linestyle='-', alpha=0.3)
+ax.grid(True, linestyle='-', alpha=0.3)
+# ax.text(2, 0.4 , "Prac.", color='orange', fontsize=14, ha='center', va='center', fontstyle='italic')
 ax.set_xlabel('Block')
 ax.legend()
-ax.set_title('RS sensors - blocks', fontstyle='italic')
+# ax.set_title('RS sensors - blocks', fontstyle='italic')
 fig.savefig(FIGURES_DIR / "RSA" / "sensors" / "rsa_blocks_sensors.pdf", transparent=True)
 plt.close(fig)
+
 # save table
 diff_rp_blocks = np.nanmean(diff_rp[:, :, idx], axis=(-1))
 rows = list()
@@ -92,7 +94,7 @@ for network in tqdm(networks):
     if not network in diff_rp:
         diff_rp[network] =  []
     for subject in subjects:
-        res_path = RESULTS_DIR / 'RSA' / 'source' / network / "rdm_blocks" / subject
+        res_path = RESULTS_DIR / 'RSA' / 'source' / network / "rdm_blocks_vect_0200" / subject
         # read behav        
         behav_dir = op.join(HOME / 'raw_behavs' / subject)
         sequence = get_sequence(behav_dir)
@@ -118,13 +120,14 @@ for network in tqdm(networks):
         rand = np.nanmean(low, 0) - bsl_rand[np.newaxis, :]
         diff_rp[network].append(rand - pat)
     diff_rp[network] = np.array(diff_rp[network])
+
 # plot
 # idx = np.where((times >= 0.3) & (times <= 0.5))[0]
 idx = np.where((times >= 0.3) & (times <= 0.6))[0]
 blocks = np.arange(1, 24)
-fig, axes = plt.subplots(2, 5, figsize=(15, 5), sharey=True, layout='tight')
+fig, axes = plt.subplots(2, 5, figsize=(15, 4), sharey=True, sharex=True, layout='tight')
 for i, (ax, network) in enumerate(zip(axes.flatten(), networks)):
-    ax.axvspan(1, 3, color='orange', alpha=0.1,  )
+    ax.axvspan(1, 3, color='orange', alpha=0.1)
     # Highlight each group of 5 blocks after practice
     for start in range(4, 24, 5):
         end = min(start + 4, 23)
@@ -133,7 +136,7 @@ for i, (ax, network) in enumerate(zip(axes.flatten(), networks)):
     ax.plot(blocks, np.nanmean(diff_rp[network][:, :, idx], axis=(0, -1)))
     # Smooth the mean curve for visualization
     smoothed = gaussian_filter1d(np.nanmean(diff_rp[network][:, :, idx], axis=(0, -1)), sigma=1.5)
-    ax.plot(blocks, smoothed, color='red', linestyle='--', label='smoothed')
+    ax.plot(blocks, smoothed, color='red', linestyle='--', label='Gaussian smoothed')
     ax.set_xticks(np.arange(1, 24, 4))
     # ax.grid(True, linestyle='-', alpha=0.3)
     ax.set_title(network_names[i], fontstyle='italic')
@@ -145,6 +148,7 @@ for i, (ax, network) in enumerate(zip(axes.flatten(), networks)):
 fig.suptitle('RS source - blocks', fontsize=14)
 fig.savefig(FIGURES_DIR / "RSA" / "source" / "rsa_blocks_source.pdf", transparent=True)
 plt.close(fig)
+
 # save table
 rows = list()
 for i, network in enumerate(networks):
@@ -197,8 +201,9 @@ for sub in range(len(subjects)):
         tg.append(data.mean())
     box_blocks.append(np.array(tg))
 box_blocks = np.array(box_blocks)
+
 # plot
-fig, ax = plt.subplots(figsize=(10, 4))
+fig, ax = plt.subplots(figsize=(10, 4), layout='tight')
 blocks = np.arange(1, 24)
 ax.axvspan(1, 3, color='orange', alpha=0.1,  )
 # Highlight each group of 5 blocks after practice
@@ -209,14 +214,15 @@ ax.axhline(0, color='grey', linestyle='-', alpha=0.5)
 ax.plot(blocks, box_blocks.mean(0))
 # Smooth the mean curve for visualization
 smoothed = gaussian_filter1d(box_blocks.mean(0), sigma=1.5)
-ax.plot(blocks, smoothed, color='red', linestyle='--', label='smoothed')
+ax.plot(blocks, smoothed, color='red', linestyle='--', label='Gaussian smoothed')
 ax.set_xticks(np.arange(1, 24, 4))
 ax.set_xlabel('Block')
 # ax.grid(True, linestyle='-', alpha=0.3)
 ax.legend()
-ax.set_title('PA sensors - blocks', fontstyle='italic')
+# ax.set_title('PA sensors - blocks', fontstyle='italic')
 fig.savefig(FIGURES_DIR / "time_gen" / "sensors" / "timeg_blocks_sensors.pdf", transparent=True)
 plt.close(fig)
+
 # save table
 rows = list()
 for i, subject in enumerate(subjects):
@@ -289,9 +295,10 @@ for network in tqdm(networks):
     cont_blocks[network] = np.array(box_blocks_c)
     pat_blocks[network] = np.array(box_blocks_p)
     rand_blocks[network] = np.array(box_blocks_r)
+
 # plot contrast
 blocks = np.arange(1, 24)
-fig, axes = plt.subplots(2, 5, figsize=(15, 5), sharey=True, layout='tight')
+fig, axes = plt.subplots(2, 5, figsize=(15, 4), sharey=True, sharex=True, layout='tight')
 for i, (ax, network) in enumerate(zip(axes.flatten(), networks)):
     ax.axvspan(1, 3, color='orange', alpha=0.1)
     # Highlight each group of 5 blocks after practice
@@ -302,7 +309,7 @@ for i, (ax, network) in enumerate(zip(axes.flatten(), networks)):
     ax.plot(blocks, cont_blocks[network].mean(0))
     # Smooth the mean curve for visualization
     smoothed = gaussian_filter1d(cont_blocks[network].mean(0), sigma=1.5)
-    ax.plot(blocks, smoothed, color='red', linestyle='--', label='smoothed')
+    ax.plot(blocks, smoothed, color='red', linestyle='--', label='Gaussian smoothed')
     ax.set_xticks(np.arange(1, 24, 4))
     # ax.grid(True, linestyle='-', alpha=0.3)
     ax.set_title(network_names[i], fontstyle='italic')
@@ -311,9 +318,10 @@ for i, (ax, network) in enumerate(zip(axes.flatten(), networks)):
     # Only set xlabel for axes in the bottom row
     if ax.get_subplotspec().is_last_row():
         ax.set_xlabel('Block')
-fig.suptitle(f'PA source - contrast blocks - {data_type}', fontsize=14)
-# fig.savefig(FIGURES_DIR / "time_gen" / "source" / "timeg_blocks_source.pdf", transparent=True)
-# plt.close(fig)
+# fig.suptitle(f'PA source - contrast blocks - {data_type}', fontsize=14)
+fig.savefig(FIGURES_DIR / "time_gen" / "source" / "timeg_blocks_source.pdf", transparent=True)
+plt.close(fig)
+
 # plot pattern
 fig, axes = plt.subplots(2, 5, figsize=(15, 5), sharey=True, layout='tight')
 for i, (ax, network) in enumerate(zip(axes.flatten(), networks)):

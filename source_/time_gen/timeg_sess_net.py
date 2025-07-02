@@ -4,18 +4,19 @@ import pandas as pd
 import mne
 from base import *
 from config import *
-from mne.decoding import GeneralizingEstimator, cross_val_multiscore
+from mne.decoding import GeneralizingEstimator
 from sklearn.pipeline import make_pipeline
 from mne.beamformer import make_lcmv, apply_lcmv_epochs
-from sklearn.model_selection import StratifiedKFold, LeaveOneOut
+from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 import gc
 import sys
+from sklearn.metrics import accuracy_score as acc
 
 # params
 subjects = SUBJS15
-data_path = DATA_DIR / 'for_timeg'
+data_path = DATA_DIR / 'for_timeg_new'
 subjects_dir = FREESURFER_DIR
 
 solver = 'lbfgs'
@@ -25,150 +26,130 @@ verbose = True
 overwrite = False
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
+pick_ori = 'vector'
+analysis = 'scores_skf_vect_0200_new'
+
 networks = NETWORKS[:-2]
 
 def process_subject(subject, jobs):
+    
+    print(f"Processing subject {subject} with analysis {analysis}...")
+    
     # define classifier'
     clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
     clf = GeneralizingEstimator(clf, scoring=scoring, n_jobs=jobs)
     skf = StratifiedKFold(folds, shuffle=True, random_state=42)
-    loo = LeaveOneOut()
-
     # network and custom label_names
-    label_path = RESULTS_DIR / 'networks_200_7' / subject    
-    
-    all_behavs = list()
-    all_stcs = list()
-        
-    for epoch_num in [0, 1, 2, 3, 4]:
+    label_path = RESULTS_DIR / 'networks_200_7' / subject
+
+    for epoch_num in range(5):
         # read behav
         behav = pd.read_pickle(op.join(data_path, 'behav', f'{subject}-{epoch_num}.pkl'))
         # read epoch
         epoch_fname = op.join(data_path, 'epochs', f"{subject}-{epoch_num}-epo.fif")
-        big_epoch = mne.read_epochs(epoch_fname, verbose=verbose, preload=True).crop(-1.5, 1.5)
-                        
-        filter = behav.trialtypes == 2
-        noise_epoch = big_epoch[filter]
-        noise_cov = mne.compute_covariance(noise_epoch, tmin=-0.2, tmax=0, method="empirical", rank="info", verbose=verbose)
-        epoch = big_epoch.copy().crop(-1.5, 1.5)
-        
-        del big_epoch, noise_epoch
-        gc.collect()
-        
-        # compute data covariance matrix
-        data_cov = mne.compute_covariance(epoch, method="empirical", rank="info", verbose=verbose)
-        # conpute rank
-        rank = mne.compute_rank(data_cov, info=epoch.info, rank=None, tol_kind='relative', verbose=verbose)
+        epoch = mne.read_epochs(epoch_fname, verbose=verbose, preload=True).crop(-1.5, 1.5)
         
         # read forward solution
         fwd_fname = RESULTS_DIR / "fwd" / 'for_timeg' / f"{subject}-{epoch_num}-fwd.fif"
         fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
-                
-        # compute source estimates
-        filters = make_lcmv(epoch.info, fwd, data_cov, reg=0.05, noise_cov=noise_cov,
-                            pick_ori='max-power', weight_norm="unit-noise-gain",
-                            rank=rank, reduce_rank=True, verbose=verbose)
-                
-        stcs = apply_lcmv_epochs(epoch, filters=filters, verbose=verbose)
-
-        del epoch, noise_cov, data_cov, fwd, filters
-        gc.collect()
-
+        
         for network in networks:
-            # read labels
             lh_label, rh_label = mne.read_label(label_path / f'{network}-lh.label'), mne.read_label(label_path / f'{network}-rh.label')
-            stcs_data = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs])
-            assert len(stcs_data) == len(behav), "Length mismatch"
+            res_path = ensured(RESULTS_DIR / 'TIMEG' / 'source' / network / analysis / subject)
             
-            res_path = ensured(RESULTS_DIR / 'TIMEG' / 'source' / network / "scores_skf" / subject)
-            
-            if not os.path.exists(res_path / f"pat-{epoch_num}.npy") or overwrite:
-                print("Processing", subject, epoch_num, "pattern", network)
-                pattern = behav.trialtypes == 1
-                X = stcs_data[pattern]
-                y = behav.positions[pattern]
-                y = y.reset_index(drop=True)
-                assert X.shape[0] == y.shape[0], "Length mismatch"
-                cv = loo if any(np.unique(y, return_counts=True)[1] < 10) else skf
-                scores = cross_val_multiscore(clf, X, y, cv=cv, n_jobs=jobs, verbose=verbose)                    
-                np.save(op.join(res_path, f"pat-{epoch_num}.npy"), scores.mean(0))
-                del X, y, scores
-                gc.collect()
-            else:
-                print("Skipping", subject, epoch_num, "pattern", network)
-                
+            random = behav[behav.trialtypes == 2].reset_index(drop=True)
+            random_epochs = epoch[random.index]
+
+            # random trials
             if not os.path.exists(res_path / f"rand-{epoch_num}.npy") or overwrite:
-                print("Processing", subject, epoch_num, "random", network)
-                random = behav.trialtypes == 2
-                X = stcs_data[random]
-                y = behav.positions[random]
-                y = y.reset_index(drop=True)
-                assert X.shape[0] == y.shape[0], "Length mismatch"
-                cv = loo if any(np.unique(y, return_counts=True)[1] < 10) else skf
-                scores = cross_val_multiscore(clf, X, y, cv=cv, n_jobs=jobs, verbose=verbose)                    
-                np.save(op.join(res_path, f"rand-{epoch_num}-scores.npy"), scores.mean(0))
-                del X, y, scores
-                gc.collect()
-            else:
-                print("Skipping", subject, epoch_num, "random", network)
+            
+                acc_matrices = list()
+                for i, (train_idx, test_idx) in enumerate(skf.split(random_epochs, random.positions)):
+
+                    print(f"Processing {subject} random {network} split {i+1}")
+                    
+                    # training data
+                    ensure_dir(res_path / 'noise_cov')
+                    noise_cov = mne.compute_covariance(random_epochs[train_idx], tmin=-0.2, tmax=0, method="empirical", rank="info", verbose=verbose)
+                    mne.write_cov(res_path / 'noise_cov' / f'sess-{epoch_num}-{i+1}-noise-cov.fif', noise_cov, overwrite=True, verbose=verbose)
+
+                    data_cov = mne.compute_covariance(random_epochs[train_idx], method="empirical", rank="info", verbose=verbose)
+                    rank = mne.compute_rank(data_cov, info=random_epochs[train_idx].info, rank=None, tol_kind='relative', verbose=verbose)
+                    filters = make_lcmv(random_epochs[train_idx].info, fwd, data_cov, reg=0.05, noise_cov=noise_cov,
+                                        pick_ori=pick_ori, weight_norm="unit-noise-gain",
+                                        rank=rank, reduce_rank=True, verbose=verbose)
+                    stcs_train = apply_lcmv_epochs(random_epochs[train_idx], filters=filters, verbose=verbose)
+                    Xtrain = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs_train])
+                    Xtrain = svd(Xtrain)
+                    ytrain = random.positions[train_idx]
+                    assert Xtrain.shape[0] == ytrain.shape[0], "Length mismatch"
+                                    
+                    # testing data
+                    stcs_test = apply_lcmv_epochs(random_epochs[test_idx], filters=filters, verbose=verbose)
+                    Xtest = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs_test])
+                    Xtest = svd(Xtest)
+                    ytest = random.positions[test_idx]
+                    assert Xtest.shape[0] == ytest.shape[0], "Length mismatch"                
+                    
+                    clf.fit(Xtrain, ytrain)
+                    ypred = clf.predict(Xtest)
+                    acc_matrix = np.apply_along_axis(lambda x: acc(ytest, x), 0, ypred)
+                    acc_matrices.append(acc_matrix)
+
+                np.save(res_path / f"rand-{epoch_num}.npy", np.array(acc_matrices).mean(0))
                 
-            del stcs_data
+                del acc_matrices, Xtrain, ytrain, Xtest, ytest, stcs_train, stcs_test
+                gc.collect()
+            
+            del random_epochs, random
             gc.collect()
-        
-        if epoch_num != 0:
-            all_behavs.append(behav)
-            all_stcs.extend(stcs)
-        
-        del stcs, behav
-        gc.collect()
-    
-    behav_df = pd.concat(all_behavs)
-    del all_behavs
-    gc.collect()
-    
-    for network in networks:
-        lh_label, rh_label = mne.read_label(label_path / f'{network}-lh.label'), mne.read_label(label_path / f'{network}-rh.label')
-        stcs_data = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in all_stcs])
-        behav_data = behav_df.reset_index(drop=True)
-        assert len(stcs_data) == len(behav_data), "Shape mismatch"
-        
-        res_path = ensured(RESULTS_DIR / 'TIMEG' / 'source' / network / "scores_skf" / subject)
 
-        if not op.exists(res_path / "pat-all.npy") or overwrite:
-            print("Processing", subject, 'all', "pattern", network)
-            pattern = behav_data.trialtypes == 1
-            X = stcs_data[pattern]
-            y = behav_data.positions[pattern]
-            y = y.reset_index(drop=True)
-            assert X.shape[0] == y.shape[0]
-            cv = loo if any(np.unique(y, return_counts=True)[1] < 10) else skf
-            scores = cross_val_multiscore(clf, X, y, cv=cv, n_jobs=jobs, verbose=True)
-            np.save(op.join(res_path, "pat-all.npy"), scores.mean(0))
-            del X, y, scores
+            pattern = behav[behav.trialtypes == 1].reset_index(drop=True)
+            pattern_epochs = epoch[pattern.index]
+
+            # pattern trials
+            if not os.path.exists(res_path / f"pat-{epoch_num}.npy") or overwrite:
+                
+                acc_matrices = list()
+                for i, (train_idx, test_idx) in enumerate(skf.split(pattern_epochs, pattern.positions)):
+
+                    print(f"Processing {subject} pattern {network} split {i+1}")
+                    
+                    # get training data - pattern trials
+                    noise_cov = mne.read_cov(res_path / 'noise_cov' / f'sess-{epoch_num}-{i+1}-noise-cov.fif', verbose=verbose)
+                    
+                    data_cov = mne.compute_covariance(pattern_epochs[train_idx], method="empirical", rank="info", verbose=verbose)
+                    rank = mne.compute_rank(data_cov, info=pattern_epochs[train_idx].info, rank=None, tol_kind='relative', verbose=verbose)
+                    filters = make_lcmv(pattern_epochs[train_idx].info, fwd, data_cov, reg=0.05, noise_cov=noise_cov,
+                                        pick_ori=pick_ori, weight_norm="unit-noise-gain",
+                                        rank=rank, reduce_rank=True, verbose=verbose)
+                    stcs_train = apply_lcmv_epochs(pattern_epochs[train_idx], filters=filters, verbose=verbose)
+                    Xtrain = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs_train])
+                    Xtrain = svd(Xtrain)
+                    ytrain = pattern.positions[train_idx]
+                    assert Xtrain.shape[0] == ytrain.shape[0], "Length mismatch"
+                                    
+                    # get testing data - pattern trials
+                    stcs_test = apply_lcmv_epochs(pattern_epochs[test_idx], filters=filters, verbose=verbose)
+                    Xtest = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs_test])
+                    Xtest = svd(Xtest)
+                    ytest = pattern.positions[test_idx]
+                    assert Xtest.shape[0] == ytest.shape[0], "Length mismatch"
+                    
+                    clf.fit(Xtrain, ytrain)
+                    ypred = clf.predict(Xtest)
+                    acc_matrix = np.apply_along_axis(lambda x: acc(ytest, x), 0, ypred)
+                    acc_matrices.append(acc_matrix)
+
+                np.save(res_path / f"pat-{epoch_num}.npy", np.array(acc_matrices).mean(0))
+                                
+                del acc_matrices, Xtrain, ytrain, Xtest, ytest, stcs_train, stcs_test
+                gc.collect()
+            
+            del pattern_epochs, pattern
             gc.collect()
-        else:
-            print("Skipping", subject, 'all', "pattern", network)          
-
-        if not op.exists(res_path / "rand-all.npy") or overwrite:
-            print("Processing", subject, 'all', "random", network)
-            random = behav_data.trialtypes == 2
-            X = stcs_data[random]
-            y = behav_data.positions[random]
-            y = y.reset_index(drop=True)
-            assert X.shape[0] == y.shape[0]
-            cv = loo if any(np.unique(y, return_counts=True)[1] < 10) else skf
-            scores = cross_val_multiscore(clf, X, y, cv=cv, n_jobs=jobs, verbose=True)
-            np.save(op.join(res_path, "rand-all.npy"), scores.mean(0))
-            del X, y, scores
-            gc.collect()
-        else:
-            print("Skipping", subject, 'all', "random", network)          
-
-        del stcs_data, behav_data
-        gc.collect()
-        
-    del all_stcs, behav_df
-    gc.collect()
+                
+        print(f"Analysis {analysis} completed for subject {subject}.")
         
 if is_cluster:
     jobs = 20

@@ -428,7 +428,7 @@ fig.suptitle("Bins – w/ practice bsl")
 
 # --------- Shuffled ---------
 # Load RSA data
-# networks = networks[:-3]  # Exclude 'Cerebellum-Cortex' for now
+networks = networks[:-3]  # Exclude 'Cerebellum-Cortex' for now
 # subjects = [sub for sub in SUBJS15 if sub != 'sub05']  # Exclude sub05 for now
 # subjects = SUBJS15
 all_highs, all_lows = {}, {}
@@ -440,26 +440,22 @@ for network in tqdm(networks):
         # RSA stuff
         behav_dir = op.join(HOME / 'raw_behavs' / subject)
         sequence = get_sequence(behav_dir)
-        res_path = RESULTS_DIR / 'RSA' / 'source' / network / 'rdm_skf_vect' / subject
+        res_path = RESULTS_DIR / 'RSA' / 'source' / network / 'rdm_skf_vect_new' / subject
         pats, rands = [], []
         pats.append(np.load(res_path / "pat-prac.npy"))
         rands.append(np.load(res_path / "rand-prac.npy"))
         pats.append(np.load(res_path / "pat-learn.npy"))
         rands.append(np.load(res_path / "rand-learn.npy"))
+        
+        if subject == 'sub05':
+            block_path = RESULTS_DIR / 'RSA' / 'source' / network / "rdm_blocks_vect_0200" / subject
+            pats[0] = np.load(block_path / "pat-1-1.npy")
+            rands[0] = np.load(block_path / "rand-1-1.npy")
+        
         pats = np.array(pats)
         rands = np.array(rands)
         high, low = get_all_high_low(pats, rands, sequence, False)
         high, low = high.mean(0), low.mean(0)
-
-        # if subject == 'sub05':
-        #     pat_block1 = all_pats_bins[network][4, 6:8].mean(0).copy()
-        #     np.save(res_path / "pat-b1.npy", pat_block1)
-        #     high[0] = pat_block1.copy()
-
-        #     rand_block1 = all_rands_bins[network][4, 6:8].mean(0).copy()
-        #     np.save(res_path / "rand-b1.npy", rand_block1)
-        #     low[0] = rand_block1.copy()
-
         all_highs[network].append(high)
         all_lows[network].append(low)
     all_highs[network] = np.array(all_highs[network])

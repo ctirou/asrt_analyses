@@ -72,7 +72,7 @@ def process_subject(subject, jobs):
     del all_epochs, all_behavs
     gc.collect()
     
-    pick_ori = 'vector' if use_vector == 'True' else 'max-power'
+    pick_ori = 'vector'
         
     for region in ['Hippocampus', 'Thalamus', 'Cerebellum-Cortex']:
             
