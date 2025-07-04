@@ -428,8 +428,8 @@ fig.suptitle("Bins – w/ practice bsl")
 
 # --------- Shuffled ---------
 # Load RSA data
-networks = networks[:-3]  # Exclude 'Cerebellum-Cortex' for now
-# subjects = [sub for sub in SUBJS15 if sub != 'sub05']  # Exclude sub05 for now
+networks = networks  # Exclude 'Cerebellum-Cortex' for now
+subjects = [sub for sub in SUBJS15 if sub != 'sub05']  # Exclude sub05 for now
 # subjects = SUBJS15
 all_highs, all_lows = {}, {}
 for network in tqdm(networks):
@@ -440,12 +440,17 @@ for network in tqdm(networks):
         # RSA stuff
         behav_dir = op.join(HOME / 'raw_behavs' / subject)
         sequence = get_sequence(behav_dir)
-        res_path = RESULTS_DIR / 'RSA' / 'source' / network / 'rdm_skf_vect_new' / subject
+        res_path = RESULTS_DIR / 'RSA' / 'source' / network / 'rdm_skf_vect_alt' / subject
         pats, rands = [], []
-        pats.append(np.load(res_path / "pat-prac.npy"))
-        rands.append(np.load(res_path / "rand-prac.npy"))
-        pats.append(np.load(res_path / "pat-learn.npy"))
-        rands.append(np.load(res_path / "rand-learn.npy"))
+        
+        for i in range(5):
+            pats.append(np.load(res_path / f"pat-{i}.npy"))
+            rands.append(np.load(res_path / f"rand-{i}.npy"))
+        
+        # pats.append(np.load(res_path / "pat-prac.npy"))
+        # rands.append(np.load(res_path / "rand-prac.npy"))
+        # pats.append(np.load(res_path / "pat-learn.npy"))
+        # rands.append(np.load(res_path / "rand-learn.npy"))
         
         if subject == 'sub05':
             block_path = RESULTS_DIR / 'RSA' / 'source' / network / "rdm_blocks_vect_0200" / subject
@@ -466,8 +471,10 @@ fig, axes = plt.subplots(2, 5, figsize=(15, 4), sharex=True, sharey=True, layout
 for i, (ax, label, name) in enumerate(zip(axes.flat, networks, network_names)):
     ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
     ax.axhline(0, color='grey', alpha=.5)
-    low = all_lows[label][:, 1, :] - all_lows[label][:, 0, :]
-    high = all_highs[label][:, 1, :] - all_highs[label][:, 0, :]
+    # low = all_lows[label][:, 1, :] - all_lows[label][:, 0, :]
+    # high = all_highs[label][:, 1, :] - all_highs[label][:, 0, :]
+    low = all_lows[label][:, 1:, :].mean(1) - all_lows[label][:, 0, :]
+    high = all_highs[label][:, 1:, :].mean(1) - all_highs[label][:, 0, :]
     diff = high - low
     pval = decod_stats(diff, -1)
     sig = pval < threshold

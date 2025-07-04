@@ -13,23 +13,23 @@ data_path, res_path = DATA_DIR, RESULTS_DIR
 
 jobs = -1
 
-overwrite = False
+overwrite = True
 verbose = True
 
-generalizing = False
-analysis = 'for_timeg' if generalizing else 'for_rsa'
+# generalizing = False
+# analysis = 'for_timeg' if generalizing else 'for_rsa'
+analyses = ['for_timeg', 'for_rsa']
 
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
-# create results directories
-folders = ["src", "bem", "trans", "fwd"]
-for f in folders:
-    if f == folders[-1]:
-        ensure_dir(os.path.join(res_path, f, analysis))
-    else:
-        ensure_dir(os.path.join(res_path, f))
-
 def process_subject(subject, jobs):
+    # create results directories
+    folders = ["src", "bem", "trans", "fwd"]
+    for f in folders:
+        if f == folders[-1]:
+            ensure_dir(os.path.join(res_path, f, analysis))
+        else:
+            ensure_dir(os.path.join(res_path, f))
     # bem model
     bem_fname = op.join(res_path, "bem", "%s-bem-sol.fif" % (subject))
     model_fname = op.join(res_path, "bem", "%s-bem.fif" % (subject))
@@ -73,8 +73,6 @@ def process_subject(subject, jobs):
     
     hipp_labels = [l for l in aseg_labels if 'Hipp' in l]
     thal_labels = [l for l in aseg_labels if 'Thal' in l]
-    hipp_thal_labels = hipp_labels + thal_labels
-    
     cerebellum_labels = [l for l in aseg_labels if 'Cerebellum-Cortex' in l]
     htc_labels = hipp_labels + thal_labels + cerebellum_labels
     
@@ -217,7 +215,8 @@ def process_subject(subject, jobs):
         
         epoch_fname = op.join(data_path, analysis, "epochs", f"{subject}-{epoch_num}-epo.fif")
         epoch = mne.read_epochs(epoch_fname, preload=False, verbose=verbose)
-        all_epochs.append(epoch)
+        if epoch_num != 0:
+            all_epochs.append(epoch)
         
         # create trans file
         # trans_fname = os.path.join(res_path, "trans", "%s-%i-trans.fif" % (subject, epoch_num))
@@ -312,5 +311,6 @@ if is_cluster:
         sys.exit(1)
 else:
     jobs = -1
-    for subject in subjects:
-        process_subject(subject, jobs=-1)
+    for analysis in analyses:
+        for subject in subjects:
+            process_subject(subject, jobs=-1)

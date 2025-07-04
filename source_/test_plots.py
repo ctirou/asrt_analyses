@@ -136,9 +136,9 @@ cmap = ['#0173B2', '#DE8F05', '#029E73', '#D55E00', '#CC78BC', '#CA9161', '#FBAF
 # # plt.show()
 # fig.savefig(figures_dir / "similarity-corr_fixed2.pdf", transparent=True)
 # plt.close(fig)
+analysis = 'scores_skf_vect_0200_new'
 
 # --- Decoding ---
-subjects = [i for i in SUBJS15 if i != SUBJS15[13]]
 timesg = np.linspace(-1.5, 1.5, 307)
 time_filter = np.where((timesg >= -0.2) & (timesg <= 0.6))[0]
 pattern, random = {}, {}
@@ -147,10 +147,10 @@ for network in tqdm(networks):
         pattern[network] = []
         random[network] = []
     for subject in subjects:
-        pat = np.load(RESULTS_DIR / 'TIMEG' / 'source' / network / 'scores_skf' / subject / "pat-all.npy")
+        pat = np.load(RESULTS_DIR / 'TIMEG' / 'source' / network / analysis / subject / "pat-all.npy")
         pat_diag = np.diag(pat)[time_filter]
         pattern[network].append(pat_diag)
-        rand = np.load(RESULTS_DIR / 'TIMEG' / 'source' / network / 'scores_skf' / subject / "rand-all.npy")
+        rand = np.load(RESULTS_DIR / 'TIMEG' / 'source' / network / analysis / subject / "rand-all.npy")
         rand_diag = np.diag(rand)[time_filter]
         random[network].append(rand_diag)
     pattern[network] = np.array(pattern[network])
@@ -223,15 +223,15 @@ for network in tqdm(networks):
     all_pat, all_rand, all_diag = [], [], []
     patpat, randrand = [], []
     for i, subject in enumerate(subjects):
-        pat, rand = [], []
-        for j in [0, 1, 2, 3, 4]:
-            pat.append(np.load(res_dir / network / 'scores_skf' / subject / f"pat-{j}.npy"))
-            rand.append(np.load(res_dir / network / 'scores_skf' / subject / f"rand-{j}.npy"))
-        patpat.append(np.array(pat))
-        randrand.append(np.array(rand))
+        # pat, rand = [], []
+        # for j in [0, 1, 2, 3, 4]:
+        #     pat.append(np.load(res_dir / network / analysis / subject / f"pat-{j}.npy"))
+        #     rand.append(np.load(res_dir / network / analysis / subject / f"rand-{j}.npy"))
+        # patpat.append(np.array(pat))
+        # randrand.append(np.array(rand))
     
-        all_pat.append(np.load(res_dir / network / 'scores_skf' / subject / "pat-all.npy"))
-        all_rand.append(np.load(res_dir / network / 'scores_skf' / subject / "rand-all.npy"))
+        all_pat.append(np.load(res_dir / network / analysis / subject / "pat-all.npy"))
+        all_rand.append(np.load(res_dir / network / analysis / subject / "rand-all.npy"))
         
         diag = np.array(all_pat) - np.array(all_rand)
         all_diag.append(np.diag(diag[i]))
@@ -240,8 +240,8 @@ for network in tqdm(networks):
     all_randoms[network] = np.array(all_rand)
     all_diags[network] = np.array(all_diag)
     
-    patterns[network] = np.array(patpat)
-    randoms[network] = np.array(randrand)
+    # patterns[network] = np.array(patpat)
+    # randoms[network] = np.array(randrand)
 
 cmap1 = "RdBu_r"
 c1 = "#20B2AA"
@@ -262,11 +262,11 @@ for ax, network, name in zip(axes.flatten(), networks, network_names):
         vmin=0.2,
         vmax=0.3)
     ax.set_title(f"{name}", fontsize=10, fontstyle="italic")
-    xx, yy = np.meshgrid(timesg, timesg, copy=False, indexing='xy')
-    pval = np.load(res_dir / network / "pval-all" / "all_pattern-pval.npy")
-    sig = pval < threshold
-    ax.contour(xx, yy, sig, colors=c1, levels=[0],
-                        linestyles='--', linewidths=1)
+    # xx, yy = np.meshgrid(timesg, timesg, copy=False, indexing='xy')
+    # pval = np.load(res_dir / network / "pval-all" / "all_pattern-pval.npy")
+    # sig = pval < threshold
+    # ax.contour(xx, yy, sig, colors=c1, levels=[0],
+    #                     linestyles='--', linewidths=1)
     ax.axvline(0, color="k", alpha=.5)
     ax.axhline(0, color="k", alpha=.5)
 # fig.savefig(figures_dir / "timeg-pattern.pdf", transparent=True)
@@ -285,11 +285,11 @@ for ax, network, name in zip(axes.flatten(), networks, network_names):
         vmin=0.2,
         vmax=0.3)
     ax.set_title(f"{name}", fontsize=10, fontstyle="italic")
-    xx, yy = np.meshgrid(timesg, timesg, copy=False, indexing='xy')
-    pval = np.load(res_dir / network / "pval-all" / "all_random-pval.npy")
-    sig = pval < threshold
-    ax.contour(xx, yy, sig, colors=c1, levels=[0],
-                        linestyles='--', linewidths=1)
+    # xx, yy = np.meshgrid(timesg, timesg, copy=False, indexing='xy')
+    # pval = np.load(res_dir / network / "pval-all" / "all_random-pval.npy")
+    # sig = pval < threshold
+    # ax.contour(xx, yy, sig, colors=c1, levels=[0],
+    #                     linestyles='--', linewidths=1)
     ax.axvline(0, color="k", alpha=.5)
     ax.axhline(0, color="k", alpha=.5)
 # fig.savefig(figures_dir / "timeg-random.pdf", transparent=True)
@@ -309,11 +309,11 @@ for ax, network, name in zip(axes.flatten(), networks, network_names):
         vmin=-0.05,
         vmax=0.05)
     ax.set_title(f"{name}", fontsize=10, fontstyle="italic")
-    xx, yy = np.meshgrid(timesg, timesg, copy=False, indexing='xy')
-    pval = np.load(res_dir / network / "pval-all" / "all_contrast-pval.npy")
-    sig = pval < threshold
-    ax.contour(xx, yy, sig, colors=c1, levels=[0],
-                        linestyles='--', linewidths=1)
+    # xx, yy = np.meshgrid(timesg, timesg, copy=False, indexing='xy')
+    # pval = np.load(res_dir / network / "pval-all" / "all_contrast-pval.npy")
+    # sig = pval < threshold
+    # ax.contour(xx, yy, sig, colors=c1, levels=[0],
+    #                     linestyles='--', linewidths=1)
     ax.axvline(0, color="k", alpha=.5)
     ax.axhline(0, color="k", alpha=.5)
 # fig.savefig(figures_dir / "timeg-contrast.pdf", transparent=True)
@@ -342,60 +342,3 @@ for ax, network, name in zip(axes.flatten(), networks, network_names):
     ax.axhline(0, color="k")
 # fig.savefig(figures_dir / "timeg-corr.pdf", transparent=True)
 # plt.close(fig)
-
-# --- Temporal generalization --- time bins ---
-subjects = SUBJS15
-res_dir = RESULTS_DIR / 'TIMEG' / 'source' 
-all_pats_bins, all_rands_bins = {}, {}
-all_box_bins = {}
-idx_tg = np.where((timesg >= -0.5) & (timesg < 0))[0]
-for network in tqdm(networks):
-    if not network in all_pats_bins:
-        all_pats_bins[network], all_rands_bins[network] = [], []
-        all_box_bins[network] = []
-    
-    for i, subject in enumerate(subjects):
-        pattern_bins, random_bins = [], []
-        
-        for epoch_num in [0, 1, 2, 3, 4]:
-            blocks = [i for i in range(1, 4)] if epoch_num == 0 else [i for i in range(5 * (epoch_num - 1) + 1, epoch_num * 5 + 1)]
-            for block in blocks:
-                for fold in range(1, 3):
-                    pattern_bins.append(np.load(res_dir / network / 'scores_40s' / subject / f"pat-{epoch_num}-{block}-{fold}.npy"))
-                    random_bins.append(np.load(res_dir / network / 'scores_40s' / subject / f"rand-{epoch_num}-{block}-{fold}.npy"))
-    
-        if subject == 'sub05':
-            for i in range(6):
-                pattern_bins[0][i] = np.mean(pattern_bins[1][:6], 0).copy()
-                random_bins[0][i] = np.mean(random_bins[1][:6], 0).copy()
-        
-        all_pats_bins[network].append(np.array(pattern_bins))
-        all_rands_bins[network].append(np.array(random_bins))
-
-    all_pats_bins[network] = np.array(all_pats_bins[network])
-    all_rands_bins[network] = np.array(all_rands_bins[network])
-    
-    contrast = all_pats_bins[network] - all_rands_bins[network]
-    box_bins = []
-    for sub in range(len(subjects)):
-        tg = []
-        for bin in range(46):
-            # data is a square matrix of shape (len(idx_tg), len(idx_tg))
-            data = contrast[sub, bin, idx_tg, :][:, idx_tg]
-            tg.append(data.mean())
-        box_bins.append(np.array(tg))
-    all_box_bins[network] = np.array(box_bins)
-
-fig, axes = plt.subplots(2, 5, figsize=(20, 4), sharex=True, sharey=True, layout='constrained')
-x = np.arange(1, 47)
-for i, (ax, label, name) in enumerate(zip(axes.flatten(), networks, network_names)):
-    ax.axhline(0, color='grey', alpha=.5)
-    data = all_box_bins[label].mean(0)
-    ax.plot(x, data, color=cmap[i])
-    ax.plot(x, np.poly1d(np.polyfit(x, data, 1))(x), color='black', linestyle='--', alpha=0.3, label='linear fit')
-    ax.set_title(name, fontstyle="italic")
-    if ax == axes.flatten()[0]:
-        ax.legend(frameon=False, loc='upper left')
-fig.suptitle('Mean predictive coding dynamics - 40-trial bins', fontsize=16)
-    
-    

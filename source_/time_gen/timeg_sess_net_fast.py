@@ -180,5 +180,5 @@ if is_cluster:
         sys.exit(1)
 else:
     jobs = -1
-    for subject in subjects:
+    for subject in subjects[11:]:
         process_subject(subject, jobs)

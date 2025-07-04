@@ -12,7 +12,6 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 import gc
 import sys
-from sklearn.metrics import accuracy_score as acc
 
 # params
 subjects = SUBJS15
@@ -92,8 +91,7 @@ def process_subject(subject, jobs):
                     assert Xtest.shape[0] == ytest.shape[0], "Length mismatch"                
                     
                     clf.fit(Xtrain, ytrain)
-                    ypred = clf.predict(Xtest)
-                    acc_matrix = np.apply_along_axis(lambda x: acc(ytest, x), 0, ypred)
+                    acc_matrix = clf.score(Xtest, ytest)
                     acc_matrices.append(acc_matrix)
 
                 np.save(res_path / f"rand-{epoch_num}.npy", np.array(acc_matrices).mean(0))
@@ -106,6 +104,11 @@ def process_subject(subject, jobs):
 
             pattern = behav[behav.trialtypes == 1].reset_index(drop=True)
             pattern_epochs = epoch[pattern.index]
+            data_cov = mne.compute_covariance(pattern_epochs, method="empirical", rank="info", verbose=verbose)
+            rank = mne.compute_rank(data_cov, info=pattern_epochs.info, rank=None, tol_kind='relative', verbose=verbose)
+            filters = make_lcmv(pattern_epochs.info, fwd, data_cov, reg=0.05, noise_cov=noise_cov,
+                                pick_ori='max-power', weight_norm="unit-noise-gain",
+                                rank=rank, reduce_rank=True, verbose=verbose)
 
             # pattern trials
             if not os.path.exists(res_path / f"pat-{epoch_num}.npy") or overwrite:
@@ -118,27 +121,26 @@ def process_subject(subject, jobs):
                     # get training data - pattern trials
                     noise_cov = mne.read_cov(res_path / 'noise_cov' / f'sess-{epoch_num}-{i+1}-noise-cov.fif', verbose=verbose)
                     
-                    data_cov = mne.compute_covariance(pattern_epochs[train_idx], method="empirical", rank="info", verbose=verbose)
-                    rank = mne.compute_rank(data_cov, info=pattern_epochs[train_idx].info, rank=None, tol_kind='relative', verbose=verbose)
-                    filters = make_lcmv(pattern_epochs[train_idx].info, fwd, data_cov, reg=0.05, noise_cov=noise_cov,
-                                        pick_ori=pick_ori, weight_norm="unit-noise-gain",
-                                        rank=rank, reduce_rank=True, verbose=verbose)
+                    # data_cov = mne.compute_covariance(pattern_epochs[train_idx], method="empirical", rank="info", verbose=verbose)
+                    # rank = mne.compute_rank(data_cov, info=pattern_epochs[train_idx].info, rank=None, tol_kind='relative', verbose=verbose)
+                    # filters = make_lcmv(pattern_epochs[train_idx].info, fwd, data_cov, reg=0.05, noise_cov=noise_cov,
+                    #                     pick_ori='max-power', weight_norm="unit-noise-gain",
+                    #                     rank=rank, reduce_rank=True, verbose=verbose)
                     stcs_train = apply_lcmv_epochs(pattern_epochs[train_idx], filters=filters, verbose=verbose)
                     Xtrain = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs_train])
-                    Xtrain = svd(Xtrain)
+                    # Xtrain = svd(Xtrain)
                     ytrain = pattern.positions[train_idx]
                     assert Xtrain.shape[0] == ytrain.shape[0], "Length mismatch"
                                     
                     # get testing data - pattern trials
                     stcs_test = apply_lcmv_epochs(pattern_epochs[test_idx], filters=filters, verbose=verbose)
                     Xtest = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs_test])
-                    Xtest = svd(Xtest)
+                    # Xtest = svd(Xtest)
                     ytest = pattern.positions[test_idx]
                     assert Xtest.shape[0] == ytest.shape[0], "Length mismatch"
                     
                     clf.fit(Xtrain, ytrain)
-                    ypred = clf.predict(Xtest)
-                    acc_matrix = np.apply_along_axis(lambda x: acc(ytest, x), 0, ypred)
+                    acc_matrix = clf.score(Xtest, ytest)
                     acc_matrices.append(acc_matrix)
 
                 np.save(res_path / f"pat-{epoch_num}.npy", np.array(acc_matrices).mean(0))
@@ -164,3 +166,25 @@ else:
     jobs = -1
     for subject in subjects:
         process_subject(subject, jobs)
+
+acc_matrices = np.array(acc_matrices)
+mean_acc = acc_matrices.mean(0)
+
+import matplotlib.pyplot as plt
+
+times = np.linspace(-1.5, 1.5, mean_acc.shape[1])
+fig, ax = plt.subplots(figsize=(10, 6))
+im = ax.imshow(mean_acc, aspect='auto', cmap='RdBu_r', origin='lower',
+               extent=[times[0], times[-1], 0, mean_acc.shape[0]])
+ax.set_title(f'Accuracy Matrix for {subject} - {analysis}')
+ax.set_xlabel('Time (s)')
+ax.set_ylabel('Position')
+cbar = plt.colorbar(im, ax=ax, orientation='vertical')
+cbar.set_label('Accuracy')
+im.set_clim(0, 0.5)
+cbar.set_ticks([0, 0.25, 0.5])
+
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.plot(times, np.diag(mean_acc))
+ax.axvline(0, color='grey', linestyle='--', linewidth=1)
+ax.axhline(0.25, color='grey', linestyle='--', linewidth=1)
