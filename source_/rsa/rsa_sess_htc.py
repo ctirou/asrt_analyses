@@ -21,6 +21,11 @@ is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
 res_path = ensured(RESULTS_DIR / 'RSA' / 'source')
 
+# pick_ori = 'max-power'
+pick_ori = 'vector'
+weight_norm = 'unit-noise-gain-invariant' if pick_ori == 'vector' else 'unit-noise-gain'
+analysis = 'rdm_skf_vector' if pick_ori == 'vector' else 'rdm_skf_maxpower'
+
 def process_subject(subject, jobs):
     
     skf = StratifiedKFold(n_splits=10, shuffle=True, random_state=42)
@@ -47,7 +52,7 @@ def process_subject(subject, jobs):
     
     for region in ['Hippocampus', 'Thalamus', 'Cerebellum-Cortex']:
 
-        res_dir = ensured(res_path / region / 'rdm_skf' / subject)
+        res_dir = ensured(res_path / region / analysis / subject)
         ensure_dir(res_dir / 'noise_cov')
         
         if not op.exists(res_dir / "rand-prac.npy") or overwrite:
@@ -57,24 +62,25 @@ def process_subject(subject, jobs):
                 y_train, y_test = random.positions.iloc[train_idx].reset_index(drop=True), random.positions.iloc[test_idx].reset_index(drop=True)
                 data_cov = mne.compute_covariance(X_train, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
                 noise_cov = mne.compute_covariance(X_train, tmin=-.2, tmax=0, method="empirical", rank="info", verbose=verbose)
-                mne.write_cov(res_dir / 'noise_cov' / f'{subject}-prac-{i}-noise-cov.fif', noise_cov, overwrite=True, verbose=verbose)
                 # conpute rank
                 rank = mne.compute_rank(data_cov, info=X_train.info, rank=None, tol_kind='relative', verbose=verbose)
                 # compute source estimates
                 filters = make_lcmv(X_train.info, fwd, data_cov, reg=0.05, noise_cov=noise_cov,
-                                pick_ori='vector', weight_norm="unit-noise-gain",
+                                pick_ori=pick_ori, weight_norm=weight_norm,
                                 rank=rank, reduce_rank=True, verbose=verbose)
                 stcs_train = apply_lcmv_epochs(X_train, filters=filters, verbose=verbose)
                 label_tc, _ = get_volume_estimate_tc(stcs_train, fwd, offsets, subject, subjects_dir)
                 labels = [label for label in label_tc.keys() if region in label]
                 stcs_data = np.concatenate([np.real(label_tc[label]) for label in labels], axis=1)     
-                Xtrain = svd(stcs_data)
+                if pick_ori == 'vector':
+                    Xtrain = svd(stcs_data)
 
                 stcs_test = apply_lcmv_epochs(X_test, filters=filters, verbose=verbose)
                 label_tc, _ = get_volume_estimate_tc(stcs_test, fwd, offsets, subject, subjects_dir)
                 labels = [label for label in label_tc.keys() if region in label]
                 stcs_data = np.concatenate([np.real(label_tc[label]) for label in labels], axis=1)     
-                Xtest = svd(stcs_data)
+                if pick_ori == 'vector':
+                    Xtest = svd(stcs_data)
                 
                 rdm_rand = train_test_mahalanobis_fast(Xtrain, Xtest, y_train, y_test, n_jobs=jobs)
                 cvMD_rand.append(rdm_rand)
@@ -90,24 +96,29 @@ def process_subject(subject, jobs):
                 X_train, X_test = pattern_epochs[train_idx], pattern_epochs[test_idx]
                 y_train, y_test = pattern.positions.iloc[train_idx].reset_index(drop=True), pattern.positions.iloc[test_idx].reset_index(drop=True)
                 data_cov = mne.compute_covariance(X_train, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
-                noise_cov = mne.read_cov(res_dir / 'noise_cov' / f'{subject}-prac-{i}-noise-cov.fif', verbose=verbose)
+                # noise covariance computed on random trials
+                for j, (tidx, _) in enumerate(skf.split(random_epochs, random.positions)):
+                    if j == i:
+                        noise_cov = mne.compute_covariance(random_epochs[tidx], tmin=-0.2, tmax=0, method="empirical", rank="info", verbose=verbose)
                 # conpute rank
                 rank = mne.compute_rank(data_cov, info=X_train.info, rank=None, tol_kind='relative', verbose=verbose)
                 # compute source estimates
                 filters = make_lcmv(X_train.info, fwd, data_cov, reg=0.05, noise_cov=noise_cov,
-                                    pick_ori='vector', weight_norm="unit-noise-gain",
+                                    pick_ori=pick_ori, weight_norm=weight_norm,
                                     rank=rank, reduce_rank=True, verbose=verbose)
                 stcs_train = apply_lcmv_epochs(X_train, filters=filters, verbose=verbose)
                 label_tc, _ = get_volume_estimate_tc(stcs_train, fwd, offsets, subject, subjects_dir)
                 labels = [label for label in label_tc.keys() if region in label]
                 stcs_data = np.concatenate([np.real(label_tc[label]) for label in labels], axis=1)     
-                Xtrain = svd(stcs_data) 
+                if pick_ori == 'vector':
+                    Xtrain = svd(stcs_data) 
                 
                 stcs_test = apply_lcmv_epochs(X_test, filters=filters, verbose=verbose)
                 label_tc, _ = get_volume_estimate_tc(stcs_test, fwd, offsets, subject, subjects_dir)
                 labels = [label for label in label_tc.keys() if region  in label]
                 stcs_data = np.concatenate([np.real(label_tc[label]) for label in labels], axis=1)     
-                Xtest = svd(stcs_data)
+                if pick_ori == 'vector':
+                    Xtest = svd(stcs_data)
                 
                 rdm_pat = train_test_mahalanobis_fast(Xtrain, Xtest, y_train, y_test, n_jobs=jobs)
                 cvMD_pat.append(rdm_pat)
@@ -151,7 +162,7 @@ def process_subject(subject, jobs):
     
     for region in ['Hippocampus', 'Thalamus', 'Cerebellum-Cortex']:
 
-        res_dir = ensured(res_path / region / 'rdm_skf' / subject)
+        res_dir = ensured(res_path / region / analysis / subject)
         ensure_dir(res_dir / 'noise_cov')
         
         if not op.exists(res_dir / "rand-learn.npy") or overwrite:
@@ -166,19 +177,21 @@ def process_subject(subject, jobs):
                 rank = mne.compute_rank(data_cov, info=X_train.info, rank=None, tol_kind='relative', verbose=verbose)
                 # compute source estimates
                 filters = make_lcmv(X_train.info, fwd, data_cov, reg=0.05, noise_cov=noise_cov,
-                                pick_ori='vector', weight_norm="unit-noise-gain",
+                                pick_ori=pick_ori, weight_norm=weight_norm,
                                 rank=rank, reduce_rank=True, verbose=verbose)
                 stcs_train = apply_lcmv_epochs(X_train, filters=filters, verbose=verbose)
                 label_tc, _ = get_volume_estimate_tc(stcs_train, fwd, offsets, subject, subjects_dir)
                 labels = [label for label in label_tc.keys() if region in label]
                 stcs_data = np.concatenate([np.real(label_tc[label]) for label in labels], axis=1)     
-                Xtrain = svd(stcs_data)
+                if pick_ori == 'vector':
+                    Xtrain = svd(stcs_data)
 
                 stcs_test = apply_lcmv_epochs(X_test, filters=filters, verbose=verbose)
                 label_tc, _ = get_volume_estimate_tc(stcs_test, fwd, offsets, subject, subjects_dir)
                 labels = [label for label in label_tc.keys() if region in label]
                 stcs_data = np.concatenate([np.real(label_tc[label]) for label in labels], axis=1)     
-                Xtest = svd(stcs_data)
+                if pick_ori == 'vector':
+                    Xtest = svd(stcs_data)
                 
                 rdm_rand = train_test_mahalanobis_fast(Xtrain, Xtest, y_train, y_test, n_jobs=jobs)
                 cvMD_rand.append(rdm_rand)
@@ -199,19 +212,21 @@ def process_subject(subject, jobs):
                 rank = mne.compute_rank(data_cov, info=X_train.info, rank=None, tol_kind='relative', verbose=verbose)
                 # compute source estimates
                 filters = make_lcmv(X_train.info, fwd, data_cov, reg=0.05, noise_cov=noise_cov,
-                                    pick_ori='vector', weight_norm="unit-noise-gain",
+                                    pick_ori=pick_ori, weight_norm=weight_norm,
                                     rank=rank, reduce_rank=True, verbose=verbose)
                 stcs_train = apply_lcmv_epochs(X_train, filters=filters, verbose=verbose)
                 label_tc, _ = get_volume_estimate_tc(stcs_train, fwd, offsets, subject, subjects_dir)
                 labels = [label for label in label_tc.keys() if region in label]
                 stcs_data = np.concatenate([np.real(label_tc[label]) for label in labels], axis=1)     
-                Xtrain = svd(stcs_data) 
+                if pick_ori == 'vector':
+                    Xtrain = svd(stcs_data) 
                 
                 stcs_test = apply_lcmv_epochs(X_test, filters=filters, verbose=verbose)
                 label_tc, _ = get_volume_estimate_tc(stcs_test, fwd, offsets, subject, subjects_dir)
                 labels = [label for label in label_tc.keys() if region  in label]
                 stcs_data = np.concatenate([np.real(label_tc[label]) for label in labels], axis=1)     
-                Xtest = svd(stcs_data)
+                if pick_ori == 'vector':
+                    Xtest = svd(stcs_data)
                 
                 rdm_pat = train_test_mahalanobis_fast(Xtrain, Xtest, y_train, y_test, n_jobs=jobs)
                 cvMD_pat.append(rdm_pat)

@@ -23,7 +23,7 @@ times = np.linspace(-4, 4, 813)
 
 figure_dir = ensured(FIGURES_DIR / "time_gen" / "sensors")
 
-res_dir = RESULTS_DIR / 'TIMEG' / 'sensors' / "scores_skf_new"
+res_dir = RESULTS_DIR / 'TIMEG' / 'sensors' / "scores_skf"
 
 # load patterns and randoms time-generalization on all epochs
 all_patterns, all_randoms = [], []

@@ -9,8 +9,7 @@ from mne.decoding import GeneralizingEstimator
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score as acc
-from base import ensured, get_train_test_blocks_net
+from base import *
 from config import *
 from joblib import Parallel, delayed
 
@@ -26,16 +25,10 @@ mne.use_log_level(verbose)
 
 networks = NETWORKS[:-2]
 
-# pick_ori = sys.argv[1]
 pick_ori = 'vector'
 # pick_ori = 'max-power'
 
-# use_resting = sys.argv[2]
-use_resting = False
-
-analysis = 'scores_blocks' + '_maxp' if pick_ori == 'max-power' else 'scores_blocks' + '_vect'
-analysis += '_rs' if use_resting == 'True' else '_0200'
-analysis += '_new'
+analysis = 'scores_blocks_vector' if pick_ori == 'vector' else 'scores_blocks_maxpower'
 
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
@@ -48,7 +41,7 @@ def process_subject(subject, jobs):
 
     for network in networks:
         
-        print(f"Processing subject {subject} in network {network} with pick_ori={pick_ori} and use_resting={use_resting}")
+        print(f"Processing subject {subject} in network {network} with pick_ori={pick_ori}")
         
         # read labels
         lh_label, rh_label = mne.read_label(label_path / f'{network}-lh.label'), mne.read_label(label_path / f'{network}-rh.label')
@@ -73,12 +66,10 @@ def process_subject(subject, jobs):
                 block = int(block)
                 
                 if not op.exists(res_path / f"rand-{epoch_num}-{block}.npy") or overwrite:
-                    Xtrain, ytrain, Xtest, ytest = get_train_test_blocks_net(data_path, subject, epoch, fwd, behav, pick_ori, lh_label, rh_label, \
-                        'random', block, use_resting, verbose=verbose)
+                    Xtrain, ytrain, Xtest, ytest = get_train_test_blocks_net(epoch, fwd, behav, pick_ori, lh_label, rh_label, \
+                        'random', block, verbose=verbose)
                     clf.fit(Xtrain, ytrain)
-                    ypred = clf.predict(Xtest)
-                    print(f"Scoring random for {subject} epoch {epoch_num} block {block}")
-                    acc_matrix = np.apply_along_axis(lambda x: acc(ytest, x), 0, ypred)
+                    acc_matrix = clf.score(Xtest, ytest)
                     np.save(res_path / f"rand-{epoch_num}-{block}.npy", acc_matrix)
                     del Xtrain, ytrain, Xtest, ytest
                     gc.collect()
@@ -86,21 +77,10 @@ def process_subject(subject, jobs):
                     print(f"Random for {subject} epoch {epoch_num} block {block} in {network} already exists")
                 
                 if not op.exists(res_path / f"pat-{epoch_num}-{block}.npy") or overwrite:
-                    Xtrain, ytrain, Xtest, ytest = get_train_test_blocks_net(data_path, subject, epoch, fwd, behav, pick_ori, lh_label, rh_label, \
-                        'pattern', block, use_resting, verbose=verbose)
+                    Xtrain, ytrain, Xtest, ytest = get_train_test_blocks_net(epoch, fwd, behav, pick_ori, lh_label, rh_label, \
+                        'pattern', block, verbose=verbose)
                     clf.fit(Xtrain, ytrain)
-                    ypred = clf.predict(Xtest)
-                    print(f"Scoring pattern for {subject} epoch {epoch_num} block {block}")
-                    acc_matrix = np.apply_along_axis(lambda x: acc(ytest, x), 0, ypred)
-                    
-                    import matplotlib.pyplot as plt
-                    plt.figure(figsize=(10, 6))
-                    plt.imshow(acc_matrix, aspect='auto', cmap='viridis', origin='lower', vmin=0, vmax=0.5)
-                    plt.colorbar(label='Accuracy', extend='both')
-                    plt.clim(0, 0.5)
-                    plt.title(f'Accuracy Matrix for {subject} epoch {epoch_num} block {block}')
-                    plt.show()
-                    
+                    acc_matrix = clf.score(Xtest, ytest)
                     np.save(res_path / f"pat-{epoch_num}-{block}.npy", acc_matrix)
                     del Xtrain, ytrain, Xtest, ytest
                     gc.collect()

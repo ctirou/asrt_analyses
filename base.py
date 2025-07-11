@@ -902,13 +902,15 @@ def mixed_model_pvalues(df, dependent, predictor, group):
         'std_err': full_result.bse[predictor]
     }
 
-def get_train_test_blocks_net(data_path, subject, data, fwd, behav, pick_ori, lh_label, rh_label, trial_type, block, resting, verbose):
+def get_train_test_blocks_net(data, fwd, behav, pick_ori, lh_label, rh_label, trial_type, block, verbose):
     """Helper function to get source data for training and testing."""
     
-    from mne import read_cov, compute_covariance, compute_rank
+    from mne import compute_covariance, compute_rank
     from mne.beamformer import make_lcmv, apply_lcmv_epochs
     import numpy as np
     from base import svd
+    
+    weight_norm = "unit-noise-gain-invariant" if pick_ori == 'vector' else "unit-noise-gain"
 
     this_block = behav.blocks == block
     out_blocks = behav.blocks != block
@@ -923,16 +925,13 @@ def get_train_test_blocks_net(data_path, subject, data, fwd, behav, pick_ori, lh
     assert len(train_blocks) == len(train_epochs), "Length mismatch in training epochs"
     
     # compute noise covariance
-    if resting == 'True':
-        noise_cov = read_cov(data_path / 'noise_cov' / f"{subject}-cov.fif", verbose=verbose)
-    else:    
-        random = behav.trialtypes == 2
-        noise_epochs = data[random & out_blocks]
-        noise_cov = compute_covariance(noise_epochs, tmin=-0.2, tmax=0, method="empirical", rank="info", verbose=verbose)
+    random = behav.trialtypes == 2
+    noise_epochs = data[random & out_blocks]
+    noise_cov = compute_covariance(noise_epochs, tmin=-0.2, tmax=0, method="empirical", rank="info", verbose=verbose)
     data_cov = compute_covariance(train_epochs, method="empirical", rank="info", verbose=verbose)
     rank = compute_rank(data_cov, info=train_epochs.info, rank=None, tol_kind='relative', verbose=verbose)
     filters = make_lcmv(train_epochs.info, fwd, data_cov, reg=0.05, noise_cov=noise_cov,
-                        pick_ori=pick_ori, weight_norm="unit-noise-gain",
+                        pick_ori=pick_ori, weight_norm=weight_norm,
                         rank=rank, reduce_rank=True, verbose=verbose)
     stcs_train = apply_lcmv_epochs(train_epochs, filters=filters, verbose=verbose)
     Xtrain = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs_train])
@@ -953,11 +952,13 @@ def get_train_test_blocks_net(data_path, subject, data, fwd, behav, pick_ori, lh
     
     return Xtrain, ytrain, Xtest, ytest
 
-def get_train_test_blocks_htc(data_path, subject, data, fwd, behav, pick_ori, trial_type, block, resting, verbose):
+def get_train_test_blocks_htc(data, fwd, behav, pick_ori, trial_type, block, verbose):
     """Helper function to get source data for training and testing."""
     
-    from mne import read_cov, compute_covariance, compute_rank
+    from mne import compute_covariance, compute_rank
     from mne.beamformer import make_lcmv, apply_lcmv_epochs
+    
+    weight_norm = "unit-noise-gain-invariant" if pick_ori == 'vector' else "unit-noise-gain"
     
     this_block = behav.blocks == block
     out_blocks = behav.blocks != block
@@ -969,16 +970,13 @@ def get_train_test_blocks_htc(data_path, subject, data, fwd, behav, pick_ori, tr
     # compute training data
     train_blocks = behav[tt_out_blocks]
     train_epochs = data[train_blocks.trials.values]
-    if resting == 'True':
-        noise_cov = read_cov(data_path / 'noise_cov' / f"{subject}-cov.fif", verbose=verbose)
-    else:    
-        random = behav.trialtypes == 2
-        noise_epochs = data[random & out_blocks]
-        noise_cov = compute_covariance(noise_epochs, tmin=-0.2, tmax=0, method="empirical", rank="info", verbose=verbose)
+    random = behav.trialtypes == 2
+    noise_epochs = data[random & out_blocks]
+    noise_cov = compute_covariance(noise_epochs, tmin=-0.2, tmax=0, method="empirical", rank="info", verbose=verbose)
     data_cov = compute_covariance(train_epochs, method="empirical", rank="info", verbose=verbose)
     rank = compute_rank(data_cov, info=train_epochs.info, rank=None, tol_kind='relative', verbose=verbose)
     filters = make_lcmv(train_epochs.info, fwd, data_cov, reg=0.05, noise_cov=noise_cov,
-                        pick_ori=pick_ori, weight_norm="unit-noise-gain",
+                        pick_ori=pick_ori, weight_norm=weight_norm,
                         rank=rank, reduce_rank=True, verbose=verbose)
     stcs_train = apply_lcmv_epochs(train_epochs, filters=filters, verbose=verbose)
     ytrain = train_blocks.positions

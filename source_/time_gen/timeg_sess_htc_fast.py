@@ -13,7 +13,6 @@ from base import *
 from config import *
 import gc
 import sys
-from sklearn.metrics import accuracy_score as acc
 
 data_path = DATA_DIR / 'for_timeg_new'
 subjects, subjects_dir = SUBJS15, FREESURFER_DIR
@@ -23,9 +22,10 @@ scoring = "accuracy"
 verbose = True
 overwrite = False
 
-use_vector = True
-
-analysis = 'scores_skf_vect_0200_new'
+# pick_ori = 'vector'
+pick_ori = 'max-power'
+weight_norm = "unit-noise-gain-invariant" if pick_ori == 'vector' else "unit-noise-gain"
+analysis = 'scores_skf_vect' if pick_ori == 'vector' else 'scores_skf_maxpower'
 
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
@@ -77,13 +77,11 @@ def process_subject(subject, jobs):
     for region in ['Hippocampus', 'Thalamus', 'Cerebellum-Cortex']:
             
         res_path = ensured(RESULTS_DIR / 'TIMEG' / 'source' / region / analysis / subject)
-        ensure_dir(res_path / 'noise_cov')
         
-        random = behavs[behavs.trialtypes == 2].reset_index(drop=True)
+        random = behavs[behavs.trialtypes == 2]
         random_epochs = epochs[random.index]
-        
-        ensure_dir(res_path / 'noise_cov')
-        
+        random = random.reset_index(drop=True)
+                
         if not op.exists(res_path / "rand-all.npy") or overwrite:
             print("Processing", subject, 'all', "random", region)
             
@@ -92,17 +90,17 @@ def process_subject(subject, jobs):
                 
                 # training data
                 noise_cov = mne.compute_covariance(random_epochs[train_idx], tmin=-0.2, tmax=0, method="empirical", rank="info", verbose=verbose)
-                mne.write_cov(res_path / 'noise_cov' / f'{epoch_num}-{i+1}-noise-cov.fif', noise_cov, overwrite=True, verbose=verbose)
                 data_cov = mne.compute_covariance(random_epochs[train_idx], method="empirical", rank="info", verbose=verbose)
                 rank = mne.compute_rank(data_cov, info=random_epochs[train_idx].info, rank=None, tol_kind='relative', verbose=verbose)
                 filters = make_lcmv(random_epochs[train_idx].info, fwd, data_cov, reg=0.05, noise_cov=noise_cov,
-                                    pick_ori=pick_ori, weight_norm="unit-noise-gain",
+                                    pick_ori=pick_ori, weight_norm=weight_norm,
                                     rank=rank, reduce_rank=True, verbose=verbose)
                 stcs = apply_lcmv_epochs(random_epochs[train_idx], filters=filters, verbose=verbose)
                 label_tc, _ = get_volume_estimate_tc(stcs, fwd, offsets, subject, subjects_dir)
                 labels = [label for label in label_tc.keys() if region in label]
                 Xtrain = np.concatenate([np.real(label_tc[label]) for label in labels], axis=1) # this works
-                Xtrain = svd(Xtrain)
+                if pick_ori == 'vector':
+                    Xtrain = svd(Xtrain)
                 ytrain = random.positions[train_idx]
                 assert Xtrain.shape[0] == ytrain.shape[0], "Shape mismatch between training data and labels"
 
@@ -111,13 +109,13 @@ def process_subject(subject, jobs):
                 label_tc, _ = get_volume_estimate_tc(stcs, fwd, offsets, subject, subjects_dir)
                 labels = [label for label in label_tc.keys() if region in label]
                 Xtest = np.concatenate([np.real(label_tc[label]) for label in labels], axis=1) # this works
-                Xtest = svd(Xtest)
+                if pick_ori == 'vector':
+                    Xtest = svd(Xtest)
                 ytest = random.positions[test_idx]
                 assert Xtest.shape[0] == ytest.shape[0], "Shape mismatch between testing data and labels"
                 
                 clf.fit(Xtrain, ytrain)
-                ypred = clf.predict(Xtest)
-                acc_matrix = np.apply_along_axis(lambda x: acc(ytest, x), 0, ypred)
+                acc_matrix = clf.score(Xtest, ytest)
                 acc_matrices.append(acc_matrix)
                 
                 del Xtrain, ytrain, Xtest, ytest, stcs, label_tc
@@ -130,28 +128,33 @@ def process_subject(subject, jobs):
         else:
             print("Skipping", subject, 'all', "pattern", region)
             
-        pattern = behavs[behavs.trialtypes == 1].reset_index(drop=True)
+        pattern = behavs[behavs.trialtypes == 1]
         pattern_epochs = epochs[pattern.index]
+        pattern = pattern.reset_index(drop=True)
         
         if not op.exists(res_path / "pat-all.npy") or overwrite:
             print("Processing", subject, 'all', "pattern", region)
             
             acc_matrices = list()
             for i, (train_idx, test_idx) in enumerate(skf.split(pattern_epochs, pattern.positions)):
+            
+                # noise covariance computed on random trials
+                for j, (tidx, _) in enumerate(skf.split(random_epochs, random.positions)):
+                    if j == i:
+                        noise_cov = mne.compute_covariance(random_epochs[tidx], tmin=-0.2, tmax=0, method="empirical", rank="info", verbose=verbose)
                 
                 # training data
-                ensure_dir(res_path / 'noise_cov')
-                noise_cov = mne.read_cov(res_path / 'noise_cov' / f'{epoch_num}-{i+1}-noise-cov.fif', verbose=verbose)
                 data_cov = mne.compute_covariance(pattern_epochs[train_idx], method="empirical", rank="info", verbose=verbose)
                 rank = mne.compute_rank(data_cov, info=pattern_epochs[train_idx].info, rank=None, tol_kind='relative', verbose=verbose)
                 filters = make_lcmv(pattern_epochs[train_idx].info, fwd, data_cov, reg=0.05, noise_cov=noise_cov,
-                                    pick_ori=pick_ori, weight_norm="unit-noise-gain",
+                                    pick_ori=pick_ori, weight_norm=weight_norm,
                                     rank=rank, reduce_rank=True, verbose=verbose)
                 stcs = apply_lcmv_epochs(pattern_epochs[train_idx], filters=filters, verbose=verbose)
                 label_tc, _ = get_volume_estimate_tc(stcs, fwd, offsets, subject, subjects_dir)
                 labels = [label for label in label_tc.keys() if region in label]
                 Xtrain = np.concatenate([np.real(label_tc[label]) for label in labels], axis=1) # this works
-                Xtrain = svd(Xtrain)
+                if pick_ori == 'vector':
+                    Xtrain = svd(Xtrain)
                 ytrain = pattern.positions[train_idx]
                 assert Xtrain.shape[0] == ytrain.shape[0], "Shape mismatch between training data and labels"
 
@@ -160,13 +163,13 @@ def process_subject(subject, jobs):
                 label_tc, _ = get_volume_estimate_tc(stcs, fwd, offsets, subject, subjects_dir)
                 labels = [label for label in label_tc.keys() if region in label]
                 Xtest = np.concatenate([np.real(label_tc[label]) for label in labels], axis=1) # this works
-                Xtest = svd(Xtest)
+                if pick_ori == 'vector':
+                    Xtest = svd(Xtest)
                 ytest = pattern.positions[test_idx]
                 assert Xtest.shape[0] == ytest.shape[0], "Shape mismatch between testing data and labels"
 
                 clf.fit(Xtrain, ytrain)
-                ypred = clf.predict(Xtest)
-                acc_matrix = np.apply_along_axis(lambda x: acc(ytest, x), 0, ypred)
+                acc_matrix = clf.score(Xtest, ytest)
                 acc_matrices.append(acc_matrix)
 
                 del Xtrain, ytrain, Xtest, ytest, stcs, label_tc

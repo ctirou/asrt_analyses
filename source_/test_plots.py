@@ -213,6 +213,8 @@ fig.suptitle(f"Random trials decoding – ori=${ori}$")
 
 # --- Temporal generalization ---
 res_dir = RESULTS_DIR / 'TIMEG' / 'source' 
+data_type = 'scores_skf_vect'
+data_type = 'scores_skf_maxp'
 patterns, randoms = {}, {}
 all_patterns, all_randoms = {}, {}
 all_diags = {}
@@ -223,30 +225,113 @@ for network in tqdm(networks):
     all_pat, all_rand, all_diag = [], [], []
     patpat, randrand = [], []
     for i, subject in enumerate(subjects):
-        # pat, rand = [], []
-        # for j in [0, 1, 2, 3, 4]:
-        #     pat.append(np.load(res_dir / network / analysis / subject / f"pat-{j}.npy"))
-        #     rand.append(np.load(res_dir / network / analysis / subject / f"rand-{j}.npy"))
-        # patpat.append(np.array(pat))
-        # randrand.append(np.array(rand))
+        pat, rand = [], []
+        for j in [0, 1, 2, 3, 4]:
+            pat.append(np.load(res_dir / network / data_type / subject / f"pat-{j}.npy"))
+            rand.append(np.load(res_dir / network / data_type / subject / f"rand-{j}.npy"))
+        patpat.append(np.array(pat))
+        randrand.append(np.array(rand))
     
-        all_pat.append(np.load(res_dir / network / analysis / subject / "pat-all.npy"))
-        all_rand.append(np.load(res_dir / network / analysis / subject / "rand-all.npy"))
+        # all_pat.append(np.load(res_dir / network / data_type / subject / "pat-all.npy"))
+        # all_rand.append(np.load(res_dir / network / data_type / subject / "rand-all.npy"))
         
-        diag = np.array(all_pat) - np.array(all_rand)
-        all_diag.append(np.diag(diag[i]))
+        # diag = np.array(all_pat) - np.array(all_rand)
+        # all_diag.append(np.diag(diag[i]))
 
-    all_patterns[network] = np.array(all_pat)
-    all_randoms[network] = np.array(all_rand)
-    all_diags[network] = np.array(all_diag)
+    # all_patterns[network] = np.array(all_pat)
+    # all_randoms[network] = np.array(all_rand)
+    # all_diags[network] = np.array(all_diag)
     
-    # patterns[network] = np.array(patpat)
-    # randoms[network] = np.array(randrand)
+    patterns[network] = np.array(patpat)
+    randoms[network] = np.array(randrand)
 
 cmap1 = "RdBu_r"
 c1 = "#20B2AA"
 c1 = "#00BFA6"
 c1 = "#708090"
+
+# Pattern per sessions
+for sess in range(5):
+    fig, axes = plt.subplots(2, 5, figsize=(20, 4), sharex=True, sharey=True, layout='constrained')
+    for ax, network, name in zip(axes.flatten(), networks, network_names):
+        im = ax.imshow(
+            patterns[network][sess].mean(0),
+            interpolation="lanczos",
+            origin="lower",
+            cmap=cmap1,
+            extent=timesg[[0, -1, 0, -1]],
+            aspect=0.5,
+            vmin=0.2,
+            vmax=0.3)
+        ax.set_title(f"{name}", fontsize=10, fontstyle="italic")
+        # xx, yy = np.meshgrid(timesg, timesg, copy=False, indexing='xy')
+        # pval = np.load(res_dir / network / "pval-all" / "all_pattern-pval.npy")
+        # sig = pval < threshold
+        # ax.contour(xx, yy, sig, colors=c1, levels=[0],
+        #                     linestyles='--', linewidths=1)
+        ax.axvline(0, color="k", alpha=.5)
+        ax.axhline(0, color="k", alpha=.5)
+    fig.suptitle(f"Pattern trials decoding – {sess}")
+    # fig.savefig(figures_dir / "timeg-pattern.pdf", transparent=True)
+    # plt.close(fig)
+
+# Pattern session average
+fig, axes = plt.subplots(2, 5, figsize=(20, 4), sharex=True, sharey=True, layout='constrained')
+for ax, network, name in zip(axes.flatten(), networks, network_names):
+    # im = axes[i].imshow(
+    im = ax.imshow(
+        patterns[network].mean((0, 1)),
+        interpolation="lanczos",
+        origin="lower",
+        cmap=cmap1,
+        extent=timesg[[0, -1, 0, -1]],
+        aspect=0.5,
+        vmin=0.2,
+        vmax=0.3)
+    ax.set_title(f"{name}", fontsize=10, fontstyle="italic")
+    # xx, yy = np.meshgrid(timesg, timesg, copy=False, indexing='xy')
+    # pval = np.load(res_dir / network / "pval-all" / "all_pattern-pval.npy")
+    # sig = pval < threshold
+    # ax.contour(xx, yy, sig, colors=c1, levels=[0],
+    #                     linestyles='--', linewidths=1)
+    ax.axvline(0, color="k", alpha=.5)
+    ax.axhline(0, color="k", alpha=.5)
+# fig.savefig(figures_dir / "timeg-pattern.pdf", transparent=True)
+# plt.close(fig)
+
+# --- Temporal generalization ---
+res_dir = RESULTS_DIR / 'TIMEG' / 'source' 
+data_type = 'scores_skf_vect'
+data_type = 'scores_skf_maxp'
+patterns, randoms = {}, {}
+all_patterns, all_randoms = {}, {}
+all_diags = {}
+for network in tqdm(networks):
+    if not network in patterns:
+        patterns[network], randoms[network] = [], []
+        all_patterns[network], all_randoms[network] = [], []
+    all_pat, all_rand, all_diag = [], [], []
+    patpat, randrand = [], []
+    for i, subject in enumerate(subjects):
+        pat, rand = [], []
+        for j in [0, 1, 2, 3, 4]:
+            pat.append(np.load(res_dir / network / data_type / subject / f"pat-{j}.npy"))
+            rand.append(np.load(res_dir / network / data_type / subject / f"rand-{j}.npy"))
+        patpat.append(np.array(pat))
+        randrand.append(np.array(rand))
+    
+        # all_pat.append(np.load(res_dir / network / data_type / subject / "pat-all.npy"))
+        # all_rand.append(np.load(res_dir / network / data_type / subject / "rand-all.npy"))
+        
+        # diag = np.array(all_pat) - np.array(all_rand)
+        # all_diag.append(np.diag(diag[i]))
+
+    # all_patterns[network] = np.array(all_pat)
+    # all_randoms[network] = np.array(all_rand)
+    # all_diags[network] = np.array(all_diag)
+    
+    patterns[network] = np.array(patpat)
+    randoms[network] = np.array(randrand)
 
 # Pattern
 fig, axes = plt.subplots(2, 5, figsize=(20, 4), sharex=True, sharey=True, layout='constrained')
@@ -319,26 +404,26 @@ for ax, network, name in zip(axes.flatten(), networks, network_names):
 # fig.savefig(figures_dir / "timeg-contrast.pdf", transparent=True)
 # plt.close(fig)
 
-# Correlation with learning
-fig, axes = plt.subplots(2, 5, figsize=(20, 4), sharex=True, sharey=True, layout='constrained')
-for ax, network, name in zip(axes.flatten(), networks, network_names):
-    rhos = np.load(res_dir / network / "corr-all" / "rhos_learn.npy")
-    pval = np.load(res_dir / network / "corr-all" / "pval_learn-pval.npy")
-    sig = pval < threshold
-    im = ax.imshow(
-        rhos.mean(0),
-        interpolation="lanczos",
-        origin="lower",
-        cmap=cmap1,
-        extent=timesg[[0, -1, 0, -1]],
-        aspect=0.5,
-        vmin=-.2,
-        vmax=.2)
-    ax.set_title(f"{name}", style='italic')
-    xx, yy = np.meshgrid(timesg, timesg, copy=False, indexing='xy')
-    ax.contour(xx, yy, sig, colors=c1, levels=[0],
-                        linestyles='solid', linewidths=1)
-    ax.axvline(0, color="k")
-    ax.axhline(0, color="k")
-# fig.savefig(figures_dir / "timeg-corr.pdf", transparent=True)
-# plt.close(fig)
+# # Correlation with learning
+# fig, axes = plt.subplots(2, 5, figsize=(20, 4), sharex=True, sharey=True, layout='constrained')
+# for ax, network, name in zip(axes.flatten(), networks, network_names):
+#     rhos = np.load(res_dir / network / "corr-all" / "rhos_learn.npy")
+#     pval = np.load(res_dir / network / "corr-all" / "pval_learn-pval.npy")
+#     sig = pval < threshold
+#     im = ax.imshow(
+#         rhos.mean(0),
+#         interpolation="lanczos",
+#         origin="lower",
+#         cmap=cmap1,
+#         extent=timesg[[0, -1, 0, -1]],
+#         aspect=0.5,
+#         vmin=-.2,
+#         vmax=.2)
+#     ax.set_title(f"{name}", style='italic')
+#     xx, yy = np.meshgrid(timesg, timesg, copy=False, indexing='xy')
+#     ax.contour(xx, yy, sig, colors=c1, levels=[0],
+#                         linestyles='solid', linewidths=1)
+#     ax.axvline(0, color="k")
+#     ax.axhline(0, color="k")
+# # fig.savefig(figures_dir / "timeg-corr.pdf", transparent=True)
+# # plt.close(fig)

@@ -9,8 +9,7 @@ from mne.decoding import GeneralizingEstimator
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score as acc
-from base import ensured, get_volume_estimate_tc, get_train_test_blocks_htc
+from base import *
 from config import *
 from joblib import Parallel, delayed
 
@@ -22,22 +21,18 @@ lock = 'stim'
 solver = 'lbfgs'
 scoring = "accuracy"
 verbose = 'error'
-overwrite = True
+overwrite = False
+mne.use_log_level(verbose)
 
-pick_ori = sys.argv[1]
-# pick_ori = 'vector'
+pick_ori = 'vector'
 # pick_ori = 'max-power'
-
-use_resting = sys.argv[2]
-
-analysis = 'scores_blocks' + '_maxp' if pick_ori == 'max-power' else 'scores_blocks' + '_vect'
-analysis += '_rs' if use_resting == 'True' else '_0200'
+analysis = 'scores_blocks_vector' if pick_ori == 'vector' else 'scores_blocks_maxpower'
 
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
 def process_subject(subject, jobs):
     
-    print(f"Processing subject {subject} with pick_ori={pick_ori} and use_resting={use_resting}")
+    print(f"Processing subject {subject} with pick_ori={pick_ori}")
     
     # define classifier
     clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
@@ -76,7 +71,7 @@ def process_subject(subject, jobs):
                 block = int(block)
                 
                 # random trials
-                stcs_train, ytrain, stcs_test, ytest = get_train_test_blocks_htc(data_path, subject, epoch, fwd, behav, pick_ori, 'random', block, use_resting, verbose=verbose)
+                stcs_train, ytrain, stcs_test, ytest = get_train_test_blocks_htc(epoch, fwd, behav, pick_ori, 'random', block, verbose=verbose)
                 label_tc_train, _ = get_volume_estimate_tc(stcs_train, fwd, offsets, subject, subjects_dir)
                 labels = [label for label in label_tc_train.keys() if region in label]
                 Xtrain = np.concatenate([np.real(label_tc_train[label]) for label in labels], axis=1)
@@ -88,11 +83,9 @@ def process_subject(subject, jobs):
                 if pick_ori == 'vector':
                     Xtest = svd(Xtest)
                 
-                clf.fit(Xtrain, ytrain)
                 if not op.exists(res_path / f"rand-{epoch_num}-{block}.npy") or overwrite:
-                    ypred = clf.predict(Xtest)
-                    print(f"Scoring random for {subject} epoch {epoch_num} block {block}")
-                    acc_matrix = np.apply_along_axis(lambda x: acc(ytest, x), 0, ypred)
+                    clf.fit(Xtrain, ytrain)
+                    acc_matrix = clf.score(Xtest, ytest)
                     np.save(res_path / f"rand-{epoch_num}-{block}.npy", acc_matrix)
                 else:
                     print(f"Random for {subject} epoch {epoch_num} block {block} already exists")
@@ -101,7 +94,7 @@ def process_subject(subject, jobs):
                 gc.collect()
                 
                 # pattern trials
-                stcs_train, ytrain, stcs_test, ytest = get_train_test_blocks_htc(data_path, subject, epoch, fwd, behav, pick_ori, 'pattern', block, use_resting, verbose=verbose)
+                stcs_train, ytrain, stcs_test, ytest = get_train_test_blocks_htc(epoch, fwd, behav, pick_ori, 'pattern', block, verbose=verbose)
                 label_tc_train, _ = get_volume_estimate_tc(stcs_train, fwd, offsets, subject, subjects_dir)
                 labels = [label for label in label_tc_train.keys() if region in label]
                 Xtrain = np.concatenate([np.real(label_tc_train[label]) for label in labels], axis=1)
@@ -113,11 +106,9 @@ def process_subject(subject, jobs):
                 if pick_ori == 'vector':
                     Xtest = svd(Xtest)
                 
-                clf.fit(Xtrain, ytrain)
                 if not op.exists(res_path / f"pat-{epoch_num}-{block}.npy") or overwrite:
-                    ypred = clf.predict(Xtest)
-                    print(f"Scoring pattern for {subject} epoch {epoch_num} block {block}")
-                    acc_matrix = np.apply_along_axis(lambda x: acc(ytest, x), 0, ypred)
+                    clf.fit(Xtrain, ytrain)
+                    acc_matrix = clf.score(Xtest, ytest)
                     np.save(res_path / f"pat-{epoch_num}-{block}.npy", acc_matrix)
                 else:
                     print(f"Pattern for {subject} epoch {epoch_num} block {block} already exists")

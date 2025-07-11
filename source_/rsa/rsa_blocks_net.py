@@ -22,7 +22,11 @@ is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
 networks = NETWORKS[:-2]
 
-analysis = 'rdm_blocks_vect_0200'
+# pick_ori = 'max-power'
+pick_ori = 'vector'
+weight_norm = "unit-noise-gain-invariant" if pick_ori == 'vector' else "unit-noise-gain"
+
+analysis = 'rdm_blocks_vect' if pick_ori == 'vector' else 'rdm_blocks_maxpower'
 
 def process_subject(subject, jobs, verbose):
 
@@ -57,8 +61,8 @@ def process_subject(subject, jobs, verbose):
                 # random trials
                 if not op.exists(res_path / f"rand-{epoch_num}-{block}.npy") or overwrite:
                     print(f"Processing Mahalanobis for {subject} epoch {epoch_num} block {block} random")
-                    Xtrain, ytrain, Xtest, ytest = get_train_test_blocks_net(data_path, subject, epoch, fwd, behav, 'vector', lh_label, rh_label, \
-                        'random', block, False, verbose=verbose)
+                    Xtrain, ytrain, Xtest, ytest = get_train_test_blocks_net(epoch, fwd, behav, pick_ori, lh_label, rh_label, \
+                        'random', block, verbose=verbose)
                     rdm_rand = train_test_mahalanobis_fast(Xtrain, Xtest, ytrain, ytest, jobs, verbose)
                     np.save(res_path / f"rand-{epoch_num}-{block}.npy", rdm_rand)
                     del Xtrain, ytrain, Xtest, ytest, rdm_rand
@@ -69,8 +73,8 @@ def process_subject(subject, jobs, verbose):
                 # pattern trials
                 if not op.exists(res_path / f"pat-{epoch_num}-{block}.npy") or overwrite:
                     print(f"Processing Mahalanobis for {subject} epoch {epoch_num} block {block} pattern")
-                    Xtrain, ytrain, Xtest, ytest = get_train_test_blocks_net(data_path, subject, epoch, fwd, behav, 'vector', lh_label, rh_label, \
-                        'pattern', block, False, verbose=verbose)
+                    Xtrain, ytrain, Xtest, ytest = get_train_test_blocks_net(epoch, fwd, behav, pick_ori, lh_label, rh_label, \
+                        'pattern', block, verbose=verbose)
                     rdm_pat = train_test_mahalanobis_fast(Xtrain, Xtest, ytrain, ytest, jobs, verbose)
                     np.save(res_path / f"pat-{epoch_num}-{block}.npy", rdm_pat)
                     del Xtrain, ytrain, Xtest, ytest, rdm_pat

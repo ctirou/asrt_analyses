@@ -18,7 +18,9 @@ verbose = 'error'
 overwrite = True
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
-analysis = 'rdm_blocks_vect_0200'
+# pick_ori = 'max-power'
+pick_ori = 'vector'
+analysis = 'rdm_blocks_vect' if pick_ori == 'vector' else 'rdm_blocks_maxpower'
 
 def process_subject(subject, jobs, verbose):
     
@@ -56,15 +58,17 @@ def process_subject(subject, jobs, verbose):
                 # random trials
                 if not op.exists(res_path / f"rand-{epoch_num}-{block}.npy") or overwrite:
                     print(f"Computing Mahalanobis for {subject} epoch {epoch_num} block {block} random")
-                    stcs_train, ytrain, stcs_test, ytest = get_train_test_blocks_htc(data_path, subject, epoch, fwd, behav, 'vector', 'random', block, False, verbose=verbose)
+                    stcs_train, ytrain, stcs_test, ytest = get_train_test_blocks_htc(epoch, fwd, behav, pick_ori, 'random', block, verbose=verbose)
                     label_tc_train, _ = get_volume_estimate_tc(stcs_train, fwd, offsets, subject, subjects_dir)
                     labels = [label for label in label_tc_train.keys() if region in label]
                     Xtrain = np.concatenate([np.real(label_tc_train[label]) for label in labels], axis=1)
-                    Xtrain = svd(Xtrain)
+                    if pick_ori == 'vector':
+                        Xtrain = svd(Xtrain)
 
                     label_tc_test, _ = get_volume_estimate_tc(stcs_test, fwd, offsets, subject, subjects_dir)
                     Xtest = np.concatenate([np.real(label_tc_test[label]) for label in labels], axis=1)
-                    Xtest = svd(Xtest)
+                    if pick_ori == 'vector':
+                        Xtest = svd(Xtest)
                     rdm_rand = train_test_mahalanobis_fast(Xtrain, Xtest, ytrain, ytest, jobs, verbose)
                     np.save(res_path / f"rand-{epoch_num}-{block}.npy", rdm_rand)
                 else:
@@ -73,15 +77,17 @@ def process_subject(subject, jobs, verbose):
                 # pattern trials
                 if not op.exists(res_path / f"pat-{epoch_num}-{block}.npy") or overwrite:
                     print(f"Computing Mahalanobis for {subject} epoch {epoch_num} block {block} random")
-                    stcs_train, ytrain, stcs_test, ytest = get_train_test_blocks_htc(data_path, subject, epoch, fwd, behav, 'vector', 'pattern', block, False, verbose=verbose)
+                    stcs_train, ytrain, stcs_test, ytest = get_train_test_blocks_htc(epoch, fwd, behav, pick_ori, 'pattern', block, verbose=verbose)
                     label_tc_train, _ = get_volume_estimate_tc(stcs_train, fwd, offsets, subject, subjects_dir)
                     labels = [label for label in label_tc_train.keys() if region in label]
                     Xtrain = np.concatenate([np.real(label_tc_train[label]) for label in labels], axis=1)
-                    Xtrain = svd(Xtrain)
+                    if pick_ori == 'vector':
+                        Xtrain = svd(Xtrain)
 
                     label_tc_test, _ = get_volume_estimate_tc(stcs_test, fwd, offsets, subject, subjects_dir)
                     Xtest = np.concatenate([np.real(label_tc_test[label]) for label in labels], axis=1)
-                    Xtest = svd(Xtest)
+                    if pick_ori == 'vector':
+                        Xtest = svd(Xtest)
                     rdm_rand = train_test_mahalanobis_fast(Xtrain, Xtest, ytrain, ytest, jobs, verbose)
                     np.save(res_path / f"pat-{epoch_num}-{block}.npy", rdm_rand)
                 else:

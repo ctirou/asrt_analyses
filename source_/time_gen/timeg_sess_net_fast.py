@@ -13,7 +13,6 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 import gc
 import sys
-from sklearn.metrics import accuracy_score as acc
 
 # params
 subjects = SUBJS15
@@ -23,12 +22,15 @@ subjects_dir = FREESURFER_DIR
 solver = 'lbfgs'
 scoring = "accuracy"
 folds = 10
-verbose = True
+verbose = 'error'
 overwrite = False
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
+mne.use_log_level(verbose)
 
-pick_ori = 'vector'
-analysis = 'scores_skf_vect_0200_new'
+# pick_ori = 'vector'
+pick_ori = 'max-power'
+weight_norm = "unit-noise-gain-invariant" if pick_ori == 'vector' else "unit-noise-gain"
+analysis = 'scores_skf_vect' if pick_ori == 'vector' else 'scores_skf_maxpower'
     
 networks = NETWORKS[:-2]
 
@@ -69,15 +71,15 @@ def process_subject(subject, jobs):
     
     # network and custom label_names
     label_path = RESULTS_DIR / 'networks_200_7' / subject
-        
     
     for network in networks:
         lh_label, rh_label = mne.read_label(label_path / f'{network}-lh.label'), mne.read_label(label_path / f'{network}-rh.label')
         res_path = ensured(RESULTS_DIR / 'TIMEG' / 'source' / network / analysis / subject)
         
-        random = behavs[behavs.trialtypes == 2].reset_index(drop=True)
+        random = behavs[behavs.trialtypes == 2]
         random_epochs = epochs[random.index]
-
+        random = random.reset_index(drop=True)
+        
         # random trials
         if not os.path.exists(res_path / "rand-all.npy") or overwrite:
         
@@ -87,31 +89,27 @@ def process_subject(subject, jobs):
                 print(f"Processing {subject} random {network} split {i+1}")
                 
                 # training data
-                ensure_dir(res_path / 'noise_cov')
                 noise_cov = mne.compute_covariance(random_epochs[train_idx], tmin=-0.2, tmax=0, method="empirical", rank="info", verbose=verbose)
-                mne.write_cov(res_path / 'noise_cov' / f'{epoch_num}-{i+1}-noise-cov.fif', noise_cov, overwrite=True, verbose=verbose)
-
                 data_cov = mne.compute_covariance(random_epochs[train_idx], method="empirical", rank="info", verbose=verbose)
                 rank = mne.compute_rank(data_cov, info=random_epochs[train_idx].info, rank=None, tol_kind='relative', verbose=verbose)
                 filters = make_lcmv(random_epochs[train_idx].info, fwd, data_cov, reg=0.05, noise_cov=noise_cov,
-                                    pick_ori=pick_ori, weight_norm="unit-noise-gain",
+                                    pick_ori=pick_ori, weight_norm=weight_norm,
                                     rank=rank, reduce_rank=True, verbose=verbose)
                 stcs_train = apply_lcmv_epochs(random_epochs[train_idx], filters=filters, verbose=verbose)
                 Xtrain = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs_train])
-                Xtrain = svd(Xtrain)
+                # Xtrain = svd(Xtrain)
                 ytrain = random.positions[train_idx]
                 assert Xtrain.shape[0] == ytrain.shape[0], "Length mismatch"
                                 
                 # testing data
                 stcs_test = apply_lcmv_epochs(random_epochs[test_idx], filters=filters, verbose=verbose)
                 Xtest = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs_test])
-                Xtest = svd(Xtest)
+                # Xtest = svd(Xtest)
                 ytest = random.positions[test_idx]
-                assert Xtest.shape[0] == ytest.shape[0], "Length mismatch"                
+                assert Xtest.shape[0] == ytest.shape[0], "Length mismatch"
                 
                 clf.fit(Xtrain, ytrain)
-                ypred = clf.predict(Xtest)
-                acc_matrix = np.apply_along_axis(lambda x: acc(ytest, x), 0, ypred)
+                acc_matrix = clf.score(Xtest, ytest)
                 acc_matrices.append(acc_matrix)
 
             np.save(res_path / "rand-all.npy", np.array(acc_matrices).mean(0))
@@ -119,11 +117,9 @@ def process_subject(subject, jobs):
             del acc_matrices, Xtrain, ytrain, Xtest, ytest, stcs_train, stcs_test
             gc.collect()
         
-        del random_epochs, random
-        gc.collect()
-
-        pattern = behavs[behavs.trialtypes == 1].reset_index(drop=True)
+        pattern = behavs[behavs.trialtypes == 1]
         pattern_epochs = epochs[pattern.index]
+        pattern = pattern.reset_index(drop=True)
 
         # pattern trials
         if not os.path.exists(res_path / "pat-all.npy") or overwrite:
@@ -133,30 +129,33 @@ def process_subject(subject, jobs):
 
                 print(f"Processing {subject} pattern {network} split {i+1}")
                 
-                # get training data - pattern trials
-                noise_cov = mne.read_cov(res_path / 'noise_cov' / f'{epoch_num}-{i+1}-noise-cov.fif', verbose=verbose)
-                
+                # get training data
+                # noise covariance computed on random trials
+                for j, (tidx, _) in enumerate(skf.split(random_epochs, random.positions)):
+                    if j == i:
+                        noise_cov = mne.compute_covariance(random_epochs[tidx], tmin=-0.2, tmax=0, method="empirical", rank="info", verbose=verbose)
                 data_cov = mne.compute_covariance(pattern_epochs[train_idx], method="empirical", rank="info", verbose=verbose)
                 rank = mne.compute_rank(data_cov, info=pattern_epochs[train_idx].info, rank=None, tol_kind='relative', verbose=verbose)
                 filters = make_lcmv(pattern_epochs[train_idx].info, fwd, data_cov, reg=0.05, noise_cov=noise_cov,
-                                    pick_ori=pick_ori, weight_norm="unit-noise-gain",
+                                    pick_ori=pick_ori, weight_norm=weight_norm,
                                     rank=rank, reduce_rank=True, verbose=verbose)
                 stcs_train = apply_lcmv_epochs(pattern_epochs[train_idx], filters=filters, verbose=verbose)
                 Xtrain = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs_train])
-                Xtrain = svd(Xtrain)
+                if pick_ori == 'vector':
+                    Xtrain = svd(Xtrain)
                 ytrain = pattern.positions[train_idx]
                 assert Xtrain.shape[0] == ytrain.shape[0], "Length mismatch"
                                 
-                # get testing data - pattern trials
+                # get testing data
                 stcs_test = apply_lcmv_epochs(pattern_epochs[test_idx], filters=filters, verbose=verbose)
                 Xtest = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs_test])
-                Xtest = svd(Xtest)
+                if pick_ori == 'vector':
+                    Xtest = svd(Xtest)
                 ytest = pattern.positions[test_idx]
                 assert Xtest.shape[0] == ytest.shape[0], "Length mismatch"
                 
                 clf.fit(Xtrain, ytrain)
-                ypred = clf.predict(Xtest)
-                acc_matrix = np.apply_along_axis(lambda x: acc(ytest, x), 0, ypred)
+                acc_matrix = clf.score(Xtest, ytest)
                 acc_matrices.append(acc_matrix)
 
             np.save(res_path / "pat-all.npy", np.array(acc_matrices).mean(0))
@@ -164,7 +163,7 @@ def process_subject(subject, jobs):
             del acc_matrices, Xtrain, ytrain, Xtest, ytest, stcs_train, stcs_test
             gc.collect()
         
-        del pattern_epochs, pattern
+        del pattern_epochs, pattern, random_epochs, random
         gc.collect()
             
     print(f"Analysis {analysis} completed for subject {subject}.")
@@ -180,5 +179,5 @@ if is_cluster:
         sys.exit(1)
 else:
     jobs = -1
-    for subject in subjects[11:]:
+    for subject in subjects[::-1]:
         process_subject(subject, jobs)

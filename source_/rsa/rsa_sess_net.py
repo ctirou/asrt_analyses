@@ -20,6 +20,11 @@ overwrite = False
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 jobs = -1
 
+# pick_ori = 'max-power'
+pick_ori = 'vector'
+weight_norm = 'unit-noise-gain-invariant' if pick_ori == 'vector' else 'unit-noise-gain'
+analysis = 'rdm_skf_vector' if pick_ori == 'vector' else 'rdm_skf_maxpower'
+
 def process_subject(subject, jobs):
 
     networks = NETWORKS[:-2]
@@ -40,8 +45,7 @@ def process_subject(subject, jobs):
     fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
 
     for network in networks:
-        res_dir = ensured(RESULTS_DIR / "RSA" / 'source' / network / 'rdm_skf' / subject)
-        ensure_dir(res_dir / "noise_cov")
+        res_dir = ensured(RESULTS_DIR / "RSA" / 'source' / network / analysis / subject)
         lh_label, rh_label = mne.read_label(label_path / f'{network}-lh.label'), mne.read_label(label_path / f'{network}-rh.label')
         cvMD_rand = list()
         if not op.exists(res_dir / "rand-prac.npy") or overwrite:
@@ -50,20 +54,21 @@ def process_subject(subject, jobs):
                 y_train, y_test = random.positions.iloc[train_idx], random.positions.iloc[test_idx]
                 data_cov = mne.compute_covariance(X_train, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
                 noise_cov = mne.compute_covariance(X_train, tmin=-.2, tmax=0, method="empirical", rank="info", verbose=verbose)
-                mne.write_cov(res_dir / 'noise_cov' / f'{subject}-prac-{i}-noise-cov.fif', noise_cov, overwrite=True, verbose=verbose)
                 # conpute rank
                 rank = mne.compute_rank(data_cov, info=X_train.info, rank=None, tol_kind='relative', verbose=verbose)
                 # compute source estimates
                 filters = make_lcmv(X_train.info, fwd, data_cov, reg=0.05, noise_cov=noise_cov,
-                                pick_ori='vector', weight_norm="unit-noise-gain",
+                                pick_ori=pick_ori, weight_norm=weight_norm,
                                 rank=rank, reduce_rank=True, verbose=verbose)
                 stcs_train = apply_lcmv_epochs(X_train, filters=filters, verbose=verbose)
                 Xtrain = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs_train])
-                Xtrain = svd(Xtrain)
+                if pick_ori == 'vector':
+                    Xtrain = svd(Xtrain)
                 
                 stcs_test = apply_lcmv_epochs(X_test, filters=filters, verbose=verbose)
                 Xtest = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs_test])
-                Xtest = svd(Xtest)
+                if pick_ori == 'vector':
+                    Xtest = svd(Xtest)
                 
                 dist = train_test_mahalanobis_fast(Xtrain, Xtest, y_train, y_test, n_jobs=jobs)
                 cvMD_rand.append(dist)
@@ -81,21 +86,25 @@ def process_subject(subject, jobs):
                 X_train, X_test = pattern_epochs[train_idx], pattern_epochs[test_idx]
                 y_train, y_test = pattern.positions.iloc[train_idx], pattern.positions.iloc[test_idx]
                 data_cov = mne.compute_covariance(X_train, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
-                noise_cov = mne.read_cov(res_dir / 'noise_cov' / f'{subject}-prac-{i}-noise-cov.fif', verbose=verbose)
-                
+                # noise covariance computed on random trials
+                for j, (tidx, _) in enumerate(skf.split(random_epochs, random.positions)):
+                    if j == i:
+                        noise_cov = mne.compute_covariance(random_epochs[tidx], tmin=-0.2, tmax=0, method="empirical", rank="info", verbose=verbose)
                 # conpute rank
                 rank = mne.compute_rank(data_cov, info=X_train.info, rank=None, tol_kind='relative', verbose=verbose)
                 # compute source estimates
                 filters = make_lcmv(X_train.info, fwd, data_cov, reg=0.05, noise_cov=noise_cov,
-                                pick_ori='vector', weight_norm="unit-noise-gain",
+                                pick_ori=pick_ori, weight_norm=weight_norm,
                                 rank=rank, reduce_rank=True, verbose=verbose)
                 stcs_train = apply_lcmv_epochs(X_train, filters=filters, verbose=verbose)
                 Xtrain = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs_train])
-                Xtrain = svd(Xtrain)
+                if pick_ori == 'vector':
+                    Xtrain = svd(Xtrain)
                 
                 stcs_test = apply_lcmv_epochs(X_test, filters=filters, verbose=verbose)
                 Xtest = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs_test])
-                Xtest = svd(Xtest)
+                if pick_ori == 'vector':
+                    Xtest = svd(Xtest)
                 
                 dist = train_test_mahalanobis_fast(Xtrain, Xtest, y_train, y_test, n_jobs=jobs)
                 cvMD_pat.append(dist)
@@ -106,7 +115,6 @@ def process_subject(subject, jobs):
             gc.collect()
         else:
             print("Pattern RDM already exists for", subject, network)
-
 
     # now the learning epochs
     all_epochs = []
@@ -134,7 +142,7 @@ def process_subject(subject, jobs):
     
     # random
     for network in networks:
-        res_dir = ensured(RESULTS_DIR / "RSA" / 'source' / network / 'rdm_skf' / subject)
+        res_dir = ensured(RESULTS_DIR / "RSA" / 'source' / network / analysis / subject)
         lh_label, rh_label = mne.read_label(label_path / f'{network}-lh.label'), mne.read_label(label_path / f'{network}-rh.label')
         cvMD_rand = list()
         
@@ -144,20 +152,21 @@ def process_subject(subject, jobs):
                 y_train, y_test = random.positions.iloc[train_idx], random.positions.iloc[test_idx]
                 data_cov = mne.compute_covariance(X_train, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
                 noise_cov = mne.compute_covariance(X_train, tmin=-.2, tmax=0, method="empirical", rank="info", verbose=verbose)
-                mne.write_cov(res_dir / 'noise_cov' / f'{subject}-learn-{i}-noise-cov.fif', noise_cov, overwrite=True, verbose=verbose)
                 # conpute rank
                 rank = mne.compute_rank(data_cov, info=X_train.info, rank=None, tol_kind='relative', verbose=verbose)
                 # compute source estimates
                 filters = make_lcmv(X_train.info, fwd, data_cov, reg=0.05, noise_cov=noise_cov,
-                                pick_ori='vector', weight_norm="unit-noise-gain",
+                                pick_ori=pick_ori, weight_norm=weight_norm,
                                 rank=rank, reduce_rank=True, verbose=verbose)
                 stcs_train = apply_lcmv_epochs(X_train, filters=filters, verbose=verbose)
                 Xtrain = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs_train])
-                Xtrain = svd(Xtrain)
+                if pick_ori == 'vector':
+                    Xtrain = svd(Xtrain)
                 
                 stcs_test = apply_lcmv_epochs(X_test, filters=filters, verbose=verbose)
                 Xtest = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs_test])
-                Xtest = svd(Xtest)
+                if pick_ori == 'vector':
+                    Xtest = svd(Xtest)
                 
                 dist = train_test_mahalanobis_fast(Xtrain, Xtest, y_train, y_test, n_jobs=jobs)
                 cvMD_rand.append(dist)
@@ -169,10 +178,9 @@ def process_subject(subject, jobs):
         else:
             print("Random RDM already exists for", subject, network)
 
-
     # pattern
     for network in networks:
-        res_dir = ensured(RESULTS_DIR / "RSA" / 'source' / network / 'rdm_skf' / subject)
+        res_dir = ensured(RESULTS_DIR / "RSA" / 'source' / network / analysis / subject)
         lh_label, rh_label = mne.read_label(label_path / f'{network}-lh.label'), mne.read_label(label_path / f'{network}-rh.label')
         cvMD_pat = list()
         
@@ -181,20 +189,25 @@ def process_subject(subject, jobs):
                 X_train, X_test = pattern_epochs[train_idx], pattern_epochs[test_idx]
                 y_train, y_test = pattern.positions.iloc[train_idx], pattern.positions.iloc[test_idx]
                 data_cov = mne.compute_covariance(X_train, tmin=0, tmax=.6, method="empirical", rank="info", verbose=verbose)
-                noise_cov = mne.read_cov(res_dir / 'noise_cov' / f'{subject}-learn-{i}-noise-cov.fif', verbose=verbose)
+                # noise covariance computed on random trials
+                for j, (tidx, _) in enumerate(skf.split(random_epochs, random.positions)):
+                    if j == i:
+                        noise_cov = mne.compute_covariance(random_epochs[tidx], tmin=-0.2, tmax=0, method="empirical", rank="info", verbose=verbose)
                 # conpute rank
                 rank = mne.compute_rank(data_cov, info=X_train.info, rank=None, tol_kind='relative', verbose=verbose)
                 # compute source estimates
                 filters = make_lcmv(X_train.info, fwd, data_cov, reg=0.05, noise_cov=noise_cov,
-                                pick_ori='vector', weight_norm="unit-noise-gain",
+                                pick_ori=pick_ori, weight_norm=weight_norm,
                                 rank=rank, reduce_rank=True, verbose=verbose)
                 stcs_train = apply_lcmv_epochs(X_train, filters=filters, verbose=verbose)
                 Xtrain = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs_train])
-                Xtrain = svd(Xtrain)
+                if pick_ori == 'vector':
+                    Xtrain = svd(Xtrain)
                 
                 stcs_test = apply_lcmv_epochs(X_test, filters=filters, verbose=verbose)
                 Xtest = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs_test])
-                Xtest = svd(Xtest)
+                if pick_ori == 'vector':
+                    Xtest = svd(Xtest)
                 
                 dist = train_test_mahalanobis_fast(Xtrain, Xtest, y_train, y_test, n_jobs=jobs)
                 cvMD_pat.append(dist)
@@ -205,7 +218,6 @@ def process_subject(subject, jobs):
             gc.collect()
         else:
             print("Pattern RDM already exists for", subject, network)
-
 
     del fwd, epoch, behav
     gc.collect()
@@ -221,6 +233,3 @@ if is_cluster:
         sys.exit(1)
 else:
     Parallel(-1)(delayed(process_subject)(subject, 1) for subject in subjects)
-    # jobs = -1
-    # for subject in subjects:
-    #     process_subject(subject, jobs)
