@@ -18,8 +18,7 @@ n_parcels = 200
 n_networks = 7
 networks = schaefer_7[:-2] if n_networks == 7 else schaefer_17[:-2]
 # networks += ['Hippocampus', 'Thalamus']
-res_dir = data_path / 'results' / 'source' / lock
-res_dir = data_path / "tg_rs_emp" / lock
+res_dir = data_path / 'results' / 'source' / 
 
 figures_dir = FIGURES_DIR / "time_gen" / "source" / lock 
 ensure_dir(figures_dir)
@@ -34,7 +33,7 @@ def compute_spearman(t, g, vector, contrasts):
     return spearmanr(vector, contrasts[:, t, g])[0]
 
 # Load data, compute, and save correlations and pvals 
-learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices.csv', sep="\t", index_col=0)
+learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices15.csv', sep="\t", index_col=0)
 all_diags = {}
 patterns, randoms = {}, {}
 all_patterns, all_randoms = {}, {}

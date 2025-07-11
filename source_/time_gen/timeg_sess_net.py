@@ -75,7 +75,7 @@ def process_subject(subject, jobs):
                     data_cov = mne.compute_covariance(random_epochs[train_idx], method="empirical", rank="info", verbose=verbose)
                     rank = mne.compute_rank(data_cov, info=random_epochs[train_idx].info, rank=None, tol_kind='relative', verbose=verbose)
                     filters = make_lcmv(random_epochs[train_idx].info, fwd, data_cov, reg=0.05, noise_cov=noise_cov,
-                                        pick_ori=pick_ori, weight_norm="unit-noise-gain",
+                                        pick_ori=pick_ori, weight_norm=weight_norm,
                                         rank=rank, reduce_rank=True, verbose=verbose)
                     stcs_train = apply_lcmv_epochs(random_epochs[train_idx], filters=filters, verbose=verbose)
                     Xtrain = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs_train])

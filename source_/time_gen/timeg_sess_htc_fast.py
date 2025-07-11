@@ -19,11 +19,12 @@ subjects, subjects_dir = SUBJS15, FREESURFER_DIR
 folds = 10
 solver = 'lbfgs'
 scoring = "accuracy"
-verbose = True
+verbose = 'error'
 overwrite = False
+mne.set_log_level(verbose)
 
-# pick_ori = 'vector'
-pick_ori = 'max-power'
+pick_ori = 'vector'
+# pick_ori = 'max-power'
 weight_norm = "unit-noise-gain-invariant" if pick_ori == 'vector' else "unit-noise-gain"
 analysis = 'scores_skf_vect' if pick_ori == 'vector' else 'scores_skf_maxpower'
 
@@ -71,9 +72,7 @@ def process_subject(subject, jobs):
     
     del all_epochs, all_behavs
     gc.collect()
-    
-    pick_ori = 'vector'
-        
+            
     for region in ['Hippocampus', 'Thalamus', 'Cerebellum-Cortex']:
             
         res_path = ensured(RESULTS_DIR / 'TIMEG' / 'source' / region / analysis / subject)
@@ -83,10 +82,10 @@ def process_subject(subject, jobs):
         random = random.reset_index(drop=True)
                 
         if not op.exists(res_path / "rand-all.npy") or overwrite:
-            print("Processing", subject, 'all', "random", region)
             
             acc_matrices = list()
             for i, (train_idx, test_idx) in enumerate(skf.split(random_epochs, random.positions)):
+                print("Processing", subject, 'all', "random", region, "fold", i + 1, "of", folds)
                 
                 # training data
                 noise_cov = mne.compute_covariance(random_epochs[train_idx], tmin=-0.2, tmax=0, method="empirical", rank="info", verbose=verbose)
@@ -133,11 +132,11 @@ def process_subject(subject, jobs):
         pattern = pattern.reset_index(drop=True)
         
         if not op.exists(res_path / "pat-all.npy") or overwrite:
-            print("Processing", subject, 'all', "pattern", region)
-            
             acc_matrices = list()
             for i, (train_idx, test_idx) in enumerate(skf.split(pattern_epochs, pattern.positions)):
-            
+                
+                print("Processing", subject, 'all', "pattern", region, "fold", i + 1, "of", folds)
+                
                 # noise covariance computed on random trials
                 for j, (tidx, _) in enumerate(skf.split(random_epochs, random.positions)):
                     if j == i:
@@ -193,5 +192,5 @@ if is_cluster:
         sys.exit(1)
 else:
     jobs = -1
-    for subject in subjects:
+    for subject in subjects[::-1]:
         process_subject(subject, jobs)

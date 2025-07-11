@@ -24,8 +24,6 @@ networks = NETWORKS[:-2]
 
 # pick_ori = 'max-power'
 pick_ori = 'vector'
-weight_norm = "unit-noise-gain-invariant" if pick_ori == 'vector' else "unit-noise-gain"
-
 analysis = 'rdm_blocks_vect' if pick_ori == 'vector' else 'rdm_blocks_maxpower'
 
 def process_subject(subject, jobs, verbose):

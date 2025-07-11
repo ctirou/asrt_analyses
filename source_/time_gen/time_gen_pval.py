@@ -16,13 +16,14 @@ overwrite = False
 
 times = np.linspace(-1.5, 1.5, 307)
 chance = .25
-threshold = .05
 
 def compute_spearman(t, g, vector, contrasts):
     return spearmanr(vector, contrasts[:, t, g])[0]
 
 # Load data, compute, and save correlations and pvals 
 learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices15.csv', sep="\t", index_col=0)
+
+data_type = 'scores_skf_maxpower'  # 'scores_skf_vect' or 'scores_skf_maxpower'
 
 patterns, randoms = {}, {}
 all_patterns, all_randoms = {}, {}
@@ -34,24 +35,24 @@ for network in networks:
     all_pat, all_rand, all_diag = [], [], []
     patpat, randrand = [], []
     for i, subject in enumerate(subjects):
-        pat, rand = [], []
-        for j in [0, 1, 2, 3, 4]:
-            pat.append(np.load(res_path / network / 'scores_skf' / subject /  f"pat-{j}.npy"))
-            rand.append(np.load(res_path / network / 'scores_skf' / subject /  f"rand-{j}.npy"))
-        patpat.append(np.array(pat))
-        randrand.append(np.array(rand))
+        # pat, rand = [], []
+        # for j in [0, 1, 2, 3, 4]:
+            # pat.append(np.load(res_path / network / 'scores_skf' / subject /  f"pat-{j}.npy"))
+            # rand.append(np.load(res_path / network / 'scores_skf' / subject /  f"rand-{j}.npy"))
+        # patpat.append(np.array(pat))
+        # randrand.append(np.array(rand))
     
-        all_pat.append(np.load(res_path / network / 'scores_skf' / subject /  "pat-all.npy"))
-        all_rand.append(np.load(res_path / network / 'scores_skf' / subject /  "rand-all.npy"))
+        all_pat.append(np.load(res_path / network / data_type / subject /  "pat-all.npy"))
+        all_rand.append(np.load(res_path / network / data_type / subject /  "rand-all.npy"))
         
     all_patterns[network] = np.array(all_pat)
     all_randoms[network] = np.array(all_rand)
     
-    patterns[network] = np.array(patpat)
-    randoms[network] = np.array(randrand)
+    # patterns[network] = np.array(patpat)
+    # randoms[network] = np.array(randrand)
     
     # save time gen pvals
-    res_dir = ensured(res_path / network / "pval-skf")
+    res_dir = ensured(res_path / network / data_type / "pval")
     if not op.exists(res_dir / "all_pattern-pval.npy") or overwrite:
         pval = gat_stats(all_patterns[network] - chance, -1)
         np.save(res_dir / "all_pattern-pval.npy", pval)
@@ -63,7 +64,7 @@ for network in networks:
         np.save(res_dir / "all_contrast-pval.npy", pval)
     
     # save learn df x time gen correlation and pvals
-    res_dir = ensured(res_path / network / "corr-skf")    
+    res_dir = ensured(res_path / network / data_type / "corr")    
     if not op.exists(res_dir / "rhos_learn.npy") or overwrite:
         contrasts = patterns[network] - randoms[network]
         contrasts = zscore(contrasts, axis=-1)  # je sais pas si zscore avant correlation pour la RSA mais c'est mieux je pense

@@ -25,10 +25,10 @@ folds = 10
 verbose = 'error'
 overwrite = False
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
-mne.use_log_level(verbose)
+mne.set_log_level(verbose)
 
-# pick_ori = 'vector'
-pick_ori = 'max-power'
+pick_ori = 'vector'
+# pick_ori = 'max-power'
 weight_norm = "unit-noise-gain-invariant" if pick_ori == 'vector' else "unit-noise-gain"
 analysis = 'scores_skf_vect' if pick_ori == 'vector' else 'scores_skf_maxpower'
     
@@ -97,14 +97,16 @@ def process_subject(subject, jobs):
                                     rank=rank, reduce_rank=True, verbose=verbose)
                 stcs_train = apply_lcmv_epochs(random_epochs[train_idx], filters=filters, verbose=verbose)
                 Xtrain = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs_train])
-                # Xtrain = svd(Xtrain)
+                if pick_ori == 'vector':
+                    Xtrain = svd(Xtrain)
                 ytrain = random.positions[train_idx]
                 assert Xtrain.shape[0] == ytrain.shape[0], "Length mismatch"
                                 
                 # testing data
                 stcs_test = apply_lcmv_epochs(random_epochs[test_idx], filters=filters, verbose=verbose)
                 Xtest = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs_test])
-                # Xtest = svd(Xtest)
+                if pick_ori == 'vector':
+                    Xtest = svd(Xtest)
                 ytest = random.positions[test_idx]
                 assert Xtest.shape[0] == ytest.shape[0], "Length mismatch"
                 
