@@ -40,8 +40,8 @@ for subject in tqdm(subjects):
     sequence = get_sequence(behav_dir)
     pats, rands = [], []
     for epoch_num in range(5):
-        pats.append(np.load(res_path / "pat-{epoch_num}.npy"))
-        rands.append(np.load(res_path / "rand-{epoch_num}.npy"))
+        pats.append(np.load(res_path / f"pat-{epoch_num}.npy"))
+        rands.append(np.load(res_path / f"rand-{epoch_num}.npy"))
     pats = np.array(pats)
     rands = np.array(rands)
 

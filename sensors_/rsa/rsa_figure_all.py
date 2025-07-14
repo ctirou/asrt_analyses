@@ -160,7 +160,7 @@ idx_rsa = np.where(sig)[0] # to compute mean later
 # Overlay significant regions with the specified color
 axd['C'].fill_between(times, diff_lh.mean(0) - sem, diff_lh.mean(0) + sem, where=sig, alpha=0.4, zorder=5, facecolor=c2)
 axd['C'].fill_between(times, diff_lh.mean(0) - sem, 0, where=sig, alpha=0.3, zorder=5, facecolor=c2)
-win = np.where((times >= 0.3) & (times <= 0.55))[0]
+win = np.where((times >= 0.4) & (times <= 0.55))[0]
 mdiff = diff_lh[:, win].mean(1)
 mdiff_sig = ttest_1samp(mdiff, 0)[1] < 0.05
 if mdiff_sig:

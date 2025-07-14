@@ -14,7 +14,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score as acc
 
-data_path = DATA_DIR / 'for_timeg'
+data_path = DATA_DIR / 'for_timeg_new'
 subjects = SUBJS15
 solver = 'lbfgs'
 scoring = "accuracy"
@@ -29,7 +29,7 @@ def process_subject(subject, jobs):
     clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
     clf = GeneralizingEstimator(clf, scoring=scoring, n_jobs=jobs)
 
-    res_path = ensured(RESULTS_DIR / 'TIMEG' / 'sensors' / "scores_blocks" / subject)
+    res_path = ensured(RESULTS_DIR / 'TIMEG' / 'sensors' / "scores_blocks_new" / subject)
     
     for epoch_num in [0, 1, 2, 3, 4]:
         

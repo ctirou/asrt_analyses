@@ -29,6 +29,7 @@ is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 pick_ori = 'vector'
 weight_norm = "unit-noise-gain-invariant" if pick_ori == 'vector' else "unit-noise-gain"
 analysis = 'scores_skf_vect' if pick_ori == 'vector' else 'scores_skf_maxpower'
+analysis += '_new'
 
 networks = NETWORKS[:-2]
 
@@ -45,7 +46,7 @@ def process_subject(subject, jobs):
 
     for epoch_num in range(5):
         # read behav
-        behav = pd.read_pickle(op.join(data_path, 'behav', f'{subject}-{epoch_num}.pkl'))
+        behav = pd.read_pickle(op.join(data_path, 'behav', f'{subject}-{epoch_num}.pkl')).reset_index(drop=True)
         # read epoch
         epoch_fname = op.join(data_path, 'epochs', f"{subject}-{epoch_num}-epo.fif")
         epoch = mne.read_epochs(epoch_fname, verbose=verbose, preload=True).crop(-1.5, 1.5)
@@ -61,6 +62,7 @@ def process_subject(subject, jobs):
             random = behav[behav.trialtypes == 2]
             random_epochs = epoch[random.index]
             random = random.reset_index(drop=True)
+            assert len(random_epochs) == len(random), "Length mismatch between random epochs and random behav"
 
             # random trials
             if not os.path.exists(res_path / f"rand-{epoch_num}.npy") or overwrite:
@@ -104,6 +106,7 @@ def process_subject(subject, jobs):
             pattern = behav[behav.trialtypes == 1]
             pattern_epochs = epoch[pattern.index]
             pattern = pattern.reset_index(drop=True)
+            assert len(pattern_epochs) == len(pattern), "Length mismatch between pattern epochs and pattern behav"
             
             # pattern trials
             if not os.path.exists(res_path / f"pat-{epoch_num}.npy") or overwrite:

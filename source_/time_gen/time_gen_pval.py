@@ -24,6 +24,7 @@ def compute_spearman(t, g, vector, contrasts):
 learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices15.csv', sep="\t", index_col=0)
 
 data_type = 'scores_skf_maxpower'  # 'scores_skf_vect' or 'scores_skf_maxpower'
+data_type = 'scores_skf_vect'  # 'scores_skf_vect' or 'scores_skf_maxpower'
 
 patterns, randoms = {}, {}
 all_patterns, all_randoms = {}, {}

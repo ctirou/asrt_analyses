@@ -136,7 +136,7 @@ cmap = ['#0173B2', '#DE8F05', '#029E73', '#D55E00', '#CC78BC', '#CA9161', '#FBAF
 # # plt.show()
 # fig.savefig(figures_dir / "similarity-corr_fixed2.pdf", transparent=True)
 # plt.close(fig)
-analysis = 'scores_skf_maxpower'
+analysis = 'scores_skf_vect'
 
 # --- Decoding ---
 timesg = np.linspace(-1.5, 1.5, 307)
@@ -178,7 +178,7 @@ for i, (ax, label, name) in enumerate(zip(axes.flat, networks, network_names)):
     ax.fill_between(times, data.mean(0) - sem, chance, where=sig, alpha=0.3, zorder=5, facecolor=cmap[i])    
     ax.axhline(chance, color='grey', alpha=.5)
     ax.set_ylabel('Acc. (%)', fontsize=11)
-    ax.set_ylim(0.2, 0.5)
+    # ax.set_ylim(0.2, 0.5)
     ax.set_title(name)
 fig.suptitle("Pattern trials decoding")
 # fig.savefig(figures_dir / "decoding-pat.pdf", transparent=True)
@@ -205,7 +205,7 @@ for i, (ax, label, name) in enumerate(zip(axes.flat, networks, network_names)):
     ax.fill_between(times, data.mean(0) - sem, chance, where=sig, alpha=0.3, zorder=5, facecolor=cmap[i])    
     ax.axhline(chance, color='grey', alpha=.5)
     ax.set_ylabel('Acc. (%)', fontsize=11)
-    ax.set_ylim(0.2, 0.5)
+    # ax.set_ylim(0.2, 0.5)
     ax.set_title(name)
 fig.suptitle("Random trials decoding")
 # fig.savefig(figures_dir / "decoding-rand.pdf", transparent=True)
@@ -328,12 +328,12 @@ fig.suptitle("Contrast diagonal")
 
 # --- Temporal generalization ---
 cmap1 = "RdBu_r"
-c1 = "#20B2AA"
 c1 = "#00BFA6"
 c1 = "#708090"
+c1 = "#20B2AA"
 res_dir = RESULTS_DIR / 'TIMEG' / 'source' 
+# data_type = 'scores_skf_maxpower'
 data_type = 'scores_skf_vect'
-data_type = 'scores_skf_maxpower'
 patterns, randoms = {}, {}
 all_patterns, all_randoms = {}, {}
 all_diags = {}
@@ -359,7 +359,8 @@ for network in tqdm(networks):
 
 # Pattern
 fig, axes = plt.subplots(2, 5, figsize=(20, 4), sharex=True, sharey=True, layout='constrained')
-for ax, network, name in zip(axes.flatten(), networks, network_names):
+for i, (ax, network, name) in enumerate(zip(axes.flatten(), networks, network_names)):
+    c1 = cmap[i]
     # im = axes[i].imshow(
     im = ax.imshow(
         all_patterns[network].mean(0),
@@ -375,7 +376,7 @@ for ax, network, name in zip(axes.flatten(), networks, network_names):
     pval = np.load(res_dir / network / analysis / "pval" / "all_pattern-pval.npy")
     sig = pval < threshold
     ax.contour(xx, yy, sig, colors=c1, levels=[0],
-                        linestyles='--', linewidths=1)
+                        linestyles='-', linewidths=1)
     ax.axvline(0, color="k", alpha=.5)
     ax.axhline(0, color="k", alpha=.5)
 fig.suptitle("Pattern trials time generalization")
@@ -384,7 +385,8 @@ fig.suptitle("Pattern trials time generalization")
 
 # Random
 fig, axes = plt.subplots(2, 5, figsize=(20, 4), sharex=True, sharey=True, layout='constrained')
-for ax, network, name in zip(axes.flatten(), networks, network_names):
+for i, (ax, network, name) in enumerate(zip(axes.flatten(), networks, network_names)):
+    c1 = cmap[i]
     im = ax.imshow(
         all_randoms[network].mean(0),
         interpolation="lanczos",
@@ -399,7 +401,7 @@ for ax, network, name in zip(axes.flatten(), networks, network_names):
     pval = np.load(res_dir / network / analysis / "pval" / "all_random-pval.npy")
     sig = pval < threshold
     ax.contour(xx, yy, sig, colors=c1, levels=[0],
-                        linestyles='--', linewidths=1)
+                        linestyles='-', linewidths=1)
     ax.axvline(0, color="k", alpha=.5)
     ax.axhline(0, color="k", alpha=.5)
 fig.suptitle("Random trials time generalization")
@@ -408,7 +410,8 @@ fig.suptitle("Random trials time generalization")
 
 # Contrast
 fig, axes = plt.subplots(2, 5, figsize=(20, 4), sharex=True, sharey=True, layout='constrained')
-for ax, network, name in zip(axes.flatten(), networks, network_names):
+for i, (ax, network, name) in enumerate(zip(axes.flatten(), networks, network_names)):
+    c1 = cmap[i]
     all_contrast = all_patterns[network] - all_randoms[network]
     im = ax.imshow(
         all_contrast.mean(0),
@@ -424,7 +427,7 @@ for ax, network, name in zip(axes.flatten(), networks, network_names):
     pval = np.load(res_dir / network / analysis / "pval" / "all_contrast-pval.npy")
     sig = pval < threshold
     ax.contour(xx, yy, sig, colors=c1, levels=[0],
-                        linestyles='--', linewidths=1)
+                        linestyles='-', linewidths=1)
     ax.axvline(0, color="k", alpha=.5)
     ax.axhline(0, color="k", alpha=.5)
 fig.suptitle("Contrast time generalization")

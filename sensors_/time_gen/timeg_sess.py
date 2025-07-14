@@ -14,7 +14,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from joblib import Parallel, delayed
 
-data_path = DATA_DIR / 'for_timeg'
+data_path = DATA_DIR / 'for_timeg_new'
 subjects = SUBJS15
 folds = 10
 solver = 'lbfgs'
@@ -40,7 +40,7 @@ def process_subject(subject, jobs):
         epoch_fname = op.join(data_path, "epochs", f"{subject}-{epoch_num}-epo.fif")
         epoch = read_epochs(epoch_fname, verbose=verbose, preload=True)
         
-        res_dir = ensured(DATA_DIR / 'TIMEG' / 'sensors' / 'scores_skf' / subject)
+        res_dir = ensured(DATA_DIR / 'TIMEG' / 'sensors' / 'scores_skf_new' / subject)
     
         print(f"Processing {subject} - session {epoch_num} - pattern...")
         if not op.exists(res_dir / f"pat-{epoch_num}.npy") or overwrite:
@@ -81,7 +81,7 @@ def process_subject(subject, jobs):
     del all_epochs, all_behavs, epoch, behav, behav_df
     gc.collect()
     
-    res_dir = ensured(DATA_DIR / 'TIMEG' / 'sensors' / 'scores_skf' / subject)
+    res_dir = ensured(DATA_DIR / 'TIMEG' / 'sensors' / 'scores_skf_new' / subject)
     
     print(f"Processing {subject} - session all - pattern...")
     if not op.exists(res_dir / "pat-all.npy") or overwrite:

@@ -13,7 +13,7 @@ from base import *
 from config import *
 from joblib import Parallel, delayed
 
-data_path = DATA_DIR / 'for_timeg'
+data_path = DATA_DIR / 'for_timeg_new'
 subjects = SUBJS15
 subjects_dir = FREESURFER_DIR
 
@@ -27,6 +27,7 @@ mne.use_log_level(verbose)
 pick_ori = 'vector'
 # pick_ori = 'max-power'
 analysis = 'scores_blocks_vector' if pick_ori == 'vector' else 'scores_blocks_maxpower'
+analysis += '_new'
 
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
@@ -123,7 +124,7 @@ if is_cluster:
     try:
         subject_num = int(os.getenv("SLURM_ARRAY_TASK_ID"))
         subject = subjects[subject_num]
-        jobs = 20
+        jobs = int(os.getenv("SLURM_CPUS_PER_TASK"))
         process_subject(subject, jobs)
     except (IndexError, ValueError) as e:
         print("Error: SLURM_ARRAY_TASK_ID is not set correctly or is out of bounds.")

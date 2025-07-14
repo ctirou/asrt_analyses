@@ -26,6 +26,7 @@ overwrite = False
 pick_ori = 'vector'
 weight_norm = "unit-noise-gain-invariant" if pick_ori == 'vector' else "unit-noise-gain"
 analysis = 'scores_skf_vect' if pick_ori == 'vector' else 'scores_skf_maxpower'
+analysis += '_new'
 
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
@@ -50,7 +51,7 @@ def process_subject(subject, jobs):
     for epoch_num in range(5):
         
         # read behav
-        behav = pd.read_pickle(op.join(data_path, 'behav', f'{subject}-{epoch_num}.pkl'))
+        behav = pd.read_pickle(op.join(data_path, 'behav', f'{subject}-{epoch_num}.pkl')).reset_index(drop=True)
         # read epoch
         epoch_fname = op.join(data_path, "epochs", f"{subject}-{epoch_num}-epo.fif")
         epoch = mne.read_epochs(epoch_fname, verbose=verbose, preload=True).crop(-1.5, 1.5)

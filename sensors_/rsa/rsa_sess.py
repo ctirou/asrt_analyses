@@ -58,14 +58,9 @@ if is_cluster:
 else:
     Parallel(-1)(delayed(process_subject)(subject, epoch_num, verbose) for subject in subjects for epoch_num in range(5))
 
-data_path = DATA_DIR / 'for_rsa'
-subjects = SUBJS15
-
-is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
-
 def process_subject(subject, verbose):
     
-    res_path = RESULTS_DIR / 'RSA' / 'sensors' / "rdm_skf2" / subject
+    res_path = RESULTS_DIR / 'RSA' / 'sensors' / "rdm_skf_new" / subject
     ensure_dir(res_path)
 
     # Practice first
