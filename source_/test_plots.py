@@ -26,6 +26,7 @@ network_names = NETWORK_NAMES + ['Cerebellum']
 ori = "power"
 # figures_dir = FIGURES_DIR / "RSA" / "source" / lock / ori
 figures_dir = FIGURES_DIR / "test_plots"
+figures_dir = FIGURES_DIR / "temp"
 ensure_dir(figures_dir)
 
 threshold = 0.05
@@ -139,6 +140,7 @@ cmap = ['#0173B2', '#DE8F05', '#029E73', '#D55E00', '#CC78BC', '#CA9161', '#FBAF
 analysis = 'scores_skf_vect'
 
 # --- Decoding ---
+ensured(figures_dir / "decoding")
 timesg = np.linspace(-1.5, 1.5, 307)
 time_filter = np.where((timesg >= -0.2) & (timesg <= 0.6))[0]
 pattern, random = {}, {}
@@ -181,7 +183,7 @@ for i, (ax, label, name) in enumerate(zip(axes.flat, networks, network_names)):
     # ax.set_ylim(0.2, 0.5)
     ax.set_title(name)
 fig.suptitle("Pattern trials decoding")
-# fig.savefig(figures_dir / "decoding-pat.pdf", transparent=True)
+fig.savefig(figures_dir / "pattern.pdf", transparent=True)
 # plt.close(fig)
 
 # Random
@@ -208,7 +210,7 @@ for i, (ax, label, name) in enumerate(zip(axes.flat, networks, network_names)):
     # ax.set_ylim(0.2, 0.5)
     ax.set_title(name)
 fig.suptitle("Random trials decoding")
-# fig.savefig(figures_dir / "decoding-rand.pdf", transparent=True)
+fig.savefig(figures_dir / "decoding" / "rand.pdf", transparent=True)
 # plt.close(fig)
 
 # contrast
@@ -235,7 +237,7 @@ for i, (ax, label, name) in enumerate(zip(axes.flat, networks, network_names)):
     # ax.set_ylim(0.2, 0.5)
     ax.set_title(name)
 fig.suptitle("Contrast diagonal")
-# fig.savefig(figures_dir / "decoding-rand.pdf", transparent=True)
+fig.savefig(figures_dir / "decoding" / "contrast.pdf", transparent=True)
 # plt.close(fig)
 
 # # --- Temporal generalization ---
@@ -380,7 +382,7 @@ for i, (ax, network, name) in enumerate(zip(axes.flatten(), networks, network_na
     ax.axvline(0, color="k", alpha=.5)
     ax.axhline(0, color="k", alpha=.5)
 fig.suptitle("Pattern trials time generalization")
-# fig.savefig(figures_dir / "timeg-pattern.pdf", transparent=True)
+fig.savefig(figures_dir / "timeg-pattern.pdf", transparent=True)
 # plt.close(fig)
 
 # Random
@@ -405,7 +407,7 @@ for i, (ax, network, name) in enumerate(zip(axes.flatten(), networks, network_na
     ax.axvline(0, color="k", alpha=.5)
     ax.axhline(0, color="k", alpha=.5)
 fig.suptitle("Random trials time generalization")
-# fig.savefig(figures_dir / "timeg-random.pdf", transparent=True)
+fig.savefig(figures_dir / "timeg-random.pdf", transparent=True)
 # plt.close(fig)
 
 # Contrast
@@ -431,29 +433,30 @@ for i, (ax, network, name) in enumerate(zip(axes.flatten(), networks, network_na
     ax.axvline(0, color="k", alpha=.5)
     ax.axhline(0, color="k", alpha=.5)
 fig.suptitle("Contrast time generalization")
-# fig.savefig(figures_dir / "timeg-contrast.pdf", transparent=True)
+fig.savefig(figures_dir / "timeg-contrast.pdf", transparent=True)
 # plt.close(fig)
 
-# # Correlation with learning
-# fig, axes = plt.subplots(2, 5, figsize=(20, 4), sharex=True, sharey=True, layout='constrained')
-# for ax, network, name in zip(axes.flatten(), networks, network_names):
-#     rhos = np.load(res_dir / network / "corr-all" / "rhos_learn.npy")
-#     pval = np.load(res_dir / network / "corr-all" / "pval_learn-pval.npy")
-#     sig = pval < threshold
-#     im = ax.imshow(
-#         rhos.mean(0),
-#         interpolation="lanczos",
-#         origin="lower",
-#         cmap=cmap1,
-#         extent=timesg[[0, -1, 0, -1]],
-#         aspect=0.5,
-#         vmin=-.2,
-#         vmax=.2)
-#     ax.set_title(f"{name}", style='italic')
-#     xx, yy = np.meshgrid(timesg, timesg, copy=False, indexing='xy')
-#     ax.contour(xx, yy, sig, colors=c1, levels=[0],
-#                         linestyles='solid', linewidths=1)
-#     ax.axvline(0, color="k")
-#     ax.axhline(0, color="k")
-# # fig.savefig(figures_dir / "timeg-corr.pdf", transparent=True)
-# # plt.close(fig)
+# Correlation with learning
+analysis += "_new"
+fig, axes = plt.subplots(2, 5, figsize=(20, 4), sharex=True, sharey=True, layout='constrained')
+for ax, network, name in zip(axes.flatten(), networks, network_names):
+    rhos = np.load(res_dir / network / analysis / "corr" / "rhos_learn.npy")
+    pval = np.load(res_dir / network / analysis / "corr" / "pval_learn-pval.npy")
+    sig = pval < threshold
+    im = ax.imshow(
+        rhos.mean(0),
+        interpolation="lanczos",
+        origin="lower",
+        cmap=cmap1,
+        extent=timesg[[0, -1, 0, -1]],
+        aspect=0.5,
+        vmin=-.2,
+        vmax=.2)
+    ax.set_title(f"{name}", style='italic')
+    xx, yy = np.meshgrid(timesg, timesg, copy=False, indexing='xy')
+    ax.contour(xx, yy, sig, colors=c1, levels=[0],
+                        linestyles='solid', linewidths=1)
+    ax.axvline(0, color="k")
+    ax.axhline(0, color="k")
+# fig.savefig(figures_dir / "timeg-corr.pdf", transparent=True)
+# plt.close(fig)

@@ -1,5 +1,5 @@
 import os
-from base import ensure_dir, decod_stats
+from base import *
 from config import *
 import os.path as op
 import matplotlib.pyplot as plt
@@ -8,24 +8,17 @@ from scipy.stats import ttest_1samp, spearmanr
 import pandas as pd
 import matplotlib.colors as mcolors
 
-
-data_path = TIMEG_DATA_DIR
 subjects, subjects_dir = SUBJS, FREESURFER_DIR
 
-lock = 'stim'
-# network and custom label_names
-n_parcels = 200
-n_networks = 7
-networks = schaefer_7[:-2] if n_networks == 7 else schaefer_17[:-2]
-# networks += ['Hippocampus', 'Thalamus']
-res_dir = data_path / 'results' / 'source' / 
+data_type1 = "scores_skf_vect"
+data_type2 = "scores_skf_vect_new"
+networks = NETWORKS + ["Cerebellum-Cortex"]
+res_path = ensured(RESULTS_DIR / 'TIMEG' / 'source')
 
-figures_dir = FIGURES_DIR / "time_gen" / "source" / lock 
-ensure_dir(figures_dir)
+figures_dir = FIGURES_DIR / "temp"
 
-names = pd.read_csv(FREESURFER_DIR / 'Schaefer2018' / f'{n_networks}NetworksOrderedNames.csv', header=0)[' Network Name'].tolist()[:-2]
-# names += ['Hippocampus', 'Thalamus']
-times = np.linspace(-1.5, 1.5, 305)
+names = NETWORK_NAMES + ["Cerebellum"]
+times = np.linspace(-1.5, 1.5, 307)
 chance = .25
 threshold = .05
 
@@ -34,7 +27,6 @@ def compute_spearman(t, g, vector, contrasts):
 
 # Load data, compute, and save correlations and pvals 
 learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices15.csv', sep="\t", index_col=0)
-all_diags = {}
 patterns, randoms = {}, {}
 all_patterns, all_randoms = {}, {}
 for network in networks:
@@ -47,20 +39,16 @@ for network in networks:
     for i, subject in enumerate(subjects):
         pat, rand = [], []
         for j in [0, 1, 2, 3, 4]:
-            pat.append(np.load(res_dir / network / 'pattern' / f"{subject}-{j}-scores.npy"))
-            rand.append(np.load(res_dir / network / 'random' / f"{subject}-{j}-scores.npy"))
+            pat.append(np.load(res_path / network / data_type2 / subject /  f"pat-{j}.npy"))
+            rand.append(np.load(res_path / network / data_type2 / subject /  f"rand-{j}.npy"))
         patpat.append(np.array(pat))
         randrand.append(np.array(rand))
     
-        all_pat.append(np.load(res_dir / network / 'pattern' / f"{subject}-all-scores.npy"))
-        all_rand.append(np.load(res_dir / network / 'random' / f"{subject}-all-scores.npy"))
-        
-        diag = np.array(all_pat) - np.array(all_rand)
-        all_diag.append(np.diag(diag[i]))
+        all_pat.append(np.load(res_path / network / data_type1 / subject /  "pat-all.npy"))
+        all_rand.append(np.load(res_path / network / data_type1 / subject /  "rand-all.npy"))
         
     all_patterns[network] = np.array(all_pat)
     all_randoms[network] = np.array(all_rand)
-    all_diags[network] = np.array(all_diag)
     
     patterns[network] = np.array(patpat)
     randoms[network] = np.array(randrand)
@@ -69,138 +57,14 @@ cmap = "viridis"
 cmap = mcolors.LinearSegmentedColormap.from_list("Zissou1", colors["Zissou1"])
 cmap = "RdBu_r"
 
-### plot pattern for all networks ###
-fig, axes = plt.subplots(7, 1, figsize=(6, 12), sharex=True, sharey=True, layout='tight')
-fig.suptitle("Pattern", fontsize=14)
-for i, (network, name) in enumerate(zip(networks, names)):
-    im = axes[i].imshow(
-        all_patterns[network].mean(0),
-        interpolation="lanczos",
-        origin="lower",
-        cmap=cmap,
-        extent=times[[0, -1, 0, -1]],
-        aspect=0.5,
-        vmin=0.2,
-        vmax=0.3)
-    axes[i].set_ylabel("Training Time (s)")
-    axes[i].set_title(f"${name}$", fontsize=10)
-    axes[i].axvline(0, color="k", alpha=.5)
-    axes[i].axhline(0, color="k", alpha=.5)
-    if network == networks[-1]:
-        axes[i].set_xlabel("Testing Time (s)")
-    cbar = plt.colorbar(im, ax=axes[i])
-    cbar.set_label("accuracy")
-    xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
-    pval = np.load(res_dir / network / "pval" / "all_pattern-pval.npy")
-    sig = pval < threshold
-    axes[i].contour(xx, yy, sig, colors='Gray', levels=[0],
-                        linestyles='solid', linewidths=1)
-fig.savefig(figures_dir / "all_pattern.pdf", transparent=True)
-### plot random for all networks ###
-fig, axes = plt.subplots(7, 1, figsize=(6, 12), sharex=True, layout='tight')
-fig.suptitle("Random", fontsize=14)
-for i, (network, name) in enumerate(zip(networks, names)):
-    im = axes[i].imshow(
-        all_randoms[network].mean(0),
-        interpolation="lanczos",
-        origin="lower",
-        cmap=cmap,
-        extent=times[[0, -1, 0, -1]],
-        aspect=0.5,
-        vmin=0.2,
-        vmax=0.3)
-    axes[i].set_ylabel("Training Time (s)")
-    axes[i].set_title(f"${name}$", fontsize=10)
-    axes[i].axvline(0, color="k", alpha=.5)
-    axes[i].axhline(0, color="k", alpha=.5)
-    if network == networks[-1]:
-        axes[i].set_xlabel("Testing Time (s)")
-    cbar = plt.colorbar(im, ax=axes[i])
-    cbar.set_label("accuracy")
-    xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
-    pval = np.load(res_dir / network / "pval" / "all_random-pval.npy")
-    sig = pval < threshold
-    axes[i].contour(xx, yy, sig, colors='Gray', levels=[0],
-                        linestyles='solid', linewidths=1)
-fig.savefig(figures_dir / "all_random.pdf", transparent=True)
-### plot contrast for all networks ###
-fig, axes = plt.subplots(7, 1, figsize=(6, 12), sharex=True, layout='tight')
-fig.suptitle("Contrast = Pattern – Random", fontsize=14)
-for i, (network, name) in enumerate(zip(networks, names)):
-    all_contrast = all_patterns[network] - all_randoms[network]
-    im = axes[i].imshow(
-        all_contrast.mean(0),
-        interpolation="lanczos",
-        origin="lower",
-        cmap=cmap,
-        extent=times[[0, -1, 0, -1]],
-        aspect=0.5,
-        vmin=-0.01,
-        vmax=0.01)
-    axes[i].set_ylabel("Training Time (s)")
-    axes[i].set_title(f"${name}$", fontsize=10)
-    axes[i].axvline(0, color="k", alpha=.5)
-    axes[i].axhline(0, color="k", alpha=.5)
-    if network == networks[-1]:
-        axes[i].set_xlabel("Testing Time (s)")
-    cbar = plt.colorbar(im, ax=axes[i])
-    cbar.set_label("accuracy")
-    xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
-    pval = np.load(res_dir / network / "pval" / "all_contrast-pval.npy")
-    sig = pval < threshold
-    axes[i].contour(xx, yy, sig, colors='Gray', levels=[0],
-                        linestyles='solid', linewidths=1)
-fig.savefig(figures_dir / "all_contrast.pdf", transparent=True)
-### plot diagonal for all networks ###
-fig, axes = plt.subplots(7, 1, figsize=(6, 12), sharex=True, layout='tight')
-fig.suptitle("Contrast diagonal", fontsize=14)
-for i, (network, name) in enumerate(zip(networks, names)):
-    axes[i].plot(times, all_diags[network].mean(0))
-    pval = decod_stats(all_diags[network], -1)
-    sig = pval < threshold
-    axes[i].fill_between(times, 0, all_diags[network].mean(0), where=sig, color='C7', alpha=.5)
-    axes[i].axhline(0, color='grey', alpha=.5)
-    axes[i].set_ylabel("difference")
-    axes[i].set_title(f"${name}$", fontsize=10)
-fig.savefig(figures_dir / "all_diagonal.pdf", transparent=True)
-
-### plot blocks x time gen correlation for all networks ###
-fig, axes = plt.subplots(7, 1, figsize=(6, 12), sharex=True, layout='tight')
-fig.suptitle("blocks x time gen correlation", fontsize=14)
-for i, (network, name) in enumerate(zip(networks, names)):
-    rhos = np.load(res_dir / network / "corr" / "rhos_blocks.npy")
-    pval = np.load(res_dir / network / "corr" / "pval_blocks-pval.npy")
-    sig = pval < threshold
-    im = axes[i].imshow(
-        rhos.mean(0),
-        interpolation="lanczos",
-        origin="lower",
-        cmap="RdBu_r",
-        extent=times[[0, -1, 0, -1]],
-        aspect=0.5,
-        vmin=-.2,
-        vmax=.2)
-    if network == networks[-1]:
-        axes[i].set_xlabel("Testing Time (s)")
-    axes[i].set_ylabel("Training Time (s)")
-    axes[i].set_title(f"{name}", style='italic')
-    axes[i].axvline(0, color="k")
-    axes[i].axhline(0, color="k")
-    xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
-    axes[i].contour(xx, yy, sig, colors='Gray', levels=[0],
-                        linestyles='solid', linewidths=1)
-    cbar = plt.colorbar(im, ax=axes[i])
-    cbar.set_label("accuracy")
-fig.savefig(figures_dir / "blocks_corr.pdf", transparent=True)
-
 ### plot learn df x time gen correlation for all networks ###
-fig, axes = plt.subplots(7, 1, figsize=(6, 12), sharex=True, layout='tight')
+fig, axes = plt.subplots(2, 5, figsize=(12, 6), sharex=True, layout='tight')
 fig.suptitle("learn df x time gen correlation", fontsize=14)
-for i, (network, name) in enumerate(zip(networks, names)):
-    rhos = np.load(res_dir / network / "corr" / "rhos_learn.npy")
-    pval = np.load(res_dir / network / "corr" / "pval_learn-pval.npy")
+for i, (ax, network, name) in enumerate(zip(axes.flatten(), networks, names)):
+    rhos = np.load(res_path / network / data_type2 / "corr" / "rhos_learn.npy")
+    pval = np.load(res_path / network / data_type2 / "corr" / "pval_learn-pval.npy")
     sig = pval < threshold
-    im = axes[i].imshow(
+    im = ax.imshow(
         rhos.mean(0),
         interpolation="lanczos",
         origin="lower",
@@ -209,18 +73,45 @@ for i, (network, name) in enumerate(zip(networks, names)):
         aspect=0.5,
         vmin=-.2,
         vmax=.2)
-    if network == networks[-1]:
-        axes[i].set_xlabel("Testing Time (s)")
-    axes[i].set_ylabel("Training Time (s)")
-    axes[i].set_title(f"{name}", style='italic')
-    axes[i].axvline(0, color="k")
-    axes[i].axhline(0, color="k")
+    ax.set_ylabel("Training Time (s)")
+    ax.set_title(f"{name}", style='italic')
+    ax.axvline(0, color="k")
+    ax.axhline(0, color="k")
     xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
-    axes[i].contour(xx, yy, sig, colors='Gray', levels=[0],
+    ax.contour(xx, yy, sig, colors='Gray', levels=[0],
                         linestyles='solid', linewidths=1)
-    cbar = plt.colorbar(im, ax=axes[i])
-    cbar.set_label("accuracy")
+    if i == 10:
+        cbar = plt.colorbar(im, ax=ax)
+        cbar.set_label("accuracy")
+
 fig.savefig(figures_dir / "learn_corr.pdf", transparent=True)
+
+# rhos diags
+# fig, axes = plt.subplots(2, 5, figsize=(12, 6),sharex=True, layout='tight')
+# for i, (ax, network, name) in enumerate(zip(axes.flatten(), networks, names)):
+ensured(figures_dir / "timeg_corr_diags")
+win = np.where((times >= -0.3) & (times < 0))[0]
+for i, (network, name) in enumerate(zip(networks, names)):
+    fig, ax = plt.subplots(figsize=(10, 2), layout='tight')
+    rhos = np.load(res_path / network / data_type2 / "corr" / "rhos_learn.npy")
+    r = np.array([np.diag(rho) for rho in rhos])
+    ax.plot(times, r.mean(0), label=name)
+    pval = decod_stats(r, -1)
+    sig = pval < threshold
+    ax.fill_between(times, r.mean(0), 0, where=sig, alpha=0.5, color='red')
+    ax.set_title(f"{name}", style='italic')
+    ax.axhline(0, color="k", alpha=.5)
+    ax.axvline(0, color="k", alpha=.5)
+    r_mean = r[:, win].mean(1)
+    sig_uncorr = ttest_1samp(r_mean, 0)[1] < threshold
+    if sig_uncorr:
+        ax.fill_between(times[win], -0.4, -0.39, alpha=0.5, color='red')
+    ax.set_xlabel("Testing Time (s)")
+    ax.set_ylabel("Spearman's rho")
+    ax.set_ylim(-0.5, 0.5)
+    fig.savefig(figures_dir / "timeg_corr_diags" / f"{network}.pdf", transparent=True)
+    plt.close()
+    
 ### plot session by session ###
 ensure_dir(figures_dir / "per_session")
 for network, name in zip(networks, names):
@@ -247,4 +138,4 @@ for network, name in zip(networks, names):
         #     cbar = plt.colorbar(im, ax=axes[i])
         #     cbar.set_label("accuracy")
     fig.savefig(figures_dir / "per_session" / f"{network}.pdf", transparent=True)
-    fig.close()
+    plt.close()

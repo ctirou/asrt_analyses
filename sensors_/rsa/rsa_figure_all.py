@@ -24,7 +24,7 @@ ensure_dir(figures_dir)
 all_patterns, all_randoms = [], []
 all_highs, all_lows = [], []
 for subject in tqdm(subjects):
-    res_path = RESULTS_DIR / 'RSA' / 'sensors' / "rdm_skf_new2" / subject
+    res_path = RESULTS_DIR / 'RSA' / 'sensors' / "rdm_skf_new" / subject
     ensure_dir(res_path)
     # RSA stuff
     behav_dir = op.join(HOME / 'raw_behavs' / subject)
@@ -36,13 +36,15 @@ for subject in tqdm(subjects):
     pats = np.array(pats)
     rands = np.array(rands)
     if subject == 'sub05':
-        pats[0] = np.load(res_path / "pat-1-1.npy")
-        rands[0] = np.load(res_path / "rand-1-1.npy")
+        block_path = RESULTS_DIR / 'RSA' / 'sensors' / "rdm_blocks_new" / subject
+        pats[0] = np.load(block_path / "pat-1-1.npy")
+        rands[0] = np.load(block_path / "rand-1-1.npy")    
     high, low = get_all_high_low(pats, rands, sequence, False)
     high = np.array(high).mean(0)
     low = np.array(low).mean(0)
     all_patterns.append(high)
     all_randoms.append(low)
+    
     # per session
     res_path = RESULTS_DIR / 'RSA' / 'sensors' / "rdm_skf_new" / subject
     pats, rands = [], []
@@ -52,8 +54,9 @@ for subject in tqdm(subjects):
     pats = np.array(pats)
     rands = np.array(rands)
     if subject == 'sub05':
-        pats[0] = np.load(res_path / "pat-1-1.npy")
-        rands[0] = np.load(res_path / "rand-1-1.npy")
+        block_path = RESULTS_DIR / 'RSA' / 'sensors' / "rdm_blocks_new" / subject
+        pats[0] = np.load(block_path / "pat-1-1.npy")
+        rands[0] = np.load(block_path / "rand-1-1.npy")
     high, low = get_all_high_low(pats, rands, sequence, False)
     high = np.array(high).mean(0)
     low = np.array(low).mean(0)
@@ -145,8 +148,10 @@ axd['A'].set_title(f'Mahalanobis distance within pairs', fontsize=13)
 
 ### B2 ### Similarity index
 axd['C'].axhline(0, color='grey', alpha=0.5)
-p_values = decod_stats(diff_lh, -1)
-sig = p_values < 0.05
+pval = decod_stats(diff_lh, -1)
+sig = pval < 0.05
+pval_unc = ttest_1samp(diff_lh, 0)[1]
+sig_unc = pval_unc < 0.05
 axd['C'].plot(times, diff_lh.mean(0), alpha=1, zorder=10, color='C7')
 sem = np.std(diff_lh, axis=0) / np.sqrt(len(subjects))
 axd['C'].fill_between(times, diff_lh.mean(0) - sem, diff_lh.mean(0) + sem, alpha=0.2, zorder=5, facecolor='C7')
@@ -160,7 +165,7 @@ idx_rsa = np.where(sig)[0] # to compute mean later
 # Overlay significant regions with the specified color
 axd['C'].fill_between(times, diff_lh.mean(0) - sem, diff_lh.mean(0) + sem, where=sig, alpha=0.4, zorder=5, facecolor=c2)
 axd['C'].fill_between(times, diff_lh.mean(0) - sem, 0, where=sig, alpha=0.3, zorder=5, facecolor=c2)
-win = np.where((times >= 0.4) & (times <= 0.55))[0]
+win = np.where((times >= 0.3) & (times <= 0.5))[0]
 mdiff = diff_lh[:, win].mean(1)
 mdiff_sig = ttest_1samp(mdiff, 0)[1] < 0.05
 if mdiff_sig:
@@ -194,10 +199,15 @@ axd['B'].set_xlabel('Time (s)', fontsize=11)
 axd['B'].text(np.mean(times[sig]), 0.1, '*', fontsize=25, ha='center', va='center', color=c6, weight='bold')
 # axd['B'].legend(frameon=False, loc="lower right")
 axd['B'].set_title('Similarity index and learning correlation time course', fontsize=13)
-cmap = plt.cm.get_cmap('tab20', len(subjects))
+win = np.where((times >= 0.3) & (times <= 0.5))[0]
+m_rho = all_rhos[:, win].mean(1)
+m_rho_sig = ttest_1samp(m_rho, 0)[1] < 0.05
+if m_rho_sig:
+    axd['B'].fill_between(times[win], -0.60, -0.63, alpha=1, zorder=5, facecolor=c6)
 
 ### C2 ### Learning index fit
-idx_rsa = np.where((times >= 0.3) & (times <= 0.6))[0]
+cmap = plt.cm.get_cmap('tab20', len(subjects))
+idx_rsa = np.where((times >= 0.3) & (times <= 0.5))[0]
 mdiff = diff_sess[:, :, idx_rsa].mean(2)
 np.save(figures_dir / "mean_rsa.npy", mdiff)
 slopes, intercepts = [], []

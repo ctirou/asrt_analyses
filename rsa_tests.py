@@ -4,8 +4,9 @@ from config import *
 from tqdm.auto import tqdm
 import matplotlib.pyplot as plt
 import pandas as pd
-from scipy.stats import ttest_1samp
+from scipy.stats import ttest_1samp, spearmanr as spear
 from scipy.ndimage import gaussian_filter1d
+
 
 subjects = SUBJS15
 times = np.linspace(-0.2, 0.6, 82)
@@ -327,6 +328,7 @@ for network in tqdm(networks):
     all_lows[network] = np.array(all_lows[network])
     
 # --- w/ practice bsl ---
+win = np.where((times >= 0.3) & (times <= 0.5))[0]
 fig, axes = plt.subplots(2, 5, figsize=(15, 4), sharex=True, sharey=True, layout='tight')
 for i, (ax, label, name) in enumerate(zip(axes.flat, networks, network_names)):
     ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
@@ -338,6 +340,8 @@ for i, (ax, label, name) in enumerate(zip(axes.flat, networks, network_names)):
     diff = high - low
     pval = decod_stats(diff, -1)
     sig = pval < threshold
+    pval_uncorr = ttest_1samp(diff, 0, axis=0)[1]
+    sig_uncorr = pval_uncorr < 0.05
     # Main plot
     ax.plot(times, diff.mean(0), alpha=1, label='Random - Pattern', zorder=10, color='C7')
     # Plot significant regions separately
@@ -349,10 +353,76 @@ for i, (ax, label, name) in enumerate(zip(axes.flat, networks, network_names)):
     ax.fill_between(times, diff.mean(0) - sem, diff.mean(0) + sem, where=sig, alpha=0.5, zorder=5, color=cmap[i])
     ax.fill_between(times, diff.mean(0) - sem, 0, where=sig, alpha=0.3, zorder=5, facecolor=cmap[i])
     ax.set_title(name, fontstyle='italic')
-    win = np.where((times >= 0.3) & (times <= 0.55))[0]
     mdiff = diff[:, win].mean(1)
     mdiff_sig = ttest_1samp(mdiff, 0)[1] < 0.05
     if mdiff_sig:
-        # ax.axvspan(times[win][0], times[win][-1], facecolor=cmap[i], edgecolor=None, alpha=0.2, zorder=5)
-        ax.fill_between(times[win], 1.4, 1.5, facecolor=cmap[i], edgecolor=None, alpha=1, zorder=5, where=times[win])
-        # ax.text((0.3+0.55)/2, 1.2, '*', fontsize=20, ha='center', va='center', color=cmap[i], weight='bold')
+        ax.axvspan(times[win][0], times[win][-1], facecolor=cmap[i], edgecolor=None, alpha=0.3, zorder=5)
+        ax.text(0.4, 0.8, '*', fontsize=20, ha='center', va='center', color=cmap[i], weight='bold')
+
+all_highs, all_lows = {}, {}
+diff_sess = {}
+for network in tqdm(networks):
+    if not network in all_highs:
+        all_highs[network] = []
+        all_lows[network] = []
+        diff_sess[network]  = []
+    for subject in subjects:        
+        # RSA stuff
+        behav_dir = op.join(HOME / 'raw_behavs' / subject)
+        sequence = get_sequence(behav_dir)
+        res_path = RESULTS_DIR / 'RSA' / 'source' / network / 'rdm_skf_vector_new' / subject
+        pats, rands = [], []
+        for i in range(5):
+            pats.append(np.load(res_path / f"pat-{i}.npy"))
+            rands.append(np.load(res_path / f"rand-{i}.npy"))
+        if subject == 'sub05':
+            block_path = RESULTS_DIR / 'RSA' / 'source' / network / "rdm_blocks_vect_new" / subject
+            pats[0] = np.load(block_path / "pat-1-1.npy")
+            rands[0] = np.load(block_path / "rand-1-1.npy")
+        pats = np.array(pats)
+        rands = np.array(rands)
+        high, low = get_all_high_low(pats, rands, sequence, False)
+        high, low = high.mean(0), low.mean(0)
+        all_highs[network].append(high)
+        all_lows[network].append(low)
+    all_highs[network] = np.array(all_highs[network])
+    all_lows[network] = np.array(all_lows[network])
+    
+    for i in range(5):
+        low = all_lows[network][:, i, :] - all_lows[network][:, 0, :]
+        high = all_highs[network][:, i, :] - all_highs[network][:, 0, :]
+        diff_sess[network].append(low - high)
+    diff_sess[network] = np.array(diff_sess[network]).swapaxes(0, 1)
+
+learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices15.csv', sep="\t", index_col=0)
+
+### Plot subject x learning index correlation ###
+win = np.where((times >= 0.3) & (times <= 0.5))[0]
+fig, axes = plt.subplots(2, 5, figsize=(15, 4), sharex=True, sharey=True, layout='tight')
+for i, (ax, label, name) in enumerate(zip(axes.flatten(), networks, network_names)):
+    ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
+    ax.axhline(0, color='grey', alpha=.5)
+    all_rhos = np.array([[spear(learn_index_df.iloc[sub, :], diff_sess[label][sub, :, t])[0] for t in range(len(times))] for sub in range(len(subjects))])
+    sem = np.std(all_rhos, axis=0) / np.sqrt(len(subjects))
+    # axd[j].plot(times, all_rhos.mean(0), color=cmap[i])
+    p_values_unc = ttest_1samp(all_rhos, axis=0, popmean=0)[1]
+    sig_unc = p_values_unc < 0.05
+    p_values = decod_stats(all_rhos, -1)
+    sig = p_values < 0.05
+    # Main plot
+    ax.plot(times, all_rhos.mean(0), alpha=1, label='Random - Pattern', zorder=10, color='C7')
+    # Plot significant regions separately
+    for start, end in contiguous_regions(sig):
+        ax.plot(times[start:end], all_rhos.mean(0)[start:end], alpha=1, zorder=10, color=cmap[i])
+    sem = np.std(all_rhos, axis=0) / np.sqrt(len(subjects))
+    ax.fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, alpha=0.2, zorder=5, facecolor='C7')
+    # Highlight significant regions
+    ax.fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, where=sig, alpha=0.5, zorder=5, color=cmap[i])
+    ax.set_ylabel("Rho", fontsize=11)
+    ax.fill_between(times, all_rhos.mean(0) - sem, 0, where=sig, alpha=0.3, zorder=5, facecolor=cmap[i])
+    mrho = all_rhos[:, win].mean(1)
+    mrho_sig = ttest_1samp(mrho, 0)[1]
+    if mrho_sig < 0.05:
+        ax.axvspan(times[win][0], times[win][-1], facecolor=cmap[i], edgecolor=None, alpha=0.3, zorder=5)
+        ax.text(0.4, 0.3, '*', fontsize=20, ha='center', va='center', color=cmap[i], weight='bold')
+    ax.set_title(name, fontstyle='italic')
