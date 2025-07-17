@@ -60,7 +60,7 @@ else:
 
 def process_subject(subject, verbose):
     
-    res_path = RESULTS_DIR / 'RSA' / 'sensors' / "rdm_skf_new" / subject
+    res_path = RESULTS_DIR / 'RSA' / 'sensors' / "rdm_skf" / subject
     ensure_dir(res_path)
 
     # Practice first

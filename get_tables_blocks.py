@@ -69,8 +69,8 @@ ax.set_xticks(np.arange(1, 24, 4))
 # ax.text(2, 0.4 , "Prac.", color='orange', fontsize=14, ha='center', va='center', fontstyle='italic')
 ax.set_xlabel('Block')
 ax.legend()
-# ax.set_title('RS sensors - blocks', fontstyle='italic')
-# fig.savefig(FIGURES_DIR / "RSA" / "sensors" / "rsa_blocks_sensors.pdf", transparent=True)
+ax.set_title('RS sensors - blocks', fontstyle='italic')
+fig.savefig(FIGURES_DIR / "RSA" / "sensors" / "rsa_blocks_sensors.pdf", transparent=True)
 # plt.close(fig)
 
 # save table
@@ -85,6 +85,21 @@ for i, subject in enumerate(subjects):
         })
 df = pd.DataFrame(rows)
 df.to_csv(FIGURES_DIR / "RSA" / "sensors" / "rsa_blocks_sensors.csv", index=False, sep=",")
+df.to_csv(FIGURES_DIR / "TM" / "data" / "rsa_blocks_sensors.csv", index=False, sep=",")
+
+# plot time resolved RSA sensors
+xmin, xmax = 0.3, 0.55
+win = np.where((times >= xmin) & (times <= xmax))[0]
+fig, ax = plt.subplots(figsize=(7, 4), layout='tight')
+ax.plot(times, np.nanmean(diff_rp, axis=(0, 1)), color=c1)
+ax.axhline(0, color='grey', linestyle='-', alpha=0.5)
+sig = decod_stats(np.nanmean(diff_rp, axis=(1)), -1) < 0.05
+ax.fill_between(times, np.nanmean(diff_rp, axis=(0, 1)), 0, where=sig, color='red', alpha=0.3)
+mdiff = np.nanmean(diff_rp[:, :, win], axis=(1, -1))
+mdiff_sig = ttest_1samp(mdiff, 0)[1] < 0.05
+if mdiff_sig:
+    ax.axvspan(times[win][0], times[win][-1], facecolor='red', edgecolor=None, alpha=0.2, zorder=5)
+    ax.text((xmin+xmax)/2, -0.5, '*', fontsize=16, ha='center', va='center', color='red', weight='bold')
 
 # RSA source --- blocks ---
 networks = NETWORKS + ['Cerebellum-Cortex']
@@ -150,7 +165,7 @@ for i, (ax, network) in enumerate(zip(axes.flatten(), networks)):
     if ax.get_subplotspec().is_last_row():
         ax.set_xlabel('Block')
 fig.suptitle('RS source - blocks', fontsize=14)
-# fig.savefig(FIGURES_DIR / "RSA" / "source" / "rsa_blocks_source.pdf", transparent=True)
+fig.savefig(FIGURES_DIR / "RSA" / "source" / "rsa_blocks_source.pdf", transparent=True)
 # plt.close(fig)
 
 # save table
@@ -168,6 +183,25 @@ for i, network in enumerate(networks):
             })
 df = pd.DataFrame(rows)
 df.to_csv(FIGURES_DIR / "RSA" / "source" / "rsa_blocks_source.csv", index=False, sep=",")
+df.to_csv(FIGURES_DIR / "TM" / "data" / "rsa_blocks_source.csv", index=False, sep=",")
+
+# plot time resolved RSA source
+xmin, xmax = 0.3, 0.55
+win = np.where((times >= xmin) & (times <= xmax))[0]
+fig, axes = plt.subplots(2, 5, figsize=(15, 4), sharey=True, sharex=True, layout='tight')
+for i, (ax, network) in enumerate(zip(axes.flatten(), networks)):
+    ax.plot(times, np.nanmean(diff_rp[network], axis=(0, 1)), color=c1)
+    ax.axhline(0, color='grey', linestyle='-', alpha=0.5)
+    sig = decod_stats(np.nanmean(diff_rp[network], axis=(1)), -1) < 0.05
+    ax.fill_between(times, np.nanmean(diff_rp[network], axis=(0, 1)), 0, where=sig, color='red', alpha=0.3) 
+    ax.set_title(network_names[i], fontstyle='italic')
+    smoothed = gaussian_filter1d(np.nanmean(diff_rp[network], axis=(0, 1)), sigma=1.5)
+    mdiff = np.nanmean(diff_rp[network][:, :, win], axis=(1, -1))
+    mdiff_sig = ttest_1samp(mdiff, 0)[1] < 0.05
+    if mdiff_sig:
+        ax.axvspan(times[win][0], times[win][-1], facecolor='red', edgecolor=None, alpha=0.2, zorder=5)
+        ax.text((xmin+xmax)/2, -0.5, '*', fontsize=16, ha='center', va='center', color='red', weight='bold')
+
     
 # --- Temporal generalization sensors --- blocks ---
 subjects = SUBJS15
@@ -225,8 +259,8 @@ ax.set_xticks(np.arange(1, 24, 4))
 ax.set_xlabel('Block')
 # ax.grid(True, linestyle='-', alpha=0.3)
 ax.legend()
-# ax.set_title('PA sensors - blocks', fontstyle='italic')
-# fig.savefig(FIGURES_DIR / "time_gen" / "sensors" / "timeg_blocks_sensors.pdf", transparent=True)
+ax.set_title('PA sensors - blocks')
+fig.savefig(FIGURES_DIR / "time_gen" / "sensors" / "timeg_blocks_sensors.pdf", transparent=True)
 # plt.close(fig)
 
 # save table
@@ -240,6 +274,7 @@ for i, subject in enumerate(subjects):
         })
 df = pd.DataFrame(rows)
 df.to_csv(FIGURES_DIR / "time_gen" / "sensors" / "timeg_blocks_sensors.csv", index=False, sep=",")
+df.to_csv(FIGURES_DIR / "TM" / "data" / "timeg_blocks_sensors.csv", index=False, sep=",")
 
 # Temporal generalization source --- blocks ---
 networks = NETWORKS + ['Cerebellum-Cortex']
@@ -249,7 +284,7 @@ idx_timeg = np.where((timesg >= -0.5) & (timesg < 0))[0]
 cont_blocks = {}
 pat_blocks = {}
 rand_blocks = {}
-data_type  = "scores_blocks_vect_0200_new"
+# data_type  = "scores_blocks_vect_0200_new"
 data_type  = "scores_blocks_vector_new"
 for network in tqdm(networks):
     pats_blocks, rands_blocks = [], []
@@ -324,56 +359,10 @@ for i, (ax, network) in enumerate(zip(axes.flatten(), networks)):
     # Only set xlabel for axes in the bottom row
     if ax.get_subplotspec().is_last_row():
         ax.set_xlabel('Block')
-# fig.suptitle(f'PA source - contrast blocks - {data_type}', fontsize=14)
-# fig.savefig(FIGURES_DIR / "time_gen" / "source" / "timeg_blocks_source.pdf", transparent=True)
+fig.suptitle('PA source - contrast blocks', fontsize=14)
+fig.savefig(FIGURES_DIR / "time_gen" / "source" / "timeg_blocks_source.pdf", transparent=True)
 # plt.close(fig)
 
-# plot pattern
-fig, axes = plt.subplots(2, 5, figsize=(15, 5), sharey=True, layout='tight')
-for i, (ax, network) in enumerate(zip(axes.flatten(), networks)):
-    ax.axvspan(1, 3, color='orange', alpha=0.1)
-    # Highlight each group of 5 blocks after practice
-    for start in range(4, 24, 5):
-        end = min(start + 4, 23)
-        ax.axvspan(start, end, color='green', alpha=0.1)
-    ax.axhline(0.25, color='grey', linestyle='-', alpha=0.5)
-    ax.plot(blocks, pat_blocks[network].mean(0))
-    # Smooth the mean curve for visualization
-    smoothed = gaussian_filter1d(pat_blocks[network].mean(0), sigma=1.5)
-    ax.plot(blocks, smoothed, color='red', linestyle='--', label='smoothed')
-    ax.set_xticks(np.arange(1, 24, 4))
-    # ax.grid(True, linestyle='-', alpha=0.3)
-    ax.set_title(network_names[i], fontstyle='italic')
-    if i == 0:
-        ax.legend()
-    # Only set xlabel for axes in the bottom row
-    if ax.get_subplotspec().is_last_row():
-        ax.set_xlabel('Block')
-fig.suptitle('PA source - pattern blocks', fontsize=14)
-
-# plot random
-fig, axes = plt.subplots(2, 5, figsize=(15, 5), sharey=True, layout='tight')
-for i, (ax, network) in enumerate(zip(axes.flatten(), networks)):
-    ax.axvspan(1, 3, color='orange', alpha=0.1)
-    # Highlight each group of 5 blocks after practice
-    for start in range(4, 24, 5):
-        end = min(start + 4, 23)
-        ax.axvspan(start, end, color='green', alpha=0.1)
-    ax.axhline(0.25, color='grey', linestyle='-', alpha=0.5)
-    ax.plot(blocks, rand_blocks[network].mean(0))
-    # Smooth the mean curve for visualization
-    smoothed = gaussian_filter1d(rand_blocks[network].mean(0), sigma=1.5)
-    ax.plot(blocks, smoothed, color='red', linestyle='--', label='smoothed')
-    ax.set_xticks(np.arange(1, 24, 4))
-    # ax.grid(True, linestyle='-', alpha=0.3)
-    ax.set_title(network_names[i], fontstyle='italic')
-    if i == 0:
-        ax.legend()
-    # Only set xlabel for axes in the bottom row
-    if ax.get_subplotspec().is_last_row():
-        ax.set_xlabel('Block')
-fig.suptitle('PA source - random blocks', fontsize=14)
-    
 # save table
 rows = list()
 for i, network in enumerate(networks):
@@ -389,4 +378,51 @@ for i, network in enumerate(networks):
             })
 df = pd.DataFrame(rows)
 df.to_csv(FIGURES_DIR / "time_gen" / "source" / "timeg_blocks_source.csv", index=False, sep=",")
+df.to_csv(FIGURES_DIR / "TM" / "data" / "timeg_blocks_source.csv", index=False, sep=",")
 
+# # plot pattern
+# fig, axes = plt.subplots(2, 5, figsize=(15, 5), sharey=True, layout='tight')
+# for i, (ax, network) in enumerate(zip(axes.flatten(), networks)):
+#     ax.axvspan(1, 3, color='orange', alpha=0.1)
+#     # Highlight each group of 5 blocks after practice
+#     for start in range(4, 24, 5):
+#         end = min(start + 4, 23)
+#         ax.axvspan(start, end, color='green', alpha=0.1)
+#     ax.axhline(0.25, color='grey', linestyle='-', alpha=0.5)
+#     ax.plot(blocks, pat_blocks[network].mean(0))
+#     # Smooth the mean curve for visualization
+#     smoothed = gaussian_filter1d(pat_blocks[network].mean(0), sigma=1.5)
+#     ax.plot(blocks, smoothed, color='red', linestyle='--', label='smoothed')
+#     ax.set_xticks(np.arange(1, 24, 4))
+#     # ax.grid(True, linestyle='-', alpha=0.3)
+#     ax.set_title(network_names[i], fontstyle='italic')
+#     if i == 0:
+#         ax.legend()
+#     # Only set xlabel for axes in the bottom row
+#     if ax.get_subplotspec().is_last_row():
+#         ax.set_xlabel('Block')
+# fig.suptitle('PA source - pattern blocks', fontsize=14)
+
+# # plot random
+# fig, axes = plt.subplots(2, 5, figsize=(15, 5), sharey=True, layout='tight')
+# for i, (ax, network) in enumerate(zip(axes.flatten(), networks)):
+#     ax.axvspan(1, 3, color='orange', alpha=0.1)
+#     # Highlight each group of 5 blocks after practice
+#     for start in range(4, 24, 5):
+#         end = min(start + 4, 23)
+#         ax.axvspan(start, end, color='green', alpha=0.1)
+#     ax.axhline(0.25, color='grey', linestyle='-', alpha=0.5)
+#     ax.plot(blocks, rand_blocks[network].mean(0))
+#     # Smooth the mean curve for visualization
+#     smoothed = gaussian_filter1d(rand_blocks[network].mean(0), sigma=1.5)
+#     ax.plot(blocks, smoothed, color='red', linestyle='--', label='smoothed')
+#     ax.set_xticks(np.arange(1, 24, 4))
+#     # ax.grid(True, linestyle='-', alpha=0.3)
+#     ax.set_title(network_names[i], fontstyle='italic')
+#     if i == 0:
+#         ax.legend()
+#     # Only set xlabel for axes in the bottom row
+#     if ax.get_subplotspec().is_last_row():
+#         ax.set_xlabel('Block')
+# fig.suptitle('PA source - random blocks', fontsize=14)
+    

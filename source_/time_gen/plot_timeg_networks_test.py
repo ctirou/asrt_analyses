@@ -32,6 +32,8 @@ chance = .25
 threshold = .05
 res_dir = RESULTS_DIR / 'TIMEG' / 'source'
 
+data_type1 = 'scores_skf_vect'
+data_type2 = 'scores_skf_vect_new'
 
 # Load data, compute, and save correlations and pvals 
 learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices15.csv', sep="\t", index_col=0)
@@ -54,16 +56,16 @@ for network in tqdm(networks):
         
         for j in [0, 1, 2, 3, 4]:
             
-            pat = np.load(res_dir / network / 'scores_skf' / subject / f"pat-{j}.npy")
-            rand = np.load(res_dir / network / 'scores_skf' / subject / f"rand-{j}.npy")
+            pat = np.load(res_dir / network / data_type2 / subject / f"pat-{j}.npy")
+            rand = np.load(res_dir / network / data_type2 / subject / f"rand-{j}.npy")
             patpat.append(np.array(pat))
             randrand.append(np.array(rand))
             
             d = np.array(pat) - np.array(rand)
             dd.append(np.diag(d))
     
-        all_pat.append(np.load(res_dir / network / 'scores_skf' / subject / "pat-all.npy"))
-        all_rand.append(np.load(res_dir / network / 'scores_skf' / subject / "rand-all.npy"))
+        all_pat.append(np.load(res_dir / network / data_type1 / subject / "pat-all.npy"))
+        all_rand.append(np.load(res_dir / network / data_type1 / subject / "rand-all.npy"))
         
         diag = np.array(all_pat) - np.array(all_rand)
         all_diag.append(np.diag(diag[i]))
@@ -170,7 +172,7 @@ for network, pattern_idx in zip(networks, ['a1', 'b1', 'c1', 'd1', 'e1', 'f1', '
     axes[pattern_idx].axhline(0, color="k", alpha=.5)
     
     xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
-    pval = np.load(res_dir / network / "pval-skf" / "all_pattern-pval.npy")
+    pval = np.load(res_dir / network / data_type1 / "pval" / "all_pattern-pval.npy")
     sig = pval < threshold
     axes[pattern_idx].contour(xx, yy, sig, colors=sig_color, levels=[0], linestyles='--', linewidths=0.5)
     axes[pattern_idx].set_ylabel("Training time (s)")
@@ -206,7 +208,7 @@ for network, random_idx in zip(networks, ['a2', 'b2', 'c2', 'd2', 'e2', 'f2', 'g
     axes[random_idx].set_yticklabels([])
     
     xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
-    pval = np.load(res_dir / network / "pval-skf" / "all_random-pval.npy")
+    pval = np.load(res_dir / network / data_type1 / "pval" / "all_random-pval.npy")
     sig = pval < threshold
     axes[random_idx].contour(xx, yy, sig, colors=sig_color, levels=[0], linestyles='--', linewidths=0.5)
     
@@ -237,7 +239,7 @@ for network, contrast_idx in zip(networks, ['a3', 'b3', 'c3', 'd3', 'e3', 'f3', 
     axes[contrast_idx].set_yticklabels([])
     
     xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
-    pval = np.load(res_dir / network / "pval-skf" / "all_contrast-pval.npy")
+    pval = np.load(res_dir / network / data_type1 / "pval" / "all_contrast-pval.npy")
     sig = pval < threshold
     axes[contrast_idx].contour(xx, yy, sig, colors=sig_color, levels=[0], linestyles='--', linewidths=0.5)
         
@@ -314,7 +316,7 @@ axes['j'].set_xticklabels(names, rotation=45, ha='right')
 axes['j'].axhline(0, color='grey', linewidth=2, zorder=10)
 axes['j'].set_title('Predictive coding during pre-stimulus period and perception', fontsize=12, pad=-20)
 axes['j'].set_ylabel('Mean effect', labelpad=-20)
-axes['j'].set_ylim(ymin, ymax)
+# axes['j'].set_ylim(ymin, ymax)
 axes['j'].set_yticks([ymin, ymax])
 # axes['j'].legend(frameon=False, loc='upper left', fontsize=9)
 axes['j'].spines['top'].set_visible(False)
@@ -338,7 +340,7 @@ axes['l'].set_aspect(0.5)
 #     if key is None:
 #         ax.set_visible(False)
 
-fig.savefig(figures_dir / "timeg-final.pdf", transparent=True)
+fig.savefig(figures_dir / "timeg-final-test.pdf", transparent=True)
 plt.close()
 
 fns = []

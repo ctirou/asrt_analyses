@@ -24,8 +24,8 @@ def compute_spearman(t, g, vector, contrasts):
 learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices15.csv', sep="\t", index_col=0)
 
 data_type = 'scores_skf_maxpower'  # 'scores_skf_vect' or 'scores_skf_maxpower'
-data_type = 'scores_skf_vect_new'  # 'scores_skf_vect' or 'scores_skf_maxpower'
 data_type = 'scores_skf_vect'  # 'scores_skf_vect' or 'scores_skf_maxpower'
+data_type = 'scores_skf_vect_new'  # 'scores_skf_vect' or 'scores_skf_maxpower'
 
 patterns, randoms = {}, {}
 all_patterns, all_randoms = {}, {}
@@ -44,8 +44,8 @@ for network in networks:
         patpat.append(np.array(pat))
         randrand.append(np.array(rand))
     
-    #     all_pat.append(np.load(res_path / network / data_type / subject /  "pat-all.npy"))
-    #     all_rand.append(np.load(res_path / network / data_type / subject /  "rand-all.npy"))
+        all_pat.append(np.load(res_path / network / data_type / subject /  "pat-all.npy"))
+        all_rand.append(np.load(res_path / network / data_type / subject /  "rand-all.npy"))
         
     # all_patterns[network] = np.array(all_pat)
     # all_randoms[network] = np.array(all_rand)

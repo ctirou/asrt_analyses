@@ -14,7 +14,7 @@ from matplotlib import colors
 subjects = SUBJS15
 jobs = -1
 overwrite = False
-session_on = True
+session_on = False
 
 def compute_spearman(t, g, vector, contrasts):
     return spear(vector, contrasts[:, t, g])[0]
@@ -23,7 +23,7 @@ times = np.linspace(-4, 4, 813)
 
 figure_dir = ensured(FIGURES_DIR / "time_gen" / "sensors")
 
-res_dir = RESULTS_DIR / 'TIMEG' / 'sensors' / "scores_skf"
+res_dir = RESULTS_DIR / 'TIMEG' / 'sensors' / "scores_skf_new"
 
 # load patterns and randoms time-generalization on all epochs
 all_patterns, all_randoms = [], []
@@ -110,9 +110,10 @@ if not op.exists(res_dir / "corr-all" / "rhos_learn.npy") or overwrite:
     pval = gat_stats(all_rhos, -1)
     np.save(res_dir / "corr-all" / "pval_learn-pval.npy", pval)
 
-
 cmap1 = "RdBu_r"
 cmap2 = "coolwarm"
+
+idx = np.where((times >= -1.5) & (times <= 3))[0]
 
 plt.rcParams.update({'font.size': 12, 'font.family': 'serif', 'font.serif': 'Arial'})
 
@@ -195,6 +196,7 @@ for ax, data, title, pval, vmin, vmax in zip(axs.flat, [contrasts, rhos], \
         ax.add_patch(rect1)
     cbar = fig.colorbar(im, ax=ax, orientation='vertical', fraction=.1, ticks=[vmin, vmax])
     cbar.set_label(label, rotation=270, fontsize=13)
+
 fig.savefig(figure_dir / "contrast_corr-final.pdf", transparent=True)
 plt.close()
 
