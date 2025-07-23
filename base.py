@@ -902,7 +902,7 @@ def mixed_model_pvalues(df, dependent, predictor, group):
         'std_err': full_result.bse[predictor]
     }
 
-def get_train_test_blocks_net(data, fwd, behav, pick_ori, lh_label, rh_label, trial_type, block, verbose):
+def get_train_test_blocks_net(data, fwd, behav, pick_ori, lh_label, rh_label, trial_type, block, blocks, verbose):
     """Helper function to get source data for training and testing."""
     
     from mne import compute_covariance, compute_rank
@@ -913,7 +913,12 @@ def get_train_test_blocks_net(data, fwd, behav, pick_ori, lh_label, rh_label, tr
     weight_norm = "unit-noise-gain-invariant" if pick_ori == 'vector' else "unit-noise-gain"
 
     this_block = behav.blocks == block
-    out_blocks = behav.blocks != block
+    # out_blocks = behav.blocks != block
+    if block in blocks[:3]:
+        rand_blocks = np.random.choice(blocks[3:], size=19, replace=False)
+        out_blocks = behav.blocks.isin(rand_blocks)
+    else:
+        out_blocks = (behav.blocks != block) & (behav.sessions != 0)
     
     tt = behav.trialtypes == 2 if trial_type == 'random' else behav.trialtypes == 1
     tt_out_blocks = tt & out_blocks
@@ -952,7 +957,7 @@ def get_train_test_blocks_net(data, fwd, behav, pick_ori, lh_label, rh_label, tr
     
     return Xtrain, ytrain, Xtest, ytest
 
-def get_train_test_blocks_htc(data, fwd, behav, pick_ori, trial_type, block, verbose):
+def get_train_test_blocks_htc(data, fwd, behav, pick_ori, trial_type, block, blocks, verbose):
     """Helper function to get source data for training and testing."""
     
     from mne import compute_covariance, compute_rank
@@ -961,7 +966,12 @@ def get_train_test_blocks_htc(data, fwd, behav, pick_ori, trial_type, block, ver
     weight_norm = "unit-noise-gain-invariant" if pick_ori == 'vector' else "unit-noise-gain"
     
     this_block = behav.blocks == block
-    out_blocks = behav.blocks != block
+    # out_blocks = behav.blocks != block
+    if block in blocks[:3]:
+        rand_blocks = np.random.choice(blocks[3:], size=19, replace=False)
+        out_blocks = behav.blocks.isin(rand_blocks)
+    else:
+        out_blocks = (behav.blocks != block) & (behav.sessions != 0)
     
     tt = behav.trialtypes == 2 if trial_type == 'random' else behav.trialtypes == 1
     tt_out_blocks = tt & out_blocks
