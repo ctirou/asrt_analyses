@@ -88,7 +88,7 @@ df.to_csv(FIGURES_DIR / "RSA" / "sensors" / "rsa_blocks_sensors.csv", index=Fals
 df.to_csv(FIGURES_DIR / "TM" / "data" / "rsa_blocks_sensors.csv", index=False, sep=",")
 
 # plot time resolved RSA sensors
-xmin, xmax = 0.3, 0.55
+xmin, xmax = 0.2, 0.55
 win = np.where((times >= xmin) & (times <= xmax))[0]
 fig, ax = plt.subplots(figsize=(7, 4), layout='tight')
 ax.plot(times, np.nanmean(diff_rp, axis=(0, 1)), color=c1)
@@ -100,6 +100,11 @@ mdiff_sig = ttest_1samp(mdiff, 0)[1] < 0.05
 if mdiff_sig:
     ax.axvspan(times[win][0], times[win][-1], facecolor='red', edgecolor=None, alpha=0.2, zorder=5)
     ax.text((xmin+xmax)/2, -0.5, '*', fontsize=16, ha='center', va='center', color='red', weight='bold')
+ax.set_xlabel('Time (s)')
+ax.set_ylabel('Similarity index (random - pattern)')
+ax.set_title('RS sensors - time resolved', fontstyle='italic')
+fig.savefig(FIGURES_DIR / "RSA" / "sensors" / "rsa_time_resolved_sensors.pdf", transparent=True)
+plt.close(fig)
 
 # RSA source --- blocks ---
 networks = NETWORKS + ['Cerebellum-Cortex']
@@ -166,7 +171,7 @@ for i, (ax, network) in enumerate(zip(axes.flatten(), networks)):
         ax.set_xlabel('Block')
 fig.suptitle('RS source - blocks', fontsize=14)
 fig.savefig(FIGURES_DIR / "RSA" / "source" / "rsa_blocks_source.pdf", transparent=True)
-# plt.close(fig)
+plt.close(fig)
 
 # save table
 rows = list()
@@ -201,7 +206,9 @@ for i, (ax, network) in enumerate(zip(axes.flatten(), networks)):
     if mdiff_sig:
         ax.axvspan(times[win][0], times[win][-1], facecolor='red', edgecolor=None, alpha=0.2, zorder=5)
         ax.text((xmin+xmax)/2, -0.5, '*', fontsize=16, ha='center', va='center', color='red', weight='bold')
-
+fig.suptitle('RS source - time resolved', fontsize=14)
+fig.savefig(FIGURES_DIR / "RSA" / "source" / "rsa_time_resolved_source.pdf", transparent=True)
+# plt.close(fig)
     
 # --- Temporal generalization sensors --- blocks ---
 subjects = SUBJS15
@@ -261,7 +268,7 @@ ax.set_xlabel('Block')
 ax.legend()
 ax.set_title('PA sensors - blocks')
 fig.savefig(FIGURES_DIR / "time_gen" / "sensors" / "timeg_blocks_sensors.pdf", transparent=True)
-# plt.close(fig)
+plt.close(fig)
 
 # save table
 rows = list()
@@ -276,6 +283,50 @@ df = pd.DataFrame(rows)
 df.to_csv(FIGURES_DIR / "time_gen" / "sensors" / "timeg_blocks_sensors.csv", index=False, sep=",")
 df.to_csv(FIGURES_DIR / "TM" / "data" / "timeg_blocks_sensors.csv", index=False, sep=",")
 
+# plot time resolved PA sensors
+patt_ave, rand_ave = pats_blocks.mean(1), rands_blocks.mean(1)
+data = patt_ave - rand_ave
+ensured(FIGURES_DIR / "temp" / "timeg_pval")
+
+from matplotlib import colors
+
+cmap1 = plt.get_cmap('RdBu_r')
+vmin, vmax = -0.05, 0.05
+idx = np.where((times >= -1.5) & (times <=3))[0]
+fig, ax = plt.subplots(figsize=(7, 4), layout='tight')
+norm = colors.Normalize(vmin=vmin, vmax=vmax)
+images = []
+images.append(ax.imshow(data[:, idx][:, :, idx].mean(0), 
+                        # norm=norm,
+                        vmin = vmin,
+                        vmax = vmax,
+                        interpolation="lanczos",
+                        origin="lower",
+                        cmap=cmap1,
+                        extent=times[idx][[0, -1, 0, -1]],
+                        aspect=0.5))
+ax.set_ylabel("Training time (s)", fontsize=13)
+ax.set_xticks(np.arange(-1, 3, .5))
+ax.set_yticks(np.arange(-1, 3, .5))
+ax.set_title(f"Time generalization - time resolved", fontsize=16)
+ax.axvline(0, color="k")
+ax.axhline(0, color="k")
+xx, yy = np.meshgrid(times[idx], times[idx], copy=False, indexing='xy')
+if not op.exists(FIGURES_DIR / "temp" / "timeg_pval" / "all_timeg-pval.npy"):
+    pval = gat_stats(data[:, idx][:, :, idx], -1)
+    np.save(FIGURES_DIR / "temp" / "timeg_pval" / "all_timeg-pval.npy", pval)
+else:
+    pval = np.load(FIGURES_DIR / "temp" / "timeg_pval" / "all_timeg-pval.npy")
+sig = pval < 0.05
+ax.contour(xx, yy, sig, colors='black', levels=[0],
+                    linestyles='--', linewidths=1, alpha=.5)
+ax.set_xlabel("Testing time (s)", fontsize=13)
+cbar = fig.colorbar(images[0], ax=ax, orientation='vertical', fraction=.1, ticks=[vmin, vmax])
+cbar.set_label("\nAccuracy", rotation=270, fontsize=13)
+ax.set_title("Time generalization - time resolved", fontstyle='italic')
+fig.savefig(FIGURES_DIR / "time_gen" / "sensors" / "timeg_time_resolved_sensors.pdf", transparent=True)
+# plt.close(fig)
+
 # Temporal generalization source --- blocks ---
 networks = NETWORKS + ['Cerebellum-Cortex']
 network_names = NETWORK_NAMES + ['Cerebellum']
@@ -284,6 +335,7 @@ idx_timeg = np.where((timesg >= -0.5) & (timesg < 0))[0]
 cont_blocks = {}
 pat_blocks = {}
 rand_blocks = {}
+contrast_net = dict()
 # data_type  = "scores_blocks_vect_0200_new"
 data_type  = "scores_blocks_vector_new"
 for network in tqdm(networks):
@@ -310,6 +362,7 @@ for network in tqdm(networks):
         rands_blocks.append(np.array(random))
     pats_blocks, rands_blocks = np.array(pats_blocks), np.array(rands_blocks)
     contrast = pats_blocks - rands_blocks
+    contrast_net[network] = contrast
     # mean box
     box_blocks_c = []
     box_blocks_p = []
@@ -333,6 +386,40 @@ for network in tqdm(networks):
     cont_blocks[network] = np.array(box_blocks_c)
     pat_blocks[network] = np.array(box_blocks_p)
     rand_blocks[network] = np.array(box_blocks_r)
+    
+ensured(FIGURES_DIR / "temp" / "timeg_pval")
+# Contrast
+cmap1 = "RdBu_r"
+c1 = "#708090"
+c1 = "#00BFA6"
+
+fig, axes = plt.subplots(2, 5, figsize=(20, 4), sharex=True, sharey=True, layout='constrained')
+for i, (ax, network, name) in enumerate(zip(axes.flatten(), networks, network_names)):
+    print(f"Plotting {network}...")
+    im = ax.imshow(
+        contrast_net[network].mean((0, 1)),
+        interpolation="lanczos",
+        origin="lower",
+        cmap=cmap1,
+        extent=timesg[[0, -1, 0, -1]],
+        aspect=0.5,
+        vmin=-0.05,
+        vmax=0.05)
+    ax.set_title(f"{name}", fontsize=10, fontstyle="italic")
+    xx, yy = np.meshgrid(timesg, timesg, copy=False, indexing='xy')
+    if not op.exists(FIGURES_DIR / "temp" / "timeg_pval" / f"{network}_timeg-pval.npy"):
+        pval = gat_stats(contrast_net[network].mean(1), -1)
+        np.save(FIGURES_DIR / "temp" / "timeg_pval" / f"{network}_timeg-pval.npy", pval)
+    else:
+        pval = np.load(FIGURES_DIR / "temp" / "timeg_pval" / f"{network}_timeg-pval.npy")
+    sig = pval < 0.05
+    ax.contour(xx, yy, sig, colors='black', levels=[0],
+                        linestyles='--', linewidths=1, alpha=.5)
+    ax.axvline(0, color="k", alpha=.5)
+    ax.axhline(0, color="k", alpha=.5)
+fig.suptitle("Contrast time generalization")
+fig.savefig(FIGURES_DIR / "time_gen" / "source" / "timeg_time_resolved_source.pdf", transparent=True)
+# plt.close(fig)
 
 # plot contrast
 blocks = np.arange(1, 24)
