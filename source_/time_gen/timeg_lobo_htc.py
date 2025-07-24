@@ -54,7 +54,6 @@ def process_subject(subject, jobs):
         behav_fname = op.join(data_path, "behav/%s-%s.pkl" % (subject, epoch_num))
         behav = pd.read_pickle(behav_fname).reset_index(drop=True)
         behav['sessions'] = epoch_num
-        behav['trials'] = behav.index
         all_behavs.append(behav)
         # read epochs
         epoch_fname = op.join(data_path, "epochs", "%s-%s-epo.fif" % (subject, epoch_num))
@@ -62,6 +61,7 @@ def process_subject(subject, jobs):
         all_epochs.append(epoch)
     # concatenate all epochs and behavs
     behav = pd.concat(all_behavs, ignore_index=True)
+    behav['trials'] = behav.index
     for epo in all_epochs:
         epo.info['dev_head_t'] = all_epochs[0].info['dev_head_t']
     epoch = mne.concatenate_epochs(all_epochs)
@@ -75,10 +75,7 @@ def process_subject(subject, jobs):
     fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
 
     # rename blocks columns
-    for i, (block, session) in enumerate(zip(behav.blocks, behav.sessions)):
-        if session != 0:
-            behav.blocks[i] = block + 3
-                            
+    behav.loc[behav.sessions != 0, 'blocks'] += 3
     blocks = np.unique(behav["blocks"])        
             
     for region in ['Hippocampus', 'Thalamus', 'Cerebellum-Cortex']:

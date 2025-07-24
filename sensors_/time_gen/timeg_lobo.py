@@ -17,7 +17,7 @@ data_path = DATA_DIR / 'for_timeg_new'
 subjects = SUBJS15
 solver = 'lbfgs'
 scoring = "accuracy"
-verbose = "error"
+verbose = True
 overwrite = False
 
 set_log_level(verbose)
@@ -38,7 +38,6 @@ def process_subject(subject, jobs):
         behav_fname = op.join(data_path, "behav/%s-%s.pkl" % (subject, epoch_num))
         behav = pd.read_pickle(behav_fname).reset_index(drop=True)
         behav['sessions'] = epoch_num
-        behav['trials'] = behav.index
         all_behavs.append(behav)
         # read epochs
         epoch_fname = op.join(data_path, "epochs", "%s-%s-epo.fif" % (subject, epoch_num))
@@ -46,6 +45,7 @@ def process_subject(subject, jobs):
         all_epochs.append(epoch)
     # concatenate all epochs and behavs
     behav = pd.concat(all_behavs, ignore_index=True)
+    behav['trials'] = behav.index
     for epo in all_epochs:
         epo.info['dev_head_t'] = all_epochs[0].info['dev_head_t']
     data = concatenate_epochs(all_epochs).get_data(picks='mag', copy=True)
@@ -55,26 +55,36 @@ def process_subject(subject, jobs):
     gc.collect()
     
     # rename blocks columns
-    for i, (block, session) in enumerate(zip(behav.blocks, behav.sessions)):
-        if session != 0:
-            behav.blocks[i] = block + 3
+    # for i, (block, session) in enumerate(zip(behav.blocks, behav.sessions)):
+    #     if session != 0:
+    #         behav.blocks[i] = block + 3
+    behav.loc[behav.sessions != 0, 'blocks'] += 3
     
-    blocks = np.unique(behav.blocks)        
+    blocks = np.unique(behav.blocks)
+    rng = np.random.default_rng(seed=42)
     
     for block in blocks:
         block = int(block)
         this_block = behav.blocks == block
         
+        np.unique(this_block, return_counts=True) 
+        np.unique(behav.sessions, return_counts=True)
+        
         if block in blocks[:3]:
-            rand_blocks = np.random.choice(blocks[3:], size=19, replace=False)
-            out_blocks = behav.blocks.isin(rand_blocks)
+            rand_blocks = rng.choice(blocks[3:], size=19, replace=False)
+            out_blocks = behav.blocks.isin(rand_blocks) & (behav.blocks != block)
         else:
             out_blocks = (behav.blocks != block) & (behav.sessions != 0)
 
+        np.unique(out_blocks, return_counts=True)
+        
+        for b, w in zip(behav.blocks, out_blocks):
+            print(f"Block: {b}, Out: {w}")
+
         # pattern trials
         pat = behav.trialtypes == 1
-        pat_this_block = pat & this_block
         pat_out_blocks = pat & out_blocks
+        pat_this_block = pat & this_block
         yob = behav[pat_out_blocks]
         ytb = behav[pat_this_block]
         Xtrain = data[yob.trials.values]
@@ -83,6 +93,7 @@ def process_subject(subject, jobs):
         ytest = ytb.positions
         assert len(Xtrain) == len(ytrain), "Xtrain and ytrain lengths do not match"
         assert len(Xtest) == len(ytest), "Xtest and ytest lengths do not match"
+        print(f"Training samples: {len(ytrain)}, Test samples: {len(ytest)}")
         
         if not op.exists(res_path / f"pat-{block}.npy") or overwrite:
             clf.fit(Xtrain, ytrain)
@@ -91,10 +102,34 @@ def process_subject(subject, jobs):
         else:
             print(f"Pattern for {subject} block {block} already exists")
 
+        import matplotlib.pyplot as plt
+        times = np.linspace(-4, 4, acc_matrix.shape[0])
+        cmap1 = plt.get_cmap('RdBu_r')
+        vmin, vmax = 0, 0.5
+        fig, ax = plt.subplots(figsize=(10, 4), layout='constrained')
+        ax.imshow(acc_matrix, 
+                    # norm=norm,
+                    vmin = vmin,
+                    vmax = vmax,
+                    interpolation="lanczos",
+                    origin="lower",
+                    cmap=cmap1,
+                    extent=times[[0, -1, 0, -1]],
+                    aspect=0.5)
+        ax.set_xticks(np.arange(-4, 4, 1))
+        ax.set_yticks(np.arange(-4, 4, 1))
+        ax.set_title("Time generalization - time resolved", fontsize=16)
+        ax.axvline(0, color="k")
+        ax.axhline(0, color="k")
+        cbar = fig.colorbar(ax.images[0], ax=ax, orientation='vertical', fraction=.1, ticks=[vmin, vmax])
+        ax.set_xlabel("Testing time (s)")
+        ax.set_ylabel("Training time (s)")
+        cbar.set_label("Accuracy", rotation=270)
+
         # random trials        
         rand = behav.trialtypes == 2
-        rand_this_block = rand & this_block
         rand_out_blocks = rand & out_blocks
+        rand_this_block = rand & this_block
         yob = behav[rand_out_blocks]
         ytb = behav[rand_this_block]
         Xtrain = data[yob.trials.values]
@@ -103,6 +138,7 @@ def process_subject(subject, jobs):
         ytest = ytb.positions
         assert len(Xtrain) == len(ytrain), "Xtrain and ytrain lengths do not match"
         assert len(Xtest) == len(ytest), "Xtest and ytest lengths do not match"
+        print(f"Training samples: {len(ytrain)}, Test samples: {len(ytest)}")
         
         if not op.exists(res_path / f"rand-{block}.npy") or overwrite:
             clf.fit(Xtrain, ytrain)

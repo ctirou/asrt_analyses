@@ -22,11 +22,10 @@ def process_subject(subject, jobs, verbose):
     
     all_epochs, all_behavs = [], []
     for epoch_num in range(5):
-        # read behav        
+        # read behav
         behav_fname = op.join(data_path, "behav/%s-%s.pkl" % (subject, epoch_num))
         behav = pd.read_pickle(behav_fname).reset_index(drop=True)
         behav['sessions'] = epoch_num
-        behav['trials'] = behav.index
         all_behavs.append(behav)
         # read epochs
         epoch_fname = op.join(data_path, "epochs", "%s-%s-epo.fif" % (subject, epoch_num))
@@ -34,6 +33,7 @@ def process_subject(subject, jobs, verbose):
         all_epochs.append(epoch)
     # concatenate all epochs and behavs
     behav = pd.concat(all_behavs, ignore_index=True)
+    behav['trials'] = behav.index
     for epo in all_epochs:
         epo.info['dev_head_t'] = all_epochs[0].info['dev_head_t']
     data = mne.concatenate_epochs(all_epochs).get_data(picks='mag', copy=True)
@@ -43,19 +43,22 @@ def process_subject(subject, jobs, verbose):
     gc.collect()
     
     # rename blocks columns
-    for i, (block, session) in enumerate(zip(behav.blocks, behav.sessions)):
-        if session != 0:
-            behav.blocks[i] = block + 3
+    behav.loc[behav.sessions != 0, 'blocks'] += 3
                 
     blocks = np.unique(behav.blocks)
             
     for block in blocks:
         block = int(block)
         
+        this_block = behav.blocks == block
+        if block in blocks[:3]:
+            rand_blocks = np.random.choice(blocks[3:], size=19, replace=False)
+            out_blocks = behav.blocks.isin(rand_blocks)
+        else:
+            out_blocks = (behav.blocks != block) & (behav.sessions != 0)
+
         # pattern trials
         pat = behav.trialtypes == 1
-        this_block = behav.blocks == block
-        out_blocks = behav.blocks != block
         pat_this_block = pat & this_block
         pat_out_blocks = pat & out_blocks
         yob = behav[pat_out_blocks]
@@ -75,8 +78,6 @@ def process_subject(subject, jobs, verbose):
         
         # random trials        
         rand = behav.trialtypes == 2
-        this_block = behav.blocks == block
-        out_blocks = behav.blocks != block
         rand_this_block = rand & this_block
         rand_out_blocks = rand & out_blocks
         yob = behav[rand_out_blocks]

@@ -17,20 +17,17 @@ c1, c2 = "#5BBCD6", "#00A08A"
 all_pats, all_rands = [], []
 all_pats_blocks, all_rands_blocks = [], []
 for subject in tqdm(subjects):
-    res_path = RESULTS_DIR / 'RSA' / 'sensors' / "rdm_blocks_new" / subject
+    res_path = RESULTS_DIR / 'RSA' / 'sensors' / "rdm_lobo_new" / subject
     # read behav        
     behav_dir = op.join(HOME / 'raw_behavs' / subject)
     sequence = get_sequence(behav_dir)
     pattern_blocks, random_blocks = [], []
-    for epoch_num in range(5):
-        blocks = [i for i in range(1, 4)] if epoch_num == 0 else [i for i in range(5 * (epoch_num - 1) + 1, epoch_num * 5 + 1)]
-        pats, rands = [], []
-        for block in blocks:
-            pattern_blocks.append(np.load(res_path / f"pat-{epoch_num}-{block}.npy"))
-            random_blocks.append(np.load(res_path / f"rand-{epoch_num}-{block}.npy"))
+    for block in range(1, 24):
+        pattern_blocks.append(np.load(res_path / f"pat-{block}.npy"))
+        random_blocks.append(np.load(res_path / f"rand-{block}.npy"))
     if subject == 'sub05':
-        pat_bsl = np.load(res_path / "pat-1-1.npy")
-        rand_bsl = np.load(res_path / "rand-1-1.npy")
+        pat_bsl = np.load(res_path / "pat-1.npy")
+        rand_bsl = np.load(res_path / "rand-1.npy")
         for i in range(3):
             pattern_blocks[i] = pat_bsl.copy()
             random_blocks[i] = rand_bsl.copy()
@@ -50,7 +47,7 @@ diff_rp = rand - pat
 # plot
 fig, ax = plt.subplots(figsize=(7, 4), layout='tight')
 blocks = np.arange(1, 24)
-idx = np.where((times >= 0.3) & (times <= 0.5))[0]
+idx = np.where((times >= 0.3) & (times <= 0.55))[0]
 ax.axvspan(1, 3, color='orange', alpha=0.1)
 # Highlight each group of 5 blocks after practice
 for start in range(4, 24, 5):
@@ -89,18 +86,19 @@ df.to_csv(FIGURES_DIR / "RSA" / "sensors" / "rsa_blocks_sensors.csv", index=Fals
 df.to_csv(FIGURES_DIR / "TM" / "data" / "rsa_blocks_sensors.csv", index=False, sep=",")
 
 # plot time resolved RSA sensors
-xmin, xmax = 0.2, 0.55
+xmin, xmax = 0.3, 0.55
 win = np.where((times >= xmin) & (times <= xmax))[0]
 fig, ax = plt.subplots(figsize=(7, 4), layout='tight')
+ax.axvspan(0, 0.2, color='grey', alpha=0.1)
 ax.plot(times, np.nanmean(diff_rp, axis=(0, 1)), color=c1)
 ax.axhline(0, color='grey', linestyle='-', alpha=0.5)
 sig = decod_stats(np.nanmean(diff_rp, axis=(1)), -1) < 0.05
 ax.fill_between(times, np.nanmean(diff_rp, axis=(0, 1)), 0, where=sig, color='red', alpha=0.3)
 mdiff = np.nanmean(diff_rp[:, :, win], axis=(1, -1))
 mdiff_sig = ttest_1samp(mdiff, 0)[1] < 0.05
-if mdiff_sig:
-    ax.axvspan(times[win][0], times[win][-1], facecolor='red', edgecolor=None, alpha=0.2, zorder=5)
-    ax.text((xmin+xmax)/2, -0.5, '*', fontsize=16, ha='center', va='center', color='red', weight='bold')
+# if mdiff_sig:
+#     ax.axvspan(times[win][0], times[win][-1], facecolor='red', edgecolor=None, alpha=0.2, zorder=5)
+#     ax.text((xmin+xmax)/2, -0.5, '*', fontsize=16, ha='center', va='center', color='red', weight='bold')
 ax.set_xlabel('Time (s)')
 ax.set_ylabel('Similarity index (random - pattern)')
 ax.set_title('RS sensors - time resolved', fontstyle='italic')
@@ -218,16 +216,14 @@ filt = np.where((times >= -1.5) & (times <= 3))[0]
 times_filt = times[filt]
 pats_blocks, rands_blocks = [], []
 for subject in tqdm(subjects):
-    res_path = RESULTS_DIR / 'TIMEG' / 'sensors' / 'scores_blocks_new' / subject
+    res_path = RESULTS_DIR / 'TIMEG' / 'sensors' / 'scores_lobo_new' / subject
     pattern, random = [], []
-    for epoch_num in range(5):
-        blocks = [i for i in range(1, 4)] if epoch_num == 0 else [i for i in range(5 * (epoch_num - 1) + 1, epoch_num * 5 + 1)]
-        for block in blocks:
-            pattern.append(np.load(res_path / f"pat-{epoch_num}-{block}.npy"))
-            random.append(np.load(res_path / f"rand-{epoch_num}-{block}.npy"))
+    for block in range(1, 24):
+        pattern.append(np.load(res_path / f"pat-{block}.npy"))
+        random.append(np.load(res_path / f"rand-{block}.npy"))
     if subject == 'sub05':
-        pat_bsl = np.load(res_path / "pat-1-1.npy")
-        rand_bsl = np.load(res_path / "rand-1-1.npy")
+        pat_bsl = np.load(res_path / "pat-1.npy")
+        rand_bsl = np.load(res_path / "rand-1.npy")
         for i in range(3):
             pattern[i] = pat_bsl.copy()
             random[i] = rand_bsl.copy()
@@ -297,16 +293,16 @@ idx = np.where((times >= -1.5) & (times <=3))[0]
 fig, ax = plt.subplots(figsize=(10, 4), layout='constrained')
 norm = colors.Normalize(vmin=vmin, vmax=vmax)
 images = []
-# images.append(ax.imshow(data[:, idx][:, :, idx].mean(0), 
-images.append(ax.imshow(data.mean(0), 
+images.append(ax.imshow(data[:, idx][:, :, idx].mean(0), 
+# images.append(ax.imshow(data.mean(0), 
                         # norm=norm,
                         vmin = vmin,
                         vmax = vmax,
                         interpolation="lanczos",
                         origin="lower",
                         cmap=cmap1,
-                        # extent=times[idx][[0, -1, 0, -1]],
-                        extent=times[[0, -1, 0, -1]],
+                        extent=times[idx][[0, -1, 0, -1]],
+                        # extent=times[[0, -1, 0, -1]],
                         aspect=0.5))
 ax.set_ylabel("Training time (s)")
 ax.set_xticks(np.arange(-1, 3, .5))
@@ -314,15 +310,15 @@ ax.set_yticks(np.arange(-1, 3, .5))
 ax.set_title("Time generalization - time resolved", fontsize=16)
 ax.axvline(0, color="k")
 ax.axhline(0, color="k")
-# xx, yy = np.meshgrid(times[idx], times[idx], copy=False, indexing='xy')
-xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
-if not op.exists(FIGURES_DIR / "temp" / "timeg_pval" / "Sensors-pval.npy"):
-    # pval = gat_stats(data[:, idx][:, :, idx], -1)
-    pval = gat_stats(data, -1)
-    np.save(FIGURES_DIR / "temp" / "timeg_pval" / "Sensors-pval.npy", pval)
+xx, yy = np.meshgrid(times[idx], times[idx], copy=False, indexing='xy')
+# xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
+if not op.exists(FIGURES_DIR / "temp" / "timeg_pval" / "Sensors-pval3.npy"):
+    pval = gat_stats(data[:, idx][:, :, idx], -1)
+    # pval = gat_stats(data, -1)
+    np.save(FIGURES_DIR / "temp" / "timeg_pval" / "Sensors-pval3.npy", pval)
 else:
-    pval = np.load(FIGURES_DIR / "temp" / "timeg_pval" / "Sensors-pval.npy")
-sig = pval < 0.01
+    pval = np.load(FIGURES_DIR / "temp" / "timeg_pval" / "Sensors-pval3.npy")
+sig = pval < 0.001
 ax.contour(xx, yy, sig, colors='black', levels=[0],
                     linestyles='-', linewidths=1, alpha=.5)
 ax.set_xlabel("Testing time (s)")
@@ -402,34 +398,34 @@ fig, axes = plt.subplots(2, 5, figsize=(20, 4), sharex=True, sharey=True, layout
 idx = np.where((timesg >= -0.5) & (timesg < 0))[0]
 for i, (ax, network, name) in enumerate(zip(axes.flatten(), networks, network_names)):
     data = contrast_net[network][:, 3:]
-    print(f"Plotting {network}...")
-    im = ax.imshow(
-        data.mean((0, 1)),
-        interpolation="lanczos",
-        origin="lower",
-        cmap=cmap1,
-        extent=timesg[[0, -1, 0, -1]],
-        aspect=0.5,
-        vmin=-0.05,
-        vmax=0.05)
-    # ax.plot(timesg, np.diag(data.mean((0, 1))), color=c1, linewidth=2, label='Diagonal')
+    # print(f"Plotting {network}...")
+    # im = ax.imshow(
+    #     data.mean((0, 1)),
+    #     interpolation="lanczos",
+    #     origin="lower",
+    #     cmap=cmap1,
+    #     extent=timesg[[0, -1, 0, -1]],
+    #     aspect=0.5,
+    #     vmin=-0.05,
+    #     vmax=0.05)
+    ax.plot(timesg, np.diag(data.mean((0, 1))), color=c1, linewidth=2, label='Diagonal')
     ax.set_title(f"{name}", fontsize=10, fontstyle="italic")
-    xx, yy = np.meshgrid(timesg, timesg, copy=False, indexing='xy')
-    if not op.exists(FIGURES_DIR / "temp" / "timeg_pval" / f"{network}-pval.npy"):
-        pval = gat_stats(data.mean(1), -1)
-        np.save(FIGURES_DIR / "temp" / "timeg_pval" / f"{network}-pval.npy", pval)
-    else:
-        pval = np.load(FIGURES_DIR / "temp" / "timeg_pval" / f"{network}-pval.npy")
-    # diags = [np.diag(d) for d in data.mean(1)]
-    # pval = decod_stats(diags, -1)
+    # xx, yy = np.meshgrid(timesg, timesg, copy=False, indexing='xy')
+    # if not op.exists(FIGURES_DIR / "temp" / "timeg_pval" / f"{network}-pval.npy"):
+    #     pval = gat_stats(data.mean(1), -1)
+    #     np.save(FIGURES_DIR / "temp" / "timeg_pval" / f"{network}-pval.npy", pval)
+    # else:
+    #     pval = np.load(FIGURES_DIR / "temp" / "timeg_pval" / f"{network}-pval.npy")
+    diags = [np.diag(d) for d in data.mean(1)]
+    pval = decod_stats(diags, -1)
     sig = pval < 0.05
-    # ax.fill_between(timesg, np.diag(data.mean((0, 1))), 0, where=sig, color='red', alpha=0.3)
-    # mdiags = [np.mean(d[idx]) for d in diags]
-    # sig_unc = ttest_1samp(mdiags, 0)[1] < 0.05
-    # if sig_unc:
-    #     ax.fill_between(timesg[idx], -0.02, -0.018, facecolor='red', edgecolor=None, alpha=1, zorder=5)
-    ax.contour(xx, yy, sig, colors='black', levels=[0],
-                        linestyles='--', linewidths=1, alpha=.5)
+    ax.fill_between(timesg, np.diag(data.mean((0, 1))), 0, where=sig, color='red', alpha=0.3)
+    mdiags = [np.mean(d[idx]) for d in diags]
+    sig_unc = ttest_1samp(mdiags, 0)[1] < 0.05
+    if sig_unc:
+        ax.fill_between(timesg[idx], -0.02, -0.018, facecolor='red', edgecolor=None, alpha=1, zorder=5)
+    # ax.contour(xx, yy, sig, colors='black', levels=[0],
+    #                     linestyles='--', linewidths=1, alpha=.5)
     ax.axvline(0, color="k", alpha=.5)
     ax.axhline(0, color="k", alpha=.5)
 fig.suptitle("Contrast time generalization")
