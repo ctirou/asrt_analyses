@@ -86,51 +86,54 @@ def process_subject(subject, jobs):
             block = int(block)
             
             # random trials
-            stcs_train, ytrain, stcs_test, ytest = get_train_test_blocks_htc(epoch, fwd, behav, pick_ori, 'random', block, blocks, verbose=verbose)
-            label_tc_train, _ = get_volume_estimate_tc(stcs_train, fwd, offsets, subject, subjects_dir)
-            labels = [label for label in label_tc_train.keys() if region in label]
-            Xtrain = np.concatenate([np.real(label_tc_train[label]) for label in labels], axis=1)
-            if pick_ori == 'vector':
-                Xtrain = svd(Xtrain)
+            if not op.exists(res_path / f"rand-{block}.npy") or overwrite:
+                stcs_train, ytrain, stcs_test, ytest = get_train_test_blocks_htc(epoch, fwd, behav, pick_ori, 'random', block, blocks, verbose=verbose)
+                label_tc_train, _ = get_volume_estimate_tc(stcs_train, fwd, offsets, subject, subjects_dir)
+                labels = [label for label in label_tc_train.keys() if region in label]
+                Xtrain = np.concatenate([np.real(label_tc_train[label]) for label in labels], axis=1)
+                if pick_ori == 'vector':
+                    Xtrain = svd(Xtrain)
 
-            label_tc_test, _ = get_volume_estimate_tc(stcs_test, fwd, offsets, subject, subjects_dir)
-            Xtest = np.concatenate([np.real(label_tc_test[label]) for label in labels], axis=1)
-            if pick_ori == 'vector':
-                Xtest = svd(Xtest)
-            
-            if not op.exists(res_path / f"rand-{epoch_num}-{block}.npy") or overwrite:
+                label_tc_test, _ = get_volume_estimate_tc(stcs_test, fwd, offsets, subject, subjects_dir)
+                Xtest = np.concatenate([np.real(label_tc_test[label]) for label in labels], axis=1)
+                if pick_ori == 'vector':
+                    Xtest = svd(Xtest)
+                
                 clf.fit(Xtrain, ytrain)
                 acc_matrix = clf.score(Xtest, ytest)
-                np.save(res_path / f"rand-{epoch_num}-{block}.npy", acc_matrix)
+                np.save(res_path / f"rand-{block}.npy", acc_matrix)
+
+                del stcs_train, ytrain, stcs_test, ytest, label_tc_train, label_tc_test, Xtrain, Xtest
+                gc.collect()
+
             else:
-                print(f"Random for {subject} epoch {epoch_num} block {block} already exists")
+                print(f"Random for {subject} block {block} already exists")
                 
-            del stcs_train, ytrain, stcs_test, ytest, label_tc_train, label_tc_test, Xtrain, Xtest
-            gc.collect()
             
             # pattern trials
-            stcs_train, ytrain, stcs_test, ytest = get_train_test_blocks_htc(epoch, fwd, behav, pick_ori, 'pattern', block, blocks, verbose=verbose)
-            label_tc_train, _ = get_volume_estimate_tc(stcs_train, fwd, offsets, subject, subjects_dir)
-            labels = [label for label in label_tc_train.keys() if region in label]
-            Xtrain = np.concatenate([np.real(label_tc_train[label]) for label in labels], axis=1)
-            if pick_ori == 'vector':
-                Xtrain = svd(Xtrain)
+            if not op.exists(res_path / f"pat-{block}.npy") or overwrite:
+                stcs_train, ytrain, stcs_test, ytest = get_train_test_blocks_htc(epoch, fwd, behav, pick_ori, 'pattern', block, blocks, verbose=verbose)
+                label_tc_train, _ = get_volume_estimate_tc(stcs_train, fwd, offsets, subject, subjects_dir)
+                labels = [label for label in label_tc_train.keys() if region in label]
+                Xtrain = np.concatenate([np.real(label_tc_train[label]) for label in labels], axis=1)
+                if pick_ori == 'vector':
+                    Xtrain = svd(Xtrain)
 
-            label_tc_test, _ = get_volume_estimate_tc(stcs_test, fwd, offsets, subject, subjects_dir)
-            Xtest = np.concatenate([np.real(label_tc_test[label]) for label in labels], axis=1)
-            if pick_ori == 'vector':
-                Xtest = svd(Xtest)
-            
-            if not op.exists(res_path / f"pat-{epoch_num}-{block}.npy") or overwrite:
+                label_tc_test, _ = get_volume_estimate_tc(stcs_test, fwd, offsets, subject, subjects_dir)
+                Xtest = np.concatenate([np.real(label_tc_test[label]) for label in labels], axis=1)
+                if pick_ori == 'vector':
+                    Xtest = svd(Xtest)
+
                 clf.fit(Xtrain, ytrain)
                 acc_matrix = clf.score(Xtest, ytest)
-                np.save(res_path / f"pat-{epoch_num}-{block}.npy", acc_matrix)
+                np.save(res_path / f"pat-{block}.npy", acc_matrix)
+
+                del stcs_train, ytrain, stcs_test, ytest, label_tc_train, label_tc_test, Xtrain, Xtest
+                gc.collect()
+
             else:
-                print(f"Pattern for {subject} epoch {epoch_num} block {block} already exists")
+                print(f"Pattern for {subject} block {block} already exists")
                 
-            del stcs_train, ytrain, stcs_test, ytest, label_tc_train, label_tc_test, Xtrain, Xtest
-            gc.collect()
-        
     del epoch, fwd
     gc.collect()
             
