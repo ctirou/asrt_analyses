@@ -1,17 +1,17 @@
 import os
+import os.path as op
 import numpy as np
 import pandas as pd
 import mne
 from base import *
 from config import *
-from mne.beamformer import make_lcmv, apply_lcmv_epochs
 import gc
 import sys
 from joblib import Parallel, delayed
 
 # params
 subjects = SUBJS15
-data_path = DATA_DIR / 'for_rsa'
+data_path = DATA_DIR / 'for_rsa_new'
 subjects_dir = FREESURFER_DIR
 
 verbose = 'error'
@@ -20,12 +20,13 @@ is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
 # pick_ori = 'max-power'
 pick_ori = 'vector'
-analysis = 'rdm_blocks_vect' if pick_ori == 'vector' else 'rdm_blocks_maxpower'
+analysis = 'rdm_lobo_vect' if pick_ori == 'vector' else 'rdm_lobo_maxpower'
+analysis += "_new"
 
 def process_subject(subject, jobs, verbose):
     
     # read volume source space
-    vol_src_fname =  RESULTS_DIR / 'src' / f"{subject}-htc-vol-src.fif"
+    vol_src_fname = RESULTS_DIR / 'src' / f"{subject}-htc-vol-src.fif"
     vol_src = mne.read_source_spaces(vol_src_fname, verbose=verbose)                     
     offsets = np.cumsum([0] + [len(s["vertno"]) for s in vol_src]) # need vol src here, fwd["src"] is mixed so does not work
     del vol_src
@@ -47,14 +48,14 @@ def process_subject(subject, jobs, verbose):
     behav['trials'] = behav.index
     for epo in all_epochs:
         epo.info['dev_head_t'] = all_epochs[0].info['dev_head_t']
-    data = mne.concatenate_epochs(all_epochs).get_data(picks='mag', copy=True)
-    assert len(data) == len(behav)
+    epoch = mne.concatenate_epochs(all_epochs)
+    assert len(epoch) == len(behav)
     
     del all_epochs, all_behavs
     gc.collect()
 
     # read forward solution
-    fwd_fname = RESULTS_DIR / "fwd" / "for_rsa" / f"{subject}-htc-all-fwd.fif" # this fwd was not generated on the rdm_bsling data
+    fwd_fname = RESULTS_DIR / "fwd" / "for_rsa" / f"{subject}-htc-all-fwd.fif"
     fwd = mne.read_forward_solution(fwd_fname, verbose=verbose)
     
     behav.loc[behav.sessions != 0, 'blocks'] += 3                
@@ -70,7 +71,7 @@ def process_subject(subject, jobs, verbose):
             # random trials
             if not op.exists(res_path / f"rand-{block}.npy") or overwrite:
                 print(f"Computing Mahalanobis for {subject} block {block} random")
-                stcs_train, ytrain, stcs_test, ytest = get_train_test_blocks_htc(epoch, fwd, behav, pick_ori, 'random', block, verbose=verbose)
+                stcs_train, ytrain, stcs_test, ytest = get_train_test_blocks_htc(epoch, fwd, behav, pick_ori, 'random', block, blocks, verbose=verbose)
                 label_tc_train, _ = get_volume_estimate_tc(stcs_train, fwd, offsets, subject, subjects_dir)
                 labels = [label for label in label_tc_train.keys() if region in label]
                 Xtrain = np.concatenate([np.real(label_tc_train[label]) for label in labels], axis=1)
@@ -89,7 +90,7 @@ def process_subject(subject, jobs, verbose):
             # pattern trials
             if not op.exists(res_path / f"pat-{block}.npy") or overwrite:
                 print(f"Computing Mahalanobis for {subject} block {block} pattern")
-                stcs_train, ytrain, stcs_test, ytest = get_train_test_blocks_htc(epoch, fwd, behav, pick_ori, 'pattern', block, verbose=verbose)
+                stcs_train, ytrain, stcs_test, ytest = get_train_test_blocks_htc(epoch, fwd, behav, pick_ori, 'pattern', block, blocks, verbose=verbose)
                 label_tc_train, _ = get_volume_estimate_tc(stcs_train, fwd, offsets, subject, subjects_dir)
                 labels = [label for label in label_tc_train.keys() if region in label]
                 Xtrain = np.concatenate([np.real(label_tc_train[label]) for label in labels], axis=1)
@@ -100,8 +101,8 @@ def process_subject(subject, jobs, verbose):
                 Xtest = np.concatenate([np.real(label_tc_test[label]) for label in labels], axis=1)
                 if pick_ori == 'vector':
                     Xtest = svd(Xtest)
-                rdm_rand = train_test_mahalanobis_fast(Xtrain, Xtest, ytrain, ytest, jobs, verbose)
-                np.save(res_path / f"pat-{block}.npy", rdm_rand)
+                rdm_pat = train_test_mahalanobis_fast(Xtrain, Xtest, ytrain, ytest, jobs, verbose)
+                np.save(res_path / f"pat-{block}.npy", rdm_pat)
             else:
                 print(f"Mahalanobis for {subject} block {block} pattern already exists")
 
