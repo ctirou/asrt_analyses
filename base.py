@@ -1000,3 +1000,28 @@ def get_train_test_blocks_htc(data, fwd, behav, pick_ori, trial_type, block, blo
     assert len(stcs_test) == len(ytest), "Length mismatch in testing data"
     
     return stcs_train, ytrain, stcs_test, ytest
+
+def fisher_z_and_ttest(rho_matrix):
+    import numpy as np
+    from scipy.stats import ttest_1samp
+    """
+    Applies Fisher z-transform and performs a one-sample t-test against 0 at each timepoint.
+    
+    Parameters:
+        rho_matrix (np.ndarray): Array of shape (n_subjects, n_timepoints) with rho values.
+    
+    Returns:
+        z_matrix (np.ndarray): Fisher z-transformed correlations, same shape as input.
+        t_stats (np.ndarray): T-statistics at each timepoint, shape (n_timepoints,).
+        p_vals (np.ndarray): P-values at each timepoint, shape (n_timepoints,).
+    """
+    # Clip rho values to avoid infinite z
+    rho_matrix = np.clip(rho_matrix, -0.999999, 0.999999)
+    
+    # Fisher z-transform
+    z_matrix = 0.5 * np.log((1 + rho_matrix) / (1 - rho_matrix))
+
+    # One-sample t-test at each timepoint
+    t_stats, p_vals = ttest_1samp(z_matrix, popmean=0, axis=0)
+    
+    return z_matrix, t_stats, p_vals

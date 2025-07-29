@@ -328,15 +328,15 @@ for network in tqdm(networks):
     all_lows[network] = np.array(all_lows[network])
     
 # --- w/ practice bsl ---
-win = np.where((times >= 0.3) & (times <= 0.5))[0]
+win = np.where((times >= 0.3) & (times <= 0.55))[0]
 fig, axes = plt.subplots(2, 5, figsize=(15, 4), sharex=True, sharey=True, layout='tight')
 for i, (ax, label, name) in enumerate(zip(axes.flat, networks, network_names)):
     ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
     ax.axhline(0, color='grey', alpha=.5)
     # low = all_lows[label][:, 1, :] - all_lows[label][:, 0, :]
     # high = all_highs[label][:, 1, :] - all_highs[label][:, 0, :]
-    low = all_lows[label][:, 1:, :].mean(1) - all_lows[label][:, 0, :]
-    high = all_highs[label][:, 1:, :].mean(1) - all_highs[label][:, 0, :]
+    low = all_lows[label][:, 1:, :].mean(1)
+    high = all_highs[label][:, 1:, :].mean(1)
     diff = high - low
     pval = decod_stats(diff, -1)
     sig = pval < threshold
@@ -357,7 +357,7 @@ for i, (ax, label, name) in enumerate(zip(axes.flat, networks, network_names)):
     mdiff_sig = ttest_1samp(mdiff, 0)[1] < 0.05
     if mdiff_sig:
         ax.axvspan(times[win][0], times[win][-1], facecolor=cmap[i], edgecolor=None, alpha=0.3, zorder=5)
-        ax.text(0.4, 0.8, '*', fontsize=20, ha='center', va='center', color=cmap[i], weight='bold')
+        # ax.text(0.4, 0.8, '*', fontsize=20, ha='center', va='center', color=cmap[i], weight='bold')
 
 all_highs, all_lows = {}, {}
 diff_sess = {}
@@ -389,8 +389,13 @@ for network in tqdm(networks):
     all_lows[network] = np.array(all_lows[network])
     
     for i in range(5):
-        low = all_lows[network][:, i, :] - all_lows[network][:, 0, :]
-        high = all_highs[network][:, i, :] - all_highs[network][:, 0, :]
+        # low = all_lows[network][:, i, :] - all_lows[network][:, 0, :]
+        # high = all_highs[network][:, i, :] - all_highs[network][:, 0, :]
+
+        low = all_lows[network][:, i, :]
+        high = all_highs[network][:, i, :]
+        
+        
         diff_sess[network].append(low - high)
     diff_sess[network] = np.array(diff_sess[network]).swapaxes(0, 1)
 

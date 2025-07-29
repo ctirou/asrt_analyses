@@ -9,7 +9,7 @@ import sys
 from joblib import Parallel, delayed
 import gc
 
-data_path = DATA_DIR / 'for_rsa_new'
+data_path = DATA_DIR / 'for_rsa'
 subjects = SUBJS15
 overwrite = True
 verbose = True
@@ -18,7 +18,7 @@ is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
 def process_subject(subject, jobs, verbose):
         
-    res_path = ensured(RESULTS_DIR / 'RSA' / 'sensors' / "rdm_lobo_new" / subject)
+    res_path = ensured(RESULTS_DIR / 'RSA' / 'sensors' / "rdm_lobo" / subject)
     
     all_epochs, all_behavs = [], []
     for epoch_num in range(5):

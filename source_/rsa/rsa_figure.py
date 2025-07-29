@@ -27,58 +27,54 @@ networks = NETWORKS + ['Cerebellum-Cortex']
 network_names = NETWORK_NAMES + ['Cerebellum']
 
 figures_dir = ensured(FIGURES_DIR / "RSA" / "source")
-# --------- Shuffled ---------
+
+data_type = "rdm_blocks_vect_new"
+bsl_practice = False
+
 # Load RSA data
-filt = np.where((timesg >= -0.2) & (timesg <= 0.6))[0]
-all_highs, all_lows = {}, {}
-diff_sess = {}
-pattern, random = {}, {}
+random = {}
+pattern = {}
+diff_rp = {}
 for network in tqdm(networks):
-    if not network in all_highs:
-        all_highs[network], all_lows[network] = [], []
-        diff_sess[network] = []
-        pattern[network], random[network] = [], []
-    for subject in subjects:        
-        # RSA stuff
+    if not network in diff_rp:
+        diff_rp[network] =  []
+        random[network] = []
+        pattern[network] = []
+    for subject in subjects:
+        res_path = RESULTS_DIR / 'RSA' / 'source' / network / data_type / subject
+        # read behav
         behav_dir = op.join(HOME / 'raw_behavs' / subject)
         sequence = get_sequence(behav_dir)
-        res_path = RESULTS_DIR / 'RSA' / 'source' / network / 'rdm_skf' / subject
-        pats, rands = [], []
+        pattern_blocks, random_blocks = [], []
         for epoch_num in range(5):
-            pats.append(np.load(res_path / f"pat-{epoch_num}.npy"))
-            rands.append(np.load(res_path / f"rand-{epoch_num}.npy"))
-        pats = np.array(pats)
-        rands = np.array(rands)
-        high, low = get_all_high_low(pats, rands, sequence, False)
-        high, low = np.array(high).mean(0), np.array(low).mean(0)
+            blocks = [i for i in range(1, 4)] if epoch_num == 0 else [i for i in range(5 * (epoch_num - 1) + 1, epoch_num * 5 + 1)]
+            pats, rands = [], []
+            for block in blocks:
+                pattern_blocks.append(np.load(res_path / f"pat-{epoch_num}-{block}.npy"))
+                random_blocks.append(np.load(res_path / f"rand-{epoch_num}-{block}.npy"))
         if subject == 'sub05':
-            pat_b1 = np.load(res_path / "pat-b1.npy")
-            high[0] = pat_b1.copy()
-            rand_b1 = np.load(res_path / "rand-b1.npy")
-            low[0] = rand_b1.copy()
-        
-        all_highs[network].append(high)
-        all_lows[network].append(low)
-        # Decoding stuff
-        res_path = RESULTS_DIR / 'TIMEG' / 'source' / network / 'scores_skf' / subject
-        pat = np.diag(np.load(res_path / "pat-all.npy"))[filt]
-        rand = np.diag(np.load(res_path / "rand-all.npy"))[filt]
+            pat_bsl = np.load(res_path / "pat-1-1.npy")
+            rand_bsl = np.load(res_path / "rand-1-1.npy")
+            for i in range(3):
+                pattern_blocks[i] = pat_bsl.copy()
+                random_blocks[i] = rand_bsl.copy()
+        pattern_blocks = np.array(pattern_blocks)
+        random_blocks = np.array(random_blocks)
+        high, low = get_all_high_low(pattern_blocks, random_blocks, sequence, False)
+        bsl_pat = np.nanmean(high[:, :3, :], (0, 1))
+        bsl_rand = np.nanmean(low[:, :3, :], (0, 1))
+        pat = np.nanmean(high, 0) - bsl_pat[np.newaxis, :] if bsl_practice else np.nanmean(high, 0)
+        rand = np.nanmean(low, 0) - bsl_rand[np.newaxis, :] if bsl_practice else np.nanmean(low, 0)
         pattern[network].append(pat)
         random[network].append(rand)
-    all_highs[network] = np.array(all_highs[network])
-    all_lows[network] = np.array(all_lows[network])
-    
-    # plot diff session by session
-    for i in range(5):
-        low_sess = all_lows[network][:, i, :] - all_lows[network][:, 0, :]
-        high_sess = all_highs[network][:, i, :] - all_highs[network][:, 0, :]
-        diff_sess[network].append(low_sess - high_sess)
-    diff_sess[network] = np.array(diff_sess[network]).swapaxes(0, 1)
-    
+        diff_rp[network].append(rand - pat)
     pattern[network] = np.array(pattern[network])
     random[network] = np.array(random[network])
+    diff_rp[network] = np.array(diff_rp[network])
 
 learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices15.csv', sep="\t", index_col=0)
+learn_index_blocks = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices_blocks.csv', sep=",", index_col=0)
+
 chance = 25
 threshold = .05
 
@@ -120,6 +116,8 @@ cmap = plt.cm.get_cmap('tab20', len(network_names))
 cmap = sns.color_palette("colorblind", as_cmap=True)
 cmap = ['#0173B2','#DE8F05','#029E73','#D55E00','#CC78BC','#CA9161','#FBAFE4','#ECE133','#56B4E9', "#76B041"]
 
+plot_brains = True
+
 fig, axd = plt.subplot_mosaic(
     design, 
     sharex=False, 
@@ -130,111 +128,101 @@ fig, axd = plt.subplot_mosaic(
         'width_ratios': [.2, .2, .5, .5, .5]  # Adjust widths if needed
     })
 ### Plot brain ###
-brain_kwargs = dict(hemi='both', background="white", cortex="low_contrast", surf='inflated', subjects_dir=subjects_dir, size=(800, 400))
-for i, (label, name, sideA, sideB) in enumerate(zip(networks, network_names, \
-    ['br11', 'br21', 'br31', 'br41', 'br51', 'br61', 'br71', 'br81', 'br91', 'br101'], ['br12', 'br22', 'br32', 'br42', 'br52', 'br62', 'br72', 'br82', 'br92', 'br102'])):
-    # Initialize Brain object
-    # Add labels
-    if label in networks[:-3]:
-        
-        brain = mne.viz.Brain(subject='fsaverage2', alpha=1, **brain_kwargs) 
-        net_name = f'{name.strip()} network'        
-        for hemi in ['lh', 'rh']:
-        # hemi = 'split'
-            brain.add_label(f'{label}', color=cmap[i], hemi=hemi, borders=False, alpha=.85, subdir='n7')
-    else:
-        brain = mne.viz.Brain(subject='fsaverage2', alpha=.5, **brain_kwargs) 
-        net_name = f'{name.strip()}'
-        
-        if label == 'Hippocampus':
-            labels = ['Left-Hippocampus', 'Right-Hippocampus']
-        elif label == 'Thalamus':
-            labels = ['Left-Thalamus-Proper', 'Right-Thalamus-Proper']
+if plot_brains:
+    brain_kwargs = dict(hemi='both', background="white", cortex="low_contrast", surf='inflated', subjects_dir=subjects_dir, size=(800, 400))
+    for i, (label, name, sideA, sideB) in enumerate(zip(networks, network_names, \
+        ['br11', 'br21', 'br31', 'br41', 'br51', 'br61', 'br71', 'br81', 'br91', 'br101'], ['br12', 'br22', 'br32', 'br42', 'br52', 'br62', 'br72', 'br82', 'br92', 'br102'])):
+        # Initialize Brain object
+        # Add labels
+        if label in networks[:-3]:
+            
+            brain = mne.viz.Brain(subject='fsaverage2', alpha=1, **brain_kwargs) 
+            net_name = f'{name.strip()} network'        
+            for hemi in ['lh', 'rh']:
+            # hemi = 'split'
+                brain.add_label(f'{label}', color=cmap[i], hemi=hemi, borders=False, alpha=.85, subdir='n7')
         else:
-            labels = ['Left-Cerebellum-Cortex', 'Right-Cerebellum-Cortex']
-                    
-        brain.add_volume_labels(aseg='aparc+aseg', labels=labels, colors=cmap[i], alpha=.85, legend=False)
-    
-    # brain = mne.viz.Brain(subject='fsaverage2', alpha=.5, **brain_kwargs) 
-    # for i, label in enumerate(['Hippocampus', 'Thalamus', 'Cerebellum-Cortex']):
-    #     if label == 'Hippocampus':
-    #         labels = ['Left-Hippocampus', 'Right-Hippocampus']
-    #     elif label == 'Thalamus':
-    #         labels = ['Left-Thalamus-Proper', 'Right-Thalamus-Proper']
-    #     else:
-    #         labels = ['Left-Cerebellum-Cortex', 'Right-Cerebellum-Cortex']
-    #     brain.add_volume_labels(aseg='aseg', labels=labels, colors=cmap[i], alpha=.85, legend=False)
-    
-    # brain.set_data_smoothing(50)
-    # Capture snapshots for the desired views 
-    brain.show_view('lateral', distance="auto")
-    lateral_img = brain.screenshot('rgb')
-    brain.show_view('medial', distance="auto")
-    medial_img = brain.screenshot('rgb')
-    brain.close()
-    
-    lateral_img, medial_img = crop_images(lateral_img), crop_images(medial_img)
-    # lateral_img = crop_images(lateral_img)
-    
-    # Display images side by side using Matplotlib
-    axd[sideA].imshow(lateral_img)
-    axd[sideA].axis('off')
-    # axd[sideA].set_title(net_name, fontsize=14)
-    # Call the function to set the br-specific title
-    net_name = " "
-    plot_with_br_title(fig, axd, design, net_name, row_idx=i)
-    axd[sideB].imshow(medial_img)
-    axd[sideB].axis('off')
+            brain = mne.viz.Brain(subject='fsaverage2', alpha=.5, **brain_kwargs) 
+            net_name = f'{name.strip()}'
+            
+            if label == 'Hippocampus':
+                labels = ['Left-Hippocampus', 'Right-Hippocampus']
+            elif label == 'Thalamus':
+                labels = ['Left-Thalamus-Proper', 'Right-Thalamus-Proper']
+            else:
+                labels = ['Left-Cerebellum-Cortex', 'Right-Cerebellum-Cortex']
+                        
+            brain.add_volume_labels(aseg='aparc+aseg', labels=labels, colors=cmap[i], alpha=.85, legend=False)
+        
+        # brain = mne.viz.Brain(subject='fsaverage2', alpha=.5, **brain_kwargs) 
+        # for i, label in enumerate(['Hippocampus', 'Thalamus', 'Cerebellum-Cortex']):
+        #     if label == 'Hippocampus':
+        #         labels = ['Left-Hippocampus', 'Right-Hippocampus']
+        #     elif label == 'Thalamus':
+        #         labels = ['Left-Thalamus-Proper', 'Right-Thalamus-Proper']
+        #     else:
+        #         labels = ['Left-Cerebellum-Cortex', 'Right-Cerebellum-Cortex']
+        #     brain.add_volume_labels(aseg='aseg', labels=labels, colors=cmap[i], alpha=.85, legend=False)
+        
+        # brain.set_data_smoothing(50)
+        # Capture snapshots for the desired views 
+        brain.show_view('lateral', distance="auto")
+        lateral_img = brain.screenshot('rgb')
+        brain.show_view('medial', distance="auto")
+        medial_img = brain.screenshot('rgb')
+        brain.close()
+        
+        lateral_img, medial_img = crop_images(lateral_img), crop_images(medial_img)
+        # lateral_img = crop_images(lateral_img)
+        
+        # Display images side by side using Matplotlib
+        axd[sideA].imshow(lateral_img)
+        axd[sideA].axis('off')
+        # axd[sideA].set_title(net_name, fontsize=14)
+        # Call the function to set the br-specific title
+        net_name = " "
+        plot_with_br_title(fig, axd, design, net_name, row_idx=i)
+        axd[sideB].imshow(medial_img)
+        axd[sideB].axis('off')
 
-### Plot decoding ###
+### Plot cvMD ###
 for i, (label, name, j, k) in enumerate(zip(networks, network_names,  \
     ['A1', 'D1', 'G1', 'J1', 'M1', 'P1', 'S1', 'V1', 'Y1', 'AB1'], ['A2', 'D2', 'G2', 'J2', 'M2', 'P2', 'S2', 'V2', 'Y2', 'AB2'])):
     for l, data in zip([j, k], [pattern, random]):
         plot_onset(axd[l])
-        score = data[label] * 100
+        score = np.nanmean(data[label], 1)
         sem = np.std(score, axis=0) / np.sqrt(len(subjects))
-        # Get significant clusters
-        p_values = decod_stats(score - chance, jobs)
-        sig = p_values < threshold
         # Main plot
-        axd[l].plot(times, score.mean(0), alpha=1, zorder=10, color='C7')
-        # Plot significant regions separately
-        for start, end in contiguous_regions(sig):
-            axd[l].plot(times[start:end], score.mean(0)[start:end], alpha=1, zorder=10, color=cmap[i])
-        sem = np.std(score, axis=0) / np.sqrt(len(subjects))
-        axd[l].fill_between(times, score.mean(0) - sem, score.mean(0) + sem, alpha=0.2, zorder=5, facecolor='C7')
+        axd[l].plot(times, score.mean(0), alpha=1, zorder=10, color=cmap[i])
         # Highlight significant regions
-        axd[l].fill_between(times, score.mean(0) - sem, score.mean(0) + sem, where=sig, alpha=0.5, zorder=5, color=cmap[i])    
-        axd[l].fill_between(times, score.mean(0) - sem, chance, where=sig, alpha=0.3, zorder=5, facecolor=cmap[i])    
-        axd[l].axhline(chance, color='grey', alpha=.5)
-        axd[l].set_ylabel('Acc. (%)', fontsize=11)
+        axd[l].fill_between(times, score.mean(0) - sem, score.mean(0) + sem, alpha=0.5, zorder=5, color=cmap[i])    
+        axd[l].axhline(0, color='grey', alpha=.5)
+        axd[l].set_ylabel('cvMD', fontsize=11)
         # axd[l].xaxis.set_major_formatter(FuncFormatter(lambda x, pos: f'{x:.1f}'))
         # axd[l].xaxis.set_major_locator(plt.MultipleLocator(0.2))
         if l == 'A1':
-            axd[l].set_title('Decoding')
+            axd[l].set_title('Mahalanobis distance')
             ymax = axd[l].get_ylim()[1]
-        # elif l == 'A2':
         elif l == 'AB2':
             axd[l].set_xlabel('Time (s)', fontsize=11)
         if l == j:
             axd[l].set_xticklabels([])
             # axd[l].figure.subplots_adjust(hspace=0)
         if '1' in l:
-            axd[l].text(times[0], ymax - 0.2 * ymax, 'Pattern', fontsize=9, ha='left', weight='normal', style='italic')
+            axd[l].text(times[0], 1.5 - 0.5 * 1.5, 'Pattern', fontsize=9, ha='left', weight='normal', style='italic')
         else:
-            axd[l].text(times[0], ymax - 0.2 * ymax, 'Random', fontsize=9, ha='left', weight='normal', style='italic')
+            axd[l].text(times[0], 1.5 - 0.5 * 1.5, 'Random', fontsize=9, ha='left', weight='normal', style='italic')
         axd[l].yaxis.set_major_formatter(FuncFormatter(lambda x, pos: f'{int(x)}'))
         axd[l].yaxis.set_major_locator(plt.MaxNLocator(nbins=2, prune='both'))
-        axd[l].set_ylim(23, 50)
-        
+        axd[l].set_ylim(-0.5, 1.5)
+
 ### Plot similarity index ###
-win = np.where((times >= 0.3) & (times <= 0.5))[0] 
+xmin, xmax = 0.3, 0.55
+win = np.where((times >= xmin) & (times <= xmax))[0]
 for i, (label, name, j) in enumerate(zip(networks, network_names, ['B', 'E', 'H', 'K', 'N', 'Q', 'T', 'W', 'Z', 'AC'])):
     plot_onset(axd[j])
     axd[j].axhline(0, color='grey', alpha=.5)
-    high = all_highs[label][:, 1:, :].mean(1) - all_highs[label][:, 0, :]
-    low = all_lows[label][:, 1:, :].mean(1) - all_lows[label][:, 0, :]
-    diff = low - high
+    diff = np.nanmean(diff_rp[label][:, 3:, :], 1)  # Exclude first 3 time points
     p_values = decod_stats(diff, jobs)
     sig = p_values < threshold
     # Main plot
@@ -255,20 +243,20 @@ for i, (label, name, j) in enumerate(zip(networks, network_names, ['B', 'E', 'H'
     if j == 'AC':
         axd[j].set_xlabel('Time (s)', fontsize=11)
     if j == 'B':
-        axd[j].set_title(f'Similarity index')
-    axd[j].set_ylim(-2, 2)
-    
+        axd[j].set_title('Similarity index')
+    axd[j].set_ylim(-0.4, 0.9)
     mdiff = diff[:, win].mean(1)
     mdiff_sig = ttest_1samp(mdiff, 0)[1] < 0.05
     if mdiff_sig:
-        axd[j].fill_between(times[win], 1.5, 1.6, facecolor=cmap[i], edgecolor=None, alpha=1)
-        axd[j].text(0.4, 1.7, '*', fontsize=20, ha='center', va='center', color=cmap[i], weight='bold')
+        axd[j].fill_between(times[win], 0.6, 0.63, facecolor=cmap[i], edgecolor=None, alpha=1)
+        axd[j].text((xmin + xmax) / 2, 0.7, '*', fontsize=20, ha='center', va='center', color=cmap[i], weight='bold')
 
 ### Plot subject x learning index correlation ###
 for i, (label, name, j) in enumerate(zip(networks, network_names, ['C', 'F', 'I', 'L', 'O', 'R', 'U', 'X', 'AA', 'AD'])):
     plot_onset(axd[j])
     axd[j].axhline(0, color="grey", alpha=0.5)
-    all_rhos = np.array([[spear(learn_index_df.iloc[sub, :], diff_sess[label][sub, :, t])[0] for t in range(len(times))] for sub in range(len(subjects))])
+    all_rhos = np.array([[spear(learn_index_blocks.iloc[sub, :], diff_rp[label][sub, :, t])[0] for t in range(len(times))] for sub in range(len(subjects))])
+    # all_rhos, _, _ = fisher_z_and_ttest(all_rhos)
     sem = np.std(all_rhos, axis=0) / np.sqrt(len(subjects))
     # axd[j].plot(times, all_rhos.mean(0), color=cmap[i])
     p_values_unc = ttest_1samp(all_rhos, axis=0, popmean=0)[1]
@@ -300,7 +288,14 @@ for i, (label, name, j) in enumerate(zip(networks, network_names, ['C', 'F', 'I'
     if j == 'C':
         axd[j].set_title('Similarity index\n& learning correlation')
     axd[j].set_ylim(-.5, .5)
-    axd[j].set_yticks([-1, 0, 1])
+    axd[j].set_yticks([-0.5, 0, 0.5])
+    m_rho = np.nanmean(all_rhos[:, win], axis=1)
+    m_rho_sig = ttest_1samp(m_rho, 0)[1] < 0.05
+    if m_rho_sig:
+        axd[j].fill_between(times[win], 0.3, 0.33, alpha=0.7, zorder=5, facecolor=cmap[i])
+        axd[j].text((xmin + xmax) / 2, 0.37, '*', fontsize=20, ha='center', va='center', color=cmap[i], weight='bold')
 
-fig.savefig(figures_dir / "rsa-final-alt.pdf", transparent=True)
+fname = 'rsa_new' if data_type.endswith('new') else 'rsa'
+fname += '_bsl.pdf' if bsl_practice else '_no_bsl.pdf'
+fig.savefig(figures_dir / fname, transparent=True)
 plt.close()
