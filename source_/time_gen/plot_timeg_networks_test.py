@@ -14,14 +14,9 @@ from tqdm.auto import tqdm
 from mne.viz import Brain
 from scipy.ndimage import gaussian_filter1d
 
-data_path = DATA_DIR / 'for_timeg'
-
 subjects, subjects_dir = SUBJS15, FREESURFER_DIR
 
-lock = 'stim'
 # network and custom label_names
-n_parcels = 200
-n_networks = 7
 figures_dir = ensured(FIGURES_DIR / "time_gen" / "source")
 overwrite = False
 
@@ -34,52 +29,77 @@ res_dir = RESULTS_DIR / 'TIMEG' / 'source'
 
 data_type1 = 'scores_skf_vect'
 data_type2 = 'scores_skf_vect_new'
+data_type = 'scores_lobo_vector_new'
 
 # Load data, compute, and save correlations and pvals 
 learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices15.csv', sep="\t", index_col=0)
-diags = {}
-all_diags = {}
-patterns, randoms = {}, {}
-all_patterns, all_randoms = {}, {}
+learn_index_blocks = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices_blocks.csv', sep=",", index_col=0)
+
+# diags = {}
+# all_diags = {}
+# patterns, randoms = {}, {}
+# all_patterns, all_randoms = {}, {}
+# for network in tqdm(networks):
+#     if not network in patterns:
+#         patterns[network], randoms[network] = [], []
+#         all_patterns[network], all_randoms[network] = [], []
+#     all_pat, all_rand, all_diag = [], [], []
+#     patpat, randrand = [], []
+#     ddd = []
+#     for i, subject in enumerate(subjects):
+#         pat, rand = [], []
+#         dd = []
+#         for j in [0, 1, 2, 3, 4]:
+#             pat = np.load(res_dir / network / data_type2 / subject / f"pat-{j}.npy")
+#             rand = np.load(res_dir / network / data_type2 / subject / f"rand-{j}.npy")
+#             patpat.append(np.array(pat))
+#             randrand.append(np.array(rand))
+#             d = np.array(pat) - np.array(rand)
+#             dd.append(np.diag(d))
+#         all_pat.append(np.load(res_dir / network / data_type1 / subject / "pat-all.npy"))
+#         all_rand.append(np.load(res_dir / network / data_type1 / subject / "rand-all.npy"))
+#         diag = np.array(all_pat) - np.array(all_rand)
+#         all_diag.append(np.diag(diag[i]))
+#         ddd.append(np.array(dd))
+#     all_patterns[network] = np.array(all_pat)
+#     all_randoms[network] = np.array(all_rand)
+#     all_diags[network] = np.array(all_diag)
+#     diags[network] = np.array(ddd)
+#     patterns[network] = np.array(patpat)
+#     randoms[network] = np.array(randrand)
+
+idx_timeg = np.where((times >= -0.5) & (times < 0))[0]
+cont_blocks = {}
+patterns = {}
+randoms = {}
+contrasts = {}
 for network in tqdm(networks):
+    pats_blocks, rands_blocks = [], []
     if not network in patterns:
         patterns[network], randoms[network] = [], []
-        all_patterns[network], all_randoms[network] = [], []
-    all_pat, all_rand, all_diag = [], [], []
-    patpat, randrand = [], []
-    ddd = []
-    
-    for i, subject in enumerate(subjects):
-        
-        pat, rand = [], []
-        dd = []
-        
-        for j in [0, 1, 2, 3, 4]:
-            
-            pat = np.load(res_dir / network / data_type2 / subject / f"pat-{j}.npy")
-            rand = np.load(res_dir / network / data_type2 / subject / f"rand-{j}.npy")
-            patpat.append(np.array(pat))
-            randrand.append(np.array(rand))
-            
-            d = np.array(pat) - np.array(rand)
-            dd.append(np.diag(d))
-    
-        all_pat.append(np.load(res_dir / network / data_type1 / subject / "pat-all.npy"))
-        all_rand.append(np.load(res_dir / network / data_type1 / subject / "rand-all.npy"))
-        
-        diag = np.array(all_pat) - np.array(all_rand)
-        all_diag.append(np.diag(diag[i]))
-
-        ddd.append(np.array(dd))
-            
-    all_patterns[network] = np.array(all_pat)
-    all_randoms[network] = np.array(all_rand)
-
-    all_diags[network] = np.array(all_diag)
-    diags[network] = np.array(ddd)
-    
-    patterns[network] = np.array(patpat)
-    randoms[network] = np.array(randrand)
+        contrasts[network] = []
+    for subject in subjects:
+        res_path = RESULTS_DIR / 'TIMEG' / 'source' / network / data_type / subject
+        pattern, random = [], []
+        for block in range(1, 24):
+            if network in networks[:-3]:
+                pattern.append(np.load(res_path / f"pat-{block}.npy"))
+                random.append(np.load(res_path / f"rand-{block}.npy"))
+            else:
+                pattern.append(np.load(res_path / f"pat-4-{block}.npy"))
+                random.append(np.load(res_path / f"rand-4-{block}.npy"))
+        if subject == 'sub05':
+            pat_bsl = np.load(res_path / "pat-4.npy") if network in networks[:-3] else np.load(res_path / "pat-4-4.npy")
+            rand_bsl = np.load(res_path / "rand-4.npy") if network in networks[:-3] else np.load(res_path / "rand-4-4.npy")
+            for i in range(3):
+                pattern[i] = pat_bsl.copy()
+                random[i] = rand_bsl.copy()
+        pats_blocks.append(np.array(pattern))
+        rands_blocks.append(np.array(random))
+    pats_blocks, rands_blocks = np.array(pats_blocks), np.array(rands_blocks)
+    patterns[network] = pats_blocks
+    randoms[network] = rands_blocks
+    contrasts[network] = pats_blocks - rands_blocks
 
 cmap = "viridis"
 cmap1 = "RdBu_r"
@@ -109,8 +129,9 @@ design = [['br11', 'br12', 'a1', 'a2', 'a3'],
 vmin, vmax = 0.2, 0.3
 
 cmap = ['#0173B2','#DE8F05','#029E73','#D55E00','#CC78BC','#CA9161','#FBAFE4','#ECE133','#56B4E9', "#76B041"]
-sig_color = "#00BFA6"
 sig_color = '#708090'
+sig_color = "#00BFA6"
+plot_brains = False
 
 fig, axes = plt.subplot_mosaic(design, figsize=(12, 18), sharey=False, sharex=False, layout="constrained",
                                gridspec_kw={'height_ratios': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1.5],
@@ -118,49 +139,54 @@ fig, axes = plt.subplot_mosaic(design, figsize=(12, 18), sharey=False, sharex=Fa
 plt.rcParams.update({'font.size': 10, 'font.family': 'serif', 'font.serif': 'Arial'})
 # fig.suptitle("Comparison of Pattern, Random, and Contrast Accuracy Over Time", fontsize=14, fontweight='bold')
 ### Plot brain ###
-brain_kwargs = dict(hemi='both', background="white", cortex="low_contrast", surf='inflated', subjects_dir=subjects_dir, size=(800, 400))
-for i, (label, sideA, sideB) in enumerate(zip(networks, \
-    ['br11', 'br21', 'br31', 'br41', 'br51', 'br61', 'br71', 'br81', 'br91', 'br101'], ['br12', 'br22', 'br32', 'br42', 'br52', 'br62', 'br72', 'br82', 'br92', 'br102'])):
-    # Initialize Brain object
-    # Add labels
-    if label in networks[:-3]:
-        brain = Brain(subject='fsaverage2', alpha=1, **brain_kwargs) 
-        for hemi in ['lh', 'rh']:
-        # hemi = 'split'
-            brain.add_label(f'{label}', color=cmap[i], hemi=hemi, alpha=.85, subdir='n7')
-    else:
-        brain = Brain(subject='fsaverage2', alpha=.5, **brain_kwargs) 
-        if label == 'Hippocampus':
-            labels = ['Left-Hippocampus', 'Right-Hippocampus']
-        elif label == 'Thalamus':
-            labels = ['Left-Thalamus-Proper', 'Right-Thalamus-Proper']
+if plot_brains:
+    brain_kwargs = dict(hemi='both', background="white", cortex="low_contrast", surf='inflated', subjects_dir=subjects_dir, size=(800, 400))
+    for i, (label, sideA, sideB) in enumerate(zip(networks, \
+        ['br11', 'br21', 'br31', 'br41', 'br51', 'br61', 'br71', 'br81', 'br91', 'br101'], ['br12', 'br22', 'br32', 'br42', 'br52', 'br62', 'br72', 'br82', 'br92', 'br102'])):
+        # Initialize Brain object
+        # Add labels
+        if label in networks[:-3]:
+            brain = Brain(subject='fsaverage2', alpha=1, **brain_kwargs) 
+            for hemi in ['lh', 'rh']:
+            # hemi = 'split'
+                brain.add_label(f'{label}', color=cmap[i], hemi=hemi, alpha=.85, subdir='n7')
         else:
-            labels = ['Left-Cerebellum-Cortex', 'Right-Cerebellum-Cortex']
-        brain.add_volume_labels(aseg='aseg', labels=labels, colors=cmap[i], alpha=.85, legend=False)
-    
-    # Capture snapshots for the desired views
-    brain.show_view('lateral', distance="auto")
-    lateral_img = brain.screenshot('rgb')
-    brain.show_view('medial', distance="auto")
-    medial_img = brain.screenshot('rgb')
-    brain.close()
-    
-    lateral_img, medial_img = crop_images(lateral_img), crop_images(medial_img)
-    # lateral_img = crop_images(lateral_img)
-    
-    # Display images side by side using Matplotlib
-    axes[sideA].imshow(lateral_img)
-    axes[sideA].axis('off')
-    # axd[sideA].set_title(net_name, fontsize=14)
-    # Call the function to set the br-specific title
-    net_name = " "
-    # plot_with_br_title(fig, axes, design, net_name, row_idx=i)
-    axes[sideB].imshow(medial_img)
-    axes[sideB].axis('off')
+            brain = Brain(subject='fsaverage2', alpha=.5, **brain_kwargs) 
+            if label == 'Hippocampus':
+                labels = ['Left-Hippocampus', 'Right-Hippocampus']
+            elif label == 'Thalamus':
+                labels = ['Left-Thalamus-Proper', 'Right-Thalamus-Proper']
+            else:
+                labels = ['Left-Cerebellum-Cortex', 'Right-Cerebellum-Cortex']
+            brain.add_volume_labels(aseg='aseg', labels=labels, colors=cmap[i], alpha=.85, legend=False)
+        
+        # Capture snapshots for the desired views
+        brain.show_view('lateral', distance="auto")
+        lateral_img = brain.screenshot('rgb')
+        brain.show_view('medial', distance="auto")
+        medial_img = brain.screenshot('rgb')
+        brain.close()
+        
+        lateral_img, medial_img = crop_images(lateral_img), crop_images(medial_img)
+        # lateral_img = crop_images(lateral_img)
+        
+        # Display images side by side using Matplotlib
+        axes[sideA].imshow(lateral_img)
+        axes[sideA].axis('off')
+        # axd[sideA].set_title(net_name, fontsize=14)
+        # Call the function to set the br-specific title
+        net_name = " "
+        # plot_with_br_title(fig, axes, design, net_name, row_idx=i)
+        axes[sideB].imshow(medial_img)
+        axes[sideB].axis('off')
+
+fig, axes = plt.subplot_mosaic(design, figsize=(12, 18), sharey=False, sharex=False, layout="constrained",
+                               gridspec_kw={'height_ratios': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1.5],
+                                            'width_ratios': [.2, .2, .5, .5, .5]})
 
 ### Pattern ###
 for network, pattern_idx in zip(networks, ['a1', 'b1', 'c1', 'd1', 'e1', 'f1', 'g1', 'h1', 'i1', 'k1']):
-    im = axes[pattern_idx].imshow(all_patterns[network].mean(0),
+    im = axes[pattern_idx].imshow(patterns[network][:, 3:].mean((0, 1)),
                                   interpolation="lanczos",
                                   origin="lower",
                                   cmap=cmap1,
@@ -172,9 +198,9 @@ for network, pattern_idx in zip(networks, ['a1', 'b1', 'c1', 'd1', 'e1', 'f1', '
     axes[pattern_idx].axhline(0, color="k", alpha=.5)
     
     xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
-    pval = np.load(res_dir / network / data_type1 / "pval" / "all_pattern-pval.npy")
+    pval = np.load(res_dir / network / data_type / "pval" / "all_pattern-pval.npy")
     sig = pval < threshold
-    axes[pattern_idx].contour(xx, yy, sig, colors=sig_color, levels=[0], linestyles='--', linewidths=0.5)
+    axes[pattern_idx].contour(xx, yy, sig, colors=sig_color, levels=[0], linestyles='-', linewidths=1, alpha=1)
     axes[pattern_idx].set_ylabel("Training time (s)")
     if pattern_idx == 'k1':
         axes[pattern_idx].set_xlabel("Testing time (s)")
@@ -191,7 +217,7 @@ for network, pattern_idx in zip(networks, ['a1', 'b1', 'c1', 'd1', 'e1', 'f1', '
 
 ### Random ###    
 for network, random_idx in zip(networks, ['a2', 'b2', 'c2', 'd2', 'e2', 'f2', 'g2', 'h2', 'i2', 'k2']):
-    im = axes[random_idx].imshow(all_randoms[network].mean(0),
+    im = axes[random_idx].imshow(randoms[network][:, 3:].mean((0, 1)),
                                  interpolation="lanczos",
                                  origin="lower",
                                  cmap=cmap1,
@@ -208,9 +234,9 @@ for network, random_idx in zip(networks, ['a2', 'b2', 'c2', 'd2', 'e2', 'f2', 'g
     axes[random_idx].set_yticklabels([])
     
     xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
-    pval = np.load(res_dir / network / data_type1 / "pval" / "all_random-pval.npy")
+    pval = np.load(res_dir / network / data_type / "pval" / "all_random-pval.npy")
     sig = pval < threshold
-    axes[random_idx].contour(xx, yy, sig, colors=sig_color, levels=[0], linestyles='--', linewidths=0.5)
+    axes[random_idx].contour(xx, yy, sig, colors=sig_color, levels=[0], linestyles='-', linewidths=1, alpha=1)
     
     if random_idx == 'a2':
         axes[random_idx].set_title("Random")
@@ -220,8 +246,7 @@ for network, random_idx in zip(networks, ['a2', 'b2', 'c2', 'd2', 'e2', 'f2', 'g
 ### Contrast ###
 vminC, vmaxC = -0.03, 0.03
 for network, contrast_idx in zip(networks, ['a3', 'b3', 'c3', 'd3', 'e3', 'f3', 'g3', 'h3', 'i3', 'k3']):
-    all_contrast = all_patterns[network] - all_randoms[network]
-    im = axes[contrast_idx].imshow(all_contrast.mean(0),
+    im = axes[contrast_idx].imshow(contrasts[network][:, 3:].mean((0, 1)),
                                    interpolation="lanczos",
                                    origin="lower",
                                    cmap=cmap2,
@@ -239,9 +264,9 @@ for network, contrast_idx in zip(networks, ['a3', 'b3', 'c3', 'd3', 'e3', 'f3', 
     axes[contrast_idx].set_yticklabels([])
     
     xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
-    pval = np.load(res_dir / network / data_type1 / "pval" / "all_contrast-pval.npy")
+    pval = np.load(res_dir / network / data_type / "pval" / "all_contrast-pval.npy")
     sig = pval < threshold
-    axes[contrast_idx].contour(xx, yy, sig, colors=sig_color, levels=[0], linestyles='--', linewidths=0.5)
+    axes[contrast_idx].contour(xx, yy, sig, colors=sig_color, levels=[0], linestyles='-', linewidths=1, alpha=1)
         
     if contrast_idx == 'a3':
         axes[contrast_idx].set_title("Contrast (Pattern - Random)")
@@ -255,16 +280,18 @@ preact = []
 filt = np.where((times >= 0.25) & (times <= 0.6))[0]
 filter_time = np.where((times >= -0.5) & (times < 0))[0]  # Correct filtering condition
 for i, net in enumerate(networks):
-    contrast = all_patterns[net] - all_randoms[net]
+    contrast = contrasts[net]
     # Compute mean net effect
-    preact.append(contrast[:, filter_time][:, :, filter_time].mean())
+    preact.append(contrast[:, 3:, filter_time][:, 3:, :, filter_time].mean())
     # Mean diagonal for the specific time window with absolute values
-    percept.append((all_diags[net][:, filt].mean()))
+    # percept.append((all_diags[net][:, filt].mean()))
+    diag = np.diag(contrast[:, 3:, filt]).mean()
+    percept.append(diag)
     sess1, sess2 = [], []
     for sub in range(len(subjects)):
         # Mean for session 1 and 2 per subject
         # sess1.append(contrast[sub, filter_time][:, filter_time].mean())
-        sess1.append(np.diag(contrast[sub, filter_time][:, filter_time]))
+        sess1.append(np.diag(contrast[sub, 3:, filter_time][3:, :, filter_time]))
         sess2.append(all_diags[net][sub, filt].mean())
     mean_net_sess.append(np.array(sess1))
     mean_diag_sess.append(np.array(sess2))
@@ -341,7 +368,7 @@ axes['l'].set_aspect(0.5)
 #         ax.set_visible(False)
 
 fig.savefig(figures_dir / "timeg-final-test.pdf", transparent=True)
-plt.close()
+# plt.close()
 
 fns = []
 max_where = []

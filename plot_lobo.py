@@ -411,22 +411,15 @@ for i, (ax, network, name) in enumerate(zip(axes.flatten(), networks, network_na
         aspect=0.5,
         vmin=-0.05,
         vmax=0.05)
-    # ax.plot(timesg, np.diag(data.mean((0, 1))), color=c1, linewidth=2, label='Diagonal')
     ax.set_title(f"{name}", fontsize=10, fontstyle="italic")
     xx, yy = np.meshgrid(timesg, timesg, copy=False, indexing='xy')
-    if not op.exists(FIGURES_DIR / "temp" / "timeg_pval" / f"{network}-pval.npy"):
+    pval_path = RESULTS_DIR / 'TIMEG' / 'source' / network / data_type / 'pval'
+    if not op.exists(pval_path / "all_contrast-pval.npy"):
         pval = gat_stats(data.mean(1), -1)
-        np.save(FIGURES_DIR / "temp" / "timeg_pval" / f"{network}-pval.npy", pval)
+        np.save(pval_path / "all_contrast-pval.npy", pval)
     else:
-        pval = np.load(FIGURES_DIR / "temp" / "timeg_pval" / f"{network}-pval.npy")
-    # diags = [np.diag(d) for d in data.mean(1)]
-    # pval = decod_stats(diags, -1)
+        pval = np.load(pval_path / "all_contrast-pval.npy")
     sig = pval < 0.05
-    # ax.fill_between(timesg, np.diag(data.mean((0, 1))), 0, where=sig, color='red', alpha=0.3)
-    # mdiags = [np.mean(d[idx]) for d in diags]
-    # sig_unc = ttest_1samp(mdiags, 0)[1] < 0.05
-    # if sig_unc:
-    #     ax.fill_between(timesg[idx], -0.02, -0.018, facecolor='red', edgecolor=None, alpha=1, zorder=5)
     ax.contour(xx, yy, sig, colors=c1, levels=[0],
                         linestyles='-', linewidths=1, alpha=1)
     ax.axvline(0, color="k", alpha=.5)
@@ -452,7 +445,7 @@ for i, (ax, network, name) in enumerate(zip(axes.flatten(), networks, network_na
     ax.axvline(0, color="k", alpha=.5)
     ax.axhline(0, color="k", alpha=.5)
 fig.suptitle("Contrast time generalization diag")
-# fig.savefig(FIGURES_DIR / "time_gen" / "source" / "timeg_time_resolved_source.pdf", transparent=True)
+fig.savefig(FIGURES_DIR / "time_gen" / "source" / "timeg_diag.pdf", transparent=True)
 # plt.close(fig)
 
 # plot contrast
@@ -482,6 +475,56 @@ for i, (ax, network) in enumerate(zip(axes.flatten(), networks)):
 fig.suptitle('PA source - contrast blocks', fontsize=14)
 # fig.savefig(FIGURES_DIR / "time_gen" / "source" / "timeg_blocks_source.pdf", transparent=True)
 # plt.close(fig)
+
+# plot correlation (block level)
+fig, axes = plt.subplots(2, 5, figsize=(20, 4), sharex=True, sharey=True, layout='constrained')
+idx = np.where((timesg >= -0.5) & (timesg < 0))[0]
+for i, (ax, network, name) in enumerate(zip(axes.flatten(), networks, network_names)):
+    rho = np.load(RESULTS_DIR / 'TIMEG' / 'source' / network / data_type / 'corr' / 'rhos_learn.npy')
+    pval = np.load(RESULTS_DIR / 'TIMEG' / 'source' / network / data_type / 'corr' / 'pval_learn-pval.npy')
+    print(f"Plotting {network}...")
+    im = ax.imshow(
+        rho.mean(0),
+        interpolation="lanczos",
+        origin="lower",
+        cmap=cmap1,
+        extent=timesg[[0, -1, 0, -1]],
+        aspect=0.5,
+        vmin=-0.05,
+        vmax=0.05)
+    ax.set_title(f"{name}", fontsize=10, fontstyle="italic")
+    xx, yy = np.meshgrid(timesg, timesg, copy=False, indexing='xy')
+    sig = pval < 0.05
+    ax.contour(xx, yy, sig, colors=c1, levels=[0],
+                        linestyles='-', linewidths=1, alpha=1)
+    ax.axvline(0, color="k", alpha=.5)
+    ax.axhline(0, color="k", alpha=.5)
+fig.suptitle("Contrast time generalization")
+fig.savefig(FIGURES_DIR / "time_gen" / "source" / "timeg_corr.pdf", transparent=True)
+
+fig, axes = plt.subplots(2, 5, figsize=(20, 4), sharex=True, sharey=True, layout='constrained')
+idx = np.where((timesg >= -0.25) & (timesg < 0))[0]
+for i, (ax, network, name) in enumerate(zip(axes.flatten(), networks, network_names)):
+    rho = np.load(RESULTS_DIR / 'TIMEG' / 'source' / network / data_type / 'corr' / 'rhos_learn.npy')
+    ax.plot(timesg, np.diag(rho.mean(0)), color=c1, linewidth=2, label='Diagonal')
+    ax.set_title(f"{name}", fontsize=10, fontstyle="italic")
+    diags = [np.diag(d) for d in rho]
+    pval = decod_stats(diags, -1)
+    sig = pval < 0.05
+    ax.fill_between(timesg, np.diag(rho.mean(0)), 0, where=sig, color='red', alpha=0.3)
+    mdiags = [np.mean(d[idx]) for d in diags]
+    sig_unc = ttest_1samp(mdiags, 0)[1] < 0.05
+    if sig_unc:
+        print(f"{network} sig *******************")
+        ax.fill_between(timesg[idx], -0.1, -0.13, facecolor='red', edgecolor=None, alpha=1, zorder=5)
+    else:
+        print(f"{network} ns")
+    ax.axvline(0, color="k", alpha=.5)
+    ax.axhline(0, color="k", alpha=.5)
+fig.suptitle("Contrast diag corr")
+fig.savefig(FIGURES_DIR / "time_gen" / "source" / "timeg_corr_diag.pdf", transparent=True)
+# plt.close(fig)
+
 
 # # save table
 # rows = list()
