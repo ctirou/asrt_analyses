@@ -1025,3 +1025,18 @@ def fisher_z_and_ttest(rho_matrix):
     t_stats, p_vals = ttest_1samp(z_matrix, popmean=0, axis=0)
     
     return z_matrix, t_stats, p_vals
+
+def fisher_z_transform_3d(rho_3d):
+    """
+    Apply Fisher's z-transformation to a 3D array of correlation coefficients.
+    
+    Parameters:
+        rho_3d (np.ndarray): Array of shape (n_subjects, n_timepoints, n_timepoints)
+    
+    Returns:
+        z_3d (np.ndarray): Fisher z-transformed array, same shape as input.
+    """
+    import numpy as np
+    rho_3d = np.clip(rho_3d, -0.999999, 0.999999)
+    z_3d = 0.5 * np.log((1 + rho_3d) / (1 - rho_3d))
+    return z_3d
