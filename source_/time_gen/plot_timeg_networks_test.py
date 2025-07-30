@@ -123,18 +123,19 @@ design = [['br11', 'br12', 'a1', 'a2', 'a3'],
           ['br71', 'br72', 'g1', 'g2', 'g3'],
           ['br81', 'br82', 'h1', 'h2', 'h3'],
           ['br91', 'br92', 'i1', 'i2', 'i3'],
-          ['br101', 'br102', 'k1', 'k2', 'k3'],
-          ['l', 'l', 'j', 'j', 'j']]
+          ['br101', 'br102', 'k1', 'k2', 'k3']]
+        #   ['l', 'l', 'j', 'j', 'j']]
 
 vmin, vmax = 0.2, 0.3
 
 cmap = ['#0173B2','#DE8F05','#029E73','#D55E00','#CC78BC','#CA9161','#FBAFE4','#ECE133','#56B4E9', "#76B041"]
 sig_color = '#708090'
 sig_color = "#00BFA6"
-plot_brains = False
+plot_brains = True
 
-fig, axes = plt.subplot_mosaic(design, figsize=(12, 18), sharey=False, sharex=False, layout="constrained",
-                               gridspec_kw={'height_ratios': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1.5],
+fig, axes = plt.subplot_mosaic(design, figsize=(12, 16), sharey=False, sharex=False, layout="constrained",
+                            #    gridspec_kw={'height_ratios': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1.5],
+                               gridspec_kw={'height_ratios': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
                                             'width_ratios': [.2, .2, .5, .5, .5]})
 plt.rcParams.update({'font.size': 10, 'font.family': 'serif', 'font.serif': 'Arial'})
 # fig.suptitle("Comparison of Pattern, Random, and Contrast Accuracy Over Time", fontsize=14, fontweight='bold')
@@ -180,9 +181,9 @@ if plot_brains:
         axes[sideB].imshow(medial_img)
         axes[sideB].axis('off')
 
-fig, axes = plt.subplot_mosaic(design, figsize=(12, 18), sharey=False, sharex=False, layout="constrained",
-                               gridspec_kw={'height_ratios': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1.5],
-                                            'width_ratios': [.2, .2, .5, .5, .5]})
+# fig, axes = plt.subplot_mosaic(design, figsize=(12, 18), sharey=False, sharex=False, layout="constrained",
+#                                gridspec_kw={'height_ratios': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1.5],
+#                                             'width_ratios': [.2, .2, .5, .5, .5]})
 
 ### Pattern ###
 for network, pattern_idx in zip(networks, ['a1', 'b1', 'c1', 'd1', 'e1', 'f1', 'g1', 'h1', 'i1', 'k1']):

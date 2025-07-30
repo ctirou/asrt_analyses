@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from scipy.stats import ttest_1samp
 from scipy.ndimage import gaussian_filter1d
+from matplotlib import colors
 
 subjects = SUBJS15
 times = np.linspace(-0.2, 0.6, 82)
@@ -98,8 +99,8 @@ sig = decod_stats(np.nanmean(diff_rp, axis=(1)), -1) < 0.05
 ax.fill_between(times, np.nanmean(diff_rp, axis=(0, 1)), 0, where=sig, color='red', alpha=0.3)
 mdiff = np.nanmean(diff_rp[:, :, win], axis=(1, -1))
 mdiff_sig = ttest_1samp(mdiff, 0)[1] < 0.05
-# if mdiff_sig:
-#     ax.axvspan(times[win][0], times[win][-1], facecolor='red', edgecolor=None, alpha=0.2, zorder=5)
+if mdiff_sig:
+    ax.axvspan(times[win][0], times[win][-1], facecolor='orange', edgecolor=None, alpha=0.2, zorder=5)
 #     ax.text((xmin+xmax)/2, -0.5, '*', fontsize=16, ha='center', va='center', color='red', weight='bold')
 ax.set_xlabel('Time (s)')
 ax.set_ylabel('Similarity index (random - pattern)')
@@ -191,7 +192,7 @@ fig.suptitle('RS source - blocks', fontsize=14)
 # df.to_csv(FIGURES_DIR / "TM" / "data" / "rsa_blocks_source.csv", index=False, sep=",")
 
 # plot time resolved RSA source
-xmin, xmax = 0.3, 0.5
+xmin, xmax = 0.3, 0.55
 win = np.where((times >= xmin) & (times <= xmax))[0]
 fig, axes = plt.subplots(2, 5, figsize=(15, 4), sharey=True, sharex=True, layout='tight')
 for i, (ax, network) in enumerate(zip(axes.flatten(), networks)):
@@ -204,7 +205,7 @@ for i, (ax, network) in enumerate(zip(axes.flatten(), networks)):
     mdiff = np.nanmean(diff_rp[network][:, :, win], axis=(1, -1))
     mdiff_sig = ttest_1samp(mdiff, 0)[1] < 0.05
     if mdiff_sig:
-        ax.axvspan(times[win][0], times[win][-1], facecolor='red', edgecolor=None, alpha=0.2, zorder=5)
+        ax.axvspan(times[win][0], times[win][-1], facecolor='orange', edgecolor=None, alpha=0.2, zorder=5)
         # ax.text((xmin+xmax)/2, -0.5, '*', fontsize=16, ha='center', va='center', color='red', weight='bold')
 fig.suptitle('RS source - time resolved', fontsize=14)
 # fig.savefig(FIGURES_DIR / "RSA" / "source" / "rsa_time_resolved_source.pdf", transparent=True)
@@ -233,16 +234,21 @@ for subject in tqdm(subjects):
 pats_blocks = np.array(pats_blocks)
 rands_blocks = np.array(rands_blocks)
 # mean box
-idx_timeg = np.where((times >= -0.5) & (times < 0))[0]
+idx_timeg = np.where((times >= -0.75) & (times < 0))[0]
 box_blocks = []
+diag_blocks = []
 conts_blocks = pats_blocks - rands_blocks
 for sub in range(len(subjects)):
     tg = []
+    dg = []
     for block in range(23):
         data = conts_blocks[sub, block, idx_timeg, :][:, idx_timeg]
         tg.append(data.mean())
+        dg.append(np.diag(conts_blocks[sub, block])[idx_timeg].mean())
     box_blocks.append(np.array(tg))
+    diag_blocks.append(np.array(dg))
 box_blocks = np.array(box_blocks)
+diag_blocks = np.array(diag_blocks)
 
 # plot
 fig, ax = plt.subplots(figsize=(7, 4), layout='tight')
@@ -263,11 +269,11 @@ ax.set_xticks(np.arange(1, 24, 4))
 ax.set_xlabel('Block')
 # ax.grid(True, linestyle='-', alpha=0.3)
 ax.legend()
-ax.set_title('PA sensors - blocks')
+ax.set_title('PA sensors - blocks - mean box')
 # fig.savefig(FIGURES_DIR / "time_gen" / "sensors" / "timeg_blocks_sensors.pdf", transparent=True)
 # plt.close(fig)
 
-# save table
+# save table for mean box
 rows = list()
 for i, subject in enumerate(subjects):
     for block in range(box_blocks.shape[1]):
@@ -279,13 +285,45 @@ for i, subject in enumerate(subjects):
 df = pd.DataFrame(rows)
 df.to_csv(FIGURES_DIR / "TM" / "data" / "timeg_lobo_sensors.csv", index=False, sep=",")
 
+# plot
+fig, ax = plt.subplots(figsize=(7, 4), layout='tight')
+blocks = np.arange(1, 24)
+ax.axvspan(1, 3, color='orange', alpha=0.1,  )
+# Highlight each group of 5 blocks after practice
+for start in range(4, 24, 5):
+    ax.axvspan(start, start + 5, color='green', alpha=0.1)
+ax.axhline(0, color='grey', linestyle='-', alpha=0.5)
+sem = np.std(diag_blocks, axis=0) / np.sqrt(diag_blocks.shape[0])
+mean = diag_blocks.mean(0)
+ax.plot(blocks, mean, color=c1)
+ax.fill_between(blocks, mean - sem, mean + sem, color=c1, alpha=0.3)
+# Smooth the mean curve for visualization
+smoothed = gaussian_filter1d(diag_blocks.mean(0), sigma=1.5)
+ax.plot(blocks, smoothed, color='red', linestyle='--', label='Gaussian smoothed')
+ax.set_xticks(np.arange(1, 24, 4))
+ax.set_xlabel('Block')
+# ax.grid(True, linestyle='-', alpha=0.3)
+ax.legend()
+ax.set_title('PA sensors - blocks - mean diagonal')
+# fig.savefig(FIGURES_DIR / "time_gen" / "sensors" / "timeg_blocks_sensors.pdf", transparent=True)
+# plt.close(fig)
+
+# save table for diagonals
+rows = list()
+for i, subject in enumerate(subjects):
+    for block in range(diag_blocks.shape[1]):
+        rows.append({
+            "subject": subject,
+            "block": block + 1,
+            "value": diag_blocks[i, block]
+        })
+df = pd.DataFrame(rows)
+df.to_csv(FIGURES_DIR / "TM" / "data" / "timeg_lobo_sensors-diag.csv", index=False, sep=",")
+
 # plot time resolved PA sensors
 patt_ave, rand_ave = pats_blocks[:, 3:].mean(1), rands_blocks[:, 3:].mean(1)
 data = patt_ave - rand_ave
 ensured(FIGURES_DIR / "temp" / "timeg_pval")
-
-from matplotlib import colors
-
 cmap1 = plt.get_cmap('RdBu_r')
 vmin, vmax = -0.05, 0.05
 idx = np.where((times >= -1.5) & (times <=3))[0]
@@ -327,6 +365,55 @@ ax.set_title("Time generalization - time resolved", fontstyle='italic')
 # fig.savefig(FIGURES_DIR / "time_gen" / "sensors" / "timeg_time_resolved_sensors.pdf", transparent=True)
 # plt.close(fig)
 
+# Modulation and perceptual change effects
+conts_blocks = pats_blocks - rands_blocks
+idx_mod_l = np.where((times >= -0.75) & (times <= -0.25))[0]
+idx_mod_h = np.where((times >= -0.75) & (times <= 0))[0]
+
+idx_per_l = np.where((times >= -0.25) & (times < 0))[0]
+idx_per_h = np.where((times > 0) & (times < 0.5))[0]
+mod_blocks = []
+per_blocks = []
+for sub in range(len(subjects)):
+    mod = []
+    per = []
+    for block in range(23):
+        # modulatory effect
+        data = conts_blocks[sub, block, idx_mod_l, :][:, idx_mod_h].mean()
+        mod.append(data)
+        # perceptual effect
+        data = conts_blocks[sub, block, idx_per_l, :][:, idx_per_h].mean()
+        per.append(data)
+    mod_blocks.append(np.array(mod))
+    per_blocks.append(np.array(per))
+mod_blocks = np.array(mod_blocks)
+per_blocks = np.array(per_blocks)
+
+# Plot
+fig, ax = plt.subplots(figsize=(7, 4), layout='tight')
+blocks = np.arange(1, 24)
+ax.axhline(0, color='grey', linestyle='-', alpha=1)
+ax.axvline(3, color='grey', linestyle='-', alpha=1)
+
+ax.plot(blocks, mod_blocks.mean(0), label='Modulation', alpha=0.6, color='blue')
+sem_mod = mod_blocks.std(0) / np.sqrt(mod_blocks.shape[0])
+ax.fill_between(blocks, mod_blocks.mean(0) - sem_mod, mod_blocks.mean(0) + sem_mod, facecolor='blue', alpha=0.1)
+smoothed_mod = gaussian_filter1d(mod_blocks.mean(0), sigma=1.5)
+ax.plot(blocks, smoothed_mod, color='blue', linestyle='--', label='Modulation smoothed')
+
+ax.plot(blocks, per_blocks.mean(0), label='Perception', alpha=0.6, color='orange')
+sem_per = per_blocks.std(0) / np.sqrt(per_blocks.shape[0])
+ax.fill_between(blocks, per_blocks.mean(0) - sem_per, per_blocks.mean(0) + sem_per, facecolor='orange', alpha=0.1)
+smoothed_per = gaussian_filter1d(per_blocks.mean(0), sigma=1.5)
+ax.plot(blocks, smoothed_per, color='orange', linestyle='--', label='Perception smoothed')
+
+ax.set_xticks(np.arange(1, 24, 4))
+ax.set_xlabel('Block')
+ax.grid(True, linestyle='-', alpha=0.2)
+ax.legend()
+ax.set_title('PA sensors - blocks - modulation and perception')
+
+
 # Temporal generalization source --- blocks ---
 networks = NETWORKS + ['Cerebellum-Cortex']
 network_names = NETWORK_NAMES + ['Cerebellum']
@@ -336,6 +423,7 @@ cont_blocks = {}
 pat_blocks = {}
 rand_blocks = {}
 contrast_net = dict()
+diag_net = dict()
 # data_type  = "scores_blocks_vect_0200_new"
 data_type  = "scores_lobo_vector_new"
 for network in tqdm(networks):
@@ -344,6 +432,7 @@ for network in tqdm(networks):
         cont_blocks[network] = []
         pat_blocks[network] = []
         rand_blocks[network] = []
+        diag_net[network] = []
     for subject in subjects:
         res_path = RESULTS_DIR / 'TIMEG' / 'source' / network / data_type / subject
         pattern, random = [], []
@@ -369,9 +458,11 @@ for network in tqdm(networks):
     box_blocks_c = []
     box_blocks_p = []
     box_blocks_r = []
+    diag_blocks = []
     for sub in range(len(subjects)):
         tg_p, tg_r = [], []
         tg_c = []
+        dg = []
         for block in range(23):
             # contrast
             data_c = contrast[sub, block, idx_timeg, :][:, idx_timeg]
@@ -382,12 +473,16 @@ for network in tqdm(networks):
             # random
             data_r = rands_blocks[sub, block, idx_timeg, :][:, idx_timeg]
             tg_r.append(data_r.mean())
+            # diagonal
+            dg.append(np.diag(contrast[sub, block])[idx_timeg].mean())
         box_blocks_c.append(np.array(tg_c))
         box_blocks_p.append(np.array(tg_p))
         box_blocks_r.append(np.array(tg_r))
+        diag_blocks.append(np.array(dg))
     cont_blocks[network] = np.array(box_blocks_c)
     pat_blocks[network] = np.array(box_blocks_p)
     rand_blocks[network] = np.array(box_blocks_r)
+    diag_net[network] = np.array(diag_blocks)
     
 ensured(FIGURES_DIR / "temp" / "timeg_pval")
 # Contrast
@@ -446,7 +541,7 @@ fig.suptitle("Contrast time generalization diag")
 fig.savefig(FIGURES_DIR / "time_gen" / "source" / "timeg_diag.pdf", transparent=True)
 # plt.close(fig)
 
-# plot contrast
+# plot contrast - box mean
 blocks = np.arange(1, 24)
 fig, axes = plt.subplots(2, 5, figsize=(15, 4), sharey=True, sharex=True, layout='tight')
 for i, (ax, network) in enumerate(zip(axes.flatten(), networks)):
@@ -470,9 +565,67 @@ for i, (ax, network) in enumerate(zip(axes.flatten(), networks)):
     # Only set xlabel for axes in the bottom row
     if ax.get_subplotspec().is_last_row():
         ax.set_xlabel('Block')
-fig.suptitle('PA source - contrast blocks', fontsize=14)
-fig.savefig(FIGURES_DIR / "time_gen" / "source" / "timeg_mean_blocks.pdf", transparent=True)
+fig.suptitle('PA source - box mean blocks', fontsize=14)
+fig.savefig(FIGURES_DIR / "time_gen" / "source" / "timeg_mean_blocks-box.pdf", transparent=True)
 # plt.close(fig)
+# save table
+rows = list()
+for i, network in enumerate(networks):
+    diff = cont_blocks[network]
+    # get table
+    for j, subject in enumerate(subjects):
+        for block in range(diff.shape[1]):
+            rows.append({
+                "network": network_names[i],
+                "subject": subject,
+                "block": block + 1,
+                "value": diff[j, block]
+            })
+df = pd.DataFrame(rows)
+df.to_csv(FIGURES_DIR / "TM" / "data" / "timeg_lobo_source.csv", index=False, sep=",")
+
+# plot contrast
+blocks = np.arange(1, 24)
+fig, axes = plt.subplots(2, 5, figsize=(15, 4), sharey=True, sharex=True, layout='tight')
+for i, (ax, network) in enumerate(zip(axes.flatten(), networks)):
+    ax.set_xticks(np.arange(1, 24, 4))
+    ax.axvspan(1, 3, color='orange', alpha=0.1)
+    # Highlight each group of 5 blocks after practice
+    for start in range(4, 24, 5):
+        ax.axvspan(start, start + 5, color='green', alpha=0.1)
+    ax.axhline(0, color='grey', linestyle='-', alpha=0.5)
+    sem = diag_net[network].std(axis=0) / np.sqrt(diag_net[network].shape[0])
+    mean = diag_net[network].mean(axis=0)
+    ax.plot(blocks, mean, color=c1)
+    ax.fill_between(blocks, mean - sem, mean + sem, color=c1, alpha=0.3)
+    # Smooth the mean curve for visualization
+    smoothed = gaussian_filter1d(diag_net[network].mean(0), sigma=1.5)
+    ax.plot(blocks, smoothed, color='red', linestyle='--', label='Gaussian smoothed')
+    # ax.grid(True, linestyle='-', alpha=0.3)
+    ax.set_title(network_names[i], fontstyle='italic')
+    if i == 0:
+        ax.legend()
+    # Only set xlabel for axes in the bottom row
+    if ax.get_subplotspec().is_last_row():
+        ax.set_xlabel('Block')
+fig.suptitle('PA source - diag mean blocks', fontsize=14)
+fig.savefig(FIGURES_DIR / "time_gen" / "source" / "timeg_mean_blocks-diag.pdf", transparent=True)
+# plt.close(fig)
+# save table
+rows = list()
+for i, network in enumerate(networks):
+    diff = diag_net[network]
+    # get table
+    for j, subject in enumerate(subjects):
+        for block in range(diff.shape[1]):
+            rows.append({
+                "network": network_names[i],
+                "subject": subject,
+                "block": block + 1,
+                "value": diff[j, block]
+            })
+df = pd.DataFrame(rows)
+df.to_csv(FIGURES_DIR / "TM" / "data" / "timeg_lobo_source-diag.csv", index=False, sep=",")
 
 # plot correlation (block level)
 fig, axes = plt.subplots(2, 5, figsize=(20, 4), sharex=True, sharey=True, layout='constrained')
@@ -522,22 +675,6 @@ for i, (ax, network, name) in enumerate(zip(axes.flatten(), networks, network_na
 fig.suptitle("Contrast diag corr")
 fig.savefig(FIGURES_DIR / "time_gen" / "source" / "timeg_corr_diag.pdf", transparent=True)
 # plt.close(fig)
-
-# save table
-rows = list()
-for i, network in enumerate(networks):
-    diff = cont_blocks[network]
-    # get table
-    for j, subject in enumerate(subjects):
-        for block in range(diff.shape[1]):
-            rows.append({
-                "network": network_names[i],
-                "subject": subject,
-                "block": block + 1,
-                "value": diff[j, block]
-            })
-df = pd.DataFrame(rows)
-df.to_csv(FIGURES_DIR / "TM" / "data" / "timeg_lobo_source.csv", index=False, sep=",")
 
 # # plot pattern
 # fig, axes = plt.subplots(2, 5, figsize=(15, 5), sharey=True, layout='tight')
