@@ -250,8 +250,7 @@ blocks = np.arange(1, 24)
 ax.axvspan(1, 3, color='orange', alpha=0.1,  )
 # Highlight each group of 5 blocks after practice
 for start in range(4, 24, 5):
-    end = min(start + 4, 23)
-    ax.axvspan(start, end, color='green', alpha=0.1)
+    ax.axvspan(start, start + 5, color='green', alpha=0.1)
 ax.axhline(0, color='grey', linestyle='-', alpha=0.5)
 sem = np.std(box_blocks, axis=0) / np.sqrt(box_blocks.shape[0])
 mean = box_blocks.mean(0)
@@ -268,18 +267,17 @@ ax.set_title('PA sensors - blocks')
 # fig.savefig(FIGURES_DIR / "time_gen" / "sensors" / "timeg_blocks_sensors.pdf", transparent=True)
 # plt.close(fig)
 
-# # save table
-# rows = list()
-# for i, subject in enumerate(subjects):
-#     for block in range(box_blocks.shape[1]):
-#         rows.append({
-#             "subject": subject,
-#             "block": block + 1,
-#             "value": box_blocks[i, block]
-#         })
-# df = pd.DataFrame(rows)
-# df.to_csv(FIGURES_DIR / "time_gen" / "sensors" / "timeg_blocks_sensors.csv", index=False, sep=",")
-# df.to_csv(FIGURES_DIR / "TM" / "data" / "timeg_blocks_sensors.csv", index=False, sep=",")
+# save table
+rows = list()
+for i, subject in enumerate(subjects):
+    for block in range(box_blocks.shape[1]):
+        rows.append({
+            "subject": subject,
+            "block": block + 1,
+            "value": box_blocks[i, block]
+        })
+df = pd.DataFrame(rows)
+df.to_csv(FIGURES_DIR / "TM" / "data" / "timeg_lobo_sensors.csv", index=False, sep=",")
 
 # plot time resolved PA sensors
 patt_ave, rand_ave = pats_blocks[:, 3:].mean(1), rands_blocks[:, 3:].mean(1)
@@ -473,7 +471,7 @@ for i, (ax, network) in enumerate(zip(axes.flatten(), networks)):
     if ax.get_subplotspec().is_last_row():
         ax.set_xlabel('Block')
 fig.suptitle('PA source - contrast blocks', fontsize=14)
-# fig.savefig(FIGURES_DIR / "time_gen" / "source" / "timeg_blocks_source.pdf", transparent=True)
+fig.savefig(FIGURES_DIR / "time_gen" / "source" / "timeg_mean_blocks.pdf", transparent=True)
 # plt.close(fig)
 
 # plot correlation (block level)
@@ -525,23 +523,21 @@ fig.suptitle("Contrast diag corr")
 fig.savefig(FIGURES_DIR / "time_gen" / "source" / "timeg_corr_diag.pdf", transparent=True)
 # plt.close(fig)
 
-
-# # save table
-# rows = list()
-# for i, network in enumerate(networks):
-#     diff = cont_blocks[network]
-#     # get table
-#     for j, subject in enumerate(subjects):
-#         for block in range(diff.shape[1]):
-#             rows.append({
-#                 "network": network_names[i],
-#                 "subject": subject,
-#                 "block": block + 1,
-#                 "value": diff[j, block]
-#             })
-# df = pd.DataFrame(rows)
-# df.to_csv(FIGURES_DIR / "time_gen" / "source" / "timeg_blocks_source.csv", index=False, sep=",")
-# df.to_csv(FIGURES_DIR / "TM" / "data" / "timeg_blocks_source.csv", index=False, sep=",")
+# save table
+rows = list()
+for i, network in enumerate(networks):
+    diff = cont_blocks[network]
+    # get table
+    for j, subject in enumerate(subjects):
+        for block in range(diff.shape[1]):
+            rows.append({
+                "network": network_names[i],
+                "subject": subject,
+                "block": block + 1,
+                "value": diff[j, block]
+            })
+df = pd.DataFrame(rows)
+df.to_csv(FIGURES_DIR / "TM" / "data" / "timeg_lobo_source.csv", index=False, sep=",")
 
 # # plot pattern
 # fig, axes = plt.subplots(2, 5, figsize=(15, 5), sharey=True, layout='tight')
