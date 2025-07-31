@@ -15,7 +15,7 @@ jobs = -1
 overwrite = False
 session_on = False
 
-data_type = "scores_lobo_new"
+data_type = "scores_lobotomized"
 
 def compute_spearman(t, g, vector, contrasts):
     return spear(vector, contrasts[:, t, g])[0]
@@ -28,11 +28,13 @@ res_dir = RESULTS_DIR / 'TIMEG' / 'sensors' / data_type
 # load patterns and randoms time-generalization on all epochs
 pats_blocks, rands_blocks = [], []
 for subject in tqdm(subjects):
-    res_path = RESULTS_DIR / 'TIMEG' / 'sensors' / 'scores_lobo_new' / subject
+    res_path = RESULTS_DIR / 'TIMEG' / 'sensors' / data_type / subject
     pattern, random = [], []
     for block in range(1, 24):
-        pattern.append(np.load(res_path / f"pat-{block}.npy"))
-        random.append(np.load(res_path / f"rand-{block}.npy"))
+        pfname = res_path / f'pat-{block}.npy' if block not in [1, 2, 3] else res_path / f'pat-0-{block}.npy'
+        rfname = res_path / f'rand-{block}.npy' if block not in [1, 2, 3] else res_path / f'rand-0-{block}.npy'
+        pattern.append(np.load(pfname))
+        random.append(np.load(rfname))
     if subject == 'sub05':
         pat_bsl = np.load(res_path / "pat-4.npy")
         rand_bsl = np.load(res_path / "rand-4.npy")
@@ -124,6 +126,7 @@ contour_color = "black"
 contour_color = "#00BFA6"
 contour_color = "#708090"
 
+
 idx = np.where((times >= -1.5) & (times <= 3))[0]
 
 plt.rcParams.update({'font.size': 12, 'font.family': 'serif', 'font.serif': 'Arial'})
@@ -171,7 +174,7 @@ fig, axs = plt.subplots(2, 1, figsize=(7, 6), sharex=True, layout='constrained')
 norm = colors.Normalize(vmin=-0.1, vmax=0.1)
 images = []
 for ax, data, title, pval, vmin, vmax in zip(axs.flat, [contrasts, rhos], \
-    ["Contrast (Pattern - Random)", "Contrast and learning correlation"], [pval_cont, pval_rhos], [-0.04, -0.1], [0.04, 0.1]):
+    ["Contrast (Pattern - Random)", "Contrast and learning correlation"], [pval_cont, pval_rhos], [-0.04, -0.05], [0.04, 0.05]):
     cmap = 'coolwarm' if ax == axs.flat[0] else "BrBG"
     im = ax.imshow(data, 
                     # norm=norm,
@@ -201,7 +204,7 @@ for ax, data, title, pval, vmin, vmax in zip(axs.flat, [contrasts, rhos], \
     # rectcolor = 'black' if ax == axs.flat[0] else 'red'
     rectcolor = 'black'
     if ax == axs.flat[0]:
-        rect = plt.Rectangle([-0.75, -0.75], 0.72, 0.68, fill=False, edgecolor=rectcolor, linestyle='--', lw=2, zorder=10)
+        rect = plt.Rectangle([-0.75, -0.75], 0.72, 0.68, fill=False, edgecolor='black', linestyle='--', lw=2, zorder=10)
         rect1 = plt.Rectangle([-0.75, 0.05], 0.72, 0.68, fill=False, edgecolor='white', linestyle='--', lw=2, zorder=10)
         ax.add_patch(rect1)
         ax.add_patch(rect)

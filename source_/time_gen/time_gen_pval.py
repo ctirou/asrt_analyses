@@ -84,7 +84,7 @@ for network in networks:
         pval = gat_stats(all_rhos, -1)
         np.save(res_dir / "pval_learn-pval.npy", pval)
 
-data_type = 'scores_lobo_vector_new'
+data_type = 'scores_lobotomized'
 learn_index_blocks = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices_blocks.csv', sep=",", index_col=0)
 cont_blocks = {}
 patterns = {}
@@ -100,11 +100,13 @@ for network in tqdm(networks):
         pattern, random = [], []
         for block in range(1, 24):
             if network in networks[:-3]:
-                pattern.append(np.load(res_path / f"pat-{block}.npy"))
-                random.append(np.load(res_path / f"rand-{block}.npy"))
+                pfname = res_path / f"pat-{block}.npy" if block not in [1, 2, 3] else res_path / f"pat-0-{block}.npy"
+                rfname = res_path / f"rand-{block}.npy" if block not in [1, 2, 3] else res_path / f"rand-0-{block}.npy"
             else:
-                pattern.append(np.load(res_path / f"pat-4-{block}.npy"))
-                random.append(np.load(res_path / f"rand-4-{block}.npy"))
+                pfname = res_path / f"pat-4-{block}.npy" if block not in [1, 2, 3] else res_path / f"pat-0-{block}.npy"
+                rfname = res_path / f"rand-4-{block}.npy" if block not in [1, 2, 3] else res_path / f"rand-0-{block}.npy"
+            pattern.append(np.load(pfname))
+            random.append(np.load(rfname))
         if subject == 'sub05':
             pat_bsl = np.load(res_path / "pat-4.npy") if network in networks[:-3] else np.load(res_path / "pat-4-4.npy")
             rand_bsl = np.load(res_path / "rand-4.npy") if network in networks[:-3] else np.load(res_path / "rand-4-4.npy")
@@ -117,7 +119,8 @@ for network in tqdm(networks):
     patterns[network] = pats_blocks
     randoms[network] = rands_blocks
     contrasts[network] = pats_blocks - rands_blocks
-    
+
+res_path = ensured(RESULTS_DIR / 'TIMEG' / 'source')
 for network in networks:    
     # save time gen pvals
     res_dir = ensured(res_path / network / data_type / "pval")
