@@ -380,12 +380,22 @@ ax.set_title("Time generalization - time resolved", fontstyle='italic')
 
 # Modulation and perceptual change effects
 conts_blocks = pats_blocks - rands_blocks
+
+### undivided modulation and perceptual change effects
 # modulation indices
 idx_mod_test = np.where((times >= -0.75) & (times <= 0))[0]
 idx_mod_train = np.where((times >= -0.75) & (times <= 0))[0]
 # perceptual change indices
 idx_per_test = np.where((times >= -0.75) & (times < 0))[0]
 idx_per_train = np.where((times > 0) & (times < 0.5))[0]
+
+### divided modulation and perceptual change effects
+idx_mod_test = np.where((times >= -0.75) & (times <= -0.25))[0]
+idx_mod_train = np.where((times >= -0.75) & (times <= 0))[0]
+# perceptual change indices
+idx_per_test = np.where((times >= -0.25) & (times < 0))[0]
+idx_per_train = np.where((times > 0) & (times < 0.5))[0]
+
 mod_blocks = []
 per_blocks = []
 for sub in range(len(subjects)):
@@ -425,7 +435,7 @@ ax.set_xticks(np.arange(1, 24, 4))
 ax.set_xlabel('Block')
 ax.grid(True, linestyle='-', alpha=0.2)
 ax.legend()
-ax.set_title(f'PA sensors - modulation and perception')
+ax.set_title(f'PA sensors - modulation and perception - divided')
 # fig.savefig(FIGURES_DIR / "time_gen" / "sensors" / "timeg_mod_per_sensors.pdf", transparent=True)
 # plt.close(fig)
 
