@@ -100,16 +100,27 @@ def crop_images(screenshot):
     cropped_screenshot = screenshot[nonwhite_row][:, nonwhite_col]
     return cropped_screenshot
 
-design = [['br11', 'br12', [['A1'], ['A2']], 'B', 'C'], 
-          ['br21', 'br22', [['D1'], ['D2']], 'E', 'F'],
-          ['br31', 'br32', [['G1'], ['G2']], 'H', 'I'],
-          ['br41', 'br42', [['J1'], ['J2']], 'K', 'L'], 
-          ['br51', 'br52', [['M1'], ['M2']], 'N', 'O'],
-          ['br61', 'br62', [['P1'], ['P2']], 'Q', 'R'], 
-          ['br71', 'br72', [['S1'], ['S2']], 'T', 'U'],
-          ['br81', 'br82', [['V1'], ['V2']], 'W', 'X'],
-          ['br91', 'br92', [['Y1'], ['Y2']], 'Z', 'AA'],
-          ['br101', 'br102', [['AB1'], ['AB2']], 'AC', 'AD']]
+# design = [['br11', 'br12', [['A1'], ['A2']], 'B', 'C'], 
+#           ['br21', 'br22', [['D1'], ['D2']], 'E', 'F'],
+#           ['br31', 'br32', [['G1'], ['G2']], 'H', 'I'],
+#           ['br41', 'br42', [['J1'], ['J2']], 'K', 'L'], 
+#           ['br51', 'br52', [['M1'], ['M2']], 'N', 'O'],
+#           ['br61', 'br62', [['P1'], ['P2']], 'Q', 'R'], 
+#           ['br71', 'br72', [['S1'], ['S2']], 'T', 'U'],
+#           ['br81', 'br82', [['V1'], ['V2']], 'W', 'X'],
+#           ['br91', 'br92', [['Y1'], ['Y2']], 'Z', 'AA'],
+#           ['br101', 'br102', [['AB1'], ['AB2']], 'AC', 'AD']]
+
+design = [['br11', 'br12', 'A1', 'B', 'C'], 
+          ['br21', 'br22', 'D1', 'E', 'F'],
+          ['br31', 'br32', 'G1', 'H', 'I'],
+          ['br41', 'br42', 'J1', 'K', 'L'], 
+          ['br51', 'br52', 'M1', 'N', 'O'],
+          ['br61', 'br62', 'P1', 'Q', 'R'], 
+          ['br71', 'br72', 'S1', 'T', 'U'],
+          ['br81', 'br82', 'V1', 'W', 'X'],
+          ['br91', 'br92', 'Y1', 'Z', 'AA'],
+          ['br101', 'br102', 'AB1', 'AC', 'AD']]
 
 plt.rcParams.update({'font.size': 10, 'font.family': 'serif', 'font.serif': 'Arial'})
 cmap = plt.cm.get_cmap('tab20', len(network_names))
@@ -186,18 +197,19 @@ if plot_brains:
         axd[sideB].axis('off')
 
 ### Plot cvMD ###
-for i, (label, name, j, k) in enumerate(zip(networks, network_names,  \
-    ['A1', 'D1', 'G1', 'J1', 'M1', 'P1', 'S1', 'V1', 'Y1', 'AB1'], ['A2', 'D2', 'G2', 'J2', 'M2', 'P2', 'S2', 'V2', 'Y2', 'AB2'])):
-    for l, data in zip([j, k], [pattern, random]):
-        plot_onset(axd[l])
+for i, (label, name, l) in enumerate(zip(networks, network_names,  \
+    # ['A1', 'D1', 'G1', 'J1', 'M1', 'P1', 'S1', 'V1', 'Y1', 'AB1'], ['A2', 'D2', 'G2', 'J2', 'M2', 'P2', 'S2', 'V2', 'Y2', 'AB2'])):
+    # for l, data in zip([j, k], [pattern, random]):
+    ['A1', 'D1', 'G1', 'J1', 'M1', 'P1', 'S1', 'V1', 'Y1', 'AB1'])):
+    # for l, data in zip([j, k],[pattern, random]):
+    for j, data in enumerate([pattern, random]):
+        alphac = 1 if j == 0 else 0.7
         score = np.nanmean(data[label], 1)
         sem = np.std(score, axis=0) / np.sqrt(len(subjects))
         # Main plot
-        axd[l].plot(times, score.mean(0), alpha=1, zorder=10, color=cmap[i])
+        axd[l].plot(times, score.mean(0), alpha=alphac, zorder=10, color=cmap[i])
         # Highlight significant regions
-        axd[l].fill_between(times, score.mean(0) - sem, score.mean(0) + sem, alpha=0.5, zorder=5, color=cmap[i])    
-        axd[l].axhline(0, color='grey', alpha=.5)
-        axd[l].set_ylabel('cvMD', fontsize=11)
+        # axd[l].fill_between(times, score.mean(0) - sem, score.mean(0) + sem, alpha=0.5, zorder=5, color=cmap[i])    
         # axd[l].xaxis.set_major_formatter(FuncFormatter(lambda x, pos: f'{x:.1f}'))
         # axd[l].xaxis.set_major_locator(plt.MultipleLocator(0.2))
         if l == 'A1':
@@ -208,13 +220,19 @@ for i, (label, name, j, k) in enumerate(zip(networks, network_names,  \
         if l == j:
             axd[l].set_xticklabels([])
             # axd[l].figure.subplots_adjust(hspace=0)
-        if '1' in l:
-            axd[l].text(times[0], 1.5 - 0.5 * 1.5, 'Pattern', fontsize=9, ha='left', weight='normal', style='italic')
-        else:
-            axd[l].text(times[0], 1.5 - 0.5 * 1.5, 'Random', fontsize=9, ha='left', weight='normal', style='italic')
+        # if '1' in l:
+        #     axd[l].text(times[0], 1.5 - 0.5 * 1.5, 'Pattern', fontsize=9, ha='left', weight='normal', style='italic')
+        # else:
+        #     axd[l].text(times[0], 1.5 - 0.5 * 1.5, 'Random', fontsize=9, ha='left', weight='normal', style='italic')
         axd[l].yaxis.set_major_formatter(FuncFormatter(lambda x, pos: f'{int(x)}'))
         axd[l].yaxis.set_major_locator(plt.MaxNLocator(nbins=2, prune='both'))
-        axd[l].set_ylim(-0.5, 1.5)
+
+    plot_onset(axd[l])
+    axd[l].axhline(0, color='grey', alpha=.5)
+    axd[l].set_ylabel('cvMD', fontsize=11)
+    axd[l].set_ylim(-0.5, 1.5)
+    axd[l].text(times[0], 1.5 - 0.5 * 1.5, 'Pattern', fontsize=10, ha='left', weight='normal', style='italic', color=cmap[i], alpha=1)
+    axd[l].text(times[0], 1.5 - 0.5 * 1.5 - 0.3, 'Random', fontsize=10, ha='left', weight='normal', style='italic', color=cmap[i], alpha=0.7)
 
 ### Plot similarity index ###
 xmin, xmax = 0.3, 0.55
@@ -238,7 +256,7 @@ for i, (label, name, j) in enumerate(zip(networks, network_names, ['B', 'E', 'H'
     axd[j].set_ylabel('Sim. index', fontsize=11)
     axd[j].yaxis.set_major_formatter(FormatStrFormatter('%.1f'))
     axd[j].xaxis.set_major_formatter(FuncFormatter(lambda x, pos: f'{x:.1f}'))
-    axd[j].xaxis.set_major_locator(plt.MultipleLocator(0.5))
+    axd[j].xaxis.set_major_locator(plt.MultipleLocator(0.2))
     # axd[j].set_xticklabels([])
     if j == 'AC':
         axd[j].set_xlabel('Time (s)', fontsize=11)
@@ -296,6 +314,6 @@ for i, (label, name, j) in enumerate(zip(networks, network_names, ['C', 'F', 'I'
         axd[j].text((xmin + xmax) / 2, 0.37, '*', fontsize=20, ha='center', va='center', color=cmap[i], weight='bold')
 
 fname = 'rsa_new' if data_type.endswith('new') else 'rsa'
-fname += '_bsl.pdf' if bsl_practice else '_no_bsl.pdf'
+fname += '_bsl2.pdf' if bsl_practice else '_no_bsl2.pdf'
 fig.savefig(figures_dir / fname, transparent=True)
 plt.close()

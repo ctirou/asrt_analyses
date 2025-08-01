@@ -30,6 +30,7 @@ res_dir = RESULTS_DIR / 'TIMEG' / 'source'
 data_type1 = 'scores_skf_vect'
 data_type2 = 'scores_skf_vect_new'
 data_type = 'scores_lobo_vector_new'
+data_type = 'scores_lobotomized'
 
 # Load data, compute, and save correlations and pvals 
 learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices15.csv', sep="\t", index_col=0)
@@ -83,11 +84,13 @@ for network in tqdm(networks):
         pattern, random = [], []
         for block in range(1, 24):
             if network in networks[:-3]:
-                pattern.append(np.load(res_path / f"pat-{block}.npy"))
-                random.append(np.load(res_path / f"rand-{block}.npy"))
+                pfname = res_path / f'pat-{block}.npy' if block not in [1, 2, 3] else res_path / f'pat-0-{block}.npy'
+                rfname = res_path / f'rand-{block}.npy' if block not in [1, 2, 3] else res_path / f'rand-0-{block}.npy'
             else:
-                pattern.append(np.load(res_path / f"pat-4-{block}.npy"))
-                random.append(np.load(res_path / f"rand-4-{block}.npy"))
+                pfname = res_path / f'pat-4-{block}.npy' if block not in [1, 2, 3] else res_path / f'pat-0-{block}.npy'
+                rfname = res_path / f'rand-4-{block}.npy' if block not in [1, 2, 3] else res_path / f'rand-0-{block}.npy'
+            pattern.append(np.load(pfname))
+            random.append(np.load(rfname))
         if subject == 'sub05':
             pat_bsl = np.load(res_path / "pat-4.npy") if network in networks[:-3] else np.load(res_path / "pat-4-4.npy")
             rand_bsl = np.load(res_path / "rand-4.npy") if network in networks[:-3] else np.load(res_path / "rand-4-4.npy")
@@ -186,7 +189,7 @@ if plot_brains:
 #                                             'width_ratios': [.2, .2, .5, .5, .5]})
 
 ### Pattern ###
-for network, pattern_idx in zip(networks, ['a1', 'b1', 'c1', 'd1', 'e1', 'f1', 'g1', 'h1', 'i1', 'k1']):
+for i, (network, pattern_idx) in enumerate(zip(networks, ['a1', 'b1', 'c1', 'd1', 'e1', 'f1', 'g1', 'h1', 'i1', 'k1'])):
     im = axes[pattern_idx].imshow(patterns[network][:, 3:].mean((0, 1)),
                                   interpolation="lanczos",
                                   origin="lower",
@@ -201,7 +204,7 @@ for network, pattern_idx in zip(networks, ['a1', 'b1', 'c1', 'd1', 'e1', 'f1', '
     xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
     pval = np.load(res_dir / network / data_type / "pval" / "all_pattern-pval.npy")
     sig = pval < threshold
-    axes[pattern_idx].contour(xx, yy, sig, colors=sig_color, levels=[0], linestyles='-', linewidths=1, alpha=1)
+    axes[pattern_idx].contour(xx, yy, sig, colors=cmap[i], levels=[0], linestyles='-', linewidths=1, alpha=1)
     axes[pattern_idx].set_ylabel("Training time (s)")
     if pattern_idx == 'k1':
         axes[pattern_idx].set_xlabel("Testing time (s)")
@@ -217,7 +220,7 @@ for network, pattern_idx in zip(networks, ['a1', 'b1', 'c1', 'd1', 'e1', 'f1', '
     # axes[pattern_idx].tick_params(axis='y', which='both', left=True, labelleft=False)
 
 ### Random ###    
-for network, random_idx in zip(networks, ['a2', 'b2', 'c2', 'd2', 'e2', 'f2', 'g2', 'h2', 'i2', 'k2']):
+for i, (network, random_idx) in enumerate(zip(networks, ['a2', 'b2', 'c2', 'd2', 'e2', 'f2', 'g2', 'h2', 'i2', 'k2'])):
     im = axes[random_idx].imshow(randoms[network][:, 3:].mean((0, 1)),
                                  interpolation="lanczos",
                                  origin="lower",
@@ -237,7 +240,7 @@ for network, random_idx in zip(networks, ['a2', 'b2', 'c2', 'd2', 'e2', 'f2', 'g
     xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
     pval = np.load(res_dir / network / data_type / "pval" / "all_random-pval.npy")
     sig = pval < threshold
-    axes[random_idx].contour(xx, yy, sig, colors=sig_color, levels=[0], linestyles='-', linewidths=1, alpha=1)
+    axes[random_idx].contour(xx, yy, sig, colors=cmap[i], levels=[0], linestyles='-', linewidths=1, alpha=1)
     
     if random_idx == 'a2':
         axes[random_idx].set_title("Random")
@@ -245,8 +248,18 @@ for network, random_idx in zip(networks, ['a2', 'b2', 'c2', 'd2', 'e2', 'f2', 'g
         cbar.set_label('Accuracy')
 
 ### Contrast ###
+win = np.where((times >= -0.75) & (times < 0))[0]
+msig = []
+for network in networks:
+    s = []
+    for sub in range(len(subjects)):
+        cont = contrasts[network][:, 3:].mean(1)[sub, win][:, win].mean()
+        s.append(cont)
+    sig = ttest_1samp(s, 0, axis=0)[1] < threshold
+    msig.append(sig)
+
 vminC, vmaxC = -0.03, 0.03
-for network, contrast_idx in zip(networks, ['a3', 'b3', 'c3', 'd3', 'e3', 'f3', 'g3', 'h3', 'i3', 'k3']):
+for i, (network, contrast_idx) in enumerate(zip(networks, ['a3', 'b3', 'c3', 'd3', 'e3', 'f3', 'g3', 'h3', 'i3', 'k3'])):
     im = axes[contrast_idx].imshow(contrasts[network][:, 3:].mean((0, 1)),
                                    interpolation="lanczos",
                                    origin="lower",
@@ -267,101 +280,107 @@ for network, contrast_idx in zip(networks, ['a3', 'b3', 'c3', 'd3', 'e3', 'f3', 
     xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
     pval = np.load(res_dir / network / data_type / "pval" / "all_contrast-pval.npy")
     sig = pval < threshold
-    axes[contrast_idx].contour(xx, yy, sig, colors=sig_color, levels=[0], linestyles='-', linewidths=1, alpha=1)
+    axes[contrast_idx].contour(xx, yy, sig, colors=cmap[i], levels=[0], linestyles='-', linewidths=1, alpha=1)
         
     if contrast_idx == 'a3':
         axes[contrast_idx].set_title("Contrast (Pattern - Random)")
         cbar = fig.colorbar(im, ax=axes[contrast_idx], location='top', fraction=0.1, ticks=[vminC, vmaxC])
         cbar.set_label("Difference in accuracy")
+    
+    if msig[i]:
+        print(f"Significant contrast for {network} at time {times[win].mean():.2f} s")
+        rect = plt.Rectangle([-0.75, -0.75], 0.72, 0.68, fill=False, edgecolor="black", linestyle='--', lw=2, zorder=10)
+        axes[contrast_idx].add_patch(rect)
+        axes[contrast_idx].text(-0.8, -0.5, "*", fontsize=25, color="black", ha='right', va='center', weight='bold')
 
-percept = []
-mean_net_sess = []
-mean_diag_sess = []
-preact = []
-filt = np.where((times >= 0.25) & (times <= 0.6))[0]
-filter_time = np.where((times >= -0.5) & (times < 0))[0]  # Correct filtering condition
-for i, net in enumerate(networks):
-    contrast = contrasts[net]
-    # Compute mean net effect
-    preact.append(contrast[:, 3:, filter_time][:, 3:, :, filter_time].mean())
-    # Mean diagonal for the specific time window with absolute values
-    # percept.append((all_diags[net][:, filt].mean()))
-    diag = np.diag(contrast[:, 3:, filt]).mean()
-    percept.append(diag)
-    sess1, sess2 = [], []
-    for sub in range(len(subjects)):
-        # Mean for session 1 and 2 per subject
-        # sess1.append(contrast[sub, filter_time][:, filter_time].mean())
-        sess1.append(np.diag(contrast[sub, 3:, filter_time][3:, :, filter_time]))
-        sess2.append(all_diags[net][sub, filt].mean())
-    mean_net_sess.append(np.array(sess1))
-    mean_diag_sess.append(np.array(sess2))
-mean_net_sess = np.array(mean_net_sess).mean(-1)
-mean_diag_sess = np.array(mean_diag_sess)
-sem_net = np.std(mean_net_sess, axis=1) / np.sqrt(len(mean_net_sess[1]))  # SEM for preact
-sem_diag = np.std(mean_diag_sess, axis=1) / np.sqrt(len(mean_diag_sess[1]))  # SEM for percept
+# percept = []
+# mean_net_sess = []
+# mean_diag_sess = []
+# preact = []
+# filt = np.where((times >= 0.25) & (times <= 0.6))[0]
+# filter_time = np.where((times >= -0.5) & (times < 0))[0]  # Correct filtering condition
+# for i, net in enumerate(networks):
+#     contrast = contrasts[net]
+#     # Compute mean net effect
+#     preact.append(contrast[:, 3:, filter_time][:, 3:, :, filter_time].mean())
+#     # Mean diagonal for the specific time window with absolute values
+#     # percept.append((all_diags[net][:, filt].mean()))
+#     diag = np.diag(contrast[:, 3:, filt]).mean()
+#     percept.append(diag)
+#     sess1, sess2 = [], []
+#     for sub in range(len(subjects)):
+#         # Mean for session 1 and 2 per subject
+#         # sess1.append(contrast[sub, filter_time][:, filter_time].mean())
+#         sess1.append(np.diag(contrast[sub, 3:, filter_time][3:, :, filter_time]))
+#         sess2.append(all_diags[net][sub, filt].mean())
+#     mean_net_sess.append(np.array(sess1))
+#     mean_diag_sess.append(np.array(sess2))
+# mean_net_sess = np.array(mean_net_sess).mean(-1)
+# mean_diag_sess = np.array(mean_diag_sess)
+# sem_net = np.std(mean_net_sess, axis=1) / np.sqrt(len(mean_net_sess[1]))  # SEM for preact
+# sem_diag = np.std(mean_diag_sess, axis=1) / np.sqrt(len(mean_diag_sess[1]))  # SEM for percept
 
-### Plot mean effect ### 
-alpha = 0.05
-c1 = '#FF0000'  # Blue
-c2 = '#5BBCD6'  # Orange
-# Perform statistical tests for preact (one-sample t-test against 0)
-mean_net_significance = [ttest_1samp(data, 0)[1] < alpha for data in mean_net_sess]
+# ### Plot mean effect ### 
+# alpha = 0.05
+# c1 = '#FF0000'  # Blue
+# c2 = '#5BBCD6'  # Orange
+# # Perform statistical tests for preact (one-sample t-test against 0)
+# mean_net_significance = [ttest_1samp(data, 0)[1] < alpha for data in mean_net_sess]
 
-# axes['d'].grid(axis='y', linestyle='--', alpha=0.3)
-ymin = -0.03
-ymax = 0.03
-x = np.arange(len(networks))
-spacing = 0.35
-# rects1 = axes['j'].bar(x + spacing/2, preact, spacing, label='Pre-activation', facecolor=c1, alpha=.8, edgecolor=None)
-# rects2 = axes['j'].bar(x - spacing/2, percept, spacing, label='Perception', facecolor=c2, alpha=.8, edgecolor=None)
+# # axes['d'].grid(axis='y', linestyle='--', alpha=0.3)
+# ymin = -0.03
+# ymax = 0.03
+# x = np.arange(len(networks))
+# spacing = 0.35
+# # rects1 = axes['j'].bar(x + spacing/2, preact, spacing, label='Pre-activation', facecolor=c1, alpha=.8, edgecolor=None)
+# # rects2 = axes['j'].bar(x - spacing/2, percept, spacing, label='Perception', facecolor=c2, alpha=.8, edgecolor=None)
 
-rects1 = axes['j'].bar(x, preact, spacing, label='Pre-activation', facecolor=c1, alpha=.8, edgecolor=None)
-rects2 = axes['j'].bar(x, percept, spacing, label='Perception', facecolor=c2, alpha=.8, edgecolor=None)
+# rects1 = axes['j'].bar(x, preact, spacing, label='Pre-activation', facecolor=c1, alpha=.8, edgecolor=None)
+# rects2 = axes['j'].bar(x, percept, spacing, label='Perception', facecolor=c2, alpha=.8, edgecolor=None)
 
 
-# axes['d'].errorbar(x - spacing/2, percept, yerr=sem_net, fmt='none', color='black', capsize=5)
-# axes['d'].errorbar(x + spacing/2, preact, yerr=sem_diag, fmt='none', color='black', capsize=5)
-# Annotate significant preact bars with an asterisk
-# for i, rect in enumerate(rects1):
-#     if mean_net_significance[i]:
-#         axes['j'].annotate('*',
-#                 xy=(rect.get_x() + rect.get_width() / 2, rect.get_height()),
-#                 xytext=(0, 9),
-#                 textcoords="offset points",
-#                 ha='center', va='bottom',
-#                 fontsize=15, color='black')
+# # axes['d'].errorbar(x - spacing/2, percept, yerr=sem_net, fmt='none', color='black', capsize=5)
+# # axes['d'].errorbar(x + spacing/2, preact, yerr=sem_diag, fmt='none', color='black', capsize=5)
+# # Annotate significant preact bars with an asterisk
+# # for i, rect in enumerate(rects1):
+# #     if mean_net_significance[i]:
+# #         axes['j'].annotate('*',
+# #                 xy=(rect.get_x() + rect.get_width() / 2, rect.get_height()),
+# #                 xytext=(0, 9),
+# #                 textcoords="offset points",
+# #                 ha='center', va='bottom',
+# #                 fontsize=15, color='black')
 
-# axes['j'].errorbar(x - spacing/2, percept, yerr=sem_net, fmt='none', color='black', capsize=3)
-# axes['j'].errorbar(x + spacing/2, preact, yerr=sem_diag, fmt='none', color='black', capsize=3)
+# # axes['j'].errorbar(x - spacing/2, percept, yerr=sem_net, fmt='none', color='black', capsize=3)
+# # axes['j'].errorbar(x + spacing/2, preact, yerr=sem_diag, fmt='none', color='black', capsize=3)
 
-axes['j'].errorbar(x, percept, yerr=sem_net, fmt='none', color='black', capsize=3)
-axes['j'].errorbar(x, preact, yerr=sem_diag, fmt='none', color='black', capsize=3)
+# axes['j'].errorbar(x, percept, yerr=sem_net, fmt='none', color='black', capsize=3)
+# axes['j'].errorbar(x, preact, yerr=sem_diag, fmt='none', color='black', capsize=3)
 
-axes['j'].set_xticks(x)
-names = [name.replace(' ', '\n') for name in network_names]
-axes['j'].set_xticklabels(names, rotation=45, ha='right')
-axes['j'].axhline(0, color='grey', linewidth=2, zorder=10)
-axes['j'].set_title('Predictive coding during pre-stimulus period and perception', fontsize=12, pad=-20)
-axes['j'].set_ylabel('Mean effect', labelpad=-20)
-# axes['j'].set_ylim(ymin, ymax)
-axes['j'].set_yticks([ymin, ymax])
-# axes['j'].legend(frameon=False, loc='upper left', fontsize=9)
-axes['j'].spines['top'].set_visible(False)
-axes['j'].spines['right'].set_visible(False)
+# axes['j'].set_xticks(x)
+# names = [name.replace(' ', '\n') for name in network_names]
+# axes['j'].set_xticklabels(names, rotation=45, ha='right')
+# axes['j'].axhline(0, color='grey', linewidth=2, zorder=10)
+# axes['j'].set_title('Predictive coding during pre-stimulus period and perception', fontsize=12, pad=-20)
+# axes['j'].set_ylabel('Mean effect', labelpad=-20)
+# # axes['j'].set_ylim(ymin, ymax)
+# axes['j'].set_yticks([ymin, ymax])
+# # axes['j'].legend(frameon=False, loc='upper left', fontsize=9)
+# axes['j'].spines['top'].set_visible(False)
+# axes['j'].spines['right'].set_visible(False)
 
-# example plot
-axes['l'].axhline(0, color='k', alpha=.5)
-axes['l'].axvline(0, color='k', alpha=.5)
-axes['l'].set_xlim(times[0], times[-1])
-axes['l'].set_ylim(times[0], times[-1])
-axes['l'].set_yticks([-1, 0, 1])
-axes['l'].plot(times[filter_time], times[filter_time], color=c1, lw=3, label='Pre-activation')
-axes['l'].plot(times[filt], times[filt], color=c2, lw=3, label='Perception')
-axes['l'].set_xlabel("Testing time (s)")
-axes['l'].set_ylabel("Training time (s)")
-axes['l'].legend(loc='upper left', fontsize=9)
-axes['l'].set_aspect(0.5)
+# # example plot
+# axes['l'].axhline(0, color='k', alpha=.5)
+# axes['l'].axvline(0, color='k', alpha=.5)
+# axes['l'].set_xlim(times[0], times[-1])
+# axes['l'].set_ylim(times[0], times[-1])
+# axes['l'].set_yticks([-1, 0, 1])
+# axes['l'].plot(times[filter_time], times[filter_time], color=c1, lw=3, label='Pre-activation')
+# axes['l'].plot(times[filt], times[filt], color=c2, lw=3, label='Perception')
+# axes['l'].set_xlabel("Testing time (s)")
+# axes['l'].set_ylabel("Training time (s)")
+# axes['l'].legend(loc='upper left', fontsize=9)
+# axes['l'].set_aspect(0.5)
 
 # # Hide all None areas
 # for key, ax in axes.items():

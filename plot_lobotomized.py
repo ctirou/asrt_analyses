@@ -113,6 +113,7 @@ ax.set_title('RS sensors - time resolved', fontstyle='italic')
 # plt.close(fig)
 
 # RSA source --- blocks ---
+data_type = 'rdm_lobotomized'
 networks = NETWORKS + ['Cerebellum-Cortex']
 network_names = NETWORK_NAMES + ['Cerebellum']
 diff_rp = {}
@@ -120,15 +121,17 @@ for network in tqdm(networks):
     if not network in diff_rp:
         diff_rp[network] =  []
     for subject in subjects:
-        res_path = RESULTS_DIR / 'RSA' / 'source' / network / "rdm_lobo_vect_new" / subject
+        res_path = RESULTS_DIR / 'RSA' / 'source' / network / data_type / subject
         # read behav        
         behav_dir = op.join(HOME / 'raw_behavs' / subject)
         sequence = get_sequence(behav_dir)
         pattern_blocks, random_blocks = [], []
         pats, rands = [], []
         for block in range(1, 24):
-            pattern_blocks.append(np.load(res_path / f"pat-{block}.npy"))
-            random_blocks.append(np.load(res_path / f"rand-{block}.npy"))
+            pfname = res_path / f"pat-{block}.npy" if block not in [1, 2, 3] else res_path / f"pat-0-{block}.npy"
+            rfname = res_path / f"rand-{block}.npy" if block not in [1, 2, 3] else res_path / f"rand-0-{block}.npy"
+            pattern_blocks.append(np.load(pfname))
+            random_blocks.append(np.load(rfname))
         if subject == 'sub05':
             pat_bsl = np.load(res_path / "pat-4.npy")
             rand_bsl = np.load(res_path / "rand-4.npy")
@@ -381,20 +384,22 @@ ax.set_title("Time generalization - time resolved", fontstyle='italic')
 # Modulation and perceptual change effects
 conts_blocks = pats_blocks - rands_blocks
 
-### undivided modulation and perceptual change effects
-# modulation indices
-idx_mod_test = np.where((times >= -0.75) & (times <= 0))[0]
-idx_mod_train = np.where((times >= -0.75) & (times <= 0))[0]
-# perceptual change indices
-idx_per_test = np.where((times >= -0.75) & (times < 0))[0]
-idx_per_train = np.where((times > 0) & (times < 0.5))[0]
+undivided = False
 
-### divided modulation and perceptual change effects
-idx_mod_test = np.where((times >= -0.75) & (times <= -0.25))[0]
-idx_mod_train = np.where((times >= -0.75) & (times <= 0))[0]
-# perceptual change indices
-idx_per_test = np.where((times >= -0.25) & (times < 0))[0]
-idx_per_train = np.where((times > 0) & (times < 0.5))[0]
+if undivided:
+    # modulation indices
+    idx_mod_test = np.where((times >= -0.75) & (times <= 0))[0]
+    idx_mod_train = np.where((times >= -0.75) & (times <= 0))[0]
+    # perceptual change indices
+    idx_per_test = np.where((times >= -0.75) & (times < 0))[0]
+    idx_per_train = np.where((times > 0) & (times < 0.75))[0]
+else:
+    ### divided modulation and perceptual change effects
+    idx_mod_test = np.where((times >= -0.75) & (times <= -0.375))[0]
+    idx_mod_train = np.where((times >= -0.75) & (times <= 0))[0]
+    # perceptual change indices
+    idx_per_test = np.where((times >= -0.375) & (times < 0))[0]
+    idx_per_train = np.where((times > 0) & (times < 0.75))[0]
 
 mod_blocks = []
 per_blocks = []
@@ -419,13 +424,13 @@ blocks = np.arange(1, 24)
 ax.axhline(0, color='grey', linestyle='-', alpha=1)
 ax.axvline(3, color='grey', linestyle='-', alpha=1)
 
-ax.plot(blocks, mod_blocks.mean(0), label='Modulation', alpha=0.6, color='blue')
+ax.plot(blocks, mod_blocks.mean(0), label='Modulation', alpha=0.4, color='blue')
 sem_mod = mod_blocks.std(0) / np.sqrt(mod_blocks.shape[0])
 ax.fill_between(blocks, mod_blocks.mean(0) - sem_mod, mod_blocks.mean(0) + sem_mod, facecolor='blue', alpha=0.1)
 smoothed_mod = gaussian_filter1d(mod_blocks.mean(0), sigma=1.5)
 ax.plot(blocks, smoothed_mod, color='blue', linestyle='--')
 
-ax.plot(blocks, per_blocks.mean(0), label='Perception', alpha=0.6, color='orange')
+ax.plot(blocks, per_blocks.mean(0), label='Perception', alpha=0.4, color='orange')
 sem_per = per_blocks.std(0) / np.sqrt(per_blocks.shape[0])
 ax.fill_between(blocks, per_blocks.mean(0) - sem_per, per_blocks.mean(0) + sem_per, facecolor='orange', alpha=0.1)
 smoothed_per = gaussian_filter1d(per_blocks.mean(0), sigma=1.5)
@@ -435,8 +440,9 @@ ax.set_xticks(np.arange(1, 24, 4))
 ax.set_xlabel('Block')
 ax.grid(True, linestyle='-', alpha=0.2)
 ax.legend()
-ax.set_title(f'PA sensors - modulation and perception - divided')
-# fig.savefig(FIGURES_DIR / "time_gen" / "sensors" / "timeg_mod_per_sensors.pdf", transparent=True)
+ax.set_title(f'PA sensors - modulation and perception - {"undivided" if undivided else "divided"}')
+fname = "mod_per_sensors_undiv.pdf" if undivided else "mod_per_sensors_div.pdf"
+fig.savefig(FIGURES_DIR / "time_gen" / "sensors" / fname, transparent=True)
 # plt.close(fig)
 
 # export tables
@@ -449,7 +455,8 @@ for i, subject in enumerate(subjects):
             "value": mod_blocks[i, block],
         })
 df = pd.DataFrame(rows)
-df.to_csv(FIGURES_DIR / "TM" / "data" / "timeg_mod_sensors_undiv.csv", index=False, sep=",")
+fname = "timeg_mod_sensors_undiv.csv" if undivided else "timeg_mod_sensors_div.csv"
+df.to_csv(FIGURES_DIR / "TM" / "data" / fname, index=False, sep=",")
 
 rows = list()
 for i, subject in enumerate(subjects):
@@ -460,7 +467,8 @@ for i, subject in enumerate(subjects):
             "value": per_blocks[i, block],
         })
 df = pd.DataFrame(rows)
-df.to_csv(FIGURES_DIR / "TM" / "data" / "timeg_per_sensors_undiv.csv", index=False, sep=",")
+fname = "timeg_per_sensors_undiv.csv" if undivided else "timeg_per_sensors_div.csv"
+df.to_csv(FIGURES_DIR / "TM" / "data" / fname, index=False, sep=",")
 
 # # test correct windows
 # # Generate dummy temporal generalization matrix (e.g., random values)
@@ -779,12 +787,13 @@ fig.suptitle("Contrast diag corr")
 fig.savefig(FIGURES_DIR / "time_gen" / "source" / "timeg_corr_diag.pdf", transparent=True)
 # plt.close(fig)
 
-# modulation indices
-idx_mod_test = np.where((timesg >= -0.75) & (timesg <= 0))[0]
-idx_mod_train = np.where((timesg >= -0.75) & (timesg <= 0))[0]
-# perceptual change indices
-idx_per_test = np.where((timesg >= -0.75) & (timesg < 0))[0]
-idx_per_train = np.where((timesg > 0) & (timesg < 0.75))[0]
+# # modulation indices
+# idx_mod_test = np.where((timesg >= -0.75) & (timesg <= 0))[0]
+# idx_mod_train = np.where((timesg >= -0.75) & (timesg <= 0))[0]
+# # perceptual change indices
+# idx_per_test = np.where((timesg >= -0.75) & (timesg < 0))[0]
+# idx_per_train = np.where((timesg > 0) & (timesg < 0.75))[0]
+
 mod_net = {}
 per_net = {}
 for network in networks:
@@ -836,8 +845,10 @@ for i, (ax, network) in enumerate(zip(axes.flatten(), networks)):
         # ax.legend()
         ax.set_xlabel('Block')
 # fig.suptitle('PA source - box mean blocks', fontsize=14)
-fig.suptitle('PA source - modulation and perception blocks - undivided', fontsize=14)
-fig.savefig(FIGURES_DIR / "time_gen" / "source" / "timeg_mod_per_source_undiv.pdf", transparent=True)
+title  = 'PA source - modulation and perception blocks - undivided' if undivided else 'PA source - modulation and perception blocks - divided'
+fig.suptitle(title, fontsize=14)
+fname = "timeg_mod_per_source_undiv.pdf" if undivided else "timeg_mod_per_source_div.pdf"
+fig.savefig(FIGURES_DIR / "time_gen" / "source" / fname, transparent=True)
 
 # export tables
 # save table

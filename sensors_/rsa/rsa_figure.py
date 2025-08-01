@@ -18,7 +18,7 @@ figures_dir = FIGURES_DIR / "RSA" / "sensors"
 ensure_dir(figures_dir)
 
 data_type = "rdm_blocks_new"
-bsl_practice = True
+bsl_practice = False
 
 all_patterns, all_randoms = [], []
 # all_highs, all_lows = [], []

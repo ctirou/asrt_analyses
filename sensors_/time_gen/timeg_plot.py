@@ -4,7 +4,7 @@ from config import *
 import os.path as op
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.stats import spearmanr as spear
+from scipy.stats import spearmanr as spear, ttest_1samp
 from tqdm.auto import tqdm
 import pandas as pd
 from joblib import Parallel, delayed
@@ -164,6 +164,9 @@ plt.close()
 
 ### plot contrast ###
 contrasts = pats_blocks - rands_blocks
+win = np.where((times[filt] <= -0.5) & (times[filt] < 0))[0]
+mean = np.array([cont[win, win].mean() for cont in contrasts.mean(1)])
+sig_mean = ttest_1samp(mean, 0, axis=0)[1] < threshold
 contrasts = contrasts[:, 3:, idx][:, 3:, :, idx].mean((0, 1))
 pval_cont = np.load(res_dir / "pval" /  "all_contrast-pval.npy")
 
@@ -205,9 +208,11 @@ for ax, data, title, pval, vmin, vmax in zip(axs.flat, [contrasts, rhos], \
     rectcolor = 'black'
     if ax == axs.flat[0]:
         rect = plt.Rectangle([-0.75, -0.75], 0.72, 0.68, fill=False, edgecolor='black', linestyle='--', lw=2, zorder=10)
-        rect1 = plt.Rectangle([-0.75, 0.05], 0.72, 0.68, fill=False, edgecolor='white', linestyle='--', lw=2, zorder=10)
-        ax.add_patch(rect1)
         ax.add_patch(rect)
+        if sig_mean:
+            ax.text(-0.8, -0.35, "*", fontsize=25, color='black', ha='right', va='center', weight='bold')
+    #     rect1 = plt.Rectangle([-0.75, 0.05], 0.72, 0.68, fill=False, edgecolor='white', linestyle='--', lw=2, zorder=10)
+    #     ax.add_patch(rect1)
     cbar = fig.colorbar(im, ax=ax, orientation='vertical', fraction=.1, ticks=[vmin, vmax])
     cbar.set_label(label, rotation=270, fontsize=13)
 
