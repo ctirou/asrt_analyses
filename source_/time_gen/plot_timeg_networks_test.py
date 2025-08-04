@@ -18,7 +18,6 @@ subjects, subjects_dir = SUBJS15, FREESURFER_DIR
 
 # network and custom label_names
 figures_dir = ensured(FIGURES_DIR / "time_gen" / "source")
-overwrite = False
 
 networks = NETWORKS + ['Cerebellum-Cortex']
 network_names = NETWORK_NAMES + ['Cerebellum']
@@ -27,14 +26,7 @@ chance = .25
 threshold = .05
 res_dir = RESULTS_DIR / 'TIMEG' / 'source'
 
-data_type1 = 'scores_skf_vect'
-data_type2 = 'scores_skf_vect_new'
-data_type = 'scores_lobo_vector_new'
 data_type = 'scores_lobotomized'
-
-# Load data, compute, and save correlations and pvals 
-learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices15.csv', sep="\t", index_col=0)
-learn_index_blocks = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices_blocks.csv', sep=",", index_col=0)
 
 # diags = {}
 # all_diags = {}
@@ -69,7 +61,6 @@ learn_index_blocks = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices_block
 #     patterns[network] = np.array(patpat)
 #     randoms[network] = np.array(randrand)
 
-idx_timeg = np.where((times >= -0.5) & (times < 0))[0]
 cont_blocks = {}
 patterns = {}
 randoms = {}
@@ -132,8 +123,8 @@ design = [['br11', 'br12', 'a1', 'a2', 'a3'],
 vmin, vmax = 0.2, 0.3
 
 cmap = ['#0173B2','#DE8F05','#029E73','#D55E00','#CC78BC','#CA9161','#FBAFE4','#ECE133','#56B4E9', "#76B041"]
-sig_color = '#708090'
 sig_color = "#00BFA6"
+sig_color = '#708090'
 plot_brains = True
 
 fig, axes = plt.subplot_mosaic(design, figsize=(12, 16), sharey=False, sharex=False, layout="constrained",
@@ -204,7 +195,7 @@ for i, (network, pattern_idx) in enumerate(zip(networks, ['a1', 'b1', 'c1', 'd1'
     xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
     pval = np.load(res_dir / network / data_type / "pval" / "all_pattern-pval.npy")
     sig = pval < threshold
-    axes[pattern_idx].contour(xx, yy, sig, colors=cmap[i], levels=[0], linestyles='-', linewidths=1, alpha=1)
+    axes[pattern_idx].contour(xx, yy, sig, colors=sig_color, levels=[0], linestyles='-', linewidths=1, alpha=1)
     axes[pattern_idx].set_ylabel("Training time (s)")
     if pattern_idx == 'k1':
         axes[pattern_idx].set_xlabel("Testing time (s)")
@@ -240,7 +231,7 @@ for i, (network, random_idx) in enumerate(zip(networks, ['a2', 'b2', 'c2', 'd2',
     xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
     pval = np.load(res_dir / network / data_type / "pval" / "all_random-pval.npy")
     sig = pval < threshold
-    axes[random_idx].contour(xx, yy, sig, colors=cmap[i], levels=[0], linestyles='-', linewidths=1, alpha=1)
+    axes[random_idx].contour(xx, yy, sig, colors=sig_color, levels=[0], linestyles='-', linewidths=1, alpha=1)
     
     if random_idx == 'a2':
         axes[random_idx].set_title("Random")
@@ -280,7 +271,7 @@ for i, (network, contrast_idx) in enumerate(zip(networks, ['a3', 'b3', 'c3', 'd3
     xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
     pval = np.load(res_dir / network / data_type / "pval" / "all_contrast-pval.npy")
     sig = pval < threshold
-    axes[contrast_idx].contour(xx, yy, sig, colors=cmap[i], levels=[0], linestyles='-', linewidths=1, alpha=1)
+    axes[contrast_idx].contour(xx, yy, sig, colors=sig_color, levels=[0], linestyles='-', linewidths=1, alpha=1)
         
     if contrast_idx == 'a3':
         axes[contrast_idx].set_title("Contrast (Pattern - Random)")
@@ -289,9 +280,9 @@ for i, (network, contrast_idx) in enumerate(zip(networks, ['a3', 'b3', 'c3', 'd3
     
     if msig[i]:
         print(f"Significant contrast for {network} at time {times[win].mean():.2f} s")
-        rect = plt.Rectangle([-0.75, -0.75], 0.72, 0.68, fill=False, edgecolor="black", linestyle='--', lw=2, zorder=10)
+        rect = plt.Rectangle([-0.75, -0.75], 0.75, 0.75, fill=False, edgecolor="black", linestyle='--', lw=1, zorder=10)
         axes[contrast_idx].add_patch(rect)
-        axes[contrast_idx].text(-0.8, -0.5, "*", fontsize=25, color="black", ha='right', va='center', weight='bold')
+        axes[contrast_idx].text(-0.8, -0.5, "*", fontsize=20, color="black", ha='right', va='center', weight='normal')
 
 # percept = []
 # mean_net_sess = []

@@ -186,6 +186,7 @@ mdiff = diff_lh[:, win].mean(1)
 mdiff_sig = ttest_1samp(mdiff, 0)[1] < 0.05
 if mdiff_sig:
     axd['C'].fill_between(times[win], -0.20, -0.18, alpha=0.7, zorder=5, facecolor=c2)
+    axd['C'].text(np.mean(times[win]), -0.28, '*', fontsize=25, ha='center', va='center', color=c2, weight='bold')
 # axd['C'].legend(frameon=False, loc="upper left")
 axd['C'].text(np.mean(times[sig]), 0.1, '*', fontsize=25, ha='center', va='center', color=c2, weight='bold')
 axd['C'].set_ylabel('Similarity index', fontsize=11)
@@ -221,6 +222,7 @@ m_rho = np.nanmean(all_rhos[:, win], axis=1)
 m_rho_sig = ttest_1samp(m_rho, 0)[1] < 0.05
 if m_rho_sig:
     axd['B'].fill_between(times[win], -0.1, -0.09, alpha=0.7, zorder=5, facecolor=c6)
+    axd['B'].text(np.mean(times[win]), -0.15, '*', fontsize=25, ha='center', va='center', color=c6, weight='bold')
 
 ### C2 ### Learning index fit
 cmap = plt.cm.get_cmap('tab20', len(subjects))
@@ -251,7 +253,9 @@ for sub in range(len(subjects)):
 pval = ttest_1samp(rhos, 0)[1]
 print(f"Spearman's rho: {np.mean(rhos):.2f}, p-value: {pval:.3f}")
 ptext = f"p = {pval:.2f}" if pval > 0.001 else "p < 0.001"
-axd['D'].legend(frameon=False, title=ptext, loc='upper left')
+axd['D'].legend(frameon=False, title=ptext, loc='lower right')
+if pval < 0.05:
+    axd['D'].text(-1.13, 10, '*', fontsize=25, ha='center', va='center', color='black', weight='bold')
 
 fname = 'rsa_new' if data_type.endswith('new') else 'rsa'
 fname += '_bsl.pdf' if bsl_practice else '_no_bsl.pdf'
