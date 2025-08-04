@@ -221,7 +221,6 @@ fig.suptitle('RS source - time resolved', fontsize=14)
 """""
  - - ---- --- -- - -- --- - -- - - -- -- --- --- - - - - - TEMPORAL GENERALIZATION
 """""
-
     
 # --- Temporal generalization sensors --- blocks ---
 data_type = 'scores_lobotomized'
@@ -299,7 +298,7 @@ for i, subject in enumerate(subjects):
             "value": box_blocks[i, block]
         })
 df = pd.DataFrame(rows)
-df.to_csv(FIGURES_DIR / "TM" / "data" / "timeg_lobotomized_sensors.csv", index=False, sep=",")
+df.to_csv(FIGURES_DIR / "TM" / "data" / "timeg_sensors.csv", index=False, sep=",")
 
 # plot
 fig, ax = plt.subplots(figsize=(7, 4), layout='tight')
@@ -334,141 +333,95 @@ for i, subject in enumerate(subjects):
             "value": diag_blocks[i, block]
         })
 df = pd.DataFrame(rows)
-df.to_csv(FIGURES_DIR / "TM" / "data" / "timeg_lobotomized_sensors-diag.csv", index=False, sep=",")
-
-# plot time resolved PA sensors
-patt_ave, rand_ave = pats_blocks[:, 3:].mean(1), rands_blocks[:, 3:].mean(1)
-data = patt_ave - rand_ave
-ensured(FIGURES_DIR / "temp" / "timeg_pval")
-cmap1 = plt.get_cmap('RdBu_r')
-vmin, vmax = -0.05, 0.05
-idx = np.where((times >= -1.5) & (times <=3))[0]
-fig, ax = plt.subplots(figsize=(10, 4), layout='constrained')
-norm = colors.Normalize(vmin=vmin, vmax=vmax)
-images = []
-images.append(ax.imshow(data[:, idx][:, :, idx].mean(0), 
-# images.append(ax.imshow(data.mean(0), 
-                        # norm=norm,
-                        vmin = vmin,
-                        vmax = vmax,
-                        interpolation="lanczos",
-                        origin="lower",
-                        cmap=cmap1,
-                        extent=times[idx][[0, -1, 0, -1]],
-                        # extent=times[[0, -1, 0, -1]],
-                        aspect=0.5))
-ax.set_ylabel("Training time (s)")
-ax.set_xticks(np.arange(-1, 3, .5))
-ax.set_yticks(np.arange(-1, 3, .5))
-ax.set_title("Time generalization - time resolved", fontsize=16)
-ax.axvline(0, color="k")
-ax.axhline(0, color="k")
-xx, yy = np.meshgrid(times[idx], times[idx], copy=False, indexing='xy')
-# xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
-if not op.exists(FIGURES_DIR / "temp" / "timeg_pval" / "Sensors-pval.npy"):
-    pval = gat_stats(data[:, idx][:, :, idx], -1)
-    # pval = gat_stats(data, -1)
-    np.save(FIGURES_DIR / "temp" / "timeg_pval" / "Sensors-pval.npy", pval)
-else:
-    pval = np.load(FIGURES_DIR / "temp" / "timeg_pval" / "Sensors-pval.npy")
-sig = pval < 0.001
-ax.contour(xx, yy, sig, colors='black', levels=[0],
-                    linestyles='-', linewidths=1, alpha=.5)
-ax.set_xlabel("Testing time (s)")
-cbar = fig.colorbar(images[0], ax=ax, orientation='vertical', fraction=.1, ticks=[vmin, vmax])
-cbar.set_label("\nDifference in accuracy", rotation=270)
-ax.set_title("Time generalization - time resolved", fontstyle='italic')
-# fig.savefig(FIGURES_DIR / "time_gen" / "sensors" / "timeg_time_resolved_sensors.pdf", transparent=True)
-# plt.close(fig)
-
+df.to_csv(FIGURES_DIR / "TM" / "data" / "timeg_sensors-diag.csv", index=False, sep=",")
 # Modulation and perceptual change effects
-conts_blocks = pats_blocks - rands_blocks
+# conts_blocks = pats_blocks - rands_blocks
 
-undivided = False
+# undivided = False
 
-if undivided:
-    # modulation indices
-    idx_mod_test = np.where((times >= -0.75) & (times <= 0))[0]
-    idx_mod_train = np.where((times >= -0.75) & (times <= 0))[0]
-    # perceptual change indices
-    idx_per_test = np.where((times >= -0.75) & (times < 0))[0]
-    idx_per_train = np.where((times > 0) & (times < 0.75))[0]
-else:
-    ### divided modulation and perceptual change effects
-    idx_mod_test = np.where((times >= -0.75) & (times <= -0.375))[0]
-    idx_mod_train = np.where((times >= -0.75) & (times <= 0))[0]
-    # perceptual change indices
-    idx_per_test = np.where((times >= -0.375) & (times < 0))[0]
-    idx_per_train = np.where((times > 0) & (times < 0.75))[0]
+# if undivided:
+#     # modulation indices
+#     idx_mod_test = np.where((times >= -0.75) & (times <= 0))[0]
+#     idx_mod_train = np.where((times >= -0.75) & (times <= 0))[0]
+#     # perceptual change indices
+#     idx_per_test = np.where((times >= -0.75) & (times < 0))[0]
+#     idx_per_train = np.where((times > 0) & (times < 0.75))[0]
+# else:
+#     ### divided modulation and perceptual change effects
+#     idx_mod_test = np.where((times >= -0.75) & (times <= -0.375))[0]
+#     idx_mod_train = np.where((times >= -0.75) & (times <= 0))[0]
+#     # perceptual change indices
+#     idx_per_test = np.where((times >= -0.375) & (times < 0))[0]
+#     idx_per_train = np.where((times > 0) & (times < 0.75))[0]
 
-mod_blocks = []
-per_blocks = []
-for sub in range(len(subjects)):
-    mod = []
-    per = []
-    for block in range(23):
-        # modulatory effect
-        mod_mean = conts_blocks[sub, block, idx_mod_train, :][:, idx_mod_test].mean()
-        mod.append(mod_mean)
-        # perceptual effect
-        per_mean = conts_blocks[sub, block, idx_per_train, :][:, idx_per_test].mean()
-        per.append(per_mean)
-    mod_blocks.append(np.array(mod))
-    per_blocks.append(np.array(per))
-mod_blocks = np.array(mod_blocks)
-per_blocks = np.array(per_blocks)
+# mod_blocks = []
+# per_blocks = []
+# for sub in range(len(subjects)):
+#     mod = []
+#     per = []
+#     for block in range(23):
+#         # modulatory effect
+#         mod_mean = conts_blocks[sub, block, idx_mod_train, :][:, idx_mod_test].mean()
+#         mod.append(mod_mean)
+#         # perceptual effect
+#         per_mean = conts_blocks[sub, block, idx_per_train, :][:, idx_per_test].mean()
+#         per.append(per_mean)
+#     mod_blocks.append(np.array(mod))
+#     per_blocks.append(np.array(per))
+# mod_blocks = np.array(mod_blocks)
+# per_blocks = np.array(per_blocks)
 
-# Plot
-fig, ax = plt.subplots(figsize=(7, 4), layout='tight')
-blocks = np.arange(1, 24)
-ax.axhline(0, color='grey', linestyle='-', alpha=1)
-ax.axvline(3, color='grey', linestyle='-', alpha=1)
+# # Plot
+# fig, ax = plt.subplots(figsize=(7, 4), layout='tight')
+# blocks = np.arange(1, 24)
+# ax.axhline(0, color='grey', linestyle='-', alpha=1)
+# ax.axvline(3, color='grey', linestyle='-', alpha=1)
 
-ax.plot(blocks, mod_blocks.mean(0), label='Modulation', alpha=0.4, color='blue')
-sem_mod = mod_blocks.std(0) / np.sqrt(mod_blocks.shape[0])
-ax.fill_between(blocks, mod_blocks.mean(0) - sem_mod, mod_blocks.mean(0) + sem_mod, facecolor='blue', alpha=0.1)
-smoothed_mod = gaussian_filter1d(mod_blocks.mean(0), sigma=1.5)
-ax.plot(blocks, smoothed_mod, color='blue', linestyle='--')
+# ax.plot(blocks, mod_blocks.mean(0), label='Modulation', alpha=0.4, color='blue')
+# sem_mod = mod_blocks.std(0) / np.sqrt(mod_blocks.shape[0])
+# ax.fill_between(blocks, mod_blocks.mean(0) - sem_mod, mod_blocks.mean(0) + sem_mod, facecolor='blue', alpha=0.1)
+# smoothed_mod = gaussian_filter1d(mod_blocks.mean(0), sigma=1.5)
+# ax.plot(blocks, smoothed_mod, color='blue', linestyle='--')
 
-ax.plot(blocks, per_blocks.mean(0), label='Perception', alpha=0.4, color='orange')
-sem_per = per_blocks.std(0) / np.sqrt(per_blocks.shape[0])
-ax.fill_between(blocks, per_blocks.mean(0) - sem_per, per_blocks.mean(0) + sem_per, facecolor='orange', alpha=0.1)
-smoothed_per = gaussian_filter1d(per_blocks.mean(0), sigma=1.5)
-ax.plot(blocks, smoothed_per, color='orange', linestyle='--')
+# ax.plot(blocks, per_blocks.mean(0), label='Perception', alpha=0.4, color='orange')
+# sem_per = per_blocks.std(0) / np.sqrt(per_blocks.shape[0])
+# ax.fill_between(blocks, per_blocks.mean(0) - sem_per, per_blocks.mean(0) + sem_per, facecolor='orange', alpha=0.1)
+# smoothed_per = gaussian_filter1d(per_blocks.mean(0), sigma=1.5)
+# ax.plot(blocks, smoothed_per, color='orange', linestyle='--')
 
-ax.set_xticks(np.arange(1, 24, 4))
-ax.set_xlabel('Block')
-ax.grid(True, linestyle='-', alpha=0.2)
-ax.legend()
-ax.set_title(f'PA sensors - modulation and perception - {"undivided" if undivided else "divided"}')
-fname = "mod_per_sensors_undiv.pdf" if undivided else "mod_per_sensors_div.pdf"
-fig.savefig(FIGURES_DIR / "time_gen" / "sensors" / fname, transparent=True)
-# plt.close(fig)
+# ax.set_xticks(np.arange(1, 24, 4))
+# ax.set_xlabel('Block')
+# ax.grid(True, linestyle='-', alpha=0.2)
+# ax.legend()
+# ax.set_title(f'PA sensors - modulation and perception - {"undivided" if undivided else "divided"}')
+# fname = "mod_per_sensors_undiv.pdf" if undivided else "mod_per_sensors_div.pdf"
+# fig.savefig(FIGURES_DIR / "time_gen" / "sensors" / fname, transparent=True)
+# # plt.close(fig)
 
-# export tables
-rows = list()
-for i, subject in enumerate(subjects):
-    for block in range(mod_blocks.shape[1]):
-        rows.append({
-            "subject": subject,
-            "block": block,
-            "value": mod_blocks[i, block],
-        })
-df = pd.DataFrame(rows)
-fname = "timeg_mod_sensors_undiv.csv" if undivided else "timeg_mod_sensors_div.csv"
-df.to_csv(FIGURES_DIR / "TM" / "data" / fname, index=False, sep=",")
+# # export tables
+# rows = list()
+# for i, subject in enumerate(subjects):
+#     for block in range(mod_blocks.shape[1]):
+#         rows.append({
+#             "subject": subject,
+#             "block": block,
+#             "value": mod_blocks[i, block],
+#         })
+# df = pd.DataFrame(rows)
+# fname = "timeg_mod_sensors_undiv.csv" if undivided else "timeg_mod_sensors_div.csv"
+# df.to_csv(FIGURES_DIR / "TM" / "data" / fname, index=False, sep=",")
 
-rows = list()
-for i, subject in enumerate(subjects):
-    for block in range(per_blocks.shape[1]):
-        rows.append({
-            "subject": subject,
-            "block": block,
-            "value": per_blocks[i, block],
-        })
-df = pd.DataFrame(rows)
-fname = "timeg_per_sensors_undiv.csv" if undivided else "timeg_per_sensors_div.csv"
-df.to_csv(FIGURES_DIR / "TM" / "data" / fname, index=False, sep=",")
+# rows = list()
+# for i, subject in enumerate(subjects):
+#     for block in range(per_blocks.shape[1]):
+#         rows.append({
+#             "subject": subject,
+#             "block": block,
+#             "value": per_blocks[i, block],
+#         })
+# df = pd.DataFrame(rows)
+# fname = "timeg_per_sensors_undiv.csv" if undivided else "timeg_per_sensors_div.csv"
+# df.to_csv(FIGURES_DIR / "TM" / "data" / fname, index=False, sep=",")
 
 # # test correct windows
 # # Generate dummy temporal generalization matrix (e.g., random values)
@@ -684,9 +637,9 @@ for i, network in enumerate(networks):
                 "value": diff[j, block]
             })
 df = pd.DataFrame(rows)
-df.to_csv(FIGURES_DIR / "TM" / "data" / "timeg_lobo_source.csv", index=False, sep=",")
+df.to_csv(FIGURES_DIR / "TM" / "data" / "timeg_source.csv", index=False, sep=",")
 
-# plot contrast
+# plot contrast - diag mean
 blocks = np.arange(1, 24)
 fig, axes = plt.subplots(2, 5, figsize=(15, 4), sharey=True, sharex=True, layout='tight')
 for i, (ax, network) in enumerate(zip(axes.flatten(), networks)):
@@ -727,7 +680,7 @@ for i, network in enumerate(networks):
                 "value": diff[j, block]
             })
 df = pd.DataFrame(rows)
-df.to_csv(FIGURES_DIR / "TM" / "data" / "timeg_lobo_source-diag.csv", index=False, sep=",")
+df.to_csv(FIGURES_DIR / "TM" / "data" / "timeg_source-diag.csv", index=False, sep=",")
 
 # plot correlation (block level)
 fig, axes = plt.subplots(2, 5, figsize=(20, 4), sharex=True, sharey=True, layout='constrained')
@@ -787,101 +740,99 @@ fig.suptitle("Contrast diag corr")
 fig.savefig(FIGURES_DIR / "time_gen" / "source" / "timeg_corr_diag.pdf", transparent=True)
 # plt.close(fig)
 
-# # modulation indices
-# idx_mod_test = np.where((timesg >= -0.75) & (timesg <= 0))[0]
-# idx_mod_train = np.where((timesg >= -0.75) & (timesg <= 0))[0]
-# # perceptual change indices
-# idx_per_test = np.where((timesg >= -0.75) & (timesg < 0))[0]
-# idx_per_train = np.where((timesg > 0) & (timesg < 0.75))[0]
+# # # modulation indices
+# # idx_mod_test = np.where((timesg >= -0.75) & (timesg <= 0))[0]
+# # idx_mod_train = np.where((timesg >= -0.75) & (timesg <= 0))[0]
+# # # perceptual change indices
+# # idx_per_test = np.where((timesg >= -0.75) & (timesg < 0))[0]
+# # idx_per_train = np.where((timesg > 0) & (timesg < 0.75))[0]
 
-mod_net = {}
-per_net = {}
-for network in networks:
-    mod_blocks = []
-    per_blocks = []
-    for sub in range(len(subjects)):
-        mod = []
-        per = []
-        for block in range(23):
-            # modulatory effect
-            mod_mean = contrast_net[network][sub, block, idx_mod_train, :][:, idx_mod_test].mean()
-            mod.append(mod_mean)
-            # perceptual effect
-            per_mean = contrast_net[network][sub, block, idx_per_train, :][:, idx_per_test].mean()
-            per.append(per_mean)
-        mod_blocks.append(np.array(mod))
-        per_blocks.append(np.array(per))
-    mod_blocks = np.array(mod_blocks)
-    per_blocks = np.array(per_blocks)
-    mod_net[network] = mod_blocks
-    per_net[network] = per_blocks
+# mod_net = {}
+# per_net = {}
+# for network in networks:
+#     mod_blocks = []
+#     per_blocks = []
+#     for sub in range(len(subjects)):
+#         mod = []
+#         per = []
+#         for block in range(23):
+#             # modulatory effect
+#             mod_mean = contrast_net[network][sub, block, idx_mod_train, :][:, idx_mod_test].mean()
+#             mod.append(mod_mean)
+#             # perceptual effect
+#             per_mean = contrast_net[network][sub, block, idx_per_train, :][:, idx_per_test].mean()
+#             per.append(per_mean)
+#         mod_blocks.append(np.array(mod))
+#         per_blocks.append(np.array(per))
+#     mod_blocks = np.array(mod_blocks)
+#     per_blocks = np.array(per_blocks)
+#     mod_net[network] = mod_blocks
+#     per_net[network] = per_blocks
 
-# plot modulation and perception per network
-blocks = np.arange(1, 24)
-fig, axes = plt.subplots(2, 5, figsize=(15, 4), sharey=True, sharex=True, layout='tight')
-for i, (ax, network) in enumerate(zip(axes.flatten(), networks)):
-    ax.axhline(0, color='grey', linestyle='-', alpha=1)
-    ax.axvline(3, color='grey', linestyle='-', alpha=1)
+# # plot modulation and perception per network
+# blocks = np.arange(1, 24)
+# fig, axes = plt.subplots(2, 5, figsize=(15, 4), sharey=True, sharex=True, layout='tight')
+# for i, (ax, network) in enumerate(zip(axes.flatten(), networks)):
+#     ax.axhline(0, color='grey', linestyle='-', alpha=1)
+#     ax.axvline(3, color='grey', linestyle='-', alpha=1)
 
-    # ax.grid(True, linestyle='-', alpha=0.3)
-    ax.set_title(network_names[i], fontstyle='italic')
+#     # ax.grid(True, linestyle='-', alpha=0.3)
+#     ax.set_title(network_names[i], fontstyle='italic')
     
-    ax.plot(blocks, mod_net[network].mean(0), label='Modulation', alpha=0.1, color='blue')
-    # sem_mod = mod_net[network].std(0) / np.sqrt(mod_net[network].shape[0])
-    # ax.fill_between(blocks, mod_net[network].mean(0) - sem_mod, mod_net[network].mean(0) + sem_mod, facecolor='blue', alpha=0.1)
-    smoothed_mod = gaussian_filter1d(mod_net[network].mean(0), sigma=1.5)
-    ax.plot(blocks, smoothed_mod, color='blue', linestyle='--')
+#     ax.plot(blocks, mod_net[network].mean(0), label='Modulation', alpha=0.1, color='blue')
+#     # sem_mod = mod_net[network].std(0) / np.sqrt(mod_net[network].shape[0])
+#     # ax.fill_between(blocks, mod_net[network].mean(0) - sem_mod, mod_net[network].mean(0) + sem_mod, facecolor='blue', alpha=0.1)
+#     smoothed_mod = gaussian_filter1d(mod_net[network].mean(0), sigma=1.5)
+#     ax.plot(blocks, smoothed_mod, color='blue', linestyle='--')
 
-    ax.plot(blocks, per_net[network].mean(0), label='Perception', alpha=0.1, color='orange')
-    # sem_per = per_net[network].std(0) / np.sqrt(per_net[network].shape[0])
-    # ax.fill_between(blocks, per_net[network].mean(0) - sem_per, per_net[network].mean(0) + sem_per, facecolor='orange', alpha=0.1)
-    smoothed_per = gaussian_filter1d(per_net[network].mean(0), sigma=1.5)
-    ax.plot(blocks, smoothed_per, color='orange', linestyle='--')
+#     ax.plot(blocks, per_net[network].mean(0), label='Perception', alpha=0.1, color='orange')
+#     # sem_per = per_net[network].std(0) / np.sqrt(per_net[network].shape[0])
+#     # ax.fill_between(blocks, per_net[network].mean(0) - sem_per, per_net[network].mean(0) + sem_per, facecolor='orange', alpha=0.1)
+#     smoothed_per = gaussian_filter1d(per_net[network].mean(0), sigma=1.5)
+#     ax.plot(blocks, smoothed_per, color='orange', linestyle='--')
 
-    ax.set_xticks(np.arange(1, 24, 4))
-    # ax.grid(True, linestyle='-', alpha=0.2)
+#     ax.set_xticks(np.arange(1, 24, 4))
+#     # ax.grid(True, linestyle='-', alpha=0.2)
     
-    if i == 0:
-        # ax.legend()
-        ax.set_xlabel('Block')
-# fig.suptitle('PA source - box mean blocks', fontsize=14)
-title  = 'PA source - modulation and perception blocks - undivided' if undivided else 'PA source - modulation and perception blocks - divided'
-fig.suptitle(title, fontsize=14)
-fname = "timeg_mod_per_source_undiv.pdf" if undivided else "timeg_mod_per_source_div.pdf"
-fig.savefig(FIGURES_DIR / "time_gen" / "source" / fname, transparent=True)
+#     if i == 0:
+#         # ax.legend()
+#         ax.set_xlabel('Block')
+# # fig.suptitle('PA source - box mean blocks', fontsize=14)
+# title  = 'PA source - modulation and perception blocks - undivided' if undivided else 'PA source - modulation and perception blocks - divided'
+# fig.suptitle(title, fontsize=14)
+# fname = "timeg_mod_per_source_undiv.pdf" if undivided else "timeg_mod_per_source_div.pdf"
+# fig.savefig(FIGURES_DIR / "time_gen" / "source" / fname, transparent=True)
 
-# export tables
-# save table
-rows = list()
-for i, network in enumerate(networks):
-    diff = mod_net[network]
-    # get table
-    for j, subject in enumerate(subjects):
-        for block in range(diff.shape[1]):
-            rows.append({
-                "network": network_names[i],
-                "subject": subject,
-                "block": block + 1,
-                "value": diff[j, block]
-            })
-df = pd.DataFrame(rows)
-df.to_csv(FIGURES_DIR / "TM" / "data" / "timeg_mod_source.csv", index=False, sep=",")
-rows = list()
-for i, network in enumerate(networks):
-    diff = per_net[network]
-    # get table
-    for j, subject in enumerate(subjects):
-        for block in range(diff.shape[1]):
-            rows.append({
-                "network": network_names[i],
-                "subject": subject,
-                "block": block + 1,
-                "value": diff[j, block]
-            })
-df = pd.DataFrame(rows)
-df.to_csv(FIGURES_DIR / "TM" / "data" / "timeg_per_source.csv", index=False, sep=",")
-
-
+# # export tables
+# # save table
+# rows = list()
+# for i, network in enumerate(networks):
+#     diff = mod_net[network]
+#     # get table
+#     for j, subject in enumerate(subjects):
+#         for block in range(diff.shape[1]):
+#             rows.append({
+#                 "network": network_names[i],
+#                 "subject": subject,
+#                 "block": block + 1,
+#                 "value": diff[j, block]
+#             })
+# df = pd.DataFrame(rows)
+# df.to_csv(FIGURES_DIR / "TM" / "data" / "timeg_mod_source.csv", index=False, sep=",")
+# rows = list()
+# for i, network in enumerate(networks):
+#     diff = per_net[network]
+#     # get table
+#     for j, subject in enumerate(subjects):
+#         for block in range(diff.shape[1]):
+#             rows.append({
+#                 "network": network_names[i],
+#                 "subject": subject,
+#                 "block": block + 1,
+#                 "value": diff[j, block]
+#             })
+# df = pd.DataFrame(rows)
+# df.to_csv(FIGURES_DIR / "TM" / "data" / "timeg_per_source.csv", index=False, sep=",")
 
 # # plot pattern
 # fig, axes = plt.subplots(2, 5, figsize=(15, 5), sharey=True, layout='tight')
