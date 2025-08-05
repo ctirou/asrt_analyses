@@ -18,6 +18,7 @@ figures_dir = FIGURES_DIR / "RSA" / "sensors"
 ensure_dir(figures_dir)
 
 data_type = "rdm_blocks_new"
+# data_type = "rdm_blocks"
 bsl_practice = False
 
 all_patterns, all_randoms = [], []
@@ -99,6 +100,8 @@ diff_b = low_b - high_b
 
 # learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices15.csv', sep="\t", index_col=0)
 learn_index_blocks = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices_blocks.csv', sep=",", index_col=0)
+# Baseline correct learn_index_blocks by subtracting the mean across blocks for each subject
+learn_index_blocks = learn_index_blocks.sub(learn_index_blocks.mean(axis=1), axis=0)
 
 chance = 25
 threshold = 0.05
@@ -182,23 +185,25 @@ idx_rsa = np.where(sig)[0] # to compute mean later
 # Overlay significant regions with the specified color
 axd['C'].fill_between(times, diff_lh.mean(0) - sem, diff_lh.mean(0) + sem, where=sig, alpha=0.4, zorder=5, facecolor=c2)
 axd['C'].fill_between(times, diff_lh.mean(0) - sem, 0, where=sig, alpha=0.3, zorder=5, facecolor=c2)
-mdiff = diff_lh[:, win].mean(1)
-mdiff_sig = ttest_1samp(mdiff, 0)[1] < 0.05
-if mdiff_sig:
-    axd['C'].fill_between(times[win], -0.20, -0.18, alpha=0.7, zorder=5, facecolor=c2)
-    axd['C'].text(np.mean(times[win]), -0.28, '*', fontsize=25, ha='center', va='center', color=c2, weight='bold')
-# axd['C'].legend(frameon=False, loc="upper left")
 axd['C'].text(np.mean(times[sig]), 0.1, '*', fontsize=25, ha='center', va='center', color=c2, weight='bold')
+# mdiff = diff_lh[:, win].mean(1)
+# mdiff_sig = ttest_1samp(mdiff, 0)[1] < 0.05
+# if mdiff_sig:
+#     axd['C'].fill_between(times[win], -0.20, -0.18, alpha=0.7, zorder=5, facecolor=c2)
+#     axd['C'].text(np.mean(times[win]), -0.28, '*', fontsize=25, ha='center', va='center', color=c2, weight='bold')
+# axd['C'].legend(frameon=False, loc="upper left")
 axd['C'].set_ylabel('Similarity index', fontsize=11)
 axd['C'].yaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter('%.2f'))
 axd['C'].set_xlabel('Time (s)', fontsize=11)
 axd['C'].set_title('Similarity index time course', fontsize=13)
 
 ### D ### Correlation with learning index
+# Center diff_b for each subject by subtracting their mean across all blocks and times
+diff_c = diff_b - np.nanmean(diff_b, axis=1, keepdims=True)
 axd['B'].axhline(0, color="grey", alpha=0.5)
-all_rhos = np.array([[spear(learn_index_blocks.iloc[sub], diff_b[sub, :, t])[0] for t in range(len(times))] for sub in range(len(subjects))])
+all_rhos = np.array([[spear(learn_index_blocks.iloc[sub], diff_c[sub, :, t])[0] for t in range(len(times))] for sub in range(len(subjects))])
 all_rhos, _, _ = fisher_z_and_ttest(all_rhos)
-sem = np.std(all_rhos, axis=0) / np.sqrt(len(subjects))
+sem = np.nanstd(all_rhos, axis=0) / np.sqrt(len(subjects))
 p_values = decod_stats(all_rhos, -1)
 sig = p_values < 0.05
 # Plot the entire line in the default color
@@ -217,19 +222,18 @@ axd['B'].set_ylabel("Spearman's rho", fontsize=11)
 axd['B'].set_xlabel('Time (s)', fontsize=11)
 # axd['B'].legend(frameon=False, loc="lower right")
 axd['B'].set_title('Similarity index and learning correlation time course', fontsize=13)
-win = np.where((times >= 0.3) & (times <= 0.55))[0]
-m_rho = np.nanmean(all_rhos[:, win], axis=1)
-m_rho_sig = ttest_1samp(m_rho, 0)[1] < 0.05
-if m_rho_sig:
-    axd['B'].fill_between(times[win], -0.1, -0.09, alpha=0.7, zorder=5, facecolor=c6)
-    axd['B'].text(np.mean(times[win]), -0.15, '*', fontsize=25, ha='center', va='center', color=c6, weight='bold')
+# win = np.where((times >= 0.3) & (times <= 0.55))[0]
+# m_rho = np.nanmean(all_rhos[:, win], axis=1)
+# m_rho_sig = ttest_1samp(m_rho, 0)[1] < 0.05
+# if m_rho_sig:
+#     axd['B'].fill_between(times[win], -0.1, -0.09, alpha=0.7, zorder=5, facecolor=c6)
+#     axd['B'].text(np.mean(times[win]), -0.15, '*', fontsize=25, ha='center', va='center', color=c6, weight='bold')
 
 ### C2 ### Learning index fit
 cmap = plt.cm.get_cmap('tab20', len(subjects))
 idx_rsa = np.where((times >= 0.3) & (times <= 0.55))[0]
-# mdiff = diff_sess[:, :, idx_rsa].mean(2)
-mdiff = diff_b[:, :, idx_rsa].mean(2)
-np.save(figures_dir / "mean_rsa.npy", mdiff)
+mdiff = diff_b[:, :, idx_rsa].mean(-1)
+mdiff = mdiff - np.nanmean(mdiff, axis=1, keepdims=True)  # center by subject
 slopes, intercepts = [], []
 # Plot for individual subjects
 for sub, subject in enumerate(subjects):
@@ -254,8 +258,8 @@ pval = ttest_1samp(rhos, 0)[1]
 print(f"Spearman's rho: {np.mean(rhos):.2f}, p-value: {pval:.3f}")
 ptext = f"p = {pval:.2f}" if pval > 0.001 else "p < 0.001"
 axd['D'].legend(frameon=False, title=ptext, loc='lower right')
-if pval < 0.05:
-    axd['D'].text(-1.13, 10, '*', fontsize=25, ha='center', va='center', color='black', weight='bold')
+# if pval < 0.05:
+#     axd['D'].text(-1.13, 10, '*', fontsize=25, ha='center', va='center', color='black', weight='bold')
 
 fname = 'rsa_new' if data_type.endswith('new') else 'rsa'
 fname += '_bsl.pdf' if bsl_practice else '_no_bsl.pdf'
