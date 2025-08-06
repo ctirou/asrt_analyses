@@ -14,7 +14,7 @@ win = np.where((times >= 0.3) & (times <= 0.5))[0]
 c1, c2 = "#5BBCD6", "#00A08A"
 
 # --- RSA sensors --- blocks ---
-data_type = "rdm_blocks"
+data_type = "rdm_blocks_new"
 bsl_practice = False
 all_pats, all_rands = [], []
 all_pats_blocks, all_rands_blocks = [], []
@@ -80,28 +80,6 @@ title += ' - no practice baseline' if not bsl_practice else ' - practice baselin
 # fig.savefig(FIGURES_DIR / "RSA" / "sensors" / fname, transparent=True)
 # plt.close(fig)
 
-# plot time resolved RSA sensors
-xmin, xmax = 0.3, 0.55
-win = np.where((times >= xmin) & (times <= xmax))[0]
-# fig, ax = plt.subplots(figsize=(7, 4), layout='tight')
-ax2.plot(times, np.nanmean(diff_rp, axis=(0, 1)), color=c1)
-ax2.axhline(0, color='grey', linestyle='-', alpha=0.5)
-sig = decod_stats(np.nanmean(diff_rp, axis=(1)), -1) < 0.05
-ax2.fill_between(times, np.nanmean(diff_rp, axis=(0, 1)), 0, where=sig, color='red', alpha=0.3, label='Significant cluster')
-mdiff = np.nanmean(diff_rp[:, :, win], axis=(1, -1))
-mdiff_sig = ttest_1samp(mdiff, 0)[1] < 0.05
-if mdiff_sig:
-    ax2.axvspan(times[win][0], times[win][-1], facecolor='orange', edgecolor=None, alpha=0.2, zorder=5, label=f'Significant time window - [{xmin}-{xmax}] s')
-    # ax.text((xmin+xmax)/2, -0.5, '*', fontsize=16, ha='center', va='center', color='red', weight='bold')
-ax2.set_xlabel('Time (s)')
-ax2.set_ylabel('Similarity index (random - pattern)')
-ax2.legend()
-fig.suptitle(title, fontstyle='italic')
-fname = "rsa_sensors" if not data_type.endswith("new") else "rsa_sensors_new"
-fname += "_no_bsl.pdf" if not bsl_practice else "_bsl.pdf"
-fig.savefig(FIGURES_DIR / "RSA" / fname, transparent=True)
-plt.close(fig)
-
 # save table
 diff_rp_blocks = np.nanmean(diff_rp[:, :, idx], axis=(-1))
 rows = list()
@@ -118,8 +96,47 @@ df = pd.DataFrame(rows)
 fname = 'rsa_sensors.csv'
 df.to_csv(FIGURES_DIR / "TM" / "data" / fname, index=False, sep=",")
 
+# plot time resolved RSA sensors
+diff_rp_tr = np.nanmean(diff_rp[:, 3:], 1)
+xmin, xmax = 0.3, 0.55
+win = np.where((times >= xmin) & (times <= xmax))[0]
+# fig, ax = plt.subplots(figsize=(7, 4), layout='tight')
+ax2.plot(times, np.nanmean(diff_rp_tr, axis=(0)), color=c1)
+ax2.axhline(0, color='grey', linestyle='-', alpha=0.5)
+sig = decod_stats(diff_rp_tr, -1) < 0.05
+ax2.fill_between(times, np.nanmean(diff_rp_tr, axis=(0)), 0, where=sig, color='red', alpha=0.3, label='Significant cluster')
+# mdiff = np.nanmean(diff_rp_tr[:, win], axis=(-1))
+# mdiff_sig = ttest_1samp(mdiff, 0)[1] < 0.05
+# if mdiff_sig:
+#     ax2.axvspan(times[win][0], times[win][-1], facecolor='orange', edgecolor=None, alpha=0.2, zorder=5, label=f'Significant time window - [{xmin}-{xmax}] s')
+#     # ax.text((xmin+xmax)/2, -0.5, '*', fontsize=16, ha='center', va='center', color='red', weight='bold')
+ax2.set_xlabel('Time (s)')
+ax2.set_ylabel('Similarity index (random - pattern)')
+ax2.legend()
+fig.suptitle(title, fontstyle='italic')
+fname = "rsa_sensors" if not data_type.endswith("new") else "rsa_sensors_new"
+fname += "_no_bsl.pdf" if not bsl_practice else "_bsl.pdf"
+# fig.savefig(FIGURES_DIR / "RSA" / fname, transparent=True)
+# plt.close(fig)
+
+# save table
+diff_rp_tr = np.nanmean(diff_rp[:, 3:], 1)
+rows = list()
+for s, subject in enumerate(subjects):
+    for t, time in enumerate(times):
+        rows.append({
+            "subject": subject,
+            'time': t,
+            "value": diff_rp_tr[s, t]
+        })
+df = pd.DataFrame(rows)
+# fname = "rsa_blocks_sensors" if not data_type.endswith("new") else "rsa_blocks_sensors_new"
+# fname += "_no_bsl.csv" if not bsl_practice else "_bsl.csv"
+fname = 'rsa_sensors_tr_all.csv' if data_type.endswith("new") else 'rsa_sensors_tr.csv'
+df.to_csv(FIGURES_DIR / "TM" / "data" / fname, index=False, sep=",")
+
 # RSA source --- blocks ---
-data_type = "rdm_blocks_vect_new"
+data_type = "rdm_blocks_vect"
 bsl_practice = False
 networks = NETWORKS + ['Cerebellum-Cortex']
 network_names = NETWORK_NAMES + ['Cerebellum']
@@ -232,6 +249,25 @@ fname = "rsa_time_resolved_source" if not data_type.endswith("new") else "rsa_ti
 fname += "_no_bsl.pdf" if not bsl_practice else "_bsl.pdf"
 fig.savefig(FIGURES_DIR / "RSA" / fname, transparent=True)
 plt.close(fig)
+
+# save table
+rows = list()
+for i, network in enumerate(networks):
+    diff = np.nanmean(diff_rp[network][:, 3:], axis=(1))
+    # get table
+    for j, subject in enumerate(subjects):
+        for t, time in enumerate(times):
+            rows.append({
+                "network": network_names[i],
+                "subject": subject,
+                "time": t,
+                "value": diff[j, t]
+            })
+df = pd.DataFrame(rows)
+# fname = "rsa_blocks_source" if not data_type.endswith("new") else "rsa_blocks_source_new"
+# fname += "_no_bsl.csv" if not bsl_practice else "_bsl.csv"
+fname = 'rsa_source_tr_all.csv' if data_type.endswith("new") else 'rsa_source_tr.csv'
+df.to_csv(FIGURES_DIR / "TM" / "data" / fname, index=False, sep=",")
 
 """""
  - - ---- --- -- - -- --- - -- - - -- -- - - - - - - --- TEMPORAL GENERALIZATION -  - - - -- - - - - -  - - - - - - - - -- - - - - ---- --- - - - - - 
