@@ -215,7 +215,7 @@ for i, (label, name, l) in enumerate(zip(networks, network_names,  \
         if l == 'A1':
             axd[l].set_title('Mahalanobis distance')
             ymax = axd[l].get_ylim()[1]
-        elif l == 'AB2':
+        elif l == 'AB1':
             axd[l].set_xlabel('Time (s)', fontsize=11)
         if l == j:
             axd[l].set_xticklabels([])

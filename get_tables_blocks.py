@@ -234,7 +234,7 @@ fig.savefig(FIGURES_DIR / "RSA" / fname, transparent=True)
 plt.close(fig)
 
 """""
- - - ---- --- -- - -- --- - -- - - -- -- --- --- - - - - - TEMPORAL GENERALIZATION
+ - - ---- --- -- - -- --- - -- - - -- -- - - - - - - --- TEMPORAL GENERALIZATION -  - - - -- - - - - -  - - - - - - - - -- - - - - ---- --- - - - - - 
 """""
     
 # --- Temporal generalization sensors --- blocks ---
@@ -264,7 +264,7 @@ pats_blocks = np.array(pats_blocks)
 rands_blocks = np.array(rands_blocks)
 
 # mean box
-idx_timeg = np.where((times >= -0.75) & (times < 0))[0]
+idx_timeg = np.where((times >= -0.5) & (times < 0))[0]
 box_blocks = []
 diag_blocks = []
 conts_blocks = pats_blocks - rands_blocks
@@ -313,7 +313,7 @@ for i, subject in enumerate(subjects):
             "value": box_blocks[i, block]
         })
 df = pd.DataFrame(rows)
-df.to_csv(FIGURES_DIR / "TM" / "data" / "timeg_sensors.csv", index=False, sep=",")
+# df.to_csv(FIGURES_DIR / "TM" / "data" / "timeg_sensors.csv", index=False, sep=",")
 
 # plot
 fig, ax = plt.subplots(figsize=(7, 4), layout='tight')
@@ -354,7 +354,7 @@ df.to_csv(FIGURES_DIR / "TM" / "data" / "timeg_sensors-diag.csv", index=False, s
 networks = NETWORKS + ['Cerebellum-Cortex']
 network_names = NETWORK_NAMES + ['Cerebellum']
 timesg = np.linspace(-1.5, 1.5, 307)
-idx_timeg = np.where((timesg >= -0.75) & (timesg < 0))[0]
+idx_timeg = np.where((timesg >= -0.5) & (timesg < 0))[0]
 cont_blocks = {}
 pat_blocks = {}
 rand_blocks = {}
@@ -548,7 +548,7 @@ for i, (ax, network) in enumerate(zip(axes.flatten(), networks)):
     if ax.get_subplotspec().is_last_row():
         ax.set_xlabel('Block')
 fig.suptitle('PA source - diag mean blocks', fontsize=14)
-fig.savefig(FIGURES_DIR / "time_gen" / "source" / "timeg_mean_blocks-diag.pdf", transparent=True)
+# fig.savefig(FIGURES_DIR / "time_gen" / "source" / "timeg_mean_blocks-diag.pdf", transparent=True)
 # plt.close(fig)
 # save table
 rows = list()
