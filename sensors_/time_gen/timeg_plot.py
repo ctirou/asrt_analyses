@@ -173,6 +173,7 @@ pval_cont = np.load(res_dir / "pval" /  "all_contrast-pval.npy")
 rhos = np.load(res_dir / "corr" / "rhos_learn.npy").mean(0)
 pval_rhos = np.load(res_dir / "corr" / "pval_learn-pval.npy")
 
+csig = "#0F0D0E"
 fig, axs = plt.subplots(2, 1, figsize=(7, 6), sharex=True, layout='constrained')
 norm = colors.Normalize(vmin=-0.1, vmax=0.1)
 images = []
@@ -207,10 +208,10 @@ for ax, data, title, pval, vmin, vmax in zip(axs.flat, [contrasts, rhos], \
     # rectcolor = 'black' if ax == axs.flat[0] else 'red'
     rectcolor = 'black'
     if ax == axs.flat[0]:
-        rect = plt.Rectangle([-0.75, -0.75], 0.72, 0.68, fill=False, edgecolor='black', linestyle='--', lw=2, zorder=10)
+        rect = plt.Rectangle([-0.5, -0.5], 0.48, 0.48, fill=False, edgecolor=csig, linestyle='--', lw=2, zorder=10)
         ax.add_patch(rect)
         if sig_mean:
-            ax.text(-0.8, -0.35, "*", fontsize=25, color='black', ha='right', va='center', weight='bold')
+            ax.text(-0.6, -0.35, "*", fontsize=25, color=csig, ha='right', va='center', weight='bold')
     #     rect1 = plt.Rectangle([-0.75, 0.05], 0.72, 0.68, fill=False, edgecolor='white', linestyle='--', lw=2, zorder=10)
     #     ax.add_patch(rect1)
     cbar = fig.colorbar(im, ax=ax, orientation='vertical', fraction=.1, ticks=[vmin, vmax])
