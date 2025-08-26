@@ -1,5 +1,5 @@
 import os
-from base import ensured, decod_stats, contiguous_regions
+from base import *
 from config import *
 import os.path as op
 import matplotlib.pyplot as plt
@@ -280,3 +280,48 @@ for i, (network, contrast_idx) in enumerate(zip(networks, ['C', 'F', 'I', 'L', '
         axes[contrast_idx].set_xlabel('Time (s)', fontsize=11)
 
 fig.savefig(figures_dir / "timeg-diag.pdf", transparent=True)
+
+# corrlation with behavior
+from scipy.stats import spearmanr as spear
+learn_index_df = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices_blocks.csv', sep=",", index_col=0)
+plt.rcParams.update({'font.size': 12, 'font.family': 'serif', 'font.serif': 'Arial'})
+fig, axes = plt.subplots(5, 2, figsize=(7, 9), sharey=True, sharex=True, layout="tight")
+for i, ax in enumerate(axes.flatten()):
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.axhline(0, color='black', alpha=1)
+    ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.2)
+    network = networks[i]
+    all_rhos = np.array([[spear(learn_index_df.iloc[sub, :], contrasts[network][sub, :, t])[0] for t in range(len(times))] for sub in range(len(subjects))])
+    # all_rhos, _, _ = fisher_z_and_ttest(all_rhos)
+    sem = np.std(all_rhos, axis=0) / np.sqrt(len(subjects))
+    p_values = decod_stats(all_rhos, -1)
+    sig = p_values < 0.05
+    # Main plot
+    ax.plot(times, all_rhos.mean(0), alpha=1, zorder=10, color='C7')
+        # Plot significant regions separately
+    for start, end in contiguous_regions(sig):
+        ax.plot(times[start:end], all_rhos.mean(0)[start:end], alpha=1, zorder=10, color=cmap[i])
+    ax.fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, alpha=0.5, zorder=5, facecolor='C7')
+    # Highlight significant regions
+    ax.fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, where=sig, alpha=0.5, zorder=5, color=cmap[i])
+    ax.set_title(network_names[i], fontsize=13, fontstyle='italic')
+    
+    wo = np.where((times >= -0.5) & (times < 0))[0]
+    mrho = all_rhos[:, wo].mean(1)
+    mrho_sig = ttest_1samp(mrho, 0)[1]
+    if mrho_sig < 0.05:
+        print(f"Significant correlation for {network} in the window {times[wo][0]} to {times[wo][-1]}")
+        ax.axvspan(times[win][0], times[win][-1], facecolor=cmap[i], edgecolor=None, alpha=0.3, zorder=5)
+        ax.text(0.4, 0.7, '*', fontsize=20, ha='center', va='center', color=cmap[i], weight='bold')
+
+    if ax in axes[:, 0]:
+        ax.set_ylabel("Spearman's rho", fontsize=11)
+    
+    # Only set xlabel for axes in the bottom row
+    if i >= (axes.shape[0] - 1) * axes.shape[1]:
+        ax.set_xlabel("Time (s)", fontsize=11)
+        
+    ax.set_xticks(np.arange(-1, 2, 0.5))
+
+fig.savefig(figures_dir / "timeg-corr.pdf", transparent=True)

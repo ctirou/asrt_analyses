@@ -239,7 +239,6 @@ for i, (label, name, j) in enumerate(zip(networks, network_names, ['C', 'F', 'I'
     # Plot significant regions separately
     for start, end in contiguous_regions(sig):
         axd[j].plot(times[start:end], all_rhos.mean(0)[start:end], alpha=1, zorder=10, color=cmap[i])
-    sem = np.std(all_rhos, axis=0) / np.sqrt(len(subjects))
     axd[j].fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, alpha=0.2, zorder=5, facecolor='C7')
     # Highlight significant regions
     axd[j].fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, where=sig, alpha=0.5, zorder=5, color=cmap[i])
