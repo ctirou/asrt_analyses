@@ -166,10 +166,17 @@ axd['A'].set_xlabel('Time (s)', fontsize=11)
 axd['A'].set_title(f'Mahalanobis distance within pairs', fontsize=13)
 
 ### B2 ### Similarity index
+
+gam_sig = pd.read_csv(FIGURES_DIR / "TM" / "segments_tr_sensors.csv")
+gam_sig = gam_sig[gam_sig['metric'] == 'RS_ALL']
+arr = np.zeros(82, dtype=bool)
+arr[gam_sig['start'][0]:gam_sig['end'][0] + 1] = True
+
 win = np.where((times >= 0.3) & (times <= 0.55))[0]
 axd['C'].axhline(0, color='grey', alpha=0.5)
 pval = decod_stats(diff_lh, -1)
 sig = pval < 0.05
+sig = arr.copy()
 pval_unc = ttest_1samp(diff_lh, 0)[1]
 sig_unc = pval_unc < 0.05
 axd['C'].plot(times, diff_lh.mean(0), alpha=1, zorder=10, color='C7')
@@ -261,7 +268,7 @@ axd['D'].legend(frameon=False, title=ptext, loc='lower right')
 # if pval < 0.05:
 #     axd['D'].text(-1.13, 10, '*', fontsize=25, ha='center', va='center', color='black', weight='bold')
 
-fname = 'rsa_new' if data_type.endswith('new') else 'rsa'
+fname = 'gam_rsa_new' if data_type.endswith('new') else 'gam_rsa'
 fname += '_bsl.pdf' if bsl_practice else '_no_bsl.pdf'
 plt.savefig(figures_dir /  fname, transparent=True)
 plt.close()
