@@ -1,11 +1,11 @@
 import os.path as op
 import numpy as np
-from base import decod_stats, get_sequence, get_all_high_low, ensured, gat_stats
+from base import *
 from config import *
 from tqdm.auto import tqdm
 import matplotlib.pyplot as plt
 import pandas as pd
-from scipy.stats import ttest_1samp
+from scipy.stats import ttest_1samp, spearmanr as spear
 from scipy.ndimage import gaussian_filter1d
 
 subjects = SUBJS15
@@ -88,16 +88,35 @@ df = pd.DataFrame(rows)
 fname = 'rsa_sensors_tr_all.csv' if data_type.endswith("new") else 'rsa_sensors_tr.csv'
 df.to_csv(FIGURES_DIR / "TM" / "data" / fname, index=False, sep=",")
 
+learn_index_blocks = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices_blocks.csv', sep=",", index_col=0)
+learn_index_blocks = learn_index_blocks.sub(learn_index_blocks.mean(axis=1), axis=0)
+all_rhos = np.array([[spear(learn_index_blocks.iloc[sub], diff_rp[sub, :, t])[0] for t in range(len(times))] for sub in range(len(subjects))])
+all_rhos, _, _ = fisher_z_and_ttest(all_rhos)
+# save table
+rows = list()
+for s, subject in enumerate(subjects):
+    for t, time in enumerate(times):
+        rows.append({
+            "subject": subject,
+            'time': t,
+            "value": all_rhos[s, t]
+        })
+df = pd.DataFrame(rows)
+fname = 'rsa_sensors_tr_all_corr.csv' if data_type.endswith("new") else 'rsa_sensors_tr_corr.csv'
+df.to_csv(FIGURES_DIR / "TM" / "data" / fname, index=False, sep=",")
+
 # RSA source --- blocks ---
 data_type = "rdm_blocks_vect_new" # "rdm_blocks_vect_new" for all trials or "rdm_blocks_vect" for correct trials only
 bsl_practice = False
 networks = NETWORKS + ['Cerebellum-Cortex']
 network_names = NETWORK_NAMES + ['Cerebellum']
 diff_rp = {}
+corr_rp = {}
 for network in tqdm(networks):
     if not network in diff_rp:
         diff_rp[network] =  []
-    for subject in subjects:
+        corr_rp[network] = []
+    for isub, subject in enumerate(subjects):
         res_path = RESULTS_DIR / 'RSA' / 'source' / network / data_type / subject
         # read behav
         behav_dir = op.join(HOME / 'raw_behavs' / subject)
@@ -122,8 +141,12 @@ for network in tqdm(networks):
         bsl_rand = np.nanmean(low[:, :3, :], (0, 1))
         pat = np.nanmean(high, 0) - bsl_pat[np.newaxis, :] if bsl_practice else np.nanmean(high, 0)
         rand = np.nanmean(low, 0) - bsl_rand[np.newaxis, :] if bsl_practice else np.nanmean(low, 0)
-        diff_rp[network].append(rand - pat)
+        diff = rand - pat
+        diff_rp[network].append(diff)
+        corr_rp[network].append([np.array([spear(learn_index_blocks.iloc[isub], diff[:, t])[0] for t in range(len(times))])])
     diff_rp[network] = np.array(diff_rp[network])
+    corr_rp[network] = np.array(corr_rp[network]).squeeze()
+    corr_rp[network], _, _ = fisher_z_and_ttest(corr_rp[network])
 
 # extract index from GAMM segments
 segments = pd.read_csv(FIGURES_DIR / "TM" / "segments_tr_sensors.csv")
@@ -192,6 +215,22 @@ df = pd.DataFrame(rows)
 fname = 'rsa_source_tr_all.csv' if data_type.endswith("new") else 'rsa_source_tr.csv'
 df.to_csv(FIGURES_DIR / "TM" / "data" / fname, index=False, sep=",")
 
+# save table
+rows = list()
+for i, network in enumerate(networks):
+    # get table
+    for j, subject in enumerate(subjects):
+        for t, time in enumerate(times):
+            rows.append({
+                "network": network_names[i],
+                "subject": subject,
+                "time": t,
+                "value": corr_rp[network][j, t]
+            })
+df = pd.DataFrame(rows)
+fname = 'rsa_source_tr_all_corr.csv' if data_type.endswith("new") else 'rsa_source_tr_corr.csv'
+df.to_csv(FIGURES_DIR / "TM" / "data" / fname, index=False, sep=",")
+
 """""
  - - ---- --- -- - -- --- - -- - - -- -- - - - - - - --- TEMPORAL GENERALIZATION -  - - - -- - - - - -  - - - - - - - - -- - - - - ---- --- - - - - - 
 """""
@@ -221,12 +260,56 @@ for subject in tqdm(subjects):
     rands_blocks.append(np.array(random))
 pats_blocks = np.array(pats_blocks)
 rands_blocks = np.array(rands_blocks)
+conts_blocks = pats_blocks - rands_blocks
+
+# export time resolved diagonals
+cont_tr = []
+pat_tr, rand_tr = [], []
+idx = np.where((times >= -1.5) & (times <= 3))[0]
+for s in range(len(subjects)):
+    cont_tr.append(np.array([np.diag(conts_blocks[s, b, idx]) for b in range(23)]))
+    pat_tr.append(np.array([np.diag(pats_blocks[s, b, idx]) for b in range(23)]))
+    rand_tr.append(np.array([np.diag(rands_blocks[s, b, idx]) for b in range(23)]))
+cont_tr = np.array(cont_tr)
+pat_tr, rand_tr = np.array(pat_tr), np.array(rand_tr)
+
+# save table for mean box
+for data, data_fname in zip([cont_tr, pat_tr, rand_tr], ['contrast', 'pattern', 'random']):
+    rows = list()
+    for i, subject in enumerate(subjects):
+        for block in range(data.shape[1]):
+            for t in range(data.shape[2]):
+                rows.append({
+                    "subject": subject,
+                    "block": block + 1,
+                    "time": t,
+                    "value": data[i, block, t]
+                })
+    df = pd.DataFrame(rows)
+    df_fname = f"timeg_sensors-tr_{data_fname}.csv"
+    df.to_csv(FIGURES_DIR / "TM" / "data" / df_fname, index=False, sep=",")
+
+# time resolved correlations with learning index
+cont_corr_tr = []
+for s in range(len(subjects)):
+    cont_corr_tr.append(np.array([spear(learn_index_blocks.iloc[s], cont_tr[s, :, t])[0] for t in range(cont_tr.shape[-1])]))
+cont_corr_tr = np.array(cont_corr_tr)
+rows = list()
+for i, subject in enumerate(subjects):
+    for t in range(cont_corr_tr.shape[-1]):
+        rows.append({
+            "subject": subject,
+            "time": t,
+            "value": cont_corr_tr[i, t]
+            })
+df = pd.DataFrame(rows)
+df_fname = "timeg_sensors-tr_cont-corr.csv"
+df.to_csv(FIGURES_DIR / "TM" / "data" / df_fname, index=False, sep=",")
 
 # mean box
 idx_timeg = np.where((times >= -0.5) & (times < 0))[0]
 box_blocks = []
 diag_blocks = []
-conts_blocks = pats_blocks - rands_blocks
 for sub in range(len(subjects)):
     tg = []
     dg = []
@@ -318,6 +401,7 @@ cont_blocks = {}
 pat_blocks = {}
 rand_blocks = {}
 contrast_net = dict()
+pattern_net, random_net = dict(), dict()
 diag_net = dict()
 # data_type  = "scores_blocks_vect_0200_new"
 # data_type  = "scores_lobo_vector_new"
@@ -352,6 +436,8 @@ for network in tqdm(networks):
     pats_blocks, rands_blocks = np.array(pats_blocks), np.array(rands_blocks)
     contrast = pats_blocks - rands_blocks
     contrast_net[network] = contrast
+    pattern_net[network] = pats_blocks
+    random_net[network] = rands_blocks
     # mean box
     box_blocks_c = []
     box_blocks_p = []
@@ -381,6 +467,64 @@ for network in tqdm(networks):
     pat_blocks[network] = np.array(box_blocks_p)
     rand_blocks[network] = np.array(box_blocks_r)
     diag_net[network] = np.array(diag_blocks)
+
+# export time resolved diagonals
+idxt = np.where((timesg >= -1) & (timesg <= 1.5))[0]
+cont_tr = {}
+pat_tr, rand_tr = {}, {}
+for network in networks:
+    cont_tr[network] = []
+    pat_tr[network] = []
+    rand_tr[network] = []
+    for s in range(len(subjects)):
+        for b in range(23):
+            cont_tr[network].append(np.diag(contrast_net[network][s, b, idxt]))
+            pat_tr[network].append(np.diag(pattern_net[network][s, b, idxt]))
+            rand_tr[network].append(np.diag(random_net[network][s, b, idxt]))
+    cont_tr[network] = np.array(cont_tr[network]).reshape(len(subjects), 23, -1)
+    pat_tr[network] = np.array(pat_tr[network]).reshape(len(subjects), 23, -1)
+    rand_tr[network] = np.array(rand_tr[network]).reshape(len(subjects), 23, -1)
+
+# save time resolved diagonals
+for data, data_fname in zip([cont_tr, pat_tr, rand_tr], ['contrast', 'pattern', 'random']):
+    rows = list()
+    for i, network in enumerate(networks):
+        # get table
+        for j, subject in enumerate(subjects):
+            for t, time in enumerate(times):
+                rows.append({
+                    "network": network_names[i],
+                    "subject": subject,
+                    "time": t,
+                    "value": data[network].mean(1)[j, t]
+                })
+    df = pd.DataFrame(rows)
+    fname = f'pa_source_tr_{data_fname}_all.csv' if data_type.endswith("new") else f'pa_source_tr_{data_fname}.csv'
+    df.to_csv(FIGURES_DIR / "TM" / "data" / fname, index=False, sep=",")
+
+corr_network = {}
+for network in networks:
+    corr_network[network] = []
+    for s in range(len(subjects)):
+        corr_network[network].append(np.array([spear(learn_index_blocks.iloc[s], cont_tr[network][s, :, t])[0] for t in range(len(times))]))
+    corr_network[network] = np.array(corr_network[network])
+    corr_network[network], _, _ = fisher_z_and_ttest(corr_network[network])
+    
+# save time resolved diagonal correlations
+rows = list()
+for i, network in enumerate(networks):
+    # get table
+    for j, subject in enumerate(subjects):
+        for t, time in enumerate(times):
+            rows.append({
+                "network": network_names[i],
+                "subject": subject,
+                "time": t,
+                "value": corr_network[network][j, t]
+            })
+df = pd.DataFrame(rows)
+df_fname = 'timeg_source-tr_cont-corr_all.csv' if data_type.endswith("new") else 'timeg_source-tr_cont-corr.csv'
+df.to_csv(FIGURES_DIR / "TM" / "data" / df_fname, index=False, sep=",")
     
 ensured(FIGURES_DIR / "temp" / "timeg_pval")
 # Contrast
