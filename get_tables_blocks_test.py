@@ -477,36 +477,93 @@ for network in networks:
     pat_tr[network] = []
     rand_tr[network] = []
     for s in range(len(subjects)):
-        for b in range(23):
-            cont_tr[network].append(np.diag(contrast_net[network][s, b, idxt]))
-            pat_tr[network].append(np.diag(pattern_net[network][s, b, idxt]))
-            rand_tr[network].append(np.diag(random_net[network][s, b, idxt]))
-    cont_tr[network] = np.array(cont_tr[network]).reshape(len(subjects), 23, -1)
-    pat_tr[network] = np.array(pat_tr[network]).reshape(len(subjects), 23, -1)
-    rand_tr[network] = np.array(rand_tr[network]).reshape(len(subjects), 23, -1)
+    
+        cont_tr[network].append(np.diag(contrast_net[network].mean(1)[s]))
+        pat_tr[network].append(np.diag(pattern_net[network].mean(1)[s]))
+        rand_tr[network].append(np.diag(random_net[network].mean(1)[s]))
+    
+    cont_tr[network] = np.array(cont_tr[network])
+    pat_tr[network] = np.array(pat_tr[network])
+    rand_tr[network] = np.array(rand_tr[network])
+
+# get significant time points from GAMM csv --- contrast
+seg_df = pd.read_csv(FIGURES_DIR / "TM" / "em_segments_pa_tr_cont_source.csv")
+seg_df = seg_df[seg_df['metric'] == 'PA']
+# dictionary of boolean arrays
+sig_dict = {}
+for _, row in seg_df.iterrows():
+    arr = sig_dict.get(row["network"], np.zeros(len(idxt), dtype=bool))
+    arr[row["start"]:row["end"] + 1] = True
+    sig_dict[row["network"]] = arr
+sig_df = pd.read_csv(FIGURES_DIR / "TM" / "smooth_pa_tr_cont_source.csv")
+sig_df = sig_df[sig_df['metric'] == 'PA']
+for i, net in enumerate(sig_df['network'].unique()):
+    if net in sig_dict:
+        if sig_df[sig_df['network'] == net]['signif_holm'][i] == 'ns':
+            del sig_dict[net]
+
+fig, ax = plt.subplots(5, 2, sharey=True, sharex=False, layout='tight')
+for ax, network, name in zip(ax.flatten(), networks, network_names):
+    data = cont_tr[network][:, idxt]
+    mytime = timesg[idxt]
+    # mytime = timesg.copy()
+    ax.plot(mytime, data.mean(0), color="grey", alpha=0.5)
+    ax.axvspan(0, 0.2, color='grey', alpha=0.1)
+    ax.axhline(0, color='grey', linestyle='-', alpha=0.5)
+    # ax.axhline(0.25, color='grey', linestyle='-', alpha=0.5)
+    ax.set_title(name, fontstyle='italic')
+    sig = sig_dict[name] if name in sig_dict else np.zeros(data.shape[1], dtype=bool)
+    for start, end in contiguous_regions(sig):
+        ax.plot(mytime[start:end], data.mean(0)[start:end], alpha=1, zorder=10, color=c1)
+
+seg_df = pd.read_csv(FIGURES_DIR / "TM" / "em_segments_pa_tr_pat_rand_source.csv")
 
 # save time resolved diagonals
+idxt = np.where((timesg >= -1) & (timesg <= 1.5))[0]
 for data, data_fname in zip([cont_tr, pat_tr, rand_tr], ['contrast', 'pattern', 'random']):
     rows = list()
     for i, network in enumerate(networks):
         # get table
         for j, subject in enumerate(subjects):
-            for t, time in enumerate(times):
+            for t, idx in enumerate(idxt):
                 rows.append({
                     "network": network_names[i],
                     "subject": subject,
                     "time": t,
-                    "value": data[network].mean(1)[j, t]
+                    "value": data[network][j, idx] - 0.25 if data_fname in ['pattern', 'random'] else data[network][j, idx]
                 })
     df = pd.DataFrame(rows)
     fname = f'pa_source_tr_{data_fname}_all.csv' if data_type.endswith("new") else f'pa_source_tr_{data_fname}.csv'
     df.to_csv(FIGURES_DIR / "TM" / "data" / fname, index=False, sep=",")
 
+# export time resolved diagonals
+idxt = np.where((timesg >= -1) & (timesg <= 1.5))[0]
+cont_tr = {}
+pat_tr, rand_tr = {}, {}
+for network in tqdm(networks):
+    cont_tr[network] = []
+    pat_tr[network] = []
+    rand_tr[network] = []
+    for s in range(len(subjects)):
+        cont_b = []
+        pat_b = []
+        rand_b = []
+        for b in range(23):
+            cont_b.append(np.diag(contrast_net[network][s, b]))
+            pat_b.append(np.diag(pattern_net[network][s, b]))
+            rand_b.append(np.diag(random_net[network][s, b]))
+        cont_tr[network].append(np.array(cont_b))
+        pat_tr[network].append(np.array(pat_b))
+        rand_tr[network].append(np.array(rand_b))
+    cont_tr[network] = np.array(cont_tr[network])[:, :, idxt]
+    pat_tr[network] = np.array(pat_tr[network])[:, :, idxt]
+    rand_tr[network] = np.array(rand_tr[network])[:, :, idxt]
+
 corr_network = {}
 for network in networks:
     corr_network[network] = []
     for s in range(len(subjects)):
-        corr_network[network].append(np.array([spear(learn_index_blocks.iloc[s], cont_tr[network][s, :, t])[0] for t in range(len(times))]))
+        corr_network[network].append(np.array([spear(learn_index_blocks.iloc[s], cont_tr[network][s, :, t])[0] for t in range(len(idxt))]))
     corr_network[network] = np.array(corr_network[network])
     corr_network[network], _, _ = fisher_z_and_ttest(corr_network[network])
     
@@ -515,7 +572,7 @@ rows = list()
 for i, network in enumerate(networks):
     # get table
     for j, subject in enumerate(subjects):
-        for t, time in enumerate(times):
+        for t, _ in enumerate(idxt):
             rows.append({
                 "network": network_names[i],
                 "subject": subject,

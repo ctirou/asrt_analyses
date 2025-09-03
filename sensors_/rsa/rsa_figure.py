@@ -168,8 +168,8 @@ axd['A'].set_title(f'Mahalanobis distance within pairs', fontsize=13)
 ### B2 ### Similarity index
 
 gam_sig = pd.read_csv(FIGURES_DIR / "TM" / "segments_tr_sensors.csv")
-gam_sig = gam_sig[gam_sig['metric'] == 'RS_ALL']
-arr = np.zeros(82, dtype=bool)
+gam_sig = gam_sig[gam_sig['metric'] == 'RS']
+arr = np.zeros(len(times), dtype=bool)
 arr[gam_sig['start'][0]:gam_sig['end'][0] + 1] = True
 
 win = np.where((times >= 0.3) & (times <= 0.55))[0]
@@ -192,7 +192,7 @@ idx_rsa = np.where(sig)[0] # to compute mean later
 # Overlay significant regions with the specified color
 axd['C'].fill_between(times, diff_lh.mean(0) - sem, diff_lh.mean(0) + sem, where=sig, alpha=0.4, zorder=5, facecolor=c2)
 axd['C'].fill_between(times, diff_lh.mean(0) - sem, 0, where=sig, alpha=0.3, zorder=5, facecolor=c2)
-axd['C'].text(np.mean(times[sig]), 0.1, '*', fontsize=25, ha='center', va='center', color=c2, weight='bold')
+axd['C'].text(np.mean(times[sig]), -0.1, '*', fontsize=25, ha='center', va='center', color=c2, weight='bold')
 # mdiff = diff_lh[:, win].mean(1)
 # mdiff_sig = ttest_1samp(mdiff, 0)[1] < 0.05
 # if mdiff_sig:
@@ -205,6 +205,13 @@ axd['C'].set_xlabel('Time (s)', fontsize=11)
 axd['C'].set_title('Similarity index time course', fontsize=13)
 
 ### D ### Correlation with learning index
+
+gam_sig = pd.read_csv(FIGURES_DIR / "TM" / "segments_tr_sensors.csv")
+gam_sig = gam_sig[gam_sig['metric'] == 'RS CORR']
+arr = np.zeros(len(times), dtype=bool)
+arr[gam_sig['start'][1]:gam_sig['end'][1] + 1] = True
+
+
 # Center diff_b for each subject by subtracting their mean across all blocks and times
 diff_c = diff_b - np.nanmean(diff_b, axis=1, keepdims=True)
 axd['B'].axhline(0, color="grey", alpha=0.5)
@@ -213,6 +220,7 @@ all_rhos, _, _ = fisher_z_and_ttest(all_rhos)
 sem = np.nanstd(all_rhos, axis=0) / np.sqrt(len(subjects))
 p_values = decod_stats(all_rhos, -1)
 sig = p_values < 0.05
+sig = arr.copy()
 # Plot the entire line in the default color
 axd['B'].plot(times, np.nanmean(all_rhos, axis=0), alpha=1, zorder=10, color='C7')
 # Fill the entire area with a semi-transparent color
@@ -221,7 +229,7 @@ axd['B'].fill_between(times, np.nanmean(all_rhos, axis=0) - sem, np.nanmean(all_
 for start, end in contiguous_regions(sig):
     axd['B'].plot(times[start:end], np.nanmean(all_rhos, axis=0)[start:end], alpha=1, zorder=10, color=c6)
     cluster_center = np.mean(times[start:end])
-    axd['B'].text(cluster_center, 0.05, '*', fontsize=25, ha='center', va='center', color=c6, weight='bold')
+    axd['B'].text(cluster_center, -0.07, '*', fontsize=25, ha='center', va='center', color=c6, weight='bold')
 # Highlight significant regions
 axd['B'].fill_between(times, np.nanmean(all_rhos, axis=0) - sem, np.nanmean(all_rhos, axis=0) + sem, where=sig, alpha=0.4, zorder=10, facecolor=c6)
 axd['B'].fill_between(times, np.nanmean(all_rhos, axis=0) - sem, 0, where=sig, alpha=0.3, zorder=5, facecolor=c6)
