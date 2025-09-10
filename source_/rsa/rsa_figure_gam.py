@@ -127,7 +127,7 @@ cmap = plt.cm.get_cmap('tab20', len(network_names))
 cmap = sns.color_palette("colorblind", as_cmap=True)
 cmap = ['#0173B2','#DE8F05','#029E73','#D55E00','#CC78BC','#CA9161','#FBAFE4','#ECE133','#56B4E9', "#76B041"]
 
-plot_brains = True
+plot_brains = False
 
 fig, axd = plt.subplot_mosaic(
     design, 
@@ -250,7 +250,6 @@ for i, net in enumerate(sig_df['network'].unique()):
     if net in sig_dict:
         if sig_df[sig_df['network'] == net]['signif_holm'][i] == 'ns':
             del sig_dict[net]
-
 
 for i, (label, name, j) in enumerate(zip(networks, network_names, ['B', 'E', 'H', 'K', 'N', 'Q', 'T', 'W', 'Z', 'AC'])):
     plot_onset(axd[j])

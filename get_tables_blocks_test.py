@@ -105,6 +105,23 @@ df = pd.DataFrame(rows)
 fname = 'rsa_sensors_tr_all_corr.csv' if data_type.endswith("new") else 'rsa_sensors_tr_corr.csv'
 df.to_csv(FIGURES_DIR / "TM" / "data" / fname, index=False, sep=",")
 
+learn_index_blocks = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices_blocks.csv', sep=",", index_col=0)
+learn_index_blocks = learn_index_blocks.iloc[:, 3:].sub(learn_index_blocks.iloc[:, 3:].mean(axis=1), axis=0)
+all_rhos = np.array([[spear(learn_index_blocks.iloc[sub], diff_rp[sub, 3:, t])[0] for t in range(len(times))] for sub in range(len(subjects))])
+all_rhos, _, _ = fisher_z_and_ttest(all_rhos)
+# save table
+rows = list()
+for s, subject in enumerate(subjects):
+    for t, time in enumerate(times):
+        rows.append({
+            "subject": subject,
+            'time': t,
+            "value": all_rhos[s, t]
+        })
+df = pd.DataFrame(rows)
+fname = 'rsa_sensors_tr_no_prac_corr.csv'
+df.to_csv(FIGURES_DIR / "TM" / "data" / fname, index=False, sep=",")
+
 # RSA source --- blocks ---
 data_type = "rdm_blocks_vect_new" # "rdm_blocks_vect_new" for all trials or "rdm_blocks_vect" for correct trials only
 bsl_practice = False
@@ -112,10 +129,15 @@ networks = NETWORKS + ['Cerebellum-Cortex']
 network_names = NETWORK_NAMES + ['Cerebellum']
 diff_rp = {}
 corr_rp = {}
+learn_index_blocks = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices_blocks.csv', sep=",", index_col=0)
+corr_rp_no_prac = {}
+learn_index_blocks_no_prac = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices_blocks.csv', sep=",", index_col=0)
+learn_index_blocks_no_prac = learn_index_blocks_no_prac.iloc[:, 3:].sub(learn_index_blocks_no_prac.iloc[:, 3:].mean(axis=1), axis=0)
 for network in tqdm(networks):
     if not network in diff_rp:
         diff_rp[network] =  []
         corr_rp[network] = []
+        corr_rp_no_prac[network] = []
     for isub, subject in enumerate(subjects):
         res_path = RESULTS_DIR / 'RSA' / 'source' / network / data_type / subject
         # read behav
@@ -144,9 +166,12 @@ for network in tqdm(networks):
         diff = rand - pat
         diff_rp[network].append(diff)
         corr_rp[network].append([np.array([spear(learn_index_blocks.iloc[isub], diff[:, t])[0] for t in range(len(times))])])
+        corr_rp_no_prac[network].append([np.array([spear(learn_index_blocks_no_prac.iloc[isub], diff[3:, t])[0] for t in range(len(times))])])
     diff_rp[network] = np.array(diff_rp[network])
     corr_rp[network] = np.array(corr_rp[network]).squeeze()
     corr_rp[network], _, _ = fisher_z_and_ttest(corr_rp[network])
+    corr_rp_no_prac[network] = np.array(corr_rp_no_prac[network]).squeeze()
+    corr_rp_no_prac[network], _, _ = fisher_z_and_ttest(corr_rp_no_prac[network])
 
 # extract index from GAMM segments
 segments = pd.read_csv(FIGURES_DIR / "TM" / "segments_tr_sensors.csv")
@@ -215,7 +240,7 @@ df = pd.DataFrame(rows)
 fname = 'rsa_source_tr_all.csv' if data_type.endswith("new") else 'rsa_source_tr.csv'
 df.to_csv(FIGURES_DIR / "TM" / "data" / fname, index=False, sep=",")
 
-# save table
+# save table correlations
 rows = list()
 for i, network in enumerate(networks):
     # get table
@@ -231,6 +256,71 @@ df = pd.DataFrame(rows)
 fname = 'rsa_source_tr_all_corr.csv' if data_type.endswith("new") else 'rsa_source_tr_corr.csv'
 df.to_csv(FIGURES_DIR / "TM" / "data" / fname, index=False, sep=",")
 
+# save table correlations no practice
+rows = list()
+for i, network in enumerate(networks):
+    # get table
+    for j, subject in enumerate(subjects):
+        for t, time in enumerate(times):
+            rows.append({
+                "network": network_names[i],
+                "subject": subject,
+                "time": t,
+                "value": corr_rp_no_prac[network][j, t]
+            })
+df = pd.DataFrame(rows)
+fname = 'rsa_source_tr_all_corr_no_corr.csv' if data_type.endswith("new") else 'rsa_source_tr_corr.csv'
+df.to_csv(FIGURES_DIR / "TM" / "data" / fname, index=False, sep=",")
+
+seg_df = pd.read_csv("/Users/coum/MEGAsync/figures/TM/em_segments_rs_tr_source_no_prac.csv")
+seg_df = seg_df[seg_df['metric'] == 'RS CORR']
+# dictionary of boolean arrays
+sig_dict = {}
+for _, row in seg_df.iterrows():
+    arr = sig_dict.get(row["network"], np.zeros(82, dtype=bool))
+    arr[row["start"]:row["end"] + 1] = True
+    sig_dict[row["network"]] = arr
+sig_df = pd.read_csv(FIGURES_DIR / "TM" / "smooth_rs_tr_source_no_prac.csv")
+sig_df = sig_df[sig_df['metric'] == 'RS CORR']
+for i, net in enumerate(sig_df['network'].unique()):
+    if net in sig_dict:
+        if sig_df[sig_df['network'] == net]['signif_holm'][i+10] == 'ns':
+            del sig_dict[net]
+
+# plot it
+times = np.linspace(-0.2, 0.6, 82)
+cmap = ['#0173B2','#DE8F05','#029E73','#D55E00','#CC78BC','#CA9161','#FBAFE4','#ECE133','#56B4E9', "#76B041"]
+fig, axes = plt.subplots(5, 2, figsize=(7, 9), sharey=True, sharex=True, layout="tight")
+for i, ax in enumerate(axes.flatten()):
+    ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
+    all_rhos = corr_rp[networks[i]]
+    sem = np.std(all_rhos, axis=0) / np.sqrt(all_rhos.shape[0])
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.axhline(0, color='black', alpha=1)
+    network = networks[i]
+    # Main plot
+    ax.plot(times, all_rhos.mean(0), alpha=1, zorder=10, color='C7')
+        # Plot significant regions separately
+    sig = sig_dict[network_names[i]] if network_names[i] in sig_dict else np.zeros(all_rhos.shape[1], dtype=bool)
+    for start, end in contiguous_regions(sig):
+        ax.plot(times[start:end], all_rhos.mean(0)[start:end], alpha=1, zorder=10, color=cmap[i])
+    ax.fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, alpha=0.2, zorder=5, facecolor='C7')
+    # Highlight significant regions
+    ax.fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, where=sig, alpha=0.5, zorder=5, color=cmap[i])
+    ax.set_title(network_names[i], fontsize=13, fontstyle='italic')
+    
+    if ax in axes[:, 0]:
+        ax.set_ylabel("Spearman's rho", fontsize=11)
+    
+    # Only set xlabel for axes in the bottom row
+    if i >= (axes.shape[0] - 1) * axes.shape[1]:
+        ax.set_xlabel("Time (s)", fontsize=11)
+    
+plt.savefig("/Users/coum/MEGAsync/figures/RSA/source/rsa_source_no_prac_corr.pdf", transparent=True)
+plt.close(fig)
+
+
 """""
  - - ---- --- -- - -- --- - -- - - -- -- - - - - - - --- TEMPORAL GENERALIZATION -  - - - -- - - - - -  - - - - - - - - -- - - - - ---- --- - - - - - 
 """""
@@ -239,8 +329,6 @@ df.to_csv(FIGURES_DIR / "TM" / "data" / fname, index=False, sep=",")
 data_type = 'scores_lobotomized'
 subjects = SUBJS15
 times = np.linspace(-4, 4, 813)
-filt = np.where((times >= -1.5) & (times <= 3))[0]
-times_filt = times[filt]
 pats_blocks, rands_blocks = [], []
 for subject in tqdm(subjects):
     res_path = RESULTS_DIR / 'TIMEG' / 'sensors' / data_type / subject
@@ -262,16 +350,55 @@ pats_blocks = np.array(pats_blocks)
 rands_blocks = np.array(rands_blocks)
 conts_blocks = pats_blocks - rands_blocks
 
+# Plot conts_blocks with imshow
+fig, ax = plt.subplots(layout='constrained')
+im = ax.imshow(
+    # conts_blocks.mean((0, 1)),
+    pats_blocks.mean((0, 1)),
+    interpolation="lanczos",
+    origin="lower",
+    aspect="auto",
+    cmap="RdBu_r",
+    extent=[times[0], times[-1], times[0], times[-1]],
+    # vmin=-0.05,
+    # vmax=0.05
+    vmin=0.2,
+    vmax=0.3
+)
+ax.set_title(subject)
+ax.set_xlabel("Train time (s)")
+ax.set_ylabel("Test time (s)")
+fig.colorbar(im, ax=ax, orientation='vertical', fraction=0.02)
+fig.suptitle("Temporal Generalization Contrast (conts_blocks)")
+plt.show()
+
 # export time resolved diagonals
 cont_tr = []
 pat_tr, rand_tr = [], []
 idx = np.where((times >= -1.5) & (times <= 3))[0]
 for s in range(len(subjects)):
-    cont_tr.append(np.array([np.diag(conts_blocks[s, b, idx]) for b in range(23)]))
-    pat_tr.append(np.array([np.diag(pats_blocks[s, b, idx]) for b in range(23)]))
-    rand_tr.append(np.array([np.diag(rands_blocks[s, b, idx]) for b in range(23)]))
+    scont, spat, srand = [], [], []
+    for b in range(23):
+        scont.append(np.diag(conts_blocks[s, b, idx]))
+        spat.append(np.diag(pats_blocks[s, b, idx]))
+        srand.append(np.diag(rands_blocks[s, b, idx]))
+    cont_tr.append(np.array(scont))
+    pat_tr.append(np.array(spat))
+    rand_tr.append(np.array(srand))
+    # cont_tr.append(np.array([np.diag(conts_blocks[s, b, idx]) for b in range(23)]))
+    # pat_tr.append(np.array([np.diag(pats_blocks[s, b, idx]) for b in range(23)]))
+    # rand_tr.append(np.array([np.diag(rands_blocks[s, b, idx]) for b in range(23)]))
 cont_tr = np.array(cont_tr)
 pat_tr, rand_tr = np.array(pat_tr), np.array(rand_tr)
+
+fig, ax = plt.subplots(figsize=(7, 4), layout='tight')
+ax.axvspan(0, 0.2, color='grey', alpha=0.1)
+ax.plot(times[idx], pat_tr.mean((0, 1)), label='Pattern')
+ax.plot(times[idx], rand_tr.mean((0, 1)), label='Random')
+ax.axhline(0.25, color='grey', linestyle='-', alpha=0.5)
+# ax.plot(times[idx], cont_tr.mean((0, 1)), label='Contrast')
+# ax.axhline(0, color='grey', linestyle='-', alpha=0.5)
+ax.legend()
 
 # save table for mean box
 for data, data_fname in zip([cont_tr, pat_tr, rand_tr], ['contrast', 'pattern', 'random']):

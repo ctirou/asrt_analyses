@@ -125,9 +125,9 @@ vmin, vmax = 0.2, 0.3
 cmap = ['#0173B2','#DE8F05','#029E73','#D55E00','#CC78BC','#CA9161','#FBAFE4','#ECE133','#56B4E9', "#76B041"]
 sig_color = "#00BFA6"
 sig_color = '#708090'
-plot_brains = True
+plot_brains = False
 
-fig, axes = plt.subplot_mosaic(design, figsize=(12, 16), sharey=False, sharex=False, layout="constrained",
+fig, axes = plt.subplot_mosaic(design, figsize=(13, 18), sharey=False, sharex=False, layout="constrained",
                             #    gridspec_kw={'height_ratios': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1.5],
                                gridspec_kw={'height_ratios': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
                                             'width_ratios': [.2, .2, .5, .5, .5]})
@@ -278,11 +278,11 @@ for i, (network, contrast_idx) in enumerate(zip(networks, ['a3', 'b3', 'c3', 'd3
         cbar = fig.colorbar(im, ax=axes[contrast_idx], location='top', fraction=0.1, ticks=[vminC, vmaxC])
         cbar.set_label("Difference in accuracy")
     
-    if msig[i]:
-        print(f"Significant contrast for {network} at time {times[win].mean():.2f} s")
-        rect = plt.Rectangle([-0.75, -0.75], 0.75, 0.75, fill=False, edgecolor="black", linestyle='--', lw=1, zorder=10)
-        axes[contrast_idx].add_patch(rect)
-        axes[contrast_idx].text(-0.8, -0.5, "*", fontsize=20, color="black", ha='right', va='center', weight='normal')
+    # if msig[i]:
+    #     print(f"Significant contrast for {network} at time {times[win].mean():.2f} s")
+    #     rect = plt.Rectangle([-0.75, -0.75], 0.75, 0.75, fill=False, edgecolor="black", linestyle='--', lw=1, zorder=10)
+    #     axes[contrast_idx].add_patch(rect)
+    #     axes[contrast_idx].text(-0.8, -0.5, "*", fontsize=20, color="black", ha='right', va='center', weight='normal')
 
 # percept = []
 # mean_net_sess = []

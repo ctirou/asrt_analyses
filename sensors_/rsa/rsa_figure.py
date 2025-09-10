@@ -177,6 +177,7 @@ axd['C'].axhline(0, color='grey', alpha=0.5)
 pval = decod_stats(diff_lh, -1)
 sig = pval < 0.05
 sig = arr.copy()
+sig_rsa = sig.copy()
 pval_unc = ttest_1samp(diff_lh, 0)[1]
 sig_unc = pval_unc < 0.05
 axd['C'].plot(times, diff_lh.mean(0), alpha=1, zorder=10, color='C7')
@@ -210,7 +211,6 @@ gam_sig = pd.read_csv(FIGURES_DIR / "TM" / "segments_tr_sensors.csv")
 gam_sig = gam_sig[gam_sig['metric'] == 'RS CORR']
 arr = np.zeros(len(times), dtype=bool)
 arr[gam_sig['start'][1]:gam_sig['end'][1] + 1] = True
-
 
 # Center diff_b for each subject by subtracting their mean across all blocks and times
 diff_c = diff_b - np.nanmean(diff_b, axis=1, keepdims=True)
@@ -247,6 +247,8 @@ axd['B'].set_title('Similarity index and learning correlation time course', font
 ### C2 ### Learning index fit
 cmap = plt.cm.get_cmap('tab20', len(subjects))
 idx_rsa = np.where((times >= 0.3) & (times <= 0.55))[0]
+idx_rsa = sig_rsa.copy()
+idx_rsa = sig.copy()
 mdiff = diff_b[:, :, idx_rsa].mean(-1)
 mdiff = mdiff - np.nanmean(mdiff, axis=1, keepdims=True)  # center by subject
 slopes, intercepts = [], []
@@ -278,5 +280,73 @@ axd['D'].legend(frameon=False, title=ptext, loc='lower right')
 
 fname = 'gam_rsa_new' if data_type.endswith('new') else 'gam_rsa'
 fname += '_bsl.pdf' if bsl_practice else '_no_bsl.pdf'
+plt.savefig(figures_dir /  fname, transparent=True)
+plt.close()
+
+# ---------------------- No practice correlation figure ----------------------
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 3), layout='tight')
+for ax in (ax1, ax2):
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+
+# Spearman's rho time course
+gam_sig = pd.read_csv(FIGURES_DIR / "TM" / "segments_tr_sensors_no_prac.csv")
+gam_sig = gam_sig[gam_sig['metric'] == 'RS CORR']
+arr2 = np.zeros(len(times), dtype=bool)
+arr2[gam_sig['start'][1]:gam_sig['end'][1] + 1] = True
+diff_c = diff_b - np.nanmean(diff_b, axis=1, keepdims=True)
+ax1.axvspan(0, 0.2, facecolor='grey', edgecolor=None, zorder=-1, alpha=.1)
+ax1.axhline(0, color="grey", alpha=0.5)
+all_rhos = np.array([[spear(learn_index_blocks.iloc[sub, 3:], diff_c[sub, 3:, t])[0] for t in range(len(times))] for sub in range(len(subjects))])
+all_rhos, _, _ = fisher_z_and_ttest(all_rhos)
+sem = np.nanstd(all_rhos, axis=0) / np.sqrt(len(subjects))
+# p_values = decod_stats(all_rhos, -1)
+# sig = p_values < 0.05
+sig = arr2.copy()
+ax1.plot(times, np.nanmean(all_rhos, axis=0), alpha=1, zorder=10, color='C7')
+ax1.fill_between(times, np.nanmean(all_rhos, axis=0) - sem, np.nanmean(all_rhos, axis=0) + sem, alpha=0.2, zorder=5, facecolor='C7')
+for start, end in contiguous_regions(sig):
+    ax1.plot(times[start:end], np.nanmean(all_rhos, axis=0)[start:end], alpha=1, zorder=10, color=c6)
+    cluster_center = np.mean(times[start:end])
+    ax1.text(cluster_center, -0.13, '***', fontsize=25, ha='center', va='center', color=c6, weight='bold')
+ax1.fill_between(times, np.nanmean(all_rhos, axis=0) - sem, np.nanmean(all_rhos, axis=0) + sem, where=sig, alpha=0.4, zorder=10, facecolor=c6)
+ax1.fill_between(times, np.nanmean(all_rhos, axis=0) - sem, 0, where=sig, alpha=0.3, zorder=5, facecolor=c6)
+ax1.set_ylabel("Spearman's rho", fontsize=11)
+ax1.set_xlabel('Time (s)', fontsize=11)
+ax1.set_title('Similarity index and learning correlation time course', fontsize=13)
+
+# Learning index fit
+cmap = plt.cm.get_cmap('tab20', len(subjects))
+idx_rsa = arr.copy()
+mdiff = diff_b[:, 3:, idx_rsa].mean(-1)
+mdiff = mdiff - np.nanmean(mdiff, axis=1, keepdims=True)  # center by subject
+slopes, intercepts = [], []
+# Plot for individual subjects
+for sub, subject in enumerate(subjects):
+    slope, intercept = np.polyfit(mdiff[sub], learn_index_blocks.iloc[sub, 3:], 1)
+    ax2.scatter(mdiff[sub], learn_index_blocks.iloc[sub, 3:], alpha=0.3)
+    ax2.plot(mdiff[sub], slope * mdiff[sub] + intercept, alpha=0.6)
+    slopes.append(slope)
+    intercepts.append(intercept)
+# Plot the mean fit line over the full range of timeg
+rangee = np.linspace(mdiff.min(), mdiff.max(), 100)
+mean_slope = np.mean(slopes)
+mean_intercept = np.mean(intercepts)
+ax2.plot(rangee, mean_slope * rangee + mean_intercept, color='black', lw=4, label='Mean fit')
+ax2.set_xlabel('Mean similarity index', fontsize=11)
+ax2.set_ylabel('Learning index (ms)', fontsize=11)
+ax2.set_title(f'Similarity index and learning fit', fontsize=13)
+rhos = []
+for sub in range(len(subjects)):
+    r, p = spear(mdiff[sub], learn_index_blocks.iloc[sub, 3:])
+    rhos.append(r)
+pval = ttest_1samp(rhos, 0)[1]
+print(f"Spearman's rho: {np.mean(rhos):.2f}, p-value: {pval:.3f}")
+ptext = f"p = {pval:.2f}" if pval > 0.001 else "p < 0.001"
+ax2.legend(frameon=False, title=ptext, loc='lower right')
+if pval < 0.05:
+    ax2.text(-1.5, -25, '*', fontsize=25, ha='center', va='center', color='black', weight='bold')
+
+fname = 'rsa_no_prac_corr.pdf'
 plt.savefig(figures_dir /  fname, transparent=True)
 plt.close()
