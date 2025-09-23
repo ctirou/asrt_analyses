@@ -195,7 +195,6 @@ for i, net in enumerate(sig_df['network'].unique()):
         if sig_df[sig_df['network'] == net]['signif_holm'][i] == 'ns':
             del sig_dict[net]
 
-
 for i, (network, pattern_idx) in enumerate(zip(networks, ['A', 'D', 'G', 'J', 'M', 'P', 'S', 'V', 'Y', 'AB'])):
     plot_onset(axes[pattern_idx])
     data = patterns[network][:, 3:].mean(1)
@@ -224,6 +223,10 @@ for i, (network, pattern_idx) in enumerate(zip(networks, ['A', 'D', 'G', 'J', 'M
         axes[pattern_idx].set_title('Pattern')
     elif pattern_idx == 'AB':
         axes[pattern_idx].set_xlabel('Time (s)', fontsize=11)
+    sig_level = sig_df[sig_df['network'] == network_names[i]]['signif_holm'].values[0]
+    if sig_level != 'ns':
+        axes[pattern_idx].text(0.5, 33, sig_level, fontsize=20, ha='center', va='center', color=cmap[i], weight='bold')
+    
 
 ### Random ###    
 # Sig from GAMM
@@ -270,6 +273,9 @@ for i, (network, random_idx) in enumerate(zip(networks, ['B', 'E', 'H', 'K', 'N'
         axes[random_idx].set_title('Random')
     if random_idx == 'AC':
         axes[random_idx].set_xlabel('Time (s)', fontsize=11)
+    sig_level = sig_df[sig_df['network'] == network_names[i]]['signif_holm'].values[0]
+    if sig_level != 'ns':
+        axes[random_idx].text(0.5, 33, sig_level, fontsize=20, ha='center', va='center', color=cmap[i], weight='bold')
 
 ### Contrast ###
 win = np.where((times >= -0.5) & (times < 0))[0]
@@ -324,7 +330,7 @@ for i, (network, contrast_idx) in enumerate(zip(networks, ['C', 'F', 'I', 'L', '
     axes[contrast_idx].fill_between(times, data.mean(0) - sem, 0, where=sig, alpha=0.3, zorder=5, facecolor=cmap[i])
     axes[contrast_idx].axhline(0, color='grey', alpha=.5)
     axes[contrast_idx].set_ylabel('Diff in acc. (%)', fontsize=11)
-    axes[contrast_idx].set_ylim(-2, 4)
+    axes[contrast_idx].set_ylim(-2, 5)
     axes[contrast_idx].set_yticks(np.arange(0, 5, 2))
     axes[contrast_idx].set_yticklabels(np.arange(0, 5, 2))
     # if msig[i]:
@@ -333,6 +339,9 @@ for i, (network, contrast_idx) in enumerate(zip(networks, ['C', 'F', 'I', 'L', '
         axes[contrast_idx].set_title('Contrast\n(Pattern - Random)')
     elif contrast_idx == 'AD':
         axes[contrast_idx].set_xlabel('Time (s)', fontsize=11)
+    sig_level = sig_df[sig_df['network'] == network_names[i]]['signif_holm'].values[0]
+    if sig_level != 'ns':
+        axes[contrast_idx].text(-0.5, 4, sig_level, fontsize=20, ha='center', va='center', color=cmap[i], weight='bold')
 
 fig.savefig(figures_dir / "timeg-diag-gamm.pdf", transparent=True)
 

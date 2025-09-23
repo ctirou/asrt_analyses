@@ -127,7 +127,7 @@ cmap = plt.cm.get_cmap('tab20', len(network_names))
 cmap = sns.color_palette("colorblind", as_cmap=True)
 cmap = ['#0173B2','#DE8F05','#029E73','#D55E00','#CC78BC','#CA9161','#FBAFE4','#ECE133','#56B4E9', "#76B041"]
 
-plot_brains = False
+plot_brains = True
 
 fig, axd = plt.subplot_mosaic(
     design, 
@@ -237,15 +237,15 @@ for i, (label, name, l) in enumerate(zip(networks, network_names,  \
 ### Plot similarity index ###
 # get significant time points from GAMM csv
 seg_df = pd.read_csv(FIGURES_DIR / "TM" / "em_segments_rs_tr_source.csv")
-seg_df = seg_df[seg_df['metric'] == 'RS_ALL']
+seg_df = seg_df[seg_df['metric'] == 'RS']
 # dictionary of boolean arrays
 sig_dict = {}
 for _, row in seg_df.iterrows():
     arr = sig_dict.get(row["network"], np.zeros(82, dtype=bool))
     arr[row["start"]:row["end"] + 1] = True
     sig_dict[row["network"]] = arr
-sig_df = pd.read_csv(FIGURES_DIR / "TM" / "smooth_p_rs_tr_source.csv")
-sig_df = sig_df[sig_df['metric'] == 'RS_ALL']
+sig_df = pd.read_csv(FIGURES_DIR / "TM" / "smooth_rs_tr_source.csv")
+sig_df = sig_df[sig_df['metric'] == 'RS']
 for i, net in enumerate(sig_df['network'].unique()):
     if net in sig_dict:
         if sig_df[sig_df['network'] == net]['signif_holm'][i] == 'ns':
@@ -277,9 +277,27 @@ for i, (label, name, j) in enumerate(zip(networks, network_names, ['B', 'E', 'H'
         axd[j].set_xlabel('Time (s)', fontsize=11)
     if j == 'B':
         axd[j].set_title('Similarity index')
+    sig_level = sig_df[sig_df['network'] == name]['signif_holm'].values[0]
+    if sig_level != 'ns':
+        axd[j].text(0.4, -0.35, sig_level, fontsize=20, ha='center', va='bottom', color=cmap[i], weight='bold')
     axd[j].set_ylim(-0.4, 0.6)
 
 ### Plot subject x learning index correlation ###
+seg_df = pd.read_csv(FIGURES_DIR / "TM" / "em_segments_rs_tr_source.csv")
+seg_df = seg_df[seg_df['metric'] == 'RS CORR']
+# dictionary of boolean arrays
+sig_dict = {}
+for _, row in seg_df.iterrows():
+    arr = sig_dict.get(row["network"], np.zeros(82, dtype=bool))
+    arr[row["start"]:row["end"] + 1] = True
+    sig_dict[row["network"]] = arr
+sig_df = pd.read_csv(FIGURES_DIR / "TM" / "smooth_rs_tr_source.csv")
+sig_df = sig_df[sig_df['metric'] == 'RS CORR']
+for i, net in enumerate(sig_df['network'].unique()):
+    if net in sig_dict:
+        if sig_df[sig_df['network'] == net]['signif_holm'][i + 10] == 'ns':
+            del sig_dict[net]
+
 xmin, xmax = 0.3, 0.55
 win = np.where((times >= xmin) & (times <= xmax))[0]
 for i, (label, name, j) in enumerate(zip(networks, network_names, ['C', 'F', 'I', 'L', 'O', 'R', 'U', 'X', 'AA', 'AD'])):
@@ -294,6 +312,7 @@ for i, (label, name, j) in enumerate(zip(networks, network_names, ['C', 'F', 'I'
     sig_unc = p_values_unc < 0.05
     p_values = decod_stats(all_rhos, -1)
     sig = p_values < 0.05
+    sig = sig_dict[name] if name in sig_dict else np.zeros(all_rhos.shape[1], dtype=bool)
     # Main plot
     axd[j].plot(times, all_rhos.mean(0), alpha=1, label='Random - Pattern', zorder=10, color='C7')
     # Plot significant regions separately
@@ -318,13 +337,16 @@ for i, (label, name, j) in enumerate(zip(networks, network_names, ['C', 'F', 'I'
     # axd[j].legend(frameon=False, loc="lower right")
     if j == 'C':
         axd[j].set_title('Similarity index\n& learning correlation')
-    axd[j].set_ylim(-.5, .5)
-    axd[j].set_yticks([-0.5, 0, 0.5])
-    m_rho = np.nanmean(all_rhos[:, win], axis=1)
-    m_rho_sig = ttest_1samp(m_rho, 0)[1] < 0.05
-    if m_rho_sig:
-        axd[j].fill_between(times[win], 0.3, 0.33, alpha=0.7, zorder=5, facecolor=cmap[i])
-        axd[j].text((xmin + xmax) / 2, 0.37, '*', fontsize=20, ha='center', va='center', color=cmap[i], weight='bold')
+    sig_level = sig_df[sig_df['network'] == name]['signif_holm'].values[0]
+    if sig_level != 'ns':
+        axd[j].text(0.4, -0.2, sig_level, fontsize=20, ha='center', va='bottom', color=cmap[i], weight='bold')
+    axd[j].set_ylim(-.3, .3)
+    axd[j].set_yticks([-0.3, 0, 0.3])
+    # m_rho = np.nanmean(all_rhos[:, win], axis=1)
+    # m_rho_sig = ttest_1samp(m_rho, 0)[1] < 0.05
+    # if m_rho_sig:
+    #     axd[j].fill_between(times[win], 0.3, 0.33, alpha=0.7, zorder=5, facecolor=cmap[i])
+    #     axd[j].text((xmin + xmax) / 2, 0.37, '*', fontsize=20, ha='center', va='center', color=cmap[i], weight='bold')
 
 fname = 'rsa_new_gam.pdf'
 # fname = 'rsa_new_gam_uncorr.pdf'

@@ -210,11 +210,11 @@ axlow.set_ylabel("Learning index (ms)", fontsize=12)
 axlow.spines['top'].set_visible(False)
 axlow.spines['right'].set_visible(False)
 axlow.set_xticklabels(['Practice', '1', '2', '3', '4'])
-axlow.set_xlabel("Session", fontsize=12)
+axlow.set_xlabel("Run", fontsize=12)
 # Add asterisks above all mean learning indices
 for session in range(5):
     t_stat, p_value = ttest_1samp(learn_index_df.iloc[:, session], 0)
-    print(f"Session {session} - t-statistic: {t_stat:.3f}, p-value: {p_value:.5f}")
+    print(f"Run {session} - t-statistic: {t_stat:.3f}, p-value: {p_value:.5f}")
 for i, (mean_li, std_li) in enumerate(zip(learning_indices_mean, learning_indices_stderr)):
     if i == 1:
         axlow.annotate('*', (sessions[i], mean_li + std_li + 3), ha='center', color='black', fontweight='bold', fontsize=14)

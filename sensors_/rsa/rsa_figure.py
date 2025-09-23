@@ -177,7 +177,6 @@ axd['C'].axhline(0, color='grey', alpha=0.5)
 pval = decod_stats(diff_lh, -1)
 sig = pval < 0.05
 sig = arr.copy()
-sig_rsa = sig.copy()
 pval_unc = ttest_1samp(diff_lh, 0)[1]
 sig_unc = pval_unc < 0.05
 axd['C'].plot(times, diff_lh.mean(0), alpha=1, zorder=10, color='C7')
@@ -193,7 +192,7 @@ idx_rsa = np.where(sig)[0] # to compute mean later
 # Overlay significant regions with the specified color
 axd['C'].fill_between(times, diff_lh.mean(0) - sem, diff_lh.mean(0) + sem, where=sig, alpha=0.4, zorder=5, facecolor=c2)
 axd['C'].fill_between(times, diff_lh.mean(0) - sem, 0, where=sig, alpha=0.3, zorder=5, facecolor=c2)
-axd['C'].text(np.mean(times[sig]), -0.1, '*', fontsize=25, ha='center', va='center', color=c2, weight='bold')
+axd['C'].text(np.mean(times[sig]), -0.1, '***', fontsize=25, ha='center', va='center', color=c2, weight='bold')
 # mdiff = diff_lh[:, win].mean(1)
 # mdiff_sig = ttest_1samp(mdiff, 0)[1] < 0.05
 # if mdiff_sig:
@@ -206,7 +205,6 @@ axd['C'].set_xlabel('Time (s)', fontsize=11)
 axd['C'].set_title('Similarity index time course', fontsize=13)
 
 ### D ### Correlation with learning index
-
 gam_sig = pd.read_csv(FIGURES_DIR / "TM" / "segments_tr_sensors.csv")
 gam_sig = gam_sig[gam_sig['metric'] == 'RS CORR']
 arr = np.zeros(len(times), dtype=bool)
@@ -247,8 +245,6 @@ axd['B'].set_title('Similarity index and learning correlation time course', font
 ### C2 ### Learning index fit
 cmap = plt.cm.get_cmap('tab20', len(subjects))
 idx_rsa = np.where((times >= 0.3) & (times <= 0.55))[0]
-idx_rsa = sig_rsa.copy()
-idx_rsa = sig.copy()
 mdiff = diff_b[:, :, idx_rsa].mean(-1)
 mdiff = mdiff - np.nanmean(mdiff, axis=1, keepdims=True)  # center by subject
 slopes, intercepts = [], []
@@ -266,17 +262,19 @@ mean_intercept = np.mean(intercepts)
 axd['D'].plot(rangee, mean_slope * rangee + mean_intercept, color='black', lw=4, label='Mean fit')
 axd['D'].set_xlabel('Mean similarity index', fontsize=11)
 axd['D'].set_ylabel('Learning index (ms)', fontsize=11)
-axd['D'].set_title(f'Similarity index and learning fit', fontsize=13)
+axd['D'].set_title(f'Subject-centered similarity index and learning fit', fontsize=13)
 rhos = []
 for sub in range(len(subjects)):
     r, p = spear(mdiff[sub], learn_index_blocks.iloc[sub])
     rhos.append(r)
 pval = ttest_1samp(rhos, 0)[1]
+rval_m = np.mean(rhos)
+rval_sem = np.std(rhos) / np.sqrt(len(subjects))
 print(f"Spearman's rho: {np.mean(rhos):.2f}, p-value: {pval:.3f}")
-ptext = f"p = {pval:.2f}" if pval > 0.001 else "p < 0.001"
+ptext = f"R = {rval_m:.2f} ± {rval_sem:.2f}\n$p$ = {pval:.2f}" if pval > 0.001 else f"R = {rval_m:.2f} ± {rval_sem:.2f}\n$p$ < 0.001"
 axd['D'].legend(frameon=False, title=ptext, loc='lower right')
-# if pval < 0.05:
-#     axd['D'].text(-1.13, 10, '*', fontsize=25, ha='center', va='center', color='black', weight='bold')
+if pval < 0.05:
+    axd['D'].text(-1.3, -40, '*', fontsize=25, ha='center', va='center', color='black', weight='bold')
 
 fname = 'gam_rsa_new' if data_type.endswith('new') else 'gam_rsa'
 fname += '_bsl.pdf' if bsl_practice else '_no_bsl.pdf'
