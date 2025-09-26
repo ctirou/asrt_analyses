@@ -23,7 +23,12 @@ n = len(subjects)
 
 subdict = {}
 learn_index_dict = {}
+
 learn_index_blocks_d = {}
+pattern_blocks = {}
+random_high_blocks = {}
+random_low_blocks = {}
+all_blocks = {}
 
 for subject in tqdm(subjects):
     
@@ -36,7 +41,12 @@ for subject in tqdm(subjects):
     
     subdict[subject] = {}
     learn_index_dict[subject] = {}
+    
     learn_index_blocks_d[subject] = {}
+    pattern_blocks[subject] = {}
+    random_high_blocks[subject] = {}
+    random_low_blocks[subject] = {}
+    all_blocks[subject] = {}
     
     for i, behav_session in enumerate(behav_sessions):
         
@@ -101,13 +111,17 @@ for subject in tqdm(subjects):
         for block in nblocks:
             
             idx = "0" + str(block) if i == 0 else str(block)
-            # learn_index_blocks_d[subject][idx] = {'pattern': [], 'random_high': []}
+
             learn_index_blocks_d[subject][idx] = 0
+            pattern_blocks[subject][idx] = 0
+            random_high_blocks[subject][idx] = 0
             
             pat, rand = [], []
             one, two = [], []
+            all_of_them = []
             for j, _ in enumerate(behav_df.RT):
                 if behav_df.block[j] == block:
+                    all_of_them.append(behav_df.RT[j])
                     if behav_df.triplet[j] == 30:
                         pat.append(behav_df.RT[j])
                     elif behav_df.triplet[j] == 32:
@@ -121,43 +135,108 @@ for subject in tqdm(subjects):
             index = np.mean(rand) - np.mean(pat)
             prac_index = np.mean(two) - np.mean(one) if i == 0 else 0
             learn_index_blocks_d[subject][idx] = index if idx not in ['01', '02', '03'] else prac_index
-                
-# Save session learning indices to CSV
-learn_index_df = pd.DataFrame.from_dict(learn_index_dict, orient='index')
-if not op.exists(figures_dir / 'behav' / 'learning_indices15.csv'):
-    learn_index_df.to_csv(figures_dir / 'behav' / 'learning_indices15.csv', sep='\t')
+            
+            pattern_blocks[subject][idx] = np.mean(pat) if idx not in ['01', '02', '03'] else np.mean(one)
+            random_high_blocks[subject][idx] = np.mean(rand) if idx not in ['01', '02', '03'] else np.mean(two)
+            all_blocks[subject][idx] = np.mean(all_of_them)
 
+color1 = "#5B9BD5"
+color1 = "#FFD966"
+color2 = "#61CBF5"
+color2 = "#FF718A"
+color3 = "#A6CAEC"
+color4 = "black" 
 
+# ----------------------------------- USING BLOCKS -----------------------------------                
 # Save block learning indices to CSV
-from scipy.ndimage import gaussian_filter1d
 learn_index_blocks_df = pd.DataFrame.from_dict(learn_index_blocks_d, orient='index')
 if not op.exists(figures_dir / 'behav' / 'learning_indices_blocks.csv'):
     learn_index_blocks_df.to_csv(figures_dir / 'behav' / 'learning_indices_blocks.csv', sep=',')
+pattern_blocks_df = pd.DataFrame.from_dict(pattern_blocks, orient='index')
+if not op.exists(figures_dir / 'behav' / 'pattern_blocks.csv'):
+    pattern_blocks_df.to_csv(figures_dir / 'behav' / 'pattern_blocks.csv', sep=',')
+random_high_blocks_df = pd.DataFrame.from_dict(random_high_blocks, orient='index')
+if not op.exists(figures_dir / 'behav' / 'random_high_blocks.csv'):
+    random_high_blocks_df.to_csv(figures_dir / 'behav' / 'random_high_blocks.csv', sep=',')
+all_blocks_df = pd.DataFrame.from_dict(all_blocks, orient='index')
+if not op.exists(figures_dir / 'behav' / 'all_blocks.csv'):
+    all_blocks_df.to_csv(figures_dir / 'behav' / 'all_blocks.csv', sep=',')
 
 # Plot blocks performance
 block_labels = ['01', '02', '03'] + [str(i) for i in range(1, 21)]
 fig, ax = plt.subplots(1, 1, figsize=(13, 5), layout="tight")
 plt.rcParams.update({'font.family': 'serif', 'font.serif': 'Arial'})
 learning_indices_mean = learn_index_blocks_df.mean(axis=0)
-learning_indices_stderr = learn_index_blocks_df.sem(axis=0)
+learning_indices_stderr = learn_index_blocks_df.std(axis=0)/len(subjects)
 bar_width = 0.5  # Adjust the width of the bars
 ax.bar(block_labels, learning_indices_mean, yerr=learning_indices_stderr, alpha=0.7, capsize=5, color="#46ACC8", width=bar_width)
-# Calculate Gaussian-smoothed curve for smoothing
-sigma = 1  # Standard deviation for Gaussian kernel; adjust for more/less smoothing
-smooth_mean = gaussian_filter1d(learning_indices_mean, sigma=sigma, mode='nearest')
-ax.plot(block_labels, smooth_mean, color='red', linewidth=2, label='Smoothed')
 ax.legend(frameon=False)
 ax.set_ylabel("Learning index", fontsize=12)
 ax.spines['top'].set_visible(False)
 ax.spines['right'].set_visible(False)
 ax.set_xlabel("Blocks", fontsize=12)
-# # Add asterisks above all mean random values
-# for i, (mean_li, std_li) in enumerate(zip(learning_indices_mean, learning_indices_stderr)):
-#     if i not in [0, 1, 2]:
-#         ax.annotate('*', (block_labels[i], mean_li + std_li + 0.005), ha='center', color='black', fontweight='bold', fontsize=12)
 fig.suptitle('Learning index per block', fontsize=16)
-fig.savefig(figures_dir / 'behav' / 'learning_index_blocks.pdf', transparent=True)
-plt.close(fig)
+# fig.savefig(figures_dir / 'behav' / 'learning_index_blocks.pdf', transparent=True)
+# plt.close(fig)
+
+# Combined RT and learning index
+fig, ax = plt.subplots(1, 1, figsize=(6, 6), layout="tight")
+plt.rcParams.update({'font.family': 'serif', 'font.serif': 'Arial'})
+ax.autoscale()
+blocks = ['01', '02', '03'] + [str(i) for i in range(1, 21)]
+x = np.arange(len(blocks))  
+width = 0.3
+# Reaction times
+for subject in subjects:
+    for j, i in enumerate(blocks):
+        xpos = x[j]
+        # All (center, no dodge)
+        ax.scatter(xpos, all_blocks_df.loc[subject][i],
+                   color=color4, marker=".", alpha=0.2)
+        if i not in ['01', '02', '03']:
+            # Pattern (dodged left)
+            ax.scatter(xpos - width, pattern_blocks_df.loc[subject][i],
+                       color=color1, marker=".", alpha=0.3)
+            # Random (dodged right)
+            ax.scatter(xpos + width, random_high_blocks_df.loc[subject][i],
+                       color=color2, marker=".", alpha=0.2)
+ax.plot(x, all_blocks_df.mean(axis=0), '-o',
+        color=color4, label="All", markersize=7, alpha=.7)
+ax.plot(x[3:] - width, pattern_blocks_df.mean(axis=0)[3:], '-o',
+        color=color1, label="Pattern", markersize=7, alpha=1)
+ax.plot(x[3:] + width, random_high_blocks_df.mean(axis=0)[3:], '-o',
+        color=color2, label="Random", markersize=7, alpha=1)
+ax.legend(loc='lower left', frameon=False, title=f"n = {n}")
+ax.set_ylabel("Reaction time (ms)", fontsize=12)
+ax.spines['top'].set_visible(False)
+ax.spines['right'].set_visible(False)
+ax.xaxis.set_tick_params(labelbottom=False)  # Hide x-axis tick labels
+
+# Learning index
+divider = make_axes_locatable(ax)
+# below height and pad are in inches
+axlow = divider.append_axes("bottom", 1.2, pad=0.2, sharex=ax)
+axlow.autoscale()
+learning_indices_mean = learn_index_blocks_df.mean(axis=0)
+learning_indices_stderr = learn_index_blocks_df.std(axis=0)/len(subjects)
+bar_width = 0.6  # Adjust the width of the bars
+axlow.bar(blocks, learning_indices_mean, yerr=learning_indices_stderr, alpha=0.7, capsize=5, color="#029E73", width=bar_width)
+axlow.set_ylabel("Learning index (ms)", fontsize=12)
+axlow.spines['top'].set_visible(False)
+axlow.spines['right'].set_visible(False)
+axlow.set_xticks(x)
+axlow.set_xticklabels(blocks)
+axlow.set_xlabel("Blocks", fontsize=12)
+
+fig.savefig(figures_dir / 'behav' / 'combined_blocks.pdf', transparent=True)
+plt.close()
+
+
+# ----------------------------------- USING RUNS -----------------------------------
+# Save session learning indices to CSV
+learn_index_df = pd.DataFrame.from_dict(learn_index_dict, orient='index')
+if not op.exists(figures_dir / 'behav' / 'learning_indices15.csv'):
+    learn_index_df.to_csv(figures_dir / 'behav' / 'learning_indices15.csv', sep='\t')
 
 # Calculate means and standard errors
 mean_all = [np.mean(all_RT[f'Epoch_{i}']) for i in range(5)]
@@ -168,13 +247,6 @@ mean_random_high = [np.mean(random_high_RT[f'Epoch_{i}']) for i in range(1, 5)]
 stderr_random_high = [np.std(random_high_RT[f'Epoch_{i}']) / np.sqrt(n) for i in range(1, 5)]
 mean_random_low = [np.mean(random_low_RT[f'Epoch_{i}']) for i in range(5)]
 stderr_random_low = [np.std(random_low_RT[f'Epoch_{i}']) / np.sqrt(n) for i in range(5)]
-
-color1 = "#5B9BD5"
-color1 = "#FFD966"
-color2 = "#61CBF5"
-color2 = "#FF718A"
-color3 = "#A6CAEC"
-color4 = "black" 
 
 # Combined RT and learning index
 fig, ax = plt.subplots(1, 1, figsize=(6, 6), layout="tight")
@@ -197,6 +269,7 @@ ax.set_ylabel("Reaction time (ms)", fontsize=12)
 ax.spines['top'].set_visible(False)
 ax.spines['right'].set_visible(False)
 ax.xaxis.set_tick_params(labelbottom=False)  # Hide x-axis tick labels
+
 # create new Axes on the right and on the top of the current Axes
 divider = make_axes_locatable(ax)
 # below height and pad are in inches
