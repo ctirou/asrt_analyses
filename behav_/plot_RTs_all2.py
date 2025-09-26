@@ -161,27 +161,10 @@ if not op.exists(figures_dir / 'behav' / 'random_high_blocks.csv'):
 all_blocks_df = pd.DataFrame.from_dict(all_blocks, orient='index')
 if not op.exists(figures_dir / 'behav' / 'all_blocks.csv'):
     all_blocks_df.to_csv(figures_dir / 'behav' / 'all_blocks.csv', sep=',')
-
-# Plot blocks performance
-block_labels = ['01', '02', '03'] + [str(i) for i in range(1, 21)]
-fig, ax = plt.subplots(1, 1, figsize=(13, 5), layout="tight")
-plt.rcParams.update({'font.family': 'serif', 'font.serif': 'Arial'})
-learning_indices_mean = learn_index_blocks_df.mean(axis=0)
-learning_indices_stderr = learn_index_blocks_df.std(axis=0)/len(subjects)
-bar_width = 0.5  # Adjust the width of the bars
-ax.bar(block_labels, learning_indices_mean, yerr=learning_indices_stderr, alpha=0.7, capsize=5, color="#46ACC8", width=bar_width)
-ax.legend(frameon=False)
-ax.set_ylabel("Learning index", fontsize=12)
-ax.spines['top'].set_visible(False)
-ax.spines['right'].set_visible(False)
-ax.set_xlabel("Blocks", fontsize=12)
-fig.suptitle('Learning index per block', fontsize=16)
-# fig.savefig(figures_dir / 'behav' / 'learning_index_blocks.pdf', transparent=True)
-# plt.close(fig)
-
+    
 # Combined RT and learning index
-fig, ax = plt.subplots(1, 1, figsize=(6, 6), layout="tight")
 plt.rcParams.update({'font.family': 'serif', 'font.serif': 'Arial'})
+fig, ax = plt.subplots(1, 1, figsize=(6, 6), layout="tight")
 ax.autoscale()
 blocks = ['01', '02', '03'] + [str(i) for i in range(1, 21)]
 x = np.arange(len(blocks))  
@@ -192,7 +175,7 @@ for subject in subjects:
         xpos = x[j]
         # All (center, no dodge)
         ax.scatter(xpos, all_blocks_df.loc[subject][i],
-                   color=color4, marker=".", alpha=0.2)
+                   color='grey', marker=".", alpha=0.2)
         if i not in ['01', '02', '03']:
             # Pattern (dodged left)
             ax.scatter(xpos - width, pattern_blocks_df.loc[subject][i],
@@ -218,7 +201,7 @@ divider = make_axes_locatable(ax)
 axlow = divider.append_axes("bottom", 1.2, pad=0.2, sharex=ax)
 axlow.autoscale()
 learning_indices_mean = learn_index_blocks_df.mean(axis=0)
-learning_indices_stderr = learn_index_blocks_df.std(axis=0)/len(subjects)
+learning_indices_stderr = learn_index_blocks_df.std(axis=0)/np.sqrt(len(subjects))
 bar_width = 0.6  # Adjust the width of the bars
 axlow.bar(blocks, learning_indices_mean, yerr=learning_indices_stderr, alpha=0.7, capsize=5, color="#029E73", width=bar_width)
 axlow.set_ylabel("Learning index (ms)", fontsize=12)
@@ -226,11 +209,23 @@ axlow.spines['top'].set_visible(False)
 axlow.spines['right'].set_visible(False)
 axlow.set_xticks(x)
 axlow.set_xticklabels(blocks)
-axlow.set_xlabel("Blocks", fontsize=12)
-
+axlow.set_xlabel("Block", fontsize=12)
+# Add asterisks above all mean learning indices
+# for i, (mean_li, std_li) in enumerate(zip(learning_indices_mean, learning_indices_stderr)):
+#     t_stat, p_value = ttest_1samp(learn_index_blocks_df.iloc[:, i], 0)
+#     # print(f"Run {iblock+1} - t-statistic: {t_stat:.3f}, p-value: {p_value:.5f}")
+#     if p_value < 0.05:
+#         print(f"Run {i-3} *")
+#         sig_level = '*'
+#         if p_value < 0.01:
+#             sig_level = '**'
+#             if p_value < 0.001:
+#                 sig_level = '***'
+#                 if p_value < 0.0001:
+#                     sig_level = '****'
+#         axlow.annotate(sig_level, (x[i], mean_li + std_li + 3), ha='center', color='black', fontweight='bold', fontsize=14)
 fig.savefig(figures_dir / 'behav' / 'combined_blocks.pdf', transparent=True)
 plt.close()
-
 
 # ----------------------------------- USING RUNS -----------------------------------
 # Save session learning indices to CSV

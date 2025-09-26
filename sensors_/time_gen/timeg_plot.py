@@ -131,7 +131,7 @@ idx = np.where((times >= -1.5) & (times <= 3))[0]
 
 plt.rcParams.update({'font.size': 12, 'font.family': 'serif', 'font.serif': 'Arial'})
 
-fig, axs = plt.subplots(2, 1, sharex=True, layout='constrained', figsize=(7, 6))
+fig, axs = plt.subplots(2, 1, sharex=False, layout='constrained', figsize=(7, 6))
 norm = colors.Normalize(vmin=0.18, vmax=0.32)
 images = []
 for ax, data, title in zip(axs.flat, [pats_blocks, rands_blocks], ["pattern", "random"]):
@@ -174,11 +174,11 @@ rhos = np.load(res_dir / "corr" / "rhos_learn.npy").mean(0)
 pval_rhos = np.load(res_dir / "corr" / "pval_learn-pval.npy")
 
 csig = "#0F0D0E"
-fig, axs = plt.subplots(2, 1, figsize=(7, 6), sharex=True, layout='constrained')
+fig, axs = plt.subplots(2, 1, figsize=(7, 6), sharex=False, layout='constrained')
 norm = colors.Normalize(vmin=-0.1, vmax=0.1)
 images = []
 for ax, data, title, pval, vmin, vmax in zip(axs.flat, [contrasts, rhos], \
-    ["Contrast (Pattern - Random)", "Contrast and learning correlation"], [pval_cont, pval_rhos], [-0.04, -0.05], [0.04, 0.05]):
+    ["Contrast (Pattern - Random)", "Contrast and learning correlation"], [pval_cont, pval_rhos], [-0.04, -0.04], [0.04, 0.04]):
     cmap = 'coolwarm' if ax == axs.flat[0] else "BrBG"
     im = ax.imshow(data, 
                     # norm=norm,
