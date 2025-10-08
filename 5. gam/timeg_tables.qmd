@@ -1,0 +1,315 @@
+---
+title: "Export and get significant clusters for Temporal Generalization"
+format: html
+execute:
+  echo: true
+  warning: false
+  error: true
+editor: visual
+python:
+  executable: /Users/coum/miniforge3/envs/mne-arm/bin/python
+---
+
+```{r}
+Sys.setenv(RETICULATE_PYTHON = "/Users/coum/miniforge3/envs/mne-arm/bin/python")
+```
+
+# In sensor space
+
+## Load packages
+
+```{python}
+import numpy as np
+from base import *
+from config import *
+import pandas as pd
+from scipy.stats import spearmanr as spear
+```
+
+## Load data
+
+```{python}
+
+data_path = Path(ensured("./gam/data"))
+learn_index_blocks = pd.read_csv(data_path / 'learning_indices_blocks.csv', sep=",", index_col=0)
+
+data_type = 'scores_blocks'
+subjects = SUBJS15
+times = np.linspace(-4, 4, 813)
+pats_blocks, rands_blocks = [], []
+for subject in subjects:
+    res_path = RESULTS_DIR / 'TIMEG' / 'sensors' / data_type / subject
+    pattern, random = [], []
+    for block in range(1, 24):
+        pfname = res_path / f'pat-{block}.npy' if block not in [1, 2, 3] else res_path / f'pat-0-{block}.npy'
+        rfname = res_path / f'rand-{block}.npy' if block not in [1, 2, 3] else res_path / f'rand-0-{block}.npy'
+        pattern.append(np.load(pfname))
+        random.append(np.load(rfname))
+    if subject == 'sub05':
+        pat_bsl = np.load(res_path / "pat-4.npy")
+        rand_bsl = np.load(res_path / "rand-4.npy")
+        for i in range(3):
+            pattern[i] = pat_bsl.copy()
+            random[i] = rand_bsl.copy()
+    pats_blocks.append(np.array(pattern))
+    rands_blocks.append(np.array(random))
+pats_blocks = np.array(pats_blocks)
+rands_blocks = np.array(rands_blocks)
+conts_blocks = pats_blocks - rands_blocks
+
+cont_tr = []
+pat_tr, rand_tr = [], []
+idx = np.where((times >= -1.5) & (times <= 3))[0]
+for s in range(len(subjects)):
+    scont, spat, srand = [], [], []
+    for b in range(23):
+        scont.append(np.diag(conts_blocks[s, b, idx]))
+        spat.append(np.diag(pats_blocks[s, b, idx]))
+        srand.append(np.diag(rands_blocks[s, b, idx]))
+    cont_tr.append(np.array(scont))
+    pat_tr.append(np.array(spat))
+    rand_tr.append(np.array(srand))
+cont_tr = np.array(cont_tr)
+pat_tr, rand_tr = np.array(pat_tr), np.array(rand_tr)
+```
+
+## Export time resolved diagonals
+
+```{python}
+for data, data_fname in zip([cont_tr, pat_tr, rand_tr], ['contrast', 'pattern', 'random']):
+    rows = list()
+    for i, subject in enumerate(subjects):
+        for block in range(data.shape[1]):
+            for t in range(data.shape[2]):
+                rows.append({
+                    "subject": subject,
+                    "block": block + 1,
+                    "time": t,
+                    "value": data[i, block, t]
+                })
+    df = pd.DataFrame(rows)
+    df_fname = f"pa_sensors_tr_{data_fname}.csv"
+    df.to_csv(data_path / df_fname, index=False, sep=",")
+```
+
+## Export time resolved correlations
+
+```{python}
+# time resolved correlations with learning index
+cont_corr_tr = []
+for s in range(len(subjects)):
+    cont_corr_tr.append(np.array([spear(learn_index_blocks.iloc[s], cont_tr[s, :, t])[0] for t in range(cont_tr.shape[-1])]))
+cont_corr_tr = np.array(cont_corr_tr)
+rows = list()
+for i, subject in enumerate(subjects):
+    for t in range(cont_corr_tr.shape[-1]):
+        rows.append({
+            "subject": subject,
+            "time": t,
+            "value": cont_corr_tr[i, t]
+            })
+df = pd.DataFrame(rows)
+df_fname = "pa_sensors_tr_cont-corr.csv"
+df.to_csv(data_path / df_fname, index=False, sep=",")
+```
+
+## Export average PA (diagonal) effect
+
+```{python}
+# mean box
+idx_timeg = np.where((times >= -0.5) & (times < 0))[0]
+box_blocks = []
+diag_blocks = []
+for sub in range(len(subjects)):
+    tg = []
+    dg = []
+    for block in range(23):
+        data = conts_blocks[sub, block, idx_timeg, :][:, idx_timeg]
+        tg.append(data.mean())
+        dg.append(np.diag(conts_blocks[sub, block])[idx_timeg].mean())
+    box_blocks.append(np.array(tg))
+    diag_blocks.append(np.array(dg))
+box_blocks = np.array(box_blocks)
+diag_blocks = np.array(diag_blocks)
+
+# save table for diagonals
+rows = list()
+for i, subject in enumerate(subjects):
+    for block in range(diag_blocks.shape[1]):
+        rows.append({
+            "subject": subject,
+            "block": block + 1,
+            "value": diag_blocks[i, block]
+        })
+df = pd.DataFrame(rows)
+df.to_csv(data_path / "pa_sensors_br.csv", index=False, sep=",")
+```
+
+## Load R libraries
+
+```{r}
+#| cache: false
+
+library(correlation)
+library(emmeans)
+library(mgcv)
+library(gratia)
+library(plotly)
+library(tictoc)
+
+library(tidyverse)
+
+options(scipen = 999)
+```
+
+# In source space
+
+## Load data
+
+```{python}
+# Temporal generalization source --- blocks ---
+networks = NETWORKS
+network_names = NETWORK_NAMES
+timesg = np.linspace(-1.5, 1.5, 307)
+idx_timeg = np.where((timesg >= -0.5) & (timesg < 0))[0]
+cont_blocks = {}
+pat_blocks = {}
+rand_blocks = {}
+contrast_net = dict()
+pattern_net, random_net = dict(), dict()
+diag_net = dict()
+data_type = 'scores_blocks'
+for network in networks:
+    pats_blocks, rands_blocks = [], []
+    if not network in pat_blocks:
+        cont_blocks[network] = []
+        pat_blocks[network] = []
+        rand_blocks[network] = []
+        diag_net[network] = []
+    for subject in subjects:
+        res_path = RESULTS_DIR / 'TIMEG' / 'source' / network / data_type / subject
+        pattern, random = [], []
+        for block in range(1, 24):
+            if network in networks[:-3]:
+                pfname = res_path / f'pat-{block}.npy' if block not in [1, 2, 3] else res_path / f'pat-0-{block}.npy'
+                rfname = res_path / f'rand-{block}.npy' if block not in [1, 2, 3] else res_path / f'rand-0-{block}.npy'
+            else:
+                pfname = res_path / f'pat-4-{block}.npy' if block not in [1, 2, 3] else res_path / f'pat-0-{block}.npy'
+                rfname = res_path / f'rand-4-{block}.npy' if block not in [1, 2, 3] else res_path / f'rand-0-{block}.npy'
+            pattern.append(np.load(pfname))
+            random.append(np.load(rfname))
+        if subject == 'sub05':
+            pat_bsl = np.load(res_path / "pat-4.npy") if network in networks[:-3] else np.load(res_path / "pat-4-4.npy")
+            rand_bsl = np.load(res_path / "rand-4.npy") if network in networks[:-3] else np.load(res_path / "rand-4-4.npy")
+            for i in range(3):
+                pattern[i] = pat_bsl.copy()
+                random[i] = rand_bsl.copy()
+        pats_blocks.append(np.array(pattern))
+        rands_blocks.append(np.array(random))
+    pats_blocks, rands_blocks = np.array(pats_blocks), np.array(rands_blocks)
+    contrast = pats_blocks - rands_blocks
+    contrast_net[network] = contrast
+    pattern_net[network] = pats_blocks
+    random_net[network] = rands_blocks
+    diag_blocks = []
+    for sub in range(len(subjects)):
+        dg = []
+        for block in range(23):
+            dg.append(np.diag(contrast[sub, block])[idx_timeg].mean())
+        diag_blocks.append(np.array(dg))
+    diag_net[network] = np.array(diag_blocks)
+```
+
+## Export time-resolved diagonals
+
+```{python}
+idxt = np.where((timesg >= -1) & (timesg <= 1.5))[0]
+cont_tr = {}
+pat_tr, rand_tr = {}, {}
+for network in networks:
+    cont_tr[network] = []
+    pat_tr[network] = []
+    rand_tr[network] = []
+    for s in range(len(subjects)):
+        cont_tr[network].append(np.diag(contrast_net[network].mean(1)[s]))
+        pat_tr[network].append(np.diag(pattern_net[network].mean(1)[s]))
+        rand_tr[network].append(np.diag(random_net[network].mean(1)[s]))
+    cont_tr[network] = np.array(cont_tr[network])
+    pat_tr[network] = np.array(pat_tr[network])
+    rand_tr[network] = np.array(rand_tr[network])
+
+idxt = np.where((timesg >= -1) & (timesg <= 1.5))[0]
+for data, data_fname in zip([cont_tr, pat_tr, rand_tr], ['contrast', 'pattern', 'random']):
+    rows = list()
+    for i, network in enumerate(networks):
+        # get table
+        for j, subject in enumerate(subjects):
+            for t, idx in enumerate(idxt):
+                rows.append({
+                    "network": network_names[i],
+                    "subject": subject,
+                    "time": t,
+                    "value": data[network][j, idx] - 0.25 if data_fname in ['pattern', 'random'] else data[network][j, idx]
+                })
+    df = pd.DataFrame(rows)
+    fname = f'pa_source_tr_{data_fname}.csv'
+    df.to_csv(data_path / fname, index=False, sep=",")
+```
+
+## Export time-resolved contrast diagonal correlations
+
+```{python}
+# export block resolved
+idxt = np.where((timesg >= -1) & (timesg <= 1.5))[0]
+cont_tr = {}
+for network in networks:
+    cont_tr[network] = []
+    for s in range(len(subjects)):
+        cont_b = []
+        for b in range(23):
+            cont_b.append(np.diag(contrast_net[network][s, b]))
+        cont_tr[network].append(np.array(cont_b))
+    cont_tr[network] = np.array(cont_tr[network])[:, :, idxt]
+
+corr_network = {}
+for network in networks:
+    corr_network[network] = []
+    for s in range(len(subjects)):
+        corr_network[network].append(np.array([spear(learn_index_blocks.iloc[s], cont_tr[network][s, :, t])[0] for t in range(len(idxt))]))
+    corr_network[network] = np.array(corr_network[network])
+    corr_network[network], _, _ = fisher_z_and_ttest(corr_network[network])
+    
+# save time resolved diagonal correlations
+rows = list()
+for i, network in enumerate(networks):
+    # get table
+    for j, subject in enumerate(subjects):
+        for t, _ in enumerate(idxt):
+            rows.append({
+                "network": network_names[i],
+                "subject": subject,
+                "time": t,
+                "value": corr_network[network][j, t]
+            })
+df = pd.DataFrame(rows)
+df_fname = 'pa_source_tr_cont-corr.csv'
+df.to_csv(data_path / df_fname, index=False, sep=",")
+```
+
+## Export average PA (diagonal) effect per block and ROI
+
+```{python}
+rows = list()
+for i, network in enumerate(networks):
+    diff = np.array(diag_net[network])
+    for j, subject in enumerate(subjects):
+        for block in range(diff.shape[1]):
+            rows.append({
+                "network": network_names[i],
+                "subject": subject,
+                "block": block + 1,
+                "value": diff[j, block]
+            })
+df = pd.DataFrame(rows)
+df.to_csv(data_path / "pa_source_br.csv", index=False, sep=",")
+```

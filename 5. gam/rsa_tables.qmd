@@ -1,0 +1,479 @@
+---
+title: "Export and get significant clusters for RSA"
+format: html
+execute:
+  echo: true
+  warning: false
+  error: true
+editor: visual
+python:
+  executable: /Users/coum/miniforge3/envs/mne-arm/bin/python
+---
+
+```{r}
+Sys.setenv(RETICULATE_PYTHON = "/Users/coum/miniforge3/envs/mne-arm/bin/python")
+```
+
+# In sensor space
+
+## Load packages
+
+```{python}
+import os.path as op
+import numpy as np
+from base import *
+from config import *
+import matplotlib.pyplot as plt
+import pandas as pd
+from scipy.stats import spearmanr as spear
+from pathlib import Path
+```
+
+## Load data
+
+```{python}
+subjects = SUBJS15
+times = np.linspace(-0.2, 0.6, 82)
+c1, c2 = "#5BBCD6", "#00A08A"
+
+data_path = Path(ensured("./gam/data"))
+
+# --- SENSORS ---
+data_type = "rdm_blocks" 
+all_pats, all_rands = [], []
+all_pats_blocks, all_rands_blocks = [], []
+for subject in subjects:
+    res_path = RESULTS_DIR / 'RSA' / 'sensors' / data_type / subject
+    # read behav        
+    behav_dir = op.join(HOME / 'raw_behavs' / subject)
+    sequence = get_sequence(behav_dir)
+    pattern_blocks, random_blocks = [], []
+    for epoch_num in range(5):
+        blocks = [i for i in range(1, 4)] if epoch_num == 0 else [i for i in range(5 * (epoch_num - 1) + 1, epoch_num * 5 + 1)]
+        pats, rands = [], []
+        for block in blocks:
+            pattern_blocks.append(np.load(res_path / f"pat-{epoch_num}-{block}.npy"))
+            random_blocks.append(np.load(res_path / f"rand-{epoch_num}-{block}.npy"))
+    if subject == 'sub05':
+        pat_bsl = np.load(res_path / "pat-1-1.npy")
+        rand_bsl = np.load(res_path / "rand-1-1.npy")
+        for i in range(3):
+            pattern_blocks[i] = pat_bsl.copy()
+            random_blocks[i] = rand_bsl.copy()
+    pattern_blocks = np.array(pattern_blocks)
+    random_blocks = np.array(random_blocks)
+    high, low = get_all_high_low(pattern_blocks, random_blocks, sequence, False)
+    all_pats.append(high.mean(0))
+    all_rands.append(low.mean(0))
+all_pats = np.array(all_pats)
+all_rands = np.array(all_rands)
+# bsl_pat = np.nanmean(all_pats[:, :3, :], 1) 
+# bsl_rand = np.nanmean(all_rands[:, :3, :], 1)
+pat = all_pats
+rand = all_rands
+diff_rp = rand - pat
+```
+
+## Save time-resolved table
+
+```{python}
+diff_rp_tr = np.nanmean(diff_rp[:, 3:], 1)
+rows = list()
+for s, subject in enumerate(subjects):
+    for t, time in enumerate(times):
+        rows.append({
+            "subject": subject,
+            'time': t,
+            "value": diff_rp_tr[s, t]
+        })
+df = pd.DataFrame(rows)
+fname = 'rsa_sensors_tr.csv'
+df.to_csv(data_path / fname, index=False, sep=",")
+```
+
+## Save time-resolved correlation table w/ practice
+
+```{python}
+learn_index_blocks = pd.read_csv(data_path / 'learning_indices_blocks.csv', sep=",", index_col=0)
+learn_index_blocks = learn_index_blocks.sub(learn_index_blocks.mean(axis=1), axis=0)
+all_rhos = np.array([[spear(learn_index_blocks.iloc[sub], diff_rp[sub, :, t])[0] for t in range(len(times))] for sub in range(len(subjects))])
+all_rhos, _, _ = fisher_z_and_ttest(all_rhos)
+# save table
+rows = list()
+for s, subject in enumerate(subjects):
+    for t, time in enumerate(times):
+        rows.append({
+            "subject": subject,
+            'time': t,
+            "value": all_rhos[s, t]
+        })
+df = pd.DataFrame(rows)
+fname = 'rsa_sensors_tr_corr.csv'
+df.to_csv(data_path / fname, index=False, sep=",")
+```
+
+## Save time-resolved correlation table w/o practice
+
+```{python}
+learn_index_blocks = learn_index_blocks.iloc[:, 3:].sub(learn_index_blocks.iloc[:, 3:].mean(axis=1), axis=0)
+all_rhos = np.array([[spear(learn_index_blocks.iloc[sub], diff_rp[sub, 3:, t])[0] for t in range(len(times))] for sub in range(len(subjects))])
+all_rhos, _, _ = fisher_z_and_ttest(all_rhos)
+# save table
+rows = list()
+for s, subject in enumerate(subjects):
+    for t, time in enumerate(times):
+        rows.append({
+            "subject": subject,
+            'time': t,
+            "value": all_rhos[s, t]
+        })
+df = pd.DataFrame(rows)
+fname = 'rsa_sensors_tr_no_prac_corr.csv'
+df.to_csv(data_path / fname, index=False, sep=",")
+```
+
+## Load R packages
+
+```{r}
+library(correlation)
+library(emmeans)
+library(mgcv)
+library(gratia)
+library(plotly)
+library(tictoc)
+
+library(tidyverse)
+
+options(scipen = 999)
+```
+
+## Load data
+
+```{r}
+df.tmp <- read_csv("./gam/data/learning_indices_blocks.csv")
+names(df.tmp) <- c('subject', as.character(1:23))
+
+df.tmp %>% 
+  pivot_longer(cols = `1`:`23`,
+               names_to = 'block',
+               names_transform = as.double,
+               values_to = 'value',
+               values_transform = ~round(.,1)) %>% 
+  write_csv("./gam/data/behav_blocks_sensors.csv")
+
+df.sensors <- bind_rows(
+  read_csv("./gam/data/rsa_sensors_tr.csv") %>% mutate(metric = "RS", .before = 1),
+  read_csv("./gam/data/rsa_sensors_tr_corr.csv") %>% mutate(metric = "RS CORR", .before = 1),
+) %>% 
+  mutate(across(c(subject), as.factor)) %>% 
+  mutate(across(c(time, value), as.numeric))
+
+df.sensors %>% mutate(NA.values = is.na(value)) %>% count(metric, time, NA.values)
+
+n.time <- df.sensors$time %>% unique %>% length()
+
+# df.sensors
+
+# nrow(df.sensors) # expected = 3 metrics * 15 subjects * (3+20) blocks = 1035
+
+time_values <- seq(-0.2, 0.6, length.out = 82)
+```
+
+## Fit models
+
+```{r}
+models.rs <- df.sensors %>%
+  # filter(block >= 4) %>% 
+  group_by(metric) %>%
+  nest() %>%
+  mutate(
+    min_time = map_dbl(data, ~ min(.x$time)),
+    max_time = map_dbl(data, ~ max(.x$time)),
+    gam_model = map(data, ~ gam(value ~ s(time, k = 10) +
+                                 s(subject, bs = "re") + # random intercept
+                                 s(subject, time, bs = "re"), # random linear slope
+                                data = .x, method = "REML"))
+  )
+
+models.fs <- df.sensors %>%
+  # filter(block >= 4) %>% 
+  group_by(metric) %>%
+  nest() %>%
+  mutate(
+    min_time = map_dbl(data, ~ min(.x$time)),
+    max_time = map_dbl(data, ~ max(.x$time)),
+    gam_model = map(data, ~ gam(value ~ s(time, k = 10) +
+                                 s(subject, bs = "re") + # random intercept
+                                 s(time, subject, bs = "fs", m = 2), # random smooth
+                                data = .x, method = "REML"))
+  )
+
+model.all <- df.sensors %>% 
+  # filter(metric != "BEHAV") %>% 
+  group_by(metric) %>% 
+  mutate(value_std = scale(value, center = FALSE, scale = TRUE)) %>% # standardization for meaningful comparison across metrics
+  mutate(metric = as.factor(metric)) %>% 
+  gam(data = .,
+      value_std ~ s(time, k = 10) +
+        s(metric, time, bs="sz") +
+        s(subject, bs = "re") + # random intercept
+        s(subject, time, bs = "re"), # random linear slope
+      method="REML")
+
+```
+
+## Export significant clusters of time-resolved RSA
+
+```{r}
+# Apply emmeans
+tmp <- models.fs %>%
+  group_by(metric) %>% 
+  mutate(
+    time_seq = map2(min_time, max_time, ~ seq(.x, .y, length.out = n.time)),
+    emm = map2(gam_model, time_seq, ~ as_tibble(emmeans(.x, ~ time, at = list(time = .y))))
+  )
+
+# Store emm + SE
+emm_meanse <- tmp %>% 
+  select(emm) %>%
+  unnest(emm)
+
+# Extract segments of significance
+emm_segments <- tmp %>%
+  mutate(
+    segs = map(emm, ~ {
+      df <- .x %>% mutate(signif = (lower.CL > 0) | (upper.CL < 0))
+      r <- rle(df$signif)
+      ends <- cumsum(r$lengths)
+      starts <- c(1, head(ends, -1) + 1)
+      keep <- which(r$values)
+      tibble(
+        start = df$time[starts[keep]],
+        end   = df$time[ends[keep]]
+      )
+    })
+  ) %>% 
+  select(segs) %>%
+  unnest(segs)
+
+# emm_segments
+write.csv(emm_segments, "./gam/data/segments_rs_tr_sensors.csv", row.names=FALSE)
+```
+
+## Export average RS effect per block
+
+```{python}
+
+### /!\ NOTE: block resolved table extraction below will only work if GAM was run on time-resolved data /!\
+# extract time resolved significant index
+segments = pd.read_csv(data_path / "segments_tr_sensors.csv")
+start = segments.iloc[0]['start'] if data_type.endswith("new") else segments.iloc[1]['start']
+end = segments.iloc[0]['end'] if data_type.endswith("new") else segments.iloc[1]['end']
+idx = np.arange(int(start), int(end)+1)
+# save block resolved table
+diff_rp_blocks = np.nanmean(diff_rp[:, :, idx], axis=(-1))
+rows = list()
+for i, subject in enumerate(subjects):
+    for block in range(diff_rp_blocks.shape[1]):
+        rows.append({
+            "subject": subject,
+            "block": block + 1,
+            "value": diff_rp_blocks[i, block]
+        })
+df = pd.DataFrame(rows)
+fname = 'rsa_sensors_br.csv'
+df.to_csv(data_path / fname, index=False, sep=",")
+```
+
+# In source space
+
+## Load data
+
+```{python}
+# --- SOURCE ---
+data_type = "rdm_blocks" 
+networks = NETWORKS
+network_names = NETWORK_NAMES
+diff_rp = {}
+corr_rp = {}
+learn_index_blocks = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices_blocks.csv', sep=",", index_col=0)
+corr_rp_no_prac = {}
+learn_index_blocks_no_prac = pd.read_csv(FIGURES_DIR / 'behav' / 'learning_indices_blocks.csv', sep=",", index_col=0)
+learn_index_blocks_no_prac = learn_index_blocks_no_prac.iloc[:, 3:].sub(learn_index_blocks_no_prac.iloc[:, 3:].mean(axis=1), axis=0)
+for network in networks:
+    if not network in diff_rp:
+        diff_rp[network] =  []
+        corr_rp[network] = []
+        corr_rp_no_prac[network] = []
+    for isub, subject in enumerate(subjects):
+        res_path = RESULTS_DIR / 'RSA' / 'source' / network / data_type / subject
+        # read behav
+        behav_dir = op.join(HOME / 'raw_behavs' / subject)
+        sequence = get_sequence(behav_dir)
+        pattern_blocks, random_blocks = [], []
+        for epoch_num in range(5):
+            blocks = [i for i in range(1, 4)] if epoch_num == 0 else [i for i in range(5 * (epoch_num - 1) + 1, epoch_num * 5 + 1)]
+            pats, rands = [], []
+            for block in blocks:
+                pattern_blocks.append(np.load(res_path / f"pat-{epoch_num}-{block}.npy"))
+                random_blocks.append(np.load(res_path / f"rand-{epoch_num}-{block}.npy"))
+        if subject == 'sub05':
+            pat_bsl = np.load(res_path / "pat-1-1.npy")
+            rand_bsl = np.load(res_path / "rand-1-1.npy")
+            for i in range(3):
+                pattern_blocks[i] = pat_bsl.copy()
+                random_blocks[i] = rand_bsl.copy()
+        pattern_blocks = np.array(pattern_blocks)
+        random_blocks = np.array(random_blocks)
+        high, low = get_all_high_low(pattern_blocks, random_blocks, sequence, False)
+        # bsl_pat = np.nanmean(high[:, :3, :], (0, 1))
+        # bsl_rand = np.nanmean(low[:, :3, :], (0, 1))
+        pat = np.nanmean(high, 0)
+        rand = np.nanmean(low, 0)
+        diff = rand - pat
+        diff_rp[network].append(diff)
+        corr_rp[network].append([np.array([spear(learn_index_blocks.iloc[isub], diff[:, t])[0] for t in range(len(times))])])
+        corr_rp_no_prac[network].append([np.array([spear(learn_index_blocks_no_prac.iloc[isub], diff[3:, t])[0] for t in range(len(times))])])
+    diff_rp[network] = np.array(diff_rp[network])
+    corr_rp[network] = np.array(corr_rp[network]).squeeze()
+    corr_rp[network], _, _ = fisher_z_and_ttest(corr_rp[network])
+    corr_rp_no_prac[network] = np.array(corr_rp_no_prac[network]).squeeze()
+    corr_rp_no_prac[network], _, _ = fisher_z_and_ttest(corr_rp_no_prac[network])
+
+```
+
+## Save time-resolved table
+
+```{python}
+rows = list()
+for i, network in enumerate(networks):
+    diff = np.nanmean(diff_rp[network][:, 3:], axis=(1))
+    # get table
+    for j, subject in enumerate(subjects):
+        for t, time in enumerate(times):
+            rows.append({
+                "network": network_names[i],
+                "subject": subject,
+                "time": t,
+                "value": diff[j, t]
+            })
+df = pd.DataFrame(rows)
+fname = 'rsa_source_tr.csv'
+df.to_csv(data_path / fname, index=False, sep=",")
+```
+
+## Save time-resolved correlation table w/practice
+
+```{python}
+rows = list()
+for i, network in enumerate(networks):
+    # get table
+    for j, subject in enumerate(subjects):
+        for t, time in enumerate(times):
+            rows.append({
+                "network": network_names[i],
+                "subject": subject,
+                "time": t,
+                "value": corr_rp[network][j, t]
+            })
+df = pd.DataFrame(rows)
+fname = 'rsa_source_tr_corr.csv'
+df.to_csv(data_path / fname, index=False, sep=",")
+```
+
+## Save time-resolved correlation table w/o practice
+
+```{python}
+# save table correlations no practice
+rows = list()
+for i, network in enumerate(networks):
+    # get table
+    for j, subject in enumerate(subjects):
+        for t, time in enumerate(times):
+            rows.append({
+                "network": network_names[i],
+                "subject": subject,
+                "time": t,
+                "value": corr_rp_no_prac[network][j, t]
+            })
+df = pd.DataFrame(rows)
+fname = 'rsa_source_tr_no_prac_corr.csv'
+df.to_csv(data_path / fname, index=False, sep=",")
+```
+
+## Export average RS effect per block and ROIs
+
+```{python}
+# extract index from GAMM segments
+segments = pd.read_csv(data_path / "segments_tr_sensors.csv")
+start = segments.iloc[0]['start'] if data_type.endswith("new") else segments.iloc[1]['start']
+end = segments.iloc[0]['end'] if data_type.endswith("new") else segments.iloc[1]['end']
+idx = np.arange(int(start), int(end)+1)
+
+# save table
+rows = list()
+for i, network in enumerate(networks):
+    diff = np.nanmean(diff_rp[network][:, :, idx], axis=(-1))
+    # get table
+    for j, subject in enumerate(subjects):
+        for block in range(diff.shape[1]):
+            rows.append({
+                "network": network_names[i],
+                "subject": subject,
+                "block": block + 1,
+                "value": diff[j, block]
+            })
+df = pd.DataFrame(rows)
+fname = 'rsa_source_br.csv'
+df.to_csv(data_path / fname, index=False, sep=",")
+```
+
+## Plot RS correlation results w/o practice
+
+```{python}
+seg_df = pd.read_csv("/Users/coum/MEGAsync/figures/TM/em_segments_rs_tr_source_no_prac.csv")
+seg_df = seg_df[seg_df['metric'] == 'RS CORR']
+# dictionary of boolean arrays
+sig_dict = {}
+for _, row in seg_df.iterrows():
+    arr = sig_dict.get(row["network"], np.zeros(82, dtype=bool))
+    arr[row["start"]:row["end"] + 1] = True
+    sig_dict[row["network"]] = arr
+sig_df = pd.read_csv(FIGURES_DIR / "TM" / "smooth_rs_tr_source_no_prac.csv")
+sig_df = sig_df[sig_df['metric'] == 'RS CORR']
+for i, net in enumerate(sig_df['network'].unique()):
+    if net in sig_dict:
+        if sig_df[sig_df['network'] == net]['signif_holm'][i+10] == 'ns':
+            del sig_dict[net]
+
+# plot it
+times = np.linspace(-0.2, 0.6, 82)
+cmap = ['#0173B2','#DE8F05','#029E73','#D55E00','#CC78BC','#CA9161','#FBAFE4','#ECE133','#56B4E9', "#76B041"]
+fig, axes = plt.subplots(5, 2, figsize=(7, 9), sharey=True, sharex=True, layout="tight")
+for i, ax in enumerate(axes.flatten()):
+    ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
+    all_rhos = corr_rp[networks[i]]
+    sem = np.std(all_rhos, axis=0) / np.sqrt(all_rhos.shape[0])
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.axhline(0, color='black', alpha=1)
+    network = networks[i]
+    # Main plot
+    ax.plot(times, all_rhos.mean(0), alpha=1, zorder=10, color='C7')
+        # Plot significant regions separately
+    sig = sig_dict[network_names[i]] if network_names[i] in sig_dict else np.zeros(all_rhos.shape[1], dtype=bool)
+    for start, end in contiguous_regions(sig):
+        ax.plot(times[start:end], all_rhos.mean(0)[start:end], alpha=1, zorder=10, color=cmap[i])
+    ax.fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, alpha=0.2, zorder=5, facecolor='C7')
+    # Highlight significant regions
+    ax.fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, where=sig, alpha=0.5, zorder=5, color=cmap[i])
+    ax.set_title(network_names[i], fontsize=13, fontstyle='italic')
+    
+    if ax in axes[:, 0]:
+        ax.set_ylabel("Spearman's rho", fontsize=11)
+    
+    # Only set xlabel for axes in the bottom row
+    if i >= (axes.shape[0] - 1) * axes.shape[1]:
+        ax.set_xlabel("Time (s)", fontsize=11)
+plt.show()
+```

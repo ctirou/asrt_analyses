@@ -2,7 +2,6 @@ import os
 import os.path as op
 import numpy as np
 from mne.stats import permutation_cluster_1samp_test
-import time
 from sklearn.pipeline import make_pipeline
 from mne.decoding import SlidingEstimator
 from sklearn.model_selection import StratifiedKFold
@@ -19,7 +18,7 @@ def ensured(path):
     return path
         
 def decod_stats(X, jobs):
-    """Statistical test applied across subjects"""
+    """Statistical test applied across subjects for Decoding"""
     # check input
     if not isinstance(X, np.ndarray):
         X = np.array(X)
@@ -39,7 +38,7 @@ def decod_stats(X, jobs):
     return np.squeeze(p_values_)
 
 def gat_stats(X, jobs):
-    """Statistical test applied across subjects"""
+    """Statistical test applied across subjects for Temporal Generalization"""
     from mne.stats import spatio_temporal_cluster_1samp_test
     # check input
     X = np.array(X)
@@ -79,6 +78,7 @@ def do_pca(epochs):
     return all_epochs
 
 def get_sequence(behav_dir):
+    """Get the sequence of a subject from the behavioral file."""
     behav_files = [f for f in os.listdir(behav_dir) if (not f.startswith('.') and ('_eASRT_Epoch_' in f))]
     behav = open(op.join(behav_dir, behav_files[0]), 'r')
     lines = behav.readlines()
@@ -171,6 +171,7 @@ def get_rdm(epoch, behav):
 
     
 def get_inseq(sequence):
+    """Get the pairs in the sequence."""
     # create list of possible pairs
     pairs_in_sequence = list()
     pairs_in_sequence.append(str(sequence[0]) + str(sequence[1]))
@@ -315,6 +316,7 @@ def get_labels_from_vol_src(src, subject, subjects_dir):
     return labels_aseg
 
 def get_volume_estimate_tc(stcs, fwd, offsets, subject, subjects_dir):
+    """Extracts time courses for each label from volume source estimates."""
     import numpy as np
     from mne import get_volume_labels_from_src
     labels = get_volume_labels_from_src(fwd['src'], subject, subjects_dir)
@@ -336,6 +338,7 @@ def get_volume_estimate_tc(stcs, fwd, offsets, subject, subjects_dir):
     return label_time_courses, vertices_info
 
 def rsync_files(source, destination, options=""):
+    """Rsync files from source to destination with given options."""
     import subprocess
     try:
         # Construct the rsync command
@@ -359,6 +362,7 @@ def rsync_files(source, destination, options=""):
         return None
     
 def get_in_out_seq(sequence, similarities, random_lows, analysis):
+    """Get in-sequence and out-sequence similarity values based on the analysis type."""
     import numpy as np
     # create list of possible pairs
     pairs_in_sequence = list()
@@ -436,24 +440,6 @@ def get_all_high_low(pattern_data, random_data, sequence, block=True):
             low.append(rand_vals)
 
     return np.array(high), np.array(low)
-
-def get_cm(clf, cv, X, y, times):
-    import numpy as np
-    from sklearn.metrics import confusion_matrix, roc_auc_score
-    
-    pred = np.zeros((len(y), X.shape[-1]))
-    pred_rock = np.zeros((len(y), X.shape[-1], len(set(y))))
-    for train, test in cv.split(X, y):
-        clf.fit(X[train], y[train])
-        pred[test] = np.array(clf.predict(X[test]))
-        pred_rock[test] = np.array(clf.predict_proba(X[test]))
-                    
-    cms, scores = list(), list()
-    for itime in range(len(times)):
-        cms.append(confusion_matrix(y[:], pred[:, itime], normalize='true', labels=[1, 2, 3, 4]))
-        scores.append(roc_auc_score(y[:], pred_rock[:, itime, :], multi_class='ovr'))
-    
-    return np.array(cms), np.array(scores)
 
 def cv_mahalanobis_parallel(X, y, n_jobs=-1, n_splits=10, verbose=True, shuffle=True):
     """
@@ -722,8 +708,8 @@ def interpolate_rdm_nan(rdm):
     return rdm, present_nan
 
 def contiguous_regions(condition):
-    import numpy as np
     """Find contiguous True regions in a boolean array."""
+    import numpy as np
     d = np.diff(condition.astype(int))
     starts = np.where(d == 1)[0] + 1
     ends = np.where(d == -1)[0] + 1
@@ -736,7 +722,7 @@ def contiguous_regions(condition):
     return zip(starts, ends)
 
 def svd(vector_data):
-    print("Singular Value Decomposition in progress...")
+    """Reduce 3 orientations to dominant orientation using Singular Value Decomposition."""
     # Initialize an array for storing the dominant orientation time series
     dominant_data = np.zeros((vector_data.shape[0], vector_data.shape[1], vector_data.shape[-1]))  # (294, 8196, 82)
     for trial in range(vector_data.shape[0]):  # Loop over trials
@@ -745,162 +731,6 @@ def svd(vector_data):
             dominant_time_series = vh[0, :] * s[0]  # First right singular vector weighted by singular value
             dominant_data[trial, source, :] = dominant_time_series  # Store in new array
     return dominant_data
-
-def check_stationarity(series):
-    """
-    Check if the series is stationary using the Augmented Dickey-Fuller test.
-    """
-    import numpy as np
-    from statsmodels.tsa.stattools import adfuller
-    new_series = np.zeros((series.shape[0], series.shape[1] - 1))
-    sig = []
-    for sub in range(series.shape[0]):
-        result = adfuller(series[sub])
-        if result[1] < 0.05:
-            sig.append(True)
-            new_series[sub, :] = series[sub, 1:]
-        else:
-            sig.append(False)
-            new_series[sub, :] = np.diff(series[sub, :])
-    return sig, new_series
-
-def ensure_stationarity(series, max_diff=2):
-    import numpy as np
-    from statsmodels.tsa.stattools import adfuller
-    """
-    Ensures that each subject's time series is stationary by applying up to max_diff levels of differencing.
-    
-    Args:
-        series (numpy array): Shape (n_subjects, n_timepoints).
-        max_diff (int): Maximum differencing order to apply (default = 2).
-    
-    Returns:
-        stationarity_flags (list): List of booleans indicating if each subject's series is stationary.
-        stationary_series (numpy array): Differenced series with max available timepoints.
-        applied_diffs (list): List of how many differences were applied per subject.
-    """
-    n_subjects, n_timepoints = series.shape
-    max_length = n_timepoints - 1  # Start with first-differencing max length
-    stationary_series = []
-
-    stationarity_flags = []
-    applied_diffs = []
-
-    for sub in range(n_subjects):
-        diff_count = 0
-        current_series = series[sub, :]
-
-        # Check stationarity and apply differencing if needed
-        while diff_count < max_diff:
-            adf_p = adfuller(current_series)[1]
-            if adf_p < 0.05:
-                stationarity_flags.append(True)
-                break  # Stop differencing if stationary
-            else:
-                current_series = np.diff(current_series)
-                diff_count += 1
-
-        # If still non-stationary after max_diff differencing
-        if adfuller(current_series)[1] >= 0.05:
-            stationarity_flags.append(False)
-            print(f"⚠️ Warning: Subject {sub} still non-stationary after {max_diff} differences.")
-
-        # Store the differenced data and track differencing steps
-        applied_diffs.append(diff_count)
-        max_length = min(max_length, len(current_series))  # Ensure equal timepoints
-        stationary_series.append(current_series)
-
-    # Convert list to array with equal-length time series
-    stationary_series = np.array([s[:max_length] for s in stationary_series])
-
-    return stationarity_flags, stationary_series, applied_diffs
-
-def optimal_lag_mi(X_sub, Y_sub, max_lag=10):
-    from sklearn.feature_selection import mutual_info_regression
-    """
-    Find optimal lag for Transfer Entropy using Mutual Information for one subject.
-    
-    Args:
-        X_sub (array): Time series for X (shape: n_time_points).
-        Y_sub (array): Time series for Y (shape: n_time_points).
-        max_lag (int): Maximum lag to test.
-
-    Returns:
-        best_lag (int): Optimal lag with highest Mutual Information.
-    """
-    mi_scores = []
-    for lag in range(1, max_lag + 1):
-        mi = mutual_info_regression(X_sub[:-lag].reshape(-1, 1), Y_sub[lag:].reshape(-1, 1), random_state=42)
-        # mi = mutual_info_regression(X_sub[:-lag].reshape(-1, 1), Y_sub[lag:].reshape(-1, 1))
-        mi_scores.append(mi[0])  # Store MI score for this lag
-
-    best_lag = np.argmax(mi_scores) + 1  # Best lag is the one with highest MI
-    return best_lag, mi_scores
-
-# ---- Run for all subjects ----
-def find_optimal_lags(X, Y, max_lag=10):
-    """
-    Compute optimal lag for TE per subject.
-    
-    Args:
-        X (array): Shape (n_subjects, n_time_points).
-        Y (array): Shape (n_subjects, n_time_points).
-        max_lag (int): Maximum lag to test.
-
-    Returns:
-        optimal_lags (list): Optimal lag per subject.
-        global_lag (int): Median of all subject lags.
-    """
-    optimal_lags = []
-    for sub in range(X.shape[0]):  # Iterate over subjects
-        best_lag, _ = optimal_lag_mi(X[sub], Y[sub], max_lag)
-        optimal_lags.append(best_lag)
-    
-    global_lag = int(np.median(optimal_lags))  # Take median for a global choice
-    return optimal_lags, global_lag
-
-def mixed_model_pvalues(df, dependent, predictor, group):
-    """
-    Fit a mixed model and extract both Wald and Likelihood Ratio p-values.
-    
-    Parameters:
-        df (pd.DataFrame): Your long-format dataframe.
-        dependent (str): Dependent variable (e.g. 'Y').
-        predictor (str): Predictor variable (e.g. 'X_lag').
-        group (str): Grouping factor (e.g. 'participant').
-
-    Returns:
-        dict: Wald and Likelihood Ratio test p-values.
-    """
-    import statsmodels.formula.api as smf
-    from scipy.stats import chi2
-
-    # Build formula strings
-    full_formula = f"{dependent} ~ {predictor}"
-    reduced_formula = f"{dependent} ~ 1"
-    
-    # Fit full model
-    full_model = smf.mixedlm(full_formula, df, groups=df[group])
-    full_result = full_model.fit()
-    
-    # Fit reduced model (intercept-only)
-    reduced_model = smf.mixedlm(reduced_formula, df, groups=df[group])
-    reduced_result = reduced_model.fit()
-    
-    # Extract Wald p-value for the predictor
-    wald_pvalue = full_result.pvalues[predictor]
-    
-    # Likelihood Ratio Test
-    lr_stat = 2 * (full_result.llf - reduced_result.llf)
-    lr_pvalue = chi2.sf(lr_stat, df=1)  # df=1 for one extra predictor
-    
-    # Report both
-    return {
-        'Wald_pvalue': wald_pvalue,
-        'LikelihoodRatio_pvalue': lr_pvalue,
-        'coef': full_result.params[predictor],
-        'std_err': full_result.bse[predictor]
-    }
 
 def get_train_test_blocks_net(data, fwd, behav, pick_ori, lh_label, rh_label, trial_type, block, blocks, verbose):
     """Helper function to get source data for training and testing."""
