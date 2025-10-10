@@ -1,3 +1,6 @@
+# Authors: Coumarane Tirou <c.tirou@hotmail.com>
+# License: BSD (3-clause)
+
 import os
 import numpy as np
 import pandas as pd

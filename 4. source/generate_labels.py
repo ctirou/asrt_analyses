@@ -1,3 +1,6 @@
+# Authors: Coumarane Tirou <c.tirou@hotmail.com>
+# License: BSD (3-clause)
+
 import mne
 from base import ensure_dir, ensured
 from config import *

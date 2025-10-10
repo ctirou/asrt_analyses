@@ -1,4 +1,6 @@
-import os
+# Authors: Coumarane Tirou <c.tirou@hotmail.com>
+# License: BSD (3-clause)
+
 import pandas as pd
 from base import *
 from config import *

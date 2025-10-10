@@ -1,3 +1,6 @@
+# Authors: Coumarane Tirou <c.tirou@hotmail.com>
+# License: BSD (3-clause)
+
 # recon -all
 cd /Users/coum/Desktop/asrt/mri_data
 export FREESURFER_HOME="/Applications/freesurfer/7.3.2"

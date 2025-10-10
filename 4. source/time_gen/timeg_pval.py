@@ -1,3 +1,6 @@
+# Authors: Coumarane Tirou <c.tirou@hotmail.com>
+# License: BSD (3-clause)
+
 from base import *
 from config import *
 import os.path as op

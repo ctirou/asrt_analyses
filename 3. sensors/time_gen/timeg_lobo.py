@@ -1,3 +1,6 @@
+# Authors: Coumarane Tirou <c.tirou@hotmail.com>
+# License: BSD (3-clause)
+
 import os
 import sys
 from config import *
@@ -13,7 +16,7 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 
-data_path = DATA_DIR / 'for_timeg_new'
+data_path = DATA_DIR / 'for_timeg'
 subjects = SUBJS15
 solver = 'lbfgs'
 scoring = "accuracy"

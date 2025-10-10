@@ -1,3 +1,6 @@
+# Authors: Coumarane Tirou <c.tirou@hotmail.com>
+# License: BSD (3-clause)
+
 import os
 import sys
 from config import *
@@ -14,7 +17,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score as acc
 
-data_path = DATA_DIR / 'for_timeg_new'
+data_path = DATA_DIR / 'for_timeg'
 subjects = SUBJS15
 solver = 'lbfgs'
 scoring = "accuracy"

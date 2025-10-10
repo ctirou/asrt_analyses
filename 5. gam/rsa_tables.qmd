@@ -5,6 +5,7 @@ execute:
   echo: true
   warning: false
   error: true
+  working-directory: "/Users/coum/Documents/GitHub/asrt_analyses"
 editor: visual
 python:
   executable: /Users/coum/miniforge3/envs/mne-arm/bin/python
