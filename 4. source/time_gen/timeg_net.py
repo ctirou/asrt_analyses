@@ -30,10 +30,15 @@ networks = NETWORKS[:-3]  # Exclude 'Hippocampus', 'Thalamus', 'Cerebellum-Corte
 
 pick_ori = 'vector'
 analysis = 'scores_blocks'
+# crop1, crop2 = -1.5, 1.5
+crop1, crop2 = -3, 1.5
+if crop1 != -1.5 or crop2 != 1.5:
+    analysis += f'_{str(crop1)}_{str(crop2)}'
 
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
 def process_subject(subject, jobs):
+
     # define classifier
     clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
     clf = GeneralizingEstimator(clf, scoring=scoring, n_jobs=jobs)
@@ -49,7 +54,7 @@ def process_subject(subject, jobs):
         all_behavs.append(behav)
         # read epochs
         epoch_fname = op.join(data_path, "epochs", "%s-%s-epo.fif" % (subject, epoch_num))
-        epoch = mne.read_epochs(epoch_fname, verbose=verbose).crop(-1.5, 1.5)
+        epoch = mne.read_epochs(epoch_fname, verbose=verbose).crop(crop1, crop2)
         all_epochs.append(epoch)
     # concatenate all epochs and behavs
     behav = pd.concat(all_behavs, ignore_index=True)
@@ -80,7 +85,6 @@ def process_subject(subject, jobs):
         
         for block in blocks:
             block = int(block)
-
             if not op.exists(res_path / f"rand-{block}.npy") or overwrite:
                 Xtrain, ytrain, Xtest, ytest = get_train_test_blocks_net(epoch, fwd, behav, pick_ori, lh_label, rh_label, \
                     'random', block, blocks, verbose=verbose)
@@ -91,7 +95,6 @@ def process_subject(subject, jobs):
                 gc.collect()
             else:
                 print(f"Random for {subject} epoch {epoch_num} block {block} in {network} already exists")
-
             if not op.exists(res_path / f"pat-{block}.npy") or overwrite:
                 Xtrain, ytrain, Xtest, ytest = get_train_test_blocks_net(epoch, fwd, behav, pick_ori, lh_label, rh_label, \
                     'pattern', block, blocks, verbose=verbose)
@@ -102,7 +105,6 @@ def process_subject(subject, jobs):
                 gc.collect()
             else:
                 print(f"Pattern for {subject} epoch {epoch_num} block {block} in {network} already exists")
-            
     del epoch, fwd
     gc.collect()
             

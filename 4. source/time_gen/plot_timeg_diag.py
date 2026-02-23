@@ -90,7 +90,7 @@ design = [['br11', 'br12', 'A', 'B', 'C'],
 
 cmap = ['#0173B2','#DE8F05','#029E73','#D55E00','#CC78BC','#CA9161','#FBAFE4','#ECE133','#56B4E9', "#76B041"]
 
-plot_brains = True
+plot_brains = False
 
 fig, axes = plt.subplot_mosaic(design, figsize=(13, 18), sharey=False, sharex=False, layout="tight",
                                gridspec_kw={'height_ratios': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
