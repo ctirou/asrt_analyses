@@ -2,8 +2,8 @@
 
 # SLURM options:
 
-#SBATCH --job-name=tgB_net           # Job name
-#SBATCH --output=tgB_net-%j.log      # Standard output and error log
+#SBATCH --job-name=tg_net           # Job name
+#SBATCH --output=tg_net-%j.log      # Standard output and error log
 
 #SBATCH --partition=htc
 #SBATCH --cpus-per-task=20              # Run a single task (by default tasks == CPU)

@@ -53,25 +53,27 @@ chance = .25
 threshold = .05
 threshold = .01
 
-idx = np.where((times >= -1.5) & (times <= 3))[0]
-res_path = ensured(res_dir / "pval")
-if not op.exists(res_path/ "all_pattern-pval.npy") or overwrite:
+# tmin, tmax = -1.5, 3
+tmin, tmax = -3, 3
+idx = np.where((times >= tmin) & (times <= tmax))[0]
+res_path = ensured(res_dir / "pval_tmin3")
+if not op.exists(res_path / "all_pattern-pval.npy") or overwrite:
     print('Computing pval for all patterns')
     pval = gat_stats(pats_blocks[:, 3:, idx][:, 3:, :, idx].mean(1) - chance, jobs) # caution: the first 3 blocks are practice, need to exclude
-    np.save(res_path/ "all_pattern-pval.npy", pval)
-if not op.exists(res_path/ "all_random-pval.npy") or overwrite:
+    np.save(res_path / "all_pattern-pval.npy", pval)
+if not op.exists(res_path / "all_random-pval.npy") or overwrite:
     print('Computing pval for all randoms')
     pval = gat_stats(rands_blocks[:, 3:, idx][:, 3:, :, idx].mean(1) - chance, jobs)
-    np.save(res_path/ "all_random-pval.npy", pval)
-if not op.exists(res_path/ "all_contrast-pval.npy") or overwrite:
+    np.save(res_path / "all_random-pval.npy", pval)
+if not op.exists(res_path / "all_contrast-pval.npy") or overwrite:
     print('Computing pval for all contrasts')
     contrasts = pats_blocks - rands_blocks
     pval = gat_stats(contrasts[:, 3:, idx][:, 3:, :, idx].mean(1), jobs)
-    np.save(res_path/ "all_contrast-pval.npy", pval)
+    np.save(res_path / "all_contrast-pval.npy", pval)
 
-filt = np.where((times >= -1.5) & (times <= 3))[0]
-ensure_dir(res_dir / "corr")
-if not op.exists(res_dir / "corr" / "rhos_learn.npy") or overwrite:
+filt = np.where((times >= tmin) & (times <= tmax))[0]
+ensure_dir(res_dir / "corr_tmin3")
+if not op.exists(res_dir / "corr_tmin3" / "rhos_learn.npy") or overwrite:
     contrasts = pats_blocks - rands_blocks
     contrasts = contrasts[:, :, filt][:, :, :, filt]
     all_rhos = []
@@ -86,16 +88,15 @@ if not op.exists(res_dir / "corr" / "rhos_learn.npy") or overwrite:
         all_rhos.append(rhos)
     all_rhos = np.array(all_rhos)
     all_rhos = fisher_z_transform_3d(all_rhos)
-    np.save(res_dir / "corr" / "rhos_learn.npy", all_rhos)
+    np.save(res_dir / "corr_tmin3" / "rhos_learn.npy", all_rhos)
     pval = gat_stats(all_rhos, -1)
-    np.save(res_dir / "corr" / "pval_learn-pval.npy", pval)
+    np.save(res_dir / "corr_tmin3" / "pval_learn-pval.npy", pval)
 
 cmap1 = "RdBu_r"
 cmap2 = "coolwarm"
 contour_color = "black"
 contour_color = "#00BFA6"
 contour_color = "#708090"
-idx = np.where((times >= -1.5) & (times <= 3))[0]
 plt.rcParams.update({'font.size': 12, 'font.family': 'serif', 'font.serif': 'Arial'})
 fig, axs = plt.subplots(2, 1, sharex=False, layout='constrained', figsize=(7, 6))
 norm = colors.Normalize(vmin=0.18, vmax=0.32)
@@ -109,32 +110,34 @@ for ax, data, title in zip(axs.flat, [pats_blocks, rands_blocks], ["pattern", "r
                             extent=times[idx][[0, -1, 0, -1]],
                             aspect=0.5))
     ax.set_ylabel("Training time (s)", fontsize=13)
-    ax.set_xticks(np.arange(-1, 3, .5))
-    ax.set_yticks(np.arange(-1, 3, .5))
+    ax.set_xticks(np.arange(tmin, tmax, .5))
+    ax.set_yticks(np.arange(tmin, tmax, .5))
     ax.set_title(f"Time generalization in {title} trials", fontsize=16)
     ax.axvline(0, color="k")
     ax.axhline(0, color="k")
     xx, yy = np.meshgrid(times[idx], times[idx], copy=False, indexing='xy')
-    pval = np.load(res_path/ f"all_{title.lower()}-pval.npy")
+    pval = np.load(res_path / f"all_{title.lower()}-pval.npy")
     sig = pval < threshold
     ax.contour(xx, yy, sig, colors=contour_color, levels=[0],
-                        linestyles='-', linewidths=1, alpha=1)
+                    linestyles='-', linewidths=1, alpha=1)
     if title == "random":
         ax.set_xlabel("Testing time (s)", fontsize=13)
 cbar = fig.colorbar(images[0], ax=axs, orientation='vertical', fraction=.1, ticks=[0.18, 0.32])
 cbar.set_label("\nAccuracy", rotation=270, fontsize=13)
-fig.savefig(figure_dir / "pattern_random.pdf", transparent=True)
+fig.savefig(figure_dir / "pattern_random_tmin3.pdf", transparent=True)
 plt.close()
 
 ### plot contrast ###
+idx = np.where((times >= tmin) & (times <= tmax))[0]
 contrasts = pats_blocks - rands_blocks
 win = np.where((times[filt] <= -0.5) & (times[filt] < 0))[0]
 mean = np.array([cont[win, win].mean() for cont in contrasts.mean(1)])
 sig_mean = ttest_1samp(mean, 0, axis=0)[1] < threshold
 contrasts = contrasts[:, 3:, idx][:, 3:, :, idx].mean((0, 1))
-pval_cont = np.load(res_dir / "pval" /  "all_contrast-pval.npy")
-rhos = np.load(res_dir / "corr" / "rhos_learn.npy").mean(0)
-pval_rhos = np.load(res_dir / "corr" / "pval_learn-pval.npy")
+pval_cont = np.load(res_dir / "pval_tmin3" /  "all_contrast-pval.npy")
+rhos = np.load(res_dir / "corr_tmin3" / "rhos_learn.npy").mean(0)
+pval_rhos = np.load(res_dir / "corr_tmin3" / "pval_learn-pval.npy")
+
 csig = "#0F0D0E"
 fig, axs = plt.subplots(2, 1, figsize=(7, 6), sharex=False, layout='constrained')
 norm = colors.Normalize(vmin=-0.1, vmax=0.1)
@@ -152,8 +155,8 @@ for ax, data, title, pval, vmin, vmax in zip(axs.flat, [contrasts, rhos], \
                     extent=times[idx][[0, -1, 0, -1]],
                     aspect=0.5)
     ax.set_ylabel("Training time (s)", fontsize=13)
-    ax.set_xticks(np.arange(-1, 3, .5))
-    ax.set_yticks(np.arange(-1, 3, .5))
+    ax.set_xticks(np.arange(tmin, tmax, .5))
+    ax.set_yticks(np.arange(tmin, tmax, .5))
     ax.set_title(title, fontsize=16)
     ax.axvline(0, color="k")
     ax.axhline(0, color="k")
@@ -168,14 +171,14 @@ for ax, data, title, pval, vmin, vmax in zip(axs.flat, [contrasts, rhos], \
         label = "Difference in\naccuracy"
     rectcolor = 'black'
     if ax == axs.flat[0]:
-        rect1 = plt.Rectangle([-0.5, 0.05], 0.48, 0.48, fill=False, edgecolor='yellow', linestyle='--', lw=2, zorder=10)
-        ax.add_patch(rect1)
-        if sig_mean:
-            ax.text(-0.6, -0.5, "*", fontsize=25, color=csig, ha='center', va='top', weight='bold')
+        # rect1 = plt.Rectangle([-0.5, 0.05], 0.48, 0.48, fill=False, edgecolor='yellow', linestyle='--', lw=2, zorder=10)
+        # ax.add_patch(rect1)
+        # if sig_mean:
+        #     ax.text(-0.6, -0.5, "*", fontsize=25, color=csig, ha='center', va='top', weight='bold')
         rect = plt.Rectangle([-0.5, -0.5], 0.48, 0.48, fill=False, edgecolor=csig, linestyle='--', lw=2, zorder=10)
         ax.add_patch(rect)
         ax.text(-0.6, 0.5, "*", fontsize=25, color="yellow", ha='center', va='center', weight='bold')
     cbar = fig.colorbar(im, ax=ax, orientation='vertical', fraction=.1, ticks=[vmin, vmax])
     cbar.set_label(label, rotation=270, fontsize=13)
-fig.savefig(figure_dir / "contrast_corr.pdf", transparent=True)
+fig.savefig(figure_dir / "contrast_corr_tmin3.pdf", transparent=True)
 plt.close()

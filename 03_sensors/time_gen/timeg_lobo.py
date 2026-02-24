@@ -23,6 +23,8 @@ scoring = "accuracy"
 verbose = True
 overwrite = False
 
+analysis = "scores_blocks"
+
 set_log_level(verbose)
 
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
@@ -33,7 +35,7 @@ def process_subject(subject, jobs):
     clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
     clf = GeneralizingEstimator(clf, scoring=scoring, n_jobs=jobs)
 
-    res_path = ensured(RESULTS_DIR / 'TIMEG' / 'sensors' / "scores_blocks" / subject)
+    res_path = ensured(RESULTS_DIR / 'TIMEG' / 'sensors' / analysis / subject)
     
     all_epochs, all_behavs = [], []
     for epoch_num in range(5):

@@ -2,8 +2,8 @@
 
 # SLURM options:
 
-#SBATCH --job-name=tglobo           # Job name
-#SBATCH --output=tglobo-%j.log      # Standard output and error log
+#SBATCH --job-name=tgb_htc          # Job name
+#SBATCH --output=tgb_htc-%j.log      # Standard output and error log
 
 #SBATCH --partition=htc
 #SBATCH --cpus-per-task=20              # Run a single task (by default tasks == CPU)
@@ -15,5 +15,4 @@
 
 module load conda
 conda activate mne
-
-python timeg_lobo.py
+python -m 04_source.time_gen.timeg_htc_wblock.py
