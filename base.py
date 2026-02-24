@@ -732,13 +732,17 @@ def svd(vector_data):
             dominant_data[trial, source, :] = dominant_time_series  # Store in new array
     return dominant_data
 
-def get_train_test_blocks_net(data, fwd, behav, pick_ori, lh_label, rh_label, trial_type, block, blocks, verbose):
+def svd_fast(vector_data):
+    """Vectorized equivalent of `svd` using NumPy batched SVD."""
+    _, s, vh = np.linalg.svd(vector_data, full_matrices=False)
+    return vh[..., 0, :] * s[..., [0]]
+
+def get_train_test_blocks_net(data, fwd, behav, pick_ori, trial_type, block, blocks, verbose):
     """Helper function to get source data for training and testing."""
     
     from mne import compute_covariance, compute_rank
     from mne.beamformer import make_lcmv, apply_lcmv_epochs
     import numpy as np
-    from base import svd
     
     weight_norm = "unit-noise-gain-invariant" if pick_ori == 'vector' else "unit-noise-gain"
 
@@ -751,13 +755,18 @@ def get_train_test_blocks_net(data, fwd, behav, pick_ori, lh_label, rh_label, tr
         out_blocks = (behav.blocks != block) & (behav.sessions != 0)
     
     tt = behav.trialtypes == 2 if trial_type == 'random' else behav.trialtypes == 1
-    tt_out_blocks = tt & out_blocks
-    tt_this_block = tt & this_block
         
     # compute training data
+    tt_out_blocks = tt & out_blocks
     train_blocks = behav[tt_out_blocks]
     train_epochs = data[train_blocks.trials.values]
     assert len(train_blocks) == len(train_epochs), "Length mismatch in training epochs"
+    ytrain = train_blocks.positions
+    # compute testing data
+    tt_this_block = tt & this_block
+    test_blocks = behav[tt_this_block]
+    test_epochs = data[test_blocks.trials.values]
+    ytest = test_blocks.positions
     
     # compute noise covariance
     random = behav.trialtypes == 2
@@ -768,24 +777,11 @@ def get_train_test_blocks_net(data, fwd, behav, pick_ori, lh_label, rh_label, tr
     filters = make_lcmv(train_epochs.info, fwd, data_cov, reg=0.05, noise_cov=noise_cov,
                         pick_ori=pick_ori, weight_norm=weight_norm,
                         rank=rank, reduce_rank=True, verbose=verbose)
+    # apply LCMV beamformer to epochs
     stcs_train = apply_lcmv_epochs(train_epochs, filters=filters, verbose=verbose)
-    Xtrain = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs_train])
-    if pick_ori == 'vector':
-        Xtrain = svd(Xtrain)
-    ytrain = train_blocks.positions
-    assert len(Xtrain) == len(ytrain), "Length mismatch in training data"
-
-    # compute testing data
-    test_blocks = behav[tt_this_block]
-    test_epochs = data[test_blocks.trials.values]
     stcs_test = apply_lcmv_epochs(test_epochs, filters=filters, verbose=verbose)
-    Xtest = np.array([np.real(stc.in_label(lh_label + rh_label).data) for stc in stcs_test])
-    if pick_ori == 'vector':
-        Xtest = svd(Xtest)
-    ytest = test_blocks.positions
-    assert len(Xtest) == len(ytest), "Length mismatch in testing data"
     
-    return Xtrain, ytrain, Xtest, ytest
+    return stcs_train, stcs_test, ytrain, ytest
 
 def get_train_test_blocks_htc(data, fwd, behav, pick_ori, trial_type, block, blocks, verbose):
     """Helper function to get source data for training and testing."""

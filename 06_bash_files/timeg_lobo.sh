@@ -15,4 +15,5 @@
 
 module load conda
 conda activate mne
+
 python timeg_lobo.py
