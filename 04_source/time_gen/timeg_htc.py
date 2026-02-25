@@ -14,6 +14,7 @@ from sklearn.linear_model import LogisticRegression
 from base import *
 from config import *
 from joblib import Parallel, delayed
+import gc
 
 data_path = DATA_DIR / 'for_timeg'
 subjects = SUBJS15
@@ -73,6 +74,7 @@ def process_subject(subject, jobs):
     for epo in all_epochs:
         epo.info['dev_head_t'] = all_epochs[0].info['dev_head_t']
     epoch = mne.concatenate_epochs(all_epochs, verbose=verbose)
+    del all_epochs, all_behavs
     assert len(epoch) == len(behav)
 
     fwd_fname = RESULTS_DIR / "fwd" / "for_timeg" / f"{subject}-htc-all-fwd.fif"
@@ -119,6 +121,9 @@ def process_subject(subject, jobs):
                 clf.fit(Xtrain, ytrain)
                 acc_matrix = clf.score(Xtest, ytest)
                 np.save(res_paths[region] / f"rand-{block}.npy", acc_matrix)
+                del Xtrain, Xtest, acc_matrix
+            del label_tc_train, label_tc_test, stcs_train, stcs_test, ytrain, ytest
+            gc.collect()
         else:
             print(f"Random outputs already exist for subject {subject}, block {block}")
 
@@ -152,8 +157,18 @@ def process_subject(subject, jobs):
                 clf.fit(Xtrain, ytrain)
                 acc_matrix = clf.score(Xtest, ytest)
                 np.save(res_paths[region] / f"pat-{block}.npy", acc_matrix)
+                del Xtrain, Xtest, acc_matrix
+            del label_tc_train, label_tc_test, stcs_train, stcs_test, ytrain, ytest
+            gc.collect()
         else:
             print(f"Pattern outputs already exist for subject {subject}, block {block}")
+
+        if 'stcs_train' in locals():
+            del stcs_train, ytrain, stcs_test, ytest
+            gc.collect()
+
+    del epoch, behav, fwd, vol_src, offsets, res_paths
+    gc.collect()
 
 
 if is_cluster:

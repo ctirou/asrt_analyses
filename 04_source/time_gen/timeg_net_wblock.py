@@ -14,6 +14,7 @@ from sklearn.linear_model import LogisticRegression
 from base import *
 from config import *
 from joblib import Parallel, delayed
+import gc
 
 data_path = DATA_DIR / 'for_timeg'
 subjects = SUBJS15
@@ -90,6 +91,9 @@ def process_subject(subject, jobs):
                     clf.fit(Xtrain, ytrain)
                     acc_matrix = clf.score(Xtest, ytest)
                     np.save(res_paths[network] / f"rand-{epoch_num}-{block}.npy", acc_matrix)
+                    del Xtrain, Xtest, acc_matrix
+                del stcs_train, stcs_test, ytrain, ytest
+                gc.collect()
             else:
                 print(f"Random outputs already exist for {subject} epoch {epoch_num} block {block}")
 
@@ -116,8 +120,21 @@ def process_subject(subject, jobs):
                     clf.fit(Xtrain, ytrain)
                     acc_matrix = clf.score(Xtest, ytest)
                     np.save(res_paths[network] / f"pat-{epoch_num}-{block}.npy", acc_matrix)
+                    del Xtrain, Xtest, acc_matrix
+                del stcs_train, stcs_test, ytrain, ytest
+                gc.collect()
             else:
                 print(f"Pattern outputs already exist for {subject} epoch {epoch_num} block {block}")
+
+            if 'stcs_train' in locals():
+                del stcs_train, stcs_test, ytrain, ytest
+                gc.collect()
+
+        del epoch, fwd, behav
+        gc.collect()
+
+    del labels, res_paths
+    gc.collect()
             
 if is_cluster:
     try:
