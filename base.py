@@ -392,7 +392,7 @@ def get_in_out_seq(sequence, similarities, random_lows, analysis):
                 out_seq.append(pat_sim)
     return np.array(in_seq), np.array(out_seq)
 
-def get_all_high_low(pattern_data, random_data, sequence, block=True):
+def get_all_high_low(pattern_data, random_data, sequence, block=True, step=1):
     """
     Extracts high and low similarity sets from RDMs based on a stimulus sequence.
     
@@ -422,7 +422,8 @@ def get_all_high_low(pattern_data, random_data, sequence, block=True):
     pair_labels = ['12', '13', '14', '23', '24', '34']
 
     # Generate forward and reverse sequence-based pairs
-    sequence_pairs = {f"{sequence[i]}{sequence[(i+1)%4]}" for i in range(4)}
+    limit = 4 if step == 1 else 4 - step
+    sequence_pairs = {f"{sequence[i]}{sequence[(i+step)%4]}" for i in range(limit)}
     sequence_pairs |= {p[::-1] for p in sequence_pairs}
 
     high, low = [], []
@@ -440,6 +441,7 @@ def get_all_high_low(pattern_data, random_data, sequence, block=True):
             low.append(rand_vals)
 
     return np.array(high), np.array(low)
+
 
 def cv_mahalanobis_parallel(X, y, n_jobs=-1, n_splits=10, verbose=True, shuffle=True):
     """
