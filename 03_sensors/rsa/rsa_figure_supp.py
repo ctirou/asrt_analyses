@@ -22,7 +22,7 @@ ensure_dir(figures_dir)
 
 data_type = "rdm_blocks_new"
 bsl_practice = False
-step = 2
+step = 3
 
 # load data
 all_patterns, all_randoms = [], []
@@ -46,8 +46,7 @@ for subject in tqdm(subjects):
             random_blocks[i] = rand_bsl.copy()
     pattern_blocks = np.array(pattern_blocks)
     random_blocks = np.array(random_blocks)
-    high, low = get_all_high_low(pattern_blocks, random_blocks, sequence, 3, False)
-    # high, low = get_non_adj_pairs(pattern_blocks, random_blocks, sequence, False)
+    high, low = get_all_high_low(pattern_blocks, random_blocks, sequence, False, step)
     high = np.array(high).mean(0)
     low = np.array(low).mean(0)
     all_patterns.append(high)
@@ -125,16 +124,14 @@ axd['A'].set_xlabel('Time (s)', fontsize=11)
 axd['A'].set_title(f'Mahalanobis distance within non-adjacent pairs', fontsize=13)
 
 ### B ### Similarity index
-# gam_sig = pd.read_csv(FIGURES_DIR / "TM" / "segments_tr_sensors.csv")
-# gam_sig = gam_sig[gam_sig['metric'] == 'RS']
-# arr = np.zeros(len(times), dtype=bool)
-# arr[gam_sig['start'][0]:gam_sig['end'][0] + 1] = True
+gam_sig = pd.read_csv(Path("./05_gam/gam/data") / f"segments_rs_tr_sensors_step{step}.csv")
+gam_sig = gam_sig[gam_sig['metric'] == 'RS']
+arr = np.zeros(len(times), dtype=bool)
+arr[gam_sig['start'][0]:gam_sig['end'][0] + 1] = True
 axd['B'].axhline(0, color='grey', alpha=0.5)
-pval = decod_stats(diff_lh, -1)
-sig = pval < 0.05
-# sig = arr.copy()
-pval_unc = ttest_1samp(diff_lh, 0)[1]
-sig_unc = pval_unc < 0.05
+# pval = decod_stats(diff_lh, -1)
+# sig = pval < 0.05
+sig = arr.copy()
 axd['B'].plot(times, diff_lh.mean(0), alpha=1, zorder=10, color='C7')
 sem = np.std(diff_lh, axis=0) / np.sqrt(len(subjects))
 axd['B'].fill_between(times, diff_lh.mean(0) - sem, diff_lh.mean(0) + sem, alpha=0.2, zorder=5, facecolor='C7')
@@ -149,18 +146,18 @@ axd['B'].set_xlabel('Time (s)', fontsize=11)
 axd['B'].set_title('Similarity index time course', fontsize=13)
 
 ### C ### Correlation with learning index
-# gam_sig_corr = pd.read_csv(FIGURES_DIR / "TM" / "segments_tr_sensors.csv")
-# gam_sig_corr = gam_sig_corr[gam_sig_corr['metric'] == 'RS CORR']
-# arr_corr = np.zeros(len(times), dtype=bool)
-# arr_corr[gam_sig_corr['start'][1]:gam_sig_corr['end'][1] + 1] = True
+gam_sig_corr = pd.read_csv(Path("./05_gam/gam/data") / f"segments_rs_tr_sensors_step{step}.csv")
+gam_sig_corr = gam_sig_corr[gam_sig_corr['metric'] == 'RS CORR']
+arr_corr = np.zeros(len(times), dtype=bool)
+arr_corr[gam_sig_corr['start'][1]:gam_sig_corr['end'][1] + 1] = True
 diff_c = diff_b - np.nanmean(diff_b, axis=1, keepdims=True) # Center diff_b for each subject by subtracting their mean across all blocks and times
 axd['C'].axhline(0, color="grey", alpha=0.5)
 all_rhos = np.array([[spear(learn_index_blocks.iloc[sub], diff_c[sub, :, t])[0] for t in range(len(times))] for sub in range(len(subjects))])
 all_rhos, _, _ = fisher_z_and_ttest(all_rhos)
 sem = np.nanstd(all_rhos, axis=0) / np.sqrt(len(subjects))
-p_values = decod_stats(all_rhos, -1)
-sig = p_values < 0.05
-# sig = arr_corr.copy()
+# p_values = decod_stats(all_rhos, -1)
+# sig = p_values < 0.05
+sig = arr_corr.copy()
 axd['C'].plot(times, np.nanmean(all_rhos, axis=0), alpha=1, zorder=10, color='C7')
 axd['C'].fill_between(times, np.nanmean(all_rhos, axis=0) - sem, np.nanmean(all_rhos, axis=0) + sem, alpha=0.2, zorder=5, facecolor='C7')
 for start, end in contiguous_regions(sig):
@@ -199,14 +196,14 @@ for sub in range(len(subjects)):
 pval = ttest_1samp(rhos, 0)[1]
 rval_m = np.mean(rhos)
 rval_sem = np.std(rhos) / np.sqrt(len(subjects))
-print(f"Spearman's rho: {np.mean(rhos):.2f}, p-value: {pval:.3f}")
-ptext = f"R = {rval_m:.2f} ± {rval_sem:.2f}\n$p$ = {pval:.2f}" if pval > 0.001 else f"R = {rval_m:.2f} ± {rval_sem:.2f}\n$p$ < 0.001"
+print(f"Spearman's rho: {np.mean(rhos):.3f}, p-value: {pval:.3f}")
+ptext = f"R = {rval_m:.3f} ± {rval_sem:.3f}\n$p$ = {pval:.3f}" if pval > 0.001 else f"R = {rval_m:.3f} ± {rval_sem:.3f}\n$p$ < 0.001"
 axd['D'].legend(frameon=False, title=ptext, loc='lower right')
 if pval < 0.05:
     axd['D'].text(-1.4, -40, '*', fontsize=25, ha='center', va='center', color='black', weight='bold')
 
 ### Save figure ###
-fname = 'rsa_figure.pdf'
+fname = f'rsa_figure_step{step}.pdf'
 plt.savefig(figures_dir /  fname, transparent=True)
 plt.close()
 

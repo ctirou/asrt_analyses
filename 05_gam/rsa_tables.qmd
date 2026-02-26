@@ -20,14 +20,26 @@ Sys.setenv(RETICULATE_PYTHON = "/Users/coum/miniforge3/envs/mne-arm/bin/python")
 ## Load packages
 
 ```{python}
+
+import sys
+import os
+
+# Dynamically add the parent directory (root) to the front of the search path.
+# This works regardless of whether Quarto thinks it's in 05_gam or the root.
+sys.path.insert(0, os.path.abspath('..'))
+sys.path.insert(0, os.path.abspath('.'))
+sys.path.insert(0, "/Users/coum/Documents/GitHub/asrt_analyses")
+
 import os.path as op
 import numpy as np
-from base import *
-from config import *
 import matplotlib.pyplot as plt
 import pandas as pd
 from scipy.stats import spearmanr as spear
 from pathlib import Path
+
+# Now these should import perfectly
+from base import ensure_dir, ensured, get_all_high_low, get_sequence, fisher_z_and_ttest
+from config import *
 ```
 
 ## Load data
@@ -36,11 +48,13 @@ from pathlib import Path
 subjects = SUBJS15
 times = np.linspace(-0.2, 0.6, 82)
 c1, c2 = "#5BBCD6", "#00A08A"
+step = 1
 
 data_path = Path(ensured("./gam/data"))
+figures_dir = FIGURES_DIR
 
 # --- SENSORS ---
-data_type = "rdm_blocks" 
+data_type = "rdm_blocks_new" 
 all_pats, all_rands = [], []
 all_pats_blocks, all_rands_blocks = [], []
 for subject in subjects:
@@ -63,7 +77,7 @@ for subject in subjects:
             random_blocks[i] = rand_bsl.copy()
     pattern_blocks = np.array(pattern_blocks)
     random_blocks = np.array(random_blocks)
-    high, low = get_all_high_low(pattern_blocks, random_blocks, sequence, False)
+    high, low = get_all_high_low(pattern_blocks, random_blocks, sequence, False, step)
     all_pats.append(high.mean(0))
     all_rands.append(low.mean(0))
 all_pats = np.array(all_pats)
@@ -88,15 +102,16 @@ for s, subject in enumerate(subjects):
             "value": diff_rp_tr[s, t]
         })
 df = pd.DataFrame(rows)
-fname = 'rsa_sensors_tr.csv'
+fname = f'rsa_sensors_tr_step{step}.csv'
 df.to_csv(data_path / fname, index=False, sep=",")
 ```
 
 ## Save time-resolved correlation table w/ practice
 
 ```{python}
-learn_index_blocks = pd.read_csv(data_path / 'learning_indices_blocks.csv', sep=",", index_col=0)
+learn_index_blocks = pd.read_csv(figures_dir / 'behav' / 'learning_indices_blocks.csv', sep=",", index_col=0)
 learn_index_blocks = learn_index_blocks.sub(learn_index_blocks.mean(axis=1), axis=0)
+
 all_rhos = np.array([[spear(learn_index_blocks.iloc[sub], diff_rp[sub, :, t])[0] for t in range(len(times))] for sub in range(len(subjects))])
 all_rhos, _, _ = fisher_z_and_ttest(all_rhos)
 # save table
@@ -109,7 +124,7 @@ for s, subject in enumerate(subjects):
             "value": all_rhos[s, t]
         })
 df = pd.DataFrame(rows)
-fname = 'rsa_sensors_tr_corr.csv'
+fname = f'rsa_sensors_tr_corr_step{step}.csv'
 df.to_csv(data_path / fname, index=False, sep=",")
 ```
 
@@ -129,20 +144,21 @@ for s, subject in enumerate(subjects):
             "value": all_rhos[s, t]
         })
 df = pd.DataFrame(rows)
-fname = 'rsa_sensors_tr_no_prac_corr.csv'
+fname = f'rsa_sensors_tr_no_prac_corr_step{step}.csv'
 df.to_csv(data_path / fname, index=False, sep=",")
 ```
 
 ## Load R packages
 
 ```{r}
+library(reticulate)
 library(correlation)
 library(emmeans)
 library(mgcv)
 library(gratia)
 library(plotly)
 library(tictoc)
-
+library(conflicted)
 library(tidyverse)
 
 options(scipen = 999)
@@ -151,7 +167,7 @@ options(scipen = 999)
 ## Load data
 
 ```{r}
-df.tmp <- read_csv("./gam/data/learning_indices_blocks.csv")
+df.tmp <- read_csv(file.path(as.character(py$figures_dir), "behav/learning_indices_blocks.csv"))
 names(df.tmp) <- c('subject', as.character(1:23))
 
 df.tmp %>% 
@@ -160,11 +176,11 @@ df.tmp %>%
                names_transform = as.double,
                values_to = 'value',
                values_transform = ~round(.,1)) %>% 
-  write_csv("./gam/data/behav_blocks_sensors.csv")
+  write_csv(paste0("./gam/data/behav_blocks_sensors_step", py$step, ".csv"))
 
 df.sensors <- bind_rows(
-  read_csv("./gam/data/rsa_sensors_tr.csv") %>% mutate(metric = "RS", .before = 1),
-  read_csv("./gam/data/rsa_sensors_tr_corr.csv") %>% mutate(metric = "RS CORR", .before = 1),
+  read_csv(paste0("./gam/data/rsa_sensors_tr_step", py$step, ".csv")) %>% mutate(metric = "RS", .before = 1),
+  read_csv(paste0("./gam/data/rsa_sensors_tr_corr_step", py$step, ".csv")) %>% mutate(metric = "RS CORR", .before = 1),
 ) %>% 
   mutate(across(c(subject), as.factor)) %>% 
   mutate(across(c(time, value), as.numeric))
@@ -258,7 +274,7 @@ emm_segments <- tmp %>%
   unnest(segs)
 
 # emm_segments
-write.csv(emm_segments, "./gam/data/segments_rs_tr_sensors.csv", row.names=FALSE)
+write.csv(emm_segments, paste0("./gam/data/segments_rs_tr_sensors_step", py$step, ".csv"), row.names=FALSE)
 ```
 
 ## Export average RS effect per block
@@ -267,7 +283,7 @@ write.csv(emm_segments, "./gam/data/segments_rs_tr_sensors.csv", row.names=FALSE
 
 ### /!\ NOTE: block resolved table extraction below will only work if GAM was run on time-resolved data /!\
 # extract time resolved significant index
-segments = pd.read_csv(data_path / "segments_tr_sensors.csv")
+segments = pd.read_csv(data_path / f"segments_rs_tr_sensors_step{step}.csv")
 start = segments.iloc[0]['start'] if data_type.endswith("new") else segments.iloc[1]['start']
 end = segments.iloc[0]['end'] if data_type.endswith("new") else segments.iloc[1]['end']
 idx = np.arange(int(start), int(end)+1)
@@ -282,7 +298,7 @@ for i, subject in enumerate(subjects):
             "value": diff_rp_blocks[i, block]
         })
 df = pd.DataFrame(rows)
-fname = 'rsa_sensors_br.csv'
+fname = f'rsa_sensors_br_step{step}.csv'
 df.to_csv(data_path / fname, index=False, sep=",")
 ```
 
@@ -292,6 +308,7 @@ df.to_csv(data_path / fname, index=False, sep=",")
 
 ```{python}
 # --- SOURCE ---
+step = 2
 data_type = "rdm_blocks" 
 networks = NETWORKS
 network_names = NETWORK_NAMES
@@ -326,7 +343,7 @@ for network in networks:
                 random_blocks[i] = rand_bsl.copy()
         pattern_blocks = np.array(pattern_blocks)
         random_blocks = np.array(random_blocks)
-        high, low = get_all_high_low(pattern_blocks, random_blocks, sequence, False)
+        high, low = get_all_high_low(pattern_blocks, random_blocks, sequence, False, step)
         # bsl_pat = np.nanmean(high[:, :3, :], (0, 1))
         # bsl_rand = np.nanmean(low[:, :3, :], (0, 1))
         pat = np.nanmean(high, 0)
@@ -359,7 +376,7 @@ for i, network in enumerate(networks):
                 "value": diff[j, t]
             })
 df = pd.DataFrame(rows)
-fname = 'rsa_source_tr.csv'
+fname = f'rsa_source_tr_step{step}.csv'
 df.to_csv(data_path / fname, index=False, sep=",")
 ```
 
@@ -378,7 +395,7 @@ for i, network in enumerate(networks):
                 "value": corr_rp[network][j, t]
             })
 df = pd.DataFrame(rows)
-fname = 'rsa_source_tr_corr.csv'
+fname = f'rsa_source_tr_corr_step{step}.csv'
 df.to_csv(data_path / fname, index=False, sep=",")
 ```
 
@@ -398,34 +415,136 @@ for i, network in enumerate(networks):
                 "value": corr_rp_no_prac[network][j, t]
             })
 df = pd.DataFrame(rows)
-fname = 'rsa_source_tr_no_prac_corr.csv'
+fname = f'rsa_source_tr_no_prac_corr_step{step}.csv'
 df.to_csv(data_path / fname, index=False, sep=",")
+```
+
+## Load data
+
+```{r}
+df.source <- bind_rows(
+  read_csv(paste0("./gam/data/rsa_source_tr_step", py$step, ".csv")) %>% mutate(metric = "RS", .before = 1),
+  read_csv(paste0("./gam/data/rsa_source_tr_corr_step", py$step, ".csv")) %>% mutate(metric = "RS CORR", .before = 1)
+) %>% 
+  mutate(across(c(network, subject), as.factor)) %>% 
+  mutate(across(c(time, value), as.numeric))
+
+df.source %>% mutate(NA.values = is.na(value)) %>% count(network, metric, time, NA.values)
+
+n.time.source <- df.source$time %>% unique %>% length()
+```
+
+## Fit models
+
+```{r}
+models.source.rs <- df.source %>%
+  group_by(network, metric) %>%
+  nest() %>%
+  mutate(
+    min_time = map_dbl(data, ~ min(.x$time)),
+    max_time = map_dbl(data, ~ max(.x$time)),
+    gam_model = map(data, ~ gam(value ~ s(time, k = 10) +
+                                 s(subject, bs = "re") + # random intercept
+                                 s(subject, time, bs = "re"), # random linear slope
+                                data = .x, method = "REML"))
+  )
+
+models.source.fs <- df.source %>%
+  group_by(network, metric) %>%
+  nest() %>%
+  mutate(
+    min_time = map_dbl(data, ~ min(.x$time)),
+    max_time = map_dbl(data, ~ max(.x$time)),
+    gam_model = map(data, ~ gam(value ~ s(time, k = 10) +
+                                 s(subject, bs = "re") + # random intercept
+                                 s(time, subject, bs = "fs", m = 2), # random smooth
+                                data = .x, method = "REML"))
+  )
+
+model.source.all <- df.source %>% 
+  mutate(value_std = scale(value, center = FALSE, scale = TRUE)) %>% 
+  mutate(metric = as.factor(metric),
+         network = as.factor(network),
+         network_metric = interaction(network, metric)) %>% 
+  gam(data = .,
+      value_std ~ s(time, k = 10) +
+        s(network_metric, time, bs = "sz") +
+        s(subject, bs = "re") + # random intercept
+        s(subject, time, bs = "re"), # random linear slope
+      method = "REML")
+```
+
+## Export significant clusters of time-resolved RSA
+
+```{r}
+# Apply emmeans
+tmp.source <- models.source.fs %>%
+  group_by(network, metric) %>% 
+  mutate(
+    time_seq = map2(min_time, max_time, ~ seq(.x, .y, length.out = n.time.source)),
+    emm = map2(gam_model, time_seq, ~ as_tibble(emmeans(.x, ~ time, at = list(time = .y))))
+  )
+
+# Store emm + SE
+emm_meanse.source <- tmp.source %>% 
+  select(network, metric, emm) %>%
+  unnest(emm)
+
+# Extract segments of significance
+emm_segments.source <- tmp.source %>%
+  mutate(
+    segs = map(emm, ~ {
+      df <- .x %>% mutate(signif = (lower.CL > 0) | (upper.CL < 0))
+      r <- rle(df$signif)
+      ends <- cumsum(r$lengths)
+      starts <- c(1, head(ends, -1) + 1)
+      keep <- which(r$values)
+      tibble(
+        start = df$time[starts[keep]],
+        end   = df$time[ends[keep]]
+      )
+    })
+  ) %>% 
+  select(network, metric, segs) %>%
+  unnest(segs)
+
+write.csv(emm_segments.source, paste0("./gam/data/segments_rs_tr_source_step", py$step, ".csv"), row.names = FALSE)
 ```
 
 ## Export average RS effect per block and ROIs
 
 ```{python}
-# extract index from GAMM segments
-segments = pd.read_csv(data_path / "segments_tr_sensors.csv")
-start = segments.iloc[0]['start'] if data_type.endswith("new") else segments.iloc[1]['start']
-end = segments.iloc[0]['end'] if data_type.endswith("new") else segments.iloc[1]['end']
-idx = np.arange(int(start), int(end)+1)
+# extract network-wise index from source GAMM segments
+segments = pd.read_csv(data_path / f"segments_rs_tr_source_step{step}.csv")
+segments_rs = segments[segments["metric"] == "RS"].copy()
+cluster_idx = 0 if data_type.endswith("new") else 1
 
 # save table
 rows = list()
 for i, network in enumerate(networks):
+    network_label = network_names[i]
+    seg_network = segments_rs[segments_rs["network"] == network_label].reset_index(drop=True)
+    if seg_network.empty:
+        continue
+    if cluster_idx >= len(seg_network):
+        cluster_idx_use = 0
+    else:
+        cluster_idx_use = cluster_idx
+    start = seg_network.iloc[cluster_idx_use]["start"]
+    end = seg_network.iloc[cluster_idx_use]["end"]
+    idx = np.arange(int(start), int(end) + 1)
     diff = np.nanmean(diff_rp[network][:, :, idx], axis=(-1))
     # get table
     for j, subject in enumerate(subjects):
         for block in range(diff.shape[1]):
             rows.append({
-                "network": network_names[i],
+                "network": network_label,
                 "subject": subject,
                 "block": block + 1,
                 "value": diff[j, block]
             })
 df = pd.DataFrame(rows)
-fname = 'rsa_source_br.csv'
+fname = f'rsa_source_br_step{step}.csv'
 df.to_csv(data_path / fname, index=False, sep=",")
 ```
 

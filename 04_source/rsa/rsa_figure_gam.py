@@ -20,10 +20,10 @@ subjects_dir = FREESURFER_DIR
 
 # get times
 times = np.linspace(-0.2, 0.6, 82)
-timesg = np.linspace(-1.5, 1.5, 307)
 
 networks = NETWORKS
 network_names = NETWORK_NAMES
+step = 2
 
 figures_dir = ensured(FIGURES_DIR / "RSA" / "source")
 
@@ -59,7 +59,7 @@ for network in tqdm(networks):
                 random_blocks[i] = rand_bsl.copy()
         pattern_blocks = np.array(pattern_blocks)
         random_blocks = np.array(random_blocks)
-        high, low = get_all_high_low(pattern_blocks, random_blocks, sequence, False)
+        high, low = get_all_high_low(pattern_blocks, random_blocks, sequence, False, step)
         bsl_pat = np.nanmean(high[:, :3, :], (0, 1))
         bsl_rand = np.nanmean(low[:, :3, :], (0, 1))
         pat = np.nanmean(high, 0) - bsl_pat[np.newaxis, :] if bsl_practice else np.nanmean(high, 0)
@@ -191,7 +191,8 @@ for i, (label, name, l) in enumerate(zip(networks, network_names,  \
 
 ### Plot similarity index ###
 # get significant time points from GAMM csv
-seg_df = pd.read_csv(FIGURES_DIR / "TM" / "em_segments_rs_tr_source.csv")
+# seg_df = pd.read_csv(FIGURES_DIR / "TM" / "em_segments_rs_tr_source.csv")
+seg_df = pd.read_csv(Path("./05_gam/gam/data") / f"segments_rs_tr_source_step{step}.csv")
 seg_df = seg_df[seg_df['metric'] == 'RS']
 # dictionary of boolean arrays
 sig_dict = {}

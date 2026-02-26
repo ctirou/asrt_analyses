@@ -5,3 +5,5 @@
 .venv/
 __pycache__/
 .DS_Store
+./05_gam/data/
+./05_gam/gam/data/
