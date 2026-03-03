@@ -22,7 +22,7 @@ ensure_dir(figures_dir)
 
 data_type = "rdm_blocks_new"
 bsl_practice = False
-step = 3
+step = 2
 
 # load data
 all_patterns, all_randoms = [], []

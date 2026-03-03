@@ -48,7 +48,7 @@ from config import *
 subjects = SUBJS15
 times = np.linspace(-0.2, 0.6, 82)
 c1, c2 = "#5BBCD6", "#00A08A"
-step = 1
+step = 2
 
 data_path = Path(ensured("./gam/data"))
 figures_dir = FIGURES_DIR
@@ -102,8 +102,8 @@ for s, subject in enumerate(subjects):
             "value": diff_rp_tr[s, t]
         })
 df = pd.DataFrame(rows)
-fname = f'rsa_sensors_tr_step{step}.csv'
-df.to_csv(data_path / fname, index=False, sep=",")
+# fname = f'rsa_sensors_tr_step{step}.csv'
+# df.to_csv(data_path / fname, index=False, sep=",")
 ```
 
 ## Save time-resolved correlation table w/ practice
@@ -124,8 +124,8 @@ for s, subject in enumerate(subjects):
             "value": all_rhos[s, t]
         })
 df = pd.DataFrame(rows)
-fname = f'rsa_sensors_tr_corr_step{step}.csv'
-df.to_csv(data_path / fname, index=False, sep=",")
+# fname = f'rsa_sensors_tr_corr_step{step}.csv'
+# df.to_csv(data_path / fname, index=False, sep=",")
 ```
 
 ## Save time-resolved correlation table w/o practice
@@ -144,8 +144,8 @@ for s, subject in enumerate(subjects):
             "value": all_rhos[s, t]
         })
 df = pd.DataFrame(rows)
-fname = f'rsa_sensors_tr_no_prac_corr_step{step}.csv'
-df.to_csv(data_path / fname, index=False, sep=",")
+# fname = f'rsa_sensors_tr_no_prac_corr_step{step}.csv'
+# df.to_csv(data_path / fname, index=False, sep=",")
 ```
 
 ## Load R packages
@@ -179,8 +179,8 @@ df.tmp %>%
   write_csv(paste0("./gam/data/behav_blocks_sensors_step", py$step, ".csv"))
 
 df.sensors <- bind_rows(
-  read_csv(paste0("./gam/data/rsa_sensors_tr_step", py$step, ".csv")) %>% mutate(metric = "RS", .before = 1),
-  read_csv(paste0("./gam/data/rsa_sensors_tr_corr_step", py$step, ".csv")) %>% mutate(metric = "RS CORR", .before = 1),
+  read_csv(paste0("./05_gam/gam/data/rsa_sensors_tr_step", py$step, ".csv")) %>% mutate(metric = "RS", .before = 1),
+  read_csv(paste0("./05_gam/gam/data/rsa_sensors_tr_corr_step", py$step, ".csv")) %>% mutate(metric = "RS CORR", .before = 1),
 ) %>% 
   mutate(across(c(subject), as.factor)) %>% 
   mutate(across(c(time, value), as.numeric))

@@ -7,7 +7,7 @@ import os.path as op
 import pandas as pd
 import numpy as np
 import mne
-from mne.decoding import GeneralizingEstimator
+from mne.decoding import GeneralizingEstimator, SlidingEstimator
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
@@ -28,7 +28,7 @@ pick_ori = 'vector'
 weight_norm = "unit-noise-gain-invariant"
 networks = NETWORKS[:-3]  # Exclude 'Hippocampus', 'Thalamus', 'Cerebellum-Cortex' for this analysis
 
-analysis = 'scores_blocks'
+analysis = 'decode_blocks'
 # crop1, crop2 = -1.5, 1.5
 crop1, crop2 = -3, 1.5
 if crop1 != -1.5 or crop2 != 1.5:
@@ -41,7 +41,8 @@ def process_subject(subject, jobs):
 
     # define classifier
     clf = make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=100000, solver=solver, class_weight="balanced", random_state=42))
-    clf = GeneralizingEstimator(clf, scoring=scoring, n_jobs=jobs)
+    # clf = GeneralizingEstimator(clf, scoring=scoring, n_jobs=jobs)
+    clf = SlidingEstimator(clf, scoring=scoring, n_jobs=jobs)
     # network and custom label_names
     label_path = RESULTS_DIR / 'networks_200_7' / subject
         
