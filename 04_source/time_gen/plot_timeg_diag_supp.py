@@ -35,8 +35,6 @@ for network in tqdm(networks):
         res_path = RESULTS_DIR / 'TIMEG' / 'source' / network / data_type / subject
         pattern, random = [], []
         for block in range(1, 24):
-            # pfname = res_path / f'pat-{block}.npy' if block not in [1, 2, 3] else res_path / f'pat-0-{block}.npy'
-            # rfname = res_path / f'rand-{block}.npy' if block not in [1, 2, 3] else res_path / f'rand-0-{block}.npy'
             pfname = res_path / f'pat-{block}.npy'
             rfname = res_path / f'rand-{block}.npy'
             pattern.append(np.load(pfname))
@@ -55,39 +53,43 @@ for network in tqdm(networks):
     contrasts[network] = patterns[network] - randoms[network]
 
 times = np.linspace(-3, 1.5, 459)
-win = np.where(times < 0)[0]
+win = np.where((times >= -1) & (times <= 0))[0]
+
+cmap = ['#DE8F05','#029E73', '#CA9161','#FBAFE4']
 
 # save table
 chance = 25
-for data_name, data_dict in zip(['pattern', 'random', 'contrast'], [patterns, randoms, contrasts]):
+for d, (data_name, data_dict) in enumerate(zip(['pattern', 'random', 'contrast'], [patterns, randoms, contrasts])):
+    fig, axes = plt.subplots(1, 4, figsize=(14, 3), sharey=True, sharex=True, layout="tight")
     rows = list()
     for i, network in enumerate(networks):
-        data = data_dict[network][:, 3:].mean(axis=0)
+        data = data_dict[network][:, 3:, win].mean(axis=0)
+        if d == 2:
+            axes[i].axhline(0, color='grey', alpha=.5)
+        else:
+            axes[i].axhline(chance, color='grey', alpha=.5)
+        axes[i].plot(times[win], data.mean(0), alpha=1, zorder=10, color=cmap[i], label=network, linewidth=2)
+        sem = np.std(data, axis=0) / np.sqrt(len(subjects))
         # get table
         for j, subject in enumerate(subjects):
             # for t in range(data.shape[1]):
-            for t in range(win[-1]):
+            for k, t in enumerate(win):
                 rows.append({
                     "network": network_names[i],
                     "subject": subject,
-                    "time": t,
-                    "value": data[j, t] - chance
+                    "time": k,
+                    "value": data[j, k] - chance if data_name != 'contrast' else data[j, k]
                 })
     df = pd.DataFrame(rows)
     fname = f'decode_{data_name}_source_tr.csv'
+    # axes[d].set_title(f"{data_name.capitalize()} trials")
+    # axes[d].legend()
     df.to_csv(FIGURES_DIR / "TM" / "data" / fname, index=False, sep=",")
 
 cmap = "viridis"
 cmap1 = "RdBu_r"
 cmap2 = "coolwarm"
 cmap3 = 'magma'
-
-def crop_images(screenshot):
-    nonwhite_pix = (screenshot != 255).any(-1)
-    nonwhite_row = nonwhite_pix.any(1)
-    nonwhite_col = nonwhite_pix.any(0)
-    cropped_screenshot = screenshot[nonwhite_row][:, nonwhite_col]
-    return cropped_screenshot
 
 def plot_onset(ax):
     ax.spines['top'].set_visible(False)
@@ -100,7 +102,6 @@ design = [['A', 'B', 'C'],
           ['G', 'H', 'I'],
           ['J', 'K', 'L']]
 
-cmap = ['#DE8F05','#029E73', '#CA9161','#FBAFE4']
 
 plot_brains = False
 
@@ -111,43 +112,43 @@ fig, axes = plt.subplot_mosaic(design, figsize=(13, 8), sharey=False, sharex=Fal
 
 ### Pattern ###
 # Sig from GAMM
-seg_df = pd.read_csv(FIGURES_DIR / "TM" / "em_segments_decode_source.csv")
-seg_df = seg_df[seg_df['metric'] == 'PATTERN']
-# dictionary of boolean arrays
-sig_dict = {}
-for _, row in seg_df.iterrows():
-    arr = sig_dict.get(row["network"], np.zeros(len(times), dtype=bool))
-    arr[row["start"]:row["end"] + 1] = True
-    sig_dict[row["network"]] = arr
-sig_df = pd.read_csv(FIGURES_DIR / "TM" / "smooth_decode_source.csv")
-sig_df = sig_df[sig_df['metric'] == 'PATTERN']
-for i, net in enumerate(sig_df['network'].unique()):
-    if net in sig_dict:
-        if sig_df[sig_df['network'] == net]['signif_holm'][i] == 'ns':
-            del sig_dict[net]
+# seg_df = pd.read_csv(FIGURES_DIR / "TM" / "em_segments_decode_source.csv")
+# seg_df = seg_df[seg_df['metric'] == 'PATTERN']
+# # dictionary of boolean arrays
+# sig_dict = {}
+# for _, row in seg_df.iterrows():
+#     arr = sig_dict.get(row["network"], np.zeros(len(times), dtype=bool))
+#     arr[row["start"]:row["end"] + 1] = True
+#     sig_dict[row["network"]] = arr
+# sig_df = pd.read_csv(FIGURES_DIR / "TM" / "smooth_decode_source.csv")
+# sig_df = sig_df[sig_df['metric'] == 'PATTERN']
+# for i, net in enumerate(sig_df['network'].unique()):
+#     if net in sig_dict:
+#         if sig_df[sig_df['network'] == net]['signif_holm'][i] == 'ns':
+#             del sig_dict[net]
 
 for i, (network, pattern_idx) in enumerate(zip(networks, ['A', 'D', 'G', 'J'])):
-    plot_onset(axes[pattern_idx])
-    data = patterns[network][:, 3:].mean(1)
-    axes[pattern_idx].axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
+    # plot_onset(axes[pattern_idx])
+    data = patterns[network][:, 3:, win].mean(1)
+    # axes[pattern_idx].axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
     axes[pattern_idx].axhline(chance, color='grey', alpha=.5)
     # Get significant clusters
     # sig = sig_dict[network_names[i]] if network_names[i] in sig_dict else np.zeros(data.shape[1], dtype=bool)
     pval = decod_stats(data - chance, -1)
     sig = pval < threshold
     # Main plot
-    axes[pattern_idx].plot(times, data.mean(0), alpha=1, zorder=10, color='C7')
+    axes[pattern_idx].plot(times[win], data.mean(0), alpha=1, zorder=10, color='C7')
     # Plot significant regions separately
     for start, end in contiguous_regions(sig):
-        axes[pattern_idx].plot(times[start:end], data.mean(0)[start:end], alpha=1, zorder=10, color=cmap[i])
+        axes[pattern_idx].plot(times[win][start:end], data.mean(0)[start:end], alpha=1, zorder=10, color=cmap[i])
     sem = np.std(data, axis=0) / np.sqrt(len(subjects))
-    axes[pattern_idx].fill_between(times, data.mean(0) - sem, data.mean(0) + sem, alpha=0.2, zorder=5, facecolor='C7')
+    axes[pattern_idx].fill_between(times[win], data.mean(0) - sem, data.mean(0) + sem, alpha=0.2, zorder=5, facecolor='C7')
     # Highlight significant regions
-    axes[pattern_idx].fill_between(times, data.mean(0) - sem, data.mean(0) + sem, where=sig, alpha=0.5, zorder=5, color=cmap[i])
-    axes[pattern_idx].fill_between(times, data.mean(0) - sem, chance, where=sig, alpha=0.3, zorder=5, facecolor=cmap[i])
+    axes[pattern_idx].fill_between(times[win], data.mean(0) - sem, data.mean(0) + sem, where=sig, alpha=0.5, zorder=5, color=cmap[i])
+    axes[pattern_idx].fill_between(times[win], data.mean(0) - sem, chance, where=sig, alpha=0.3, zorder=5, facecolor=cmap[i])
     axes[pattern_idx].set_ylabel('Acc. (%)', fontsize=11)
     axes[pattern_idx].set_ylim(23, 35)
-    axes[pattern_idx].set_xticks(np.arange(-3, 1.5, 0.5))
+    axes[pattern_idx].set_xticks(np.arange(-1, 0.25, 0.25))
     axes[pattern_idx].set_yticks(np.arange(25, 36, 5))
     axes[pattern_idx].set_yticklabels(np.arange(25, 36, 5))
     if pattern_idx == 'A':

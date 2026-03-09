@@ -22,7 +22,7 @@ subjects = SUBJS15
 solver = 'lbfgs'
 scoring = "accuracy"
 verbose = True
-overwrite = False
+overwrite = True
 
 analysis = "scores_blocks"
 
@@ -89,23 +89,17 @@ def process_subject(subject, jobs):
     ytest = ytb.positions
     assert len(Xtrain) == len(ytrain), "Xtrain and ytrain lengths do not match"
     assert len(Xtest) == len(ytest), "Xtest and ytest lengths do not match"
-    print(f"Training samples: {len(ytrain)}, Test samples: {len(ytest)}")
+    # print(f"Training samples: {len(ytrain)}, Test samples: {len(ytest)}")
     
-    Xtr1 = Xtrain[:len(Xtrain)//2]
+    clf.fit(Xtrain, ytrain)
+    
     Xte1 = Xtest[:len(Xtest)//2]
-    ytr1 = ytrain[:len(ytrain)//2]
     yte1 = ytest[:len(ytest)//2]
-    
-    clf.fit(Xtr1, ytr1)
     acc_matrix1 = clf.score(Xte1, yte1)
     np.save(res_path / f"pat-{block}-fold1.npy", acc_matrix1)
     
-    Xtr2 = Xtrain[len(Xtrain)//2:]
     Xte2 = Xtest[len(Xtest)//2:]
-    ytr2 = ytrain[len(ytrain)//2:]
     yte2 = ytest[len(ytest)//2:]
-    
-    clf.fit(Xtr2, ytr2)
     acc_matrix2 = clf.score(Xte2, yte2)
     np.save(res_path / f"pat-{block}-fold2.npy", acc_matrix2)
     
@@ -121,23 +115,17 @@ def process_subject(subject, jobs):
     ytest = ytb.positions
     assert len(Xtrain) == len(ytrain), "Xtrain and ytrain lengths do not match"
     assert len(Xtest) == len(ytest), "Xtest and ytest lengths do not match"
-    print(f"Training samples: {len(ytrain)}, Test samples: {len(ytest)}")
+    # print(f"Training samples: {len(ytrain)}, Test samples: {len(ytest)}")
     
-    Xtr1 = Xtrain[:len(Xtrain)//2]
+    clf.fit(Xtrain, ytrain)
+    
     Xte1 = Xtest[:len(Xtest)//2]
-    ytr1 = ytrain[:len(ytrain)//2]
     yte1 = ytest[:len(ytest)//2]
-    
-    clf.fit(Xtr1, ytr1)
     acc_matrix1 = clf.score(Xte1, yte1)
     np.save(res_path / f"rand-{block}-fold1.npy", acc_matrix1)
     
-    Xtr2 = Xtrain[len(Xtrain)//2:]
     Xte2 = Xtest[len(Xtest)//2:]
-    ytr2 = ytrain[len(ytrain)//2:]
     yte2 = ytest[len(ytest)//2:]
-
-    clf.fit(Xtr2, ytr2)
     acc_matrix2 = clf.score(Xte2, yte2)
     np.save(res_path / f"rand-{block}-fold2.npy", acc_matrix2)
     
