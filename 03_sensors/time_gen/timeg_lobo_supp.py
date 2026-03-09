@@ -65,61 +65,82 @@ def process_subject(subject, jobs):
     blocks = np.unique(behav.blocks)
     rng = np.random.default_rng(seed=42)
     
-    for block in blocks:
-        block = int(block)
-        this_block = behav.blocks == block
-        
-        if block in blocks[:3]:
-            rand_blocks = rng.choice(blocks[3:], size=19, replace=False)
-            out_blocks = behav.blocks.isin(rand_blocks) & (behav.blocks != block)
-        else:
-            out_blocks = (behav.blocks != block) & (behav.sessions != 0)
+    block = 4
+    this_block = behav.blocks == block
+    
+    if block in blocks[:3]:
+        rand_blocks = rng.choice(blocks[3:], size=19, replace=False)
+        out_blocks = behav.blocks.isin(rand_blocks) & (behav.blocks != block)
+    else:
+        out_blocks = (behav.blocks != block) & (behav.sessions != 0)
 
-        for b, w in zip(behav.blocks, out_blocks):
-            print(f"Block: {b}, Out: {w}")
+    for b, w in zip(behav.blocks, out_blocks):
+        print(f"Block: {b}, Out: {w}")
 
-        # pattern trials
-        pat = behav.trialtypes == 1
-        pat_out_blocks = pat & out_blocks
-        pat_this_block = pat & this_block
-        yob = behav[pat_out_blocks]
-        ytb = behav[pat_this_block]
-        Xtrain = data[yob.trials.values]
-        ytrain = yob.positions
-        Xtest = data[ytb.trials.values]
-        ytest = ytb.positions
-        assert len(Xtrain) == len(ytrain), "Xtrain and ytrain lengths do not match"
-        assert len(Xtest) == len(ytest), "Xtest and ytest lengths do not match"
-        print(f"Training samples: {len(ytrain)}, Test samples: {len(ytest)}")
-        
-        if not op.exists(res_path / f"pat-{block}.npy") or overwrite:
-            clf.fit(Xtrain, ytrain)
-            acc_matrix = clf.score(Xtest, ytest)
-            np.save(res_path / f"pat-{block}.npy", acc_matrix)
-        else:
-            print(f"Pattern for {subject} block {block} already exists")
+    # pattern trials
+    pat = behav.trialtypes == 1
+    pat_out_blocks = pat & out_blocks
+    pat_this_block = pat & this_block
+    yob = behav[pat_out_blocks]
+    ytb = behav[pat_this_block]
+    Xtrain = data[yob.trials.values]
+    ytrain = yob.positions
+    Xtest = data[ytb.trials.values]
+    ytest = ytb.positions
+    assert len(Xtrain) == len(ytrain), "Xtrain and ytrain lengths do not match"
+    assert len(Xtest) == len(ytest), "Xtest and ytest lengths do not match"
+    print(f"Training samples: {len(ytrain)}, Test samples: {len(ytest)}")
+    
+    Xtr1 = Xtrain[:len(Xtrain)//2]
+    Xte1 = Xtest[:len(Xtest)//2]
+    ytr1 = ytrain[:len(ytrain)//2]
+    yte1 = ytest[:len(ytest)//2]
+    
+    clf.fit(Xtr1, ytr1)
+    acc_matrix1 = clf.score(Xte1, yte1)
+    np.save(res_path / f"pat-{block}-fold1.npy", acc_matrix1)
+    
+    Xtr2 = Xtrain[len(Xtrain)//2:]
+    Xte2 = Xtest[len(Xtest)//2:]
+    ytr2 = ytrain[len(ytrain)//2:]
+    yte2 = ytest[len(ytest)//2:]
+    
+    clf.fit(Xtr2, ytr2)
+    acc_matrix2 = clf.score(Xte2, yte2)
+    np.save(res_path / f"pat-{block}-fold2.npy", acc_matrix2)
+    
+    # random trials        
+    rand = behav.trialtypes == 2
+    rand_out_blocks = rand & out_blocks
+    rand_this_block = rand & this_block
+    yob = behav[rand_out_blocks]
+    ytb = behav[rand_this_block]
+    Xtrain = data[yob.trials.values]
+    ytrain = yob.positions
+    Xtest = data[ytb.trials.values]
+    ytest = ytb.positions
+    assert len(Xtrain) == len(ytrain), "Xtrain and ytrain lengths do not match"
+    assert len(Xtest) == len(ytest), "Xtest and ytest lengths do not match"
+    print(f"Training samples: {len(ytrain)}, Test samples: {len(ytest)}")
+    
+    Xtr1 = Xtrain[:len(Xtrain)//2]
+    Xte1 = Xtest[:len(Xtest)//2]
+    ytr1 = ytrain[:len(ytrain)//2]
+    yte1 = ytest[:len(ytest)//2]
+    
+    clf.fit(Xtr1, ytr1)
+    acc_matrix1 = clf.score(Xte1, yte1)
+    np.save(res_path / f"rand-{block}-fold1.npy", acc_matrix1)
+    
+    Xtr2 = Xtrain[len(Xtrain)//2:]
+    Xte2 = Xtest[len(Xtest)//2:]
+    ytr2 = ytrain[len(ytrain)//2:]
+    yte2 = ytest[len(ytest)//2:]
 
-        # random trials        
-        rand = behav.trialtypes == 2
-        rand_out_blocks = rand & out_blocks
-        rand_this_block = rand & this_block
-        yob = behav[rand_out_blocks]
-        ytb = behav[rand_this_block]
-        Xtrain = data[yob.trials.values]
-        ytrain = yob.positions
-        Xtest = data[ytb.trials.values]
-        ytest = ytb.positions
-        assert len(Xtrain) == len(ytrain), "Xtrain and ytrain lengths do not match"
-        assert len(Xtest) == len(ytest), "Xtest and ytest lengths do not match"
-        print(f"Training samples: {len(ytrain)}, Test samples: {len(ytest)}")
-        
-        if not op.exists(res_path / f"rand-{block}.npy") or overwrite:
-            clf.fit(Xtrain, ytrain)
-            acc_matrix = clf.score(Xtest, ytest)
-            np.save(res_path / f"rand-{block}.npy", acc_matrix)
-        else:
-            print(f"Random for {subject} block {block} already exists")
-
+    clf.fit(Xtr2, ytr2)
+    acc_matrix2 = clf.score(Xte2, yte2)
+    np.save(res_path / f"rand-{block}-fold2.npy", acc_matrix2)
+    
     del data, behav
     gc.collect()
 
