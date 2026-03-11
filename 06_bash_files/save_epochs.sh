@@ -15,4 +15,5 @@
 
 module load conda
 conda activate mne
-python save_epochs.py                           # run the script
+# python save_epochs.py
+python -m 02_preprocessing.save_reordered_epochs.py

@@ -868,3 +868,53 @@ def fisher_z_transform_3d(rho_3d):
     rho_3d = np.clip(rho_3d, -0.999999, 0.999999)
     z_3d = 0.5 * np.log((1 + rho_3d) / (1 - rho_3d))
     return z_3d
+
+def reorder(random_events, events, raw_rd, dur=200, nsamples=33):
+    import mne
+    """
+    Reorder random events to match the given sequence.
+
+    Parameters:
+    random_events -- array of random events
+    events -- target sequence of events
+    raw_rd -- raw data corresponding to random events
+    dur -- duration (in samples) of pre-task and post-task data
+    nsamples -- window duration in samples
+
+    Returns:
+    Reordered raw data, original random event indices, and reordered events.
+    """
+    events = list(events)
+    orig_nums = []
+    events_reord = []
+    raw_Xrd = raw_rd.get_data()
+    raw_reord = []
+    new_sample = 0
+    first_samp = raw_rd.first_samp
+
+    # Start reordered random with the first seconds of random raw
+    raw_reord.append(raw_Xrd[:, :dur])
+    new_sample += dur
+
+    random_events_numbers = np.arange(len(random_events))
+    for event in events:
+        if event[2] in random_events[:, 2]:
+            index = random_events[:, 2].tolist().index(event[2])
+            orig_nums.append(random_events_numbers[index])
+            samp = random_events[index, 0] - first_samp
+            raw_reord.append(raw_Xrd[:, samp:samp + nsamples])
+            random_events = np.delete(random_events, index, axis=0)
+            random_events_numbers = np.delete(random_events_numbers, index, axis=0)
+            events_reord.append([new_sample, 0, event[2]])
+            new_sample += nsamples
+        else:
+            break
+
+    # End reordered random with the last seconds of random raw
+    raw_reord.append(raw_Xrd[:, -dur:])
+    orig_nums_reord = np.array(orig_nums)
+    events_reord = np.array(events_reord)
+    raw_reord = np.concatenate(raw_reord, axis=1)
+    raw_reord = mne.io.RawArray(raw_reord, raw_rd.info)
+
+    return raw_reord, orig_nums_reord, events_reord

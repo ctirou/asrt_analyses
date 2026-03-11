@@ -17,7 +17,8 @@ from joblib import Parallel, delayed
 import gc
 
 data_path = DATA_DIR / 'for_timeg'
-subjects = SUBJS15
+# subjects = SUBJS15
+subjects = ['sub09', 'sub10']
 lock = 'stim'
 solver = 'lbfgs'
 scoring = "accuracy"
