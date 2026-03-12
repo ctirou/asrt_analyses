@@ -17,9 +17,8 @@ from autoreject import get_rejection_threshold
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
 subjects = SUBJS15
-mode_ICA = False
-generalizing = True
-filtering = False
+mode_ICA = True
+filtering = True
 overwrite = False
 verbose = True
 jobs = -1
@@ -27,15 +26,11 @@ jobs = -1
 def int_to_unicode(array):
         return ''.join([str(chr(int(ii))) for ii in array]) # permet de convertir int en unicode (pour editops)
 
-def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs, verbose):      
+def process_subject(subject, mode_ICA, filtering, overwrite, jobs, verbose):      
         # Set path
         data_path = RAW_DATA_DIR
-        if generalizing:
-                res_path = ensured(DATA_DIR / 'for_timeg_reordered')
-                tmin, tmax = -3, 3
-        else:
-                res_path = ensured(DATA_DIR / 'for_rsa')
-                tmin, tmax = -0.2, 0.6
+        res_path = ensured(DATA_DIR / 'for_timeg_reordered')
+        tmin, tmax = -3, 3
 
         meg_sessions = ['2_PRACTICE', '3_EPOCH_1', '4_EPOCH_2', '5_EPOCH_3', '6_EPOCH_4']
         # Create preprocessed sub-folders
@@ -43,8 +38,8 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
         for fol in folders:
                 ensure_dir(res_path / fol)
         # Sort behav files
-        # path_to_behav_dir = f'{data_path}/{subject}/behav_data'
-        path_to_behav_dir = HOME / 'raw_behavs' / subject
+        path_to_behav_dir = f'{data_path}/{subject}/behav_data'
+        # path_to_behav_dir = HOME / 'raw_behavs' / subject
         behav_dir = os.listdir(path_to_behav_dir)
         behav_files_filter = [f for f in behav_dir if not f.startswith('.')]
         behav_files = sorted([f for f in behav_files_filter if '_eASRT_Practice' in f or '_eASRT_Epoch' in f])
@@ -151,7 +146,7 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                                 events_stim = np.array(events_stim)                
                         
                         # Read behav data
-                        fname_behav = HOME / 'raw_behavs' / subject / behav_session
+                        fname_behav = op.join(data_path, subject, 'behav_data', behav_session)
                         behav = open(fname_behav, 'r')
                         lines = behav.readlines()
                         column_names = lines[0].split()
@@ -213,7 +208,8 @@ def process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs,
                         picks = mne.pick_types(raw_reord.info, meg=True, eeg=False, eog=False, stim=False) # by default eog is True
                         # reject = dict(mag=reject['mag'])
                         epochs = mne.Epochs(raw_reord, events_reord, tmin=tmin, tmax=tmax, baseline=None, preload=True, picks=picks, decim=20, reject=None, verbose=verbose)
-                        
+                        epochs.save(op.join(res_path, 'epochs', f'{subject}-{session_num}-epo.fif'), overwrite=overwrite)
+                        behav_df.to_pickle(op.join(res_path, 'behav', f'{subject}-{session_num}.pkl'))
                 else:
                         print(f"Epochs for {subject} {meg_session} already exist, skipping...")
         
@@ -223,11 +219,11 @@ if is_cluster:
         subject_num = int(os.getenv("SLURM_ARRAY_TASK_ID"))
         subject = subjects[subject_num]
         jobs = int(os.getenv("SLURM_CPUS_PER_TASK"))
-        process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs, verbose)
+        process_subject(subject, mode_ICA, filtering, overwrite, jobs, verbose)
     except (IndexError, ValueError) as e:
         print("Error: SLURM_ARRAY_TASK_ID is not set correctly or is out of bounds.")
         sys.exit(1)
 else:
         jobs = -1
         for subject in subjects:
-                process_subject(subject, mode_ICA, generalizing, filtering, overwrite, jobs, verbose)
+                process_subject(subject, mode_ICA, filtering, overwrite, jobs, verbose)
