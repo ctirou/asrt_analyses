@@ -51,8 +51,10 @@ def process_subject(subject, mode_ICA, filtering, overwrite, jobs, verbose):
                 
                         # Read the raw data
                         raw_fname = op.join(data_path, subject, 'meg_data', meg_session, 'results', 'c,rfDC_EEG')
-                        hs_fname = op.join(data_path, subject, "meg_data", meg_session, "results", "hs_file")
-                        config_fname = op.join(data_path, subject, "meg_data", meg_session, "results", "config")
+                        # hs_fname = op.join(data_path, subject, "meg_data", meg_session, "results", "hs_file")
+                        hs_fname = op.join(data_path, subject, "meg_data", meg_session, "hs_file")
+                        config_fname = op.join(data_path, subject, "meg_data", meg_session, "config")
+                        # config_fname = op.join(data_path, subject, "meg_data", meg_session, "results", "config")
                         raw = mne.io.read_raw_bti(raw_fname, preload=True, config_fname=config_fname, head_shape_fname=hs_fname, verbose=verbose)
                         # Set some channel types and rename them
                         raw.set_channel_types({'EEG 001': 'ecg',
@@ -66,6 +68,7 @@ def process_subject(subject, mode_ICA, filtering, overwrite, jobs, verbose):
                         raw.drop_channels(to_drop)
                         # Save a filtered version of the raw to run the ICA on
                         filt_raw = raw.copy().filter(l_freq=1., h_freq=None, n_jobs=jobs)
+                        
                         # Find rejection thresholds
                         try:
                                 epochs_for_thresh = mne.make_fixed_length_epochs(filt_raw, duration=2., preload=True, verbose=verbose)
@@ -76,6 +79,7 @@ def process_subject(subject, mode_ICA, filtering, overwrite, jobs, verbose):
                         except Exception as e:
                                 print(f"AutoReject failed, falling back to default reject: {e}")
                                 reject = dict(mag=4e-12)
+                        # ICA fitting and artifact removal
                         if mode_ICA:
                                 # Initialize the ICA asking for 30 components
                                 ica = ICA(n_components=30, method='picard', fit_params=dict(ortho=True), random_state=42, verbose=verbose)
@@ -94,13 +98,14 @@ def process_subject(subject, mode_ICA, filtering, overwrite, jobs, verbose):
                                 ica.exclude = np.unique(np.concatenate([veog_indices, heog_indices, hbeat_indices]))
                                 # Filter raw
                                 ica.apply(raw)
-                        
                         del filt_raw
                         gc.collect()
-                                
+                        
+                        # filter raw        
                         if filtering:
                                 raw.filter(0.1, 30, n_jobs=jobs)
                         
+                        # find events
                         if subject == 'sub11' and session_num != 0: # sub11 has wrong triggers so we need to read a txt file with correct events
                                 file_path = data_path / subject / 'meg_data' / meg_session / 'events_info.txt'
                                 ev = open(file_path, 'r')
@@ -200,11 +205,10 @@ def process_subject(subject, mode_ICA, filtering, overwrite, jobs, verbose):
                         epoch_dur = 2900 # in ms
                         nsamples = int(epoch_dur * raw.info['sfreq'] / 1000)
                         raw_reord, _, events_reord = reorder(rd_events, pat_events, raw, dur=100, nsamples=nsamples-1)
-                        
                         del raw
                         gc.collect()
                         
-                        # Create epochs time locked on stimulus onset and baseline epochs
+                        # generate epochs and save them with behavioral data
                         picks = mne.pick_types(raw_reord.info, meg=True, eeg=False, eog=False, stim=False) # by default eog is True
                         # reject = dict(mag=reject['mag'])
                         epochs = mne.Epochs(raw_reord, events_reord, tmin=tmin, tmax=tmax, baseline=None, preload=True, picks=picks, decim=20, reject=None, verbose=verbose)
