@@ -90,12 +90,12 @@ design = [['br11', 'br12', 'A', 'B', 'C'],
 
 cmap = ['#0173B2','#DE8F05','#029E73','#D55E00','#CC78BC','#CA9161','#FBAFE4','#ECE133','#56B4E9', "#76B041"]
 
+plt.rcParams.update({'font.size': 10, 'font.family': 'serif', 'font.serif': 'Arial'})
 plot_brains = False
 
 fig, axes = plt.subplot_mosaic(design, figsize=(13, 18), sharey=False, sharex=False, layout="tight",
                                gridspec_kw={'height_ratios': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
                                             'width_ratios': [.2, .2, .5, .5, .5]})
-plt.rcParams.update({'font.size': 10, 'font.family': 'serif', 'font.serif': 'Arial'})
 ### Plot brain ###
 if plot_brains:
     brain_kwargs = dict(hemi='both', background="white", cortex="low_contrast", surf='inflated', subjects_dir=subjects_dir, size=(800, 400))
@@ -178,7 +178,11 @@ for i, (network, pattern_idx) in enumerate(zip(networks, ['A', 'D', 'G', 'J', 'M
     sig_level = sig_df[sig_df['network'] == network_names[i]]['signif_holm'].values[0]
     if sig_level != 'ns':
         axes[pattern_idx].text(0.5, 33, sig_level, fontsize=20, ha='center', va='center', color=cmap[i], weight='bold')
-    
+    # Cohen's d (one-sample vs chance)
+    cohen_d = (data.mean(0) - chance) / data.std(0, ddof=1)
+    for ci, (start, end) in enumerate(contiguous_regions(sig)):
+        print(f"[Pattern] {network_names[i]} — cluster {ci+1} ({times[start]:.3f}–{times[end-1]:.3f}s): "
+              f"peak d={cohen_d[start:end].max():.2f}, mean d={cohen_d[start:end].mean():.2f}")
 
 ### Random ###    
 # Sig from GAMM
@@ -226,6 +230,11 @@ for i, (network, random_idx) in enumerate(zip(networks, ['B', 'E', 'H', 'K', 'N'
     sig_level = sig_df[sig_df['network'] == network_names[i]]['signif_holm'].values[0]
     if sig_level != 'ns':
         axes[random_idx].text(0.5, 33, sig_level, fontsize=20, ha='center', va='center', color=cmap[i], weight='bold')
+    # Cohen's d (one-sample vs chance)
+    cohen_d = (data.mean(0) - chance) / data.std(0, ddof=1)
+    for ci, (start, end) in enumerate(contiguous_regions(sig)):
+        print(f"[Random] {network_names[i]} — cluster {ci+1} ({times[start]:.3f}–{times[end-1]:.3f}s): "
+              f"peak d={cohen_d[start:end].max():.2f}, mean d={cohen_d[start:end].mean():.2f}")
 
 ### Contrast ###
 win = np.where((times >= -0.5) & (times < 0))[0]
@@ -286,6 +295,11 @@ for i, (network, contrast_idx) in enumerate(zip(networks, ['C', 'F', 'I', 'L', '
     sig_level = sig_df[sig_df['network'] == network_names[i]]['signif_holm'].values[0]
     if sig_level != 'ns':
         axes[contrast_idx].text(-0.5, 4, sig_level, fontsize=20, ha='center', va='center', color=cmap[i], weight='bold')
+    # Cohen's d (one-sample vs 0)
+    cohen_d = data.mean(0) / data.std(0, ddof=1)
+    for ci, (start, end) in enumerate(contiguous_regions(sig)):
+        print(f"[Contrast] {network_names[i]} — cluster {ci+1} ({times[start]:.3f}–{times[end-1]:.3f}s): "
+              f"peak d={cohen_d[start:end].max():.2f}, mean d={cohen_d[start:end].mean():.2f}")
 
 fig.savefig(figures_dir / "timeg-diag.pdf", transparent=True)
 

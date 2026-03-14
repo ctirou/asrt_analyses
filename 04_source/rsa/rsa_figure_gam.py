@@ -27,7 +27,8 @@ step = 2
 
 figures_dir = ensured(FIGURES_DIR / "RSA" / "source")
 
-data_type = "rdm_blocks"
+# data_type = "rdm_blocks"
+data_type = "rdm_blocks_vect"
 bsl_practice = False
 
 # Load RSA data
@@ -191,8 +192,8 @@ for i, (label, name, l) in enumerate(zip(networks, network_names,  \
 
 ### Plot similarity index ###
 # get significant time points from GAMM csv
-# seg_df = pd.read_csv(FIGURES_DIR / "TM" / "em_segments_rs_tr_source.csv")
-seg_df = pd.read_csv(Path("./05_gam/gam/data") / f"segments_rs_tr_source_step{step}.csv")
+seg_df = pd.read_csv(FIGURES_DIR / "TM" / "em_segments_rs_tr_source.csv")
+# seg_df = pd.read_csv(Path("./05_gam/gam/data") / f"segments_rs_tr_source_step{step}.csv")
 seg_df = seg_df[seg_df['metric'] == 'RS']
 # dictionary of boolean arrays
 sig_dict = {}
@@ -233,6 +234,11 @@ for i, (label, name, j) in enumerate(zip(networks, network_names, ['B', 'E', 'H'
     if sig_level != 'ns':
         axd[j].text(0.4, -0.35, sig_level, fontsize=20, ha='center', va='bottom', color=cmap[i], weight='bold')
     axd[j].set_ylim(-0.4, 0.6)
+    # Cohen's d for similarity index (one-sample, vs 0): d = mean / std
+    cohen_d = diff.mean(0) / diff.std(0, ddof=1)
+    for ci, (start, end) in enumerate(contiguous_regions(sig)):
+        print(f"[B] {name} — cluster {ci+1} ({times[start]:.3f}–{times[end-1]:.3f}s): "
+              f"peak d={cohen_d[start:end].max():.2f}, mean d={cohen_d[start:end].mean():.2f}")
 
 ### Plot learning index correlation ###
 seg_df = pd.read_csv(FIGURES_DIR / "TM" / "em_segments_rs_tr_source.csv")

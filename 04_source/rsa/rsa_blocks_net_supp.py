@@ -71,7 +71,7 @@ def process_subject(subject, jobs):
                 if overwrite or not op.exists(res_paths[network] / f"rand-{epoch_num}-{block}.npy")]
 
             if random_pending:
-                stcs_train, stcs_test, ytrain, ytest = get_train_test_blocks_net(epoch, fwd, behav, pick_ori, 'random', block, blocks, verbose)
+                stcs_train, stcs_test, ytrain, ytest = get_train_test_blocks_net(epoch, fwd, behav, pick_ori, 'random', block, blocks, rsa=True, verbose=verbose)
 
                 for network in random_pending:
                     print(f"Processing Mahalanobis for {subject} epoch {epoch_num} in network {network} block {block} random")
@@ -97,7 +97,7 @@ def process_subject(subject, jobs):
                 if overwrite or not op.exists(res_paths[network] / f"pat-{epoch_num}-{block}.npy")]
 
             if pattern_pending:
-                stcs_train, stcs_test, ytrain, ytest = get_train_test_blocks_net(epoch, fwd, behav, pick_ori, 'pattern', block, blocks, verbose)
+                stcs_train, stcs_test, ytrain, ytest = get_train_test_blocks_net(epoch, fwd, behav, pick_ori, 'pattern', block, blocks, rsa=True, verbose=verbose)
 
                 for network in pattern_pending:
                     print(f"Processing Mahalanobis for {subject} epoch {epoch_num} in network {network} block {block} pattern")
@@ -132,6 +132,6 @@ if is_cluster:
         print("Error: SLURM_ARRAY_TASK_ID is not set correctly or is out of bounds.")
         sys.exit(1)
 else:
-    jobs = 1
+    jobs = -1
     for subject in subjects:
         process_subject(subject, jobs)

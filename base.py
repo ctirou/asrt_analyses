@@ -739,7 +739,7 @@ def svd_fast(vector_data):
     _, s, vh = np.linalg.svd(vector_data, full_matrices=False)
     return vh[..., 0, :] * s[..., [0]]
 
-def get_train_test_blocks_net(data, fwd, behav, pick_ori, trial_type, block, blocks, verbose):
+def get_train_test_blocks_net(data, fwd, behav, pick_ori, trial_type, block, blocks, rsa=False, verbose=False):
     """Helper function to get source data for training and testing."""
     
     from mne import compute_covariance, compute_rank
@@ -749,12 +749,14 @@ def get_train_test_blocks_net(data, fwd, behav, pick_ori, trial_type, block, blo
     weight_norm = "unit-noise-gain-invariant" if pick_ori == 'vector' else "unit-noise-gain"
 
     this_block = behav.blocks == block
-    # out_blocks = behav.blocks != block
-    if block in blocks[:3]:
-        rand_blocks = np.random.choice(blocks[3:], size=19, replace=False)
-        out_blocks = behav.blocks.isin(rand_blocks)
+    if not rsa:
+        if block in blocks[:3]:
+            rand_blocks = np.random.choice(blocks[3:], size=19, replace=False)
+            out_blocks = behav.blocks.isin(rand_blocks)
+        else:
+            out_blocks = (behav.blocks != block) & (behav.sessions != 0)
     else:
-        out_blocks = (behav.blocks != block) & (behav.sessions != 0)
+        out_blocks = behav.blocks != block
     
     tt = behav.trialtypes == 2 if trial_type == 'random' else behav.trialtypes == 1
         
@@ -785,7 +787,7 @@ def get_train_test_blocks_net(data, fwd, behav, pick_ori, trial_type, block, blo
     
     return stcs_train, stcs_test, ytrain, ytest
 
-def get_train_test_blocks_htc(data, fwd, behav, pick_ori, trial_type, block, blocks, verbose):
+def get_train_test_blocks_htc(data, fwd, behav, pick_ori, trial_type, block, blocks, rsa=False, verbose=False):
     """Helper function to get source data for training and testing."""
     
     from mne import compute_covariance, compute_rank
@@ -794,13 +796,15 @@ def get_train_test_blocks_htc(data, fwd, behav, pick_ori, trial_type, block, blo
     weight_norm = "unit-noise-gain-invariant" if pick_ori == 'vector' else "unit-noise-gain"
     
     this_block = behav.blocks == block
-    # out_blocks = behav.blocks != block
-    if block in blocks[:3]:
-        rand_blocks = np.random.choice(blocks[3:], size=19, replace=False)
-        out_blocks = behav.blocks.isin(rand_blocks)
+    if not rsa:
+        if block in blocks[:3]:
+            rand_blocks = np.random.choice(blocks[3:], size=19, replace=False)
+            out_blocks = behav.blocks.isin(rand_blocks)
+        else:
+            out_blocks = (behav.blocks != block) & (behav.sessions != 0)
     else:
-        out_blocks = (behav.blocks != block) & (behav.sessions != 0)
-    
+        out_blocks = behav.blocks != block
+
     tt = behav.trialtypes == 2 if trial_type == 'random' else behav.trialtypes == 1
     tt_out_blocks = tt & out_blocks
     tt_this_block = tt & this_block
