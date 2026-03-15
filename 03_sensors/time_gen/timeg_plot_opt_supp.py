@@ -117,3 +117,35 @@ ax2.legend(fontsize=8)
 ax2.set_title("block level effects")
 plt.savefig(figure_dir / "timeg_opt_supp.pdf", dpi=300, transparent=True)
 plt.close()
+
+# --- separate figure: ax1 content split into 2 subplots (1 col, 2 rows) ---
+fig2, (ax1a, ax1b) = plt.subplots(2, 1, figsize=(6, 5), layout='tight', sharex=True)
+
+# top: pattern and random
+for ax in (ax1a, ax1b):
+    ax.axvspan(0, 0.2, color="lightgray", alpha=0.2)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+
+ax1a.axhline(chance, color="grey", linestyle="-", alpha=0.5)
+ax1a.plot(times[win], pats_mean.mean(0), label="Pattern", color=cpat)
+ax1a.fill_between(times[win], pats_mean.mean(0) - pats_mean.std(0) / np.sqrt(n),
+                  pats_mean.mean(0) + pats_mean.std(0) / np.sqrt(n), alpha=0.2, color=cpat)
+ax1a.plot(times[win], rands_mean.mean(0), label="Random", color=crdm)
+ax1a.fill_between(times[win], rands_mean.mean(0) - rands_mean.std(0) / np.sqrt(n),
+                  rands_mean.mean(0) + rands_mean.std(0) / np.sqrt(n), alpha=0.2, color=crdm)
+ax1a.set_ylabel("Accuracy (%)")
+ax1a.set_title("Decoding")
+ax1a.legend(fontsize=8, frameon=False, loc='upper left')
+
+# bottom: contrast
+ax1b.axhline(0, color="grey", linestyle="-", alpha=0.5)
+ax1b.plot(times[win], contrast_mean.mean(0), color="g")
+ax1b.fill_between(times[win], contrast_mean.mean(0) - contrast_mean.std(0) / np.sqrt(n),
+                  contrast_mean.mean(0) + contrast_mean.std(0) / np.sqrt(n), alpha=0.2, color="g")
+ax1b.set_xlabel("Time (s)")
+ax1b.set_ylabel("Diff. in accuracy (a.u.)")
+ax1b.set_title("Contrast")
+
+plt.savefig(figure_dir / "timeg_opt_trial_supp.pdf", dpi=300, transparent=True)
+plt.close()
