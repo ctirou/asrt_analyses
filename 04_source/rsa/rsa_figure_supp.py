@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from tqdm.auto import tqdm
 from collections import defaultdict
+import pandas as pd
 
 subjects, subjects_dir = SUBJS15, FREESURFER_DIR
 
@@ -78,9 +79,28 @@ for network in networks:
 
 net_labels = {
     'SomMot': 'Sensorimotor',
-    'DorsAttn': 'Dorsal\nAttention',
-    'Cont': 'Central\nExecutive',
+    'DorsAttn': 'Dorsal Attention',
+    'Cont': 'Central Executive',
 }
+
+data_arr = diff_rp.copy()
+chance = 0
+
+# get significant time points from GAMM csv
+seg_df = pd.read_csv(FIGURES_DIR / "TM" / "em_segments_rs_tr_source_supp.csv")
+seg_df = seg_df[seg_df['metric'] == 'RS']
+# dictionary of boolean arrays
+sig_dict = {}
+for _, row in seg_df.iterrows():
+    arr = sig_dict.get(row["network"], np.zeros(82, dtype=bool))
+    arr[row["start"]:row["end"] + 1] = True
+    sig_dict[row["network"]] = arr
+sig_df = pd.read_csv(FIGURES_DIR / "TM" / "smooth_rs_tr_source_supp.csv")
+sig_df = sig_df[sig_df['metric'] == 'RS']
+for i, net in enumerate(sig_df['network'].unique()):
+    if net in sig_dict:
+        if sig_df[sig_df['network'] == net]['signif_holm'][i] == 'ns':
+            del sig_dict[net]
 
 net_order = ['SomMot', 'DorsAttn', 'Cont']
 n_cols = len(net_order)
@@ -88,10 +108,7 @@ n_rows = max(len(net_groups[n]) for n in net_order)
 
 plt.rcParams.update({'font.size': 10, 'font.family': 'serif', 'font.serif': 'Arial'})
 
-data_arr = diff_rp.copy()
-chance = 0
-
-fig, axes = plt.subplots(n_rows, n_cols, figsize=(n_cols * 4, n_rows * 2.5),
+fig, axes = plt.subplots(n_rows, n_cols, figsize=(n_cols * 3.5, n_rows * 2),
                          sharey=True, sharex=True, layout="tight")
 
 for col, net_name in enumerate(net_order):
@@ -108,19 +125,24 @@ for col, net_name in enumerate(net_order):
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
         ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1, label='Stimulus onset')
-        
 
         ax.axhline(chance, color='grey', alpha=.5)
 
-        # pval = decod_stats(data, -1)
-        pval = decod_stats(data - chance, -1)
-        sig = pval < threshold
-
         # Non-sig line
         ax.plot(times, data.mean(0), alpha=1, zorder=10, color='C7')
+        
         # Sig regions in color
+        sig = sig_dict[network] if network in sig_dict else np.zeros(data.shape[1], dtype=bool)
         for start, end in contiguous_regions(sig):
             ax.plot(times[start:end], data.mean(0)[start:end], alpha=1, zorder=10, color=color)
+            
+        sig_level = sig_df[sig_df['network'] == network]['signif_holm'].values[0]
+        if sig_level != 'ns':
+            if net_name != 'Cont':
+                x, y = 0.4, -0.25
+            else:
+                x, y = 0.13, -0.25 
+            ax.text(x, y, sig_level, fontsize=20, ha='center', va='bottom', color=color, weight='bold')
 
         ax.fill_between(times, data.mean(0) - sem, data.mean(0) + sem, alpha=0.2, zorder=5, facecolor='C7')
         ax.fill_between(times, data.mean(0) - sem, data.mean(0) + sem, where=sig, alpha=0.5, zorder=5, color=color)
@@ -128,20 +150,39 @@ for col, net_name in enumerate(net_order):
 
         if row == 0:
             ax.set_title(f'{net_labels[net_name]}', fontsize=11,
-                         color=color, fontweight='bold')
+                         color=color)
         
         ax.text(0.05, 0.15, region_label, transform=ax.transAxes,
-                fontsize=10, va='top', ha='left', color=color, fontstyle='italic')
+                fontsize=10, va='top', ha='left', color='k', fontstyle='italic')
 
         if col == 0:
-            ax.set_ylabel('Diff in acc. (%)', fontsize=9)
+            ax.set_ylabel('Diff in acc. (a.u.)', fontsize=9)
             if row == 0:
-                ax.legend()
+                ax.legend(fontsize=8, frameon=False)
         if row == n_rows - 1:
             ax.set_xlabel('Time (s)', fontsize=9)
 
     for row in range(len(regions), n_rows):
         axes[row, col].set_visible(False)
+        
+fig.suptitle("Representational change: contrast in subregions of significant networks", fontsize=12, fontweight='bold')
 
 fig.savefig(figures_dir / "rsa-net-supp-regions.pdf", transparent=True)
 plt.close()
+
+# save table
+rows = list()
+for i, network in enumerate(networks):
+    diff = np.nanmean(diff_rp[network][:, 3:], axis=(1))
+    # get table
+    for j, subject in enumerate(subjects):
+        for t, time in enumerate(times):
+            rows.append({
+                "network": networks[i],
+                "subject": subject,
+                "time": t,
+                "value": diff[j, t]
+            })
+df = pd.DataFrame(rows)
+fname = 'rsa_source_tr_supp.csv'
+df.to_csv(FIGURES_DIR / "TM" / "data" / fname, index=False, sep=",")

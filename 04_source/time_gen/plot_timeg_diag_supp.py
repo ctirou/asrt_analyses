@@ -103,6 +103,23 @@ for d, (data_name, data_dict) in enumerate(zip(['pattern', 'random', 'contrast']
     plt.savefig(figures_dir / f"linear_fit-{data_name}.pdf", transparent=True)
     plt.close()
     df.to_csv(FIGURES_DIR / "TM" / "data" / fname, index=False, sep=",")
+    
+# save time resolved diagonals
+for data, data_fname in zip([cont_tr, pat_tr, rand_tr], ['contrast', 'pattern', 'random']):
+    rows = list()
+    for i, network in enumerate(networks):
+        # get table
+        for j, subject in enumerate(subjects):
+            for t, idx in enumerate(idxt):
+                rows.append({
+                    "network": network_names[i],
+                    "subject": subject,
+                    "time": t,
+                    "value": data[network][j, idx] - 0.25 if data_fname in ['pattern', 'random'] else data[network][j, idx]
+                })
+    df = pd.DataFrame(rows)
+    fname = f'pa_source_tr_{data_fname}_all.csv' if data_type.endswith("new") else f'pa_source_tr_{data_fname}.csv'
+    df.to_csv(FIGURES_DIR / "TM" / "data" / fname, index=False, sep=",")
 
 # cmap = "viridis"
 # cmap1 = "RdBu_r"
