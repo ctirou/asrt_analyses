@@ -33,6 +33,9 @@ is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
 def int_to_unicode(array):
         return ''.join([str(chr(int(ii))) for ii in array]) # permet de convertir int en unicode (pour editops)
+    
+subject = 'sub15'
+jobs = -1
 
 def process_subject(subject, jobs):
     
@@ -41,27 +44,7 @@ def process_subject(subject, jobs):
     clf = GeneralizingEstimator(clf, scoring=scoring, n_jobs=jobs)
 
     res_path = ensured(RESULTS_DIR / 'TIMEG' / 'sensors' / analysis / subject)
-    
-    epoch_fname = op.join(data_path, "epochs", "%s-0-epo.fif" % (subject))
-    epochs = read_epochs(epoch_fname, verbose=verbose)
-    
-    behav_fname = op.join(data_path, "behav/%s-4.pkl" % (subject))
-    behav = pd.read_pickle(behav_fname).reset_index(drop=True)
-    last_blocks = behav.blocks.unique()[-3:]
-    behav = behav[behav.blocks.isin(last_blocks) & (behav.trialtypes == 1)].reset_index(drop=True)
-    
-    changes = editops(int_to_unicode(behav.positions), int_to_unicode(np.array(epochs.events[:, 2])))
-    if len(changes) !=0:
-        del_from_behav = list()
-        for change in changes:
-            if change[0] == 'delete':
-                del_from_behav.append(change[1])
-        behav.drop(behav.index[del_from_behav], inplace=True)
-    behav = behav.reset_index(drop=True)
-    assert len(behav) == len(np.array(epochs.events[:, 2])), "Length of behav and events do not match after editops"
-    data = epochs.get_data(picks='mag', copy=True)
-    
-    
+        
     all_epochs = []
     all_behavs = []
     for epoch_num in range(5):
@@ -82,45 +65,47 @@ def process_subject(subject, jobs):
     # equalize behav and epochs with editops
     changes = editops(int_to_unicode(behav.positions), int_to_unicode(np.array(epochs.events[:, 2])))
     if len(changes) !=0:
+        del_from_epoch = list()
         del_from_behav = list()
         for change in changes:
-            if change[0] == 'delete':
-                del_from_behav.append(change[1])
+                if change[0] == 'insert':
+                        del_from_epoch.append(change[2])
+                elif change[0] == 'replace':
+                        del_from_epoch.append(change[2])
+                        del_from_behav.append(change[1])
+                elif change[0] == 'delete':
+                        del_from_behav.append(change[1])
+        epochs.drop(del_from_epoch)
         behav.drop(behav.index[del_from_behav], inplace=True)
     behav = behav.reset_index(drop=True)
     assert len(behav) == len(np.array(epochs.events[:, 2])), "Length of behav and events do not match after editops"
     data = epochs.get_data(picks='mag', copy=True)    
     
-    for block in last_blocks:
-        block = int(block)
+    behav.loc[behav.sessions != 0, 'blocks'] += 3
+    
+    test_blocks = behav.blocks.unique()[:3]
+    train_blocks = behav.blocks.unique()[3:]
+    
+    out_blocks = behav.blocks.isin(train_blocks)
+    Xtrain = data[out_blocks]
+    ytrain = behav[out_blocks].positions
+    assert len(Xtrain) == len(ytrain), "Xtrain and ytrain lengths do not match"
+    
+    clf.fit(Xtrain, ytrain)
+    
+    for block in test_blocks:
         
         this_block = behav.blocks == block
-        out_blocks = behav.blocks != block
-
-        pat = behav.trialtypes == 1
-        pat_out_blocks = pat & out_blocks
-        pat_this_block = pat & this_block
-        
-        yob = behav[pat_out_blocks]
-        ytb = behav[pat_this_block]
-        
-        Xtrain = data[yob.index]
-        ytrain = yob.positions
-        
-        Xtest = data[ytb.index]
-        ytest = ytb.positions
-        
-        assert len(Xtrain) == len(ytrain), "Xtrain and ytrain lengths do not match"
+        Xtest = data[this_block]
+        ytest = behav[this_block].positions
         assert len(Xtest) == len(ytest), "Xtest and ytest lengths do not match"
-        print(f"Training samples: {len(ytrain)}, Test samples: {len(ytest)}")
         
         if not op.exists(res_path / f"scores-0-{block}.npy") or overwrite:
-            clf.fit(Xtrain, ytrain)
             acc_matrix = clf.score(Xtest, ytest)
             np.save(res_path / f"scores-0-{block}.npy", acc_matrix)
         else:
             print(f"Data for {subject} block {block} already exists")
-
+    
     del data, behav
     gc.collect()
 
