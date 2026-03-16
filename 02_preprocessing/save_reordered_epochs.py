@@ -45,7 +45,8 @@ def process_subject(subject, mode_ICA, filtering, overwrite, jobs, verbose):
         behav_files = sorted([f for f in behav_files_filter if '_eASRT_Practice' in f or '_eASRT_Epoch' in f])
         behav_sessions = [behav_files[-1]] + behav_files[:-1]
         # Loop across sessions
-        for session_num, meg_session, behav_session in zip([1, 2, 3, 4], meg_sessions[1:], behav_sessions[1:]):
+        for session_num, meg_session, behav_session in zip([0, 1, 2, 3, 4], meg_sessions, behav_sessions):
+        # for session_num, meg_session, behav_session in zip([1, 2, 3, 4], meg_sessions[1:], behav_sessions[1:]):
                 
                 if not op.exists(op.join(res_path, 'epochs', f'{subject}-{session_num}-epo.fif')) or overwrite:
                 
@@ -196,12 +197,48 @@ def process_subject(subject, mode_ICA, filtering, overwrite, jobs, verbose):
                         assert len(events_stim) == len(behav_df), f"Number of events ({len(events_stim)}) and behav trials ({len(behav_df)}) do not match after alignment for {subject} {meg_session}"
 
                         # reordering random epochs to match pattern ones
-                        pat_pos = behav_df.iloc[np.where(behav_df.trialtypes == 1)[0]].positions.to_list()
                         rd_pos = behav_df.iloc[np.where(behav_df.trialtypes == 2)[0]].positions.to_list()
                         pat_events = events_stim[np.where(behav_df.trialtypes == 1)[0]]
                         rd_events = events_stim[np.where(behav_df.trialtypes == 2)[0]]
-                        pat_events[:, 2] = pat_pos
                         rd_events[:, 2] = rd_pos
+                        
+                        # for practice session, take the last three blocks of last session for patter events, else take all pattern events from the current session
+                        if session_num == 0:
+                                # read last session behav and create pattern events for the last three blocks
+                                fname_behav = data_path / subject / 'behav_data' / '1_eASRT_Epoch_4.txt'
+                                behav = open(fname_behav, 'r')
+                                lines = behav.readlines()
+                                column_names = lines[0].split()
+                                if session_num == 0:
+                                        del column_names[7] # there are extra columns in the behav file that mess up the reading
+                                        del column_names[7] # there are extra columns in the behav file that mess up the reading
+                                positions = list()
+                                triplets = list()
+                                trialtypes = list()
+                                RTs = list()
+                                stim_pres_times = list()
+                                blocks = list()
+                                for line in lines[1:]:
+                                        pos = int(line.split()[column_names.index('position')])
+                                        positions.append(pos)
+                                        triplets.append(int(line.split()[column_names.index('triplet')]))
+                                        trialtypes.append(int(line.split()[column_names.index('trialtype')]))
+                                        RTs.append(float(line.split()[column_names.index('RT')]))
+                                        blocks.append(int(line.split()[column_names.index('block')]))
+                                        stim_pres_times.append(int(line.split()[column_names.index('stim_pres_time')]))
+                                behav_dict = {'positions': np.array(positions), 'triplets': np.array(triplets),
+                                                'trialtypes': np.array(trialtypes), 'RTs': np.array(RTs),
+                                                'blocks': np.array(blocks)}
+                                stim_pres_times = np.array(stim_pres_times)
+                                behav_4 = pd.DataFrame(behav_dict)
+                                last_blocks = behav_4.blocks.unique()[-3:]
+                                behav_pat = behav_4[behav_4.blocks.isin(last_blocks) & (behav_4.trialtypes == 1)]
+                                pat_events = np.zeros((len(behav_pat), 3), dtype=int)
+                                pat_events[:, 2] = behav_pat.positions.values
+                        else:
+                                pat_pos = behav_df.iloc[np.where(behav_df.trialtypes == 1)[0]].positions.to_list()
+                                pat_events[:, 2] = pat_pos
+                        
                         epoch_dur = 2900 # in ms
                         nsamples = int(epoch_dur * raw.info['sfreq'] / 1000)
                         raw_reord, _, events_reord = reorder(rd_events, pat_events, raw, dur=100, nsamples=nsamples-1)
