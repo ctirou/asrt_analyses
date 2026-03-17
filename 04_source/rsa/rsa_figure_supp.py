@@ -17,9 +17,10 @@ figures_dir = ensured(FIGURES_DIR / "time_gen" / "source")
 analysis = 'rdm_blocks'
 
 networks = ['SomMot-precentral', 'SomMot-postcentral', 'SomMot-paracentral', \
-    'DorsAttn-superiorparietal', 'DorsAttn-caudalmiddlefrontal', \
+    'DorsAttn-superiorparietal', 'DorsAttn-caudalmiddlefrontal']
+    # 'DorsAttn-superiorparietal', 'DorsAttn-caudalmiddlefrontal', \
     # 'Cont-rostralmiddlefrontal', 'Cont-superiorfrontal', 'Cont-parsopercularis', 'Cont-parstriangularis', 'Cont-supramarginal']
-    'Cont-rostralmiddlefrontal', 'Cont-superiorfrontal', 'Cont-supramarginal']
+    # 'Cont-rostralmiddlefrontal', 'Cont-superiorfrontal', 'Cont-supramarginal']
 
 times = np.linspace(-0.2, 0.6, 82)
 threshold = .05
@@ -68,7 +69,7 @@ for network in tqdm(networks):
 net_cmap = {
     'SomMot': '#DE8F05',
     'DorsAttn': '#029E73',
-    'Cont': '#CA9161',
+    # 'Cont': '#CA9161',
 }
 
 # Group regions by parent network (before '-')
@@ -80,7 +81,7 @@ for network in networks:
 net_labels = {
     'SomMot': 'Sensorimotor',
     'DorsAttn': 'Dorsal Attention',
-    'Cont': 'Central Executive',
+    # 'Cont': 'Central Executive',
 }
 
 data_arr = diff_rp.copy()
@@ -102,13 +103,14 @@ for i, net in enumerate(sig_df['network'].unique()):
         if sig_df[sig_df['network'] == net]['signif_holm'][i] == 'ns':
             del sig_dict[net]
 
-net_order = ['SomMot', 'DorsAttn', 'Cont']
+# net_order = ['SomMot', 'DorsAttn', 'Cont']
+net_order = ['SomMot', 'DorsAttn']
 n_cols = len(net_order)
 n_rows = max(len(net_groups[n]) for n in net_order)
 
 plt.rcParams.update({'font.size': 10, 'font.family': 'serif', 'font.serif': 'Arial'})
 
-fig, axes = plt.subplots(n_rows, n_cols, figsize=(n_cols * 3.5, n_rows * 2),
+fig, axes = plt.subplots(n_rows, n_cols, figsize=(n_cols * 3.5, n_rows * 1.75),
                          sharey=True, sharex=True, layout="tight")
 
 for col, net_name in enumerate(net_order):
@@ -124,7 +126,7 @@ for col, net_name in enumerate(net_order):
         # plot_onset(ax)
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
-        ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1, label='Stimulus onset')
+        ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
 
         ax.axhline(chance, color='grey', alpha=.5)
 
@@ -161,13 +163,14 @@ for col, net_name in enumerate(net_order):
                 ax.legend(fontsize=8, frameon=False)
         if row == n_rows - 1:
             ax.set_xlabel('Time (s)', fontsize=9)
+            ax.tick_params(labelbottom=True)
 
     for row in range(len(regions), n_rows):
         axes[row, col].set_visible(False)
         
-fig.suptitle("Representational change: contrast in subregions of significant networks", fontsize=12, fontweight='bold')
+# fig.suptitle("Representational change: contrast in subregions of significant networks", fontsize=12, fontweight='bold')
 
-fig.savefig(figures_dir / "rsa-net-supp-regions.pdf", transparent=True)
+fig.savefig(figures_dir / "rsa-net-supp-regions2.pdf", transparent=True)
 plt.close()
 
 # save table

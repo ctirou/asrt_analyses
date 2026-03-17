@@ -23,7 +23,7 @@ def compute_spearman(t, g, vector, contrasts):
     return spear(vector, contrasts[:, t, g])[0]
 
 times = np.linspace(-4, 4, 813)
-win = np.where((times >= -0.2) & (times <= 1))[0]
+win = np.where((times >= 0) & (times <= 1))[0]
 
 figure_dir = ensured(FIGURES_DIR / "time_gen" / "sensors")
 res_dir = RESULTS_DIR / 'TIMEG' / 'sensors' / data_type
@@ -134,9 +134,9 @@ ax1a.fill_between(times[win], pats_mean.mean(0) - pats_mean.std(0) / np.sqrt(n),
 ax1a.plot(times[win], rands_mean.mean(0), label="Random", color=crdm)
 ax1a.fill_between(times[win], rands_mean.mean(0) - rands_mean.std(0) / np.sqrt(n),
                   rands_mean.mean(0) + rands_mean.std(0) / np.sqrt(n), alpha=0.2, color=crdm)
-ax1a.set_ylabel("Accuracy (%)")
+ax1a.set_ylabel("Accuracy (%)\n")
 ax1a.set_title("Decoding")
-ax1a.legend(fontsize=8, frameon=False, loc='upper left')
+ax1a.legend(fontsize=9, frameon=False)
 
 # bottom: contrast
 ax1b.axhline(0, color="grey", linestyle="-", alpha=0.5)

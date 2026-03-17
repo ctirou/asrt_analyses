@@ -98,6 +98,7 @@ contour_color = "black"
 contour_color = "#00BFA6"
 contour_color = "#708090"
 plt.rcParams.update({'font.size': 12, 'font.family': 'serif', 'font.serif': 'Arial'})
+
 fig, axs = plt.subplots(2, 1, sharex=False, layout='constrained', figsize=(7, 6))
 norm = colors.Normalize(vmin=0.18, vmax=0.32)
 images = []

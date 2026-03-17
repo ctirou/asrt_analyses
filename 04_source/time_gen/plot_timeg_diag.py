@@ -178,11 +178,12 @@ for i, (network, pattern_idx) in enumerate(zip(networks, ['A', 'D', 'G', 'J', 'M
     sig_level = sig_df[sig_df['network'] == network_names[i]]['signif_holm'].values[0]
     if sig_level != 'ns':
         axes[pattern_idx].text(0.5, 33, sig_level, fontsize=20, ha='center', va='center', color=cmap[i], weight='bold')
-    # Cohen's d (one-sample vs chance)
-    cohen_d = (data.mean(0) - chance) / data.std(0, ddof=1)
+    # Cohen's d (one-sample vs chance): average within cluster first
     for ci, (start, end) in enumerate(contiguous_regions(sig)):
+        data_cluster = data[:, start:end].mean(1)  # (n_subjects,)
+        cohen_d = (data_cluster.mean() - chance) / data_cluster.std(ddof=1)
         print(f"[Pattern] {network_names[i]} — cluster {ci+1} ({times[start]:.3f}–{times[end-1]:.3f}s): "
-              f"peak d={cohen_d[start:end].max():.2f}, mean d={cohen_d[start:end].mean():.2f}")
+              f"Cohen's d={cohen_d:.2f}")
 
 ### Random ###    
 # Sig from GAMM
@@ -230,11 +231,12 @@ for i, (network, random_idx) in enumerate(zip(networks, ['B', 'E', 'H', 'K', 'N'
     sig_level = sig_df[sig_df['network'] == network_names[i]]['signif_holm'].values[0]
     if sig_level != 'ns':
         axes[random_idx].text(0.5, 33, sig_level, fontsize=20, ha='center', va='center', color=cmap[i], weight='bold')
-    # Cohen's d (one-sample vs chance)
-    cohen_d = (data.mean(0) - chance) / data.std(0, ddof=1)
+    # Cohen's d (one-sample vs chance): average within cluster first
     for ci, (start, end) in enumerate(contiguous_regions(sig)):
+        data_cluster = data[:, start:end].mean(1)  # (n_subjects,)
+        cohen_d = (data_cluster.mean() - chance) / data_cluster.std(ddof=1)
         print(f"[Random] {network_names[i]} — cluster {ci+1} ({times[start]:.3f}–{times[end-1]:.3f}s): "
-              f"peak d={cohen_d[start:end].max():.2f}, mean d={cohen_d[start:end].mean():.2f}")
+              f"Cohen's d={cohen_d:.2f}")
 
 ### Contrast ###
 win = np.where((times >= -0.5) & (times < 0))[0]
@@ -295,11 +297,12 @@ for i, (network, contrast_idx) in enumerate(zip(networks, ['C', 'F', 'I', 'L', '
     sig_level = sig_df[sig_df['network'] == network_names[i]]['signif_holm'].values[0]
     if sig_level != 'ns':
         axes[contrast_idx].text(-0.5, 4, sig_level, fontsize=20, ha='center', va='center', color=cmap[i], weight='bold')
-    # Cohen's d (one-sample vs 0)
-    cohen_d = data.mean(0) / data.std(0, ddof=1)
+    # Cohen's d (one-sample vs 0): average within cluster first
     for ci, (start, end) in enumerate(contiguous_regions(sig)):
+        data_cluster = data[:, start:end].mean(1)  # (n_subjects,)
+        cohen_d = data_cluster.mean() / data_cluster.std(ddof=1)
         print(f"[Contrast] {network_names[i]} — cluster {ci+1} ({times[start]:.3f}–{times[end-1]:.3f}s): "
-              f"peak d={cohen_d[start:end].max():.2f}, mean d={cohen_d[start:end].mean():.2f}")
+              f"Cohen's d={cohen_d:.2f}")
 
 fig.savefig(figures_dir / "timeg-diag.pdf", transparent=True)
 

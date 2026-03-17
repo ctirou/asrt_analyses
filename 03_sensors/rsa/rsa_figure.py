@@ -145,10 +145,11 @@ axd['B'].set_ylabel('Similarity index', fontsize=11)
 axd['B'].yaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter('%.2f'))
 axd['B'].set_xlabel('Time (s)', fontsize=11)
 axd['B'].set_title('Similarity index time course', fontsize=13)
-# Cohen's d for plot B (one-sample, vs 0): d = mean / std
-cohen_d_B = diff_lh.mean(0) / diff_lh.std(0, ddof=1)
-print(f"[B] Cohen's d — peak in sig. cluster: {cohen_d_B[sig].max():.2f}, "
-      f"mean over sig. cluster: {cohen_d_B[sig].mean():.2f}")
+
+# Cohen's d for plot B (one-sample, vs 0): average within sig. cluster first, then compute d
+diff_lh_cluster = diff_lh[:, sig].mean(1)  # (n_subjects,) — mean effect within cluster
+cohen_d_B = diff_lh_cluster.mean() / diff_lh_cluster.std(ddof=1)
+print(f"[B] Cohen's d (cluster-averaged): {cohen_d_B:.2f}")
 
 ### C ### Correlation with learning index
 gam_sig_corr = pd.read_csv(FIGURES_DIR / "TM" / "segments_tr_sensors.csv")
