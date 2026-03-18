@@ -7,16 +7,25 @@ import os.path as op
 import pandas as pd
 import numpy as np
 import mne
+from collections import defaultdict
 from base import *
 from config import *
 from joblib import Parallel, delayed
 import gc
 
+
+def get_base_name(label_name):
+    """Strip hemisphere prefix (LH_/RH_) and suffix (-lh/-rh) to get bilateral base name.
+    e.g. '7Networks_LH_SomMot_1-lh' -> '7Networks_SomMot_1'
+    """
+    name = label_name.replace('_LH_', '_').replace('_RH_', '_')
+    return name.replace('-lh', '').replace('-rh', '')
+
 data_path = DATA_DIR / 'for_rsa'
 subjects = SUBJS15
 # subjects = ['sub09', 'sub10']
 lock = 'stim'
-verbose = 'error'
+verbose = True
 overwrite = False
 
 networks = ['SomMot', 'DorsAttn']
@@ -27,7 +36,7 @@ pick_ori = 'vector'
 weight_norm = "unit-noise-gain-invariant"
 
 pick_ori = 'vector'
-analysis = 'rdm_blocks_subreg'
+analysis = 'rdm_blocks_subreg_merged'
 
 is_cluster = os.getenv("SLURM_ARRAY_TASK_ID") is not None
 
@@ -42,14 +51,27 @@ def process_subject(subject, jobs):
         for network in networks
     }
 
-    # Flat list of (label, network) tuples — one entry per sub-region parcel
-    all_labels = [
-        (label, network)
-        for network in networks
-        for label in labels_per_network[network]
-    ]
+    # Group lh/rh labels by bilateral base name to find mergeable pairs
+    label_groups = defaultdict(list)
+    for network in networks:
+        for label in labels_per_network[network]:
+            base = get_base_name(label.name)
+            label_groups[base].append((label, network))
 
-    # Cache output paths per sub-region (one subdirectory per parcel label)
+    # Merge lh+rh pairs into a BiHemiLabel; keep singletons (one hemi only) as-is
+    all_labels = []
+    for base_name, group in label_groups.items():
+        network = group[0][1]
+        if len(group) == 2:
+            lh = next(l for l, _ in group if l.name.endswith('-lh'))
+            rh = next(l for l, _ in group if l.name.endswith('-rh'))
+            merged = lh + rh   # MNE BiHemiLabel covering both hemispheres
+            merged.name = base_name
+        else:
+            merged = group[0][0]  # only one hemisphere available, use as-is
+        all_labels.append((merged, network))
+
+    # Cache output paths per merged label (one subdirectory per label name)
     res_paths = {
         label.name: ensured(RESULTS_DIR / "RSA" / 'source' / network / analysis / subject / label.name)
         for label, network in all_labels

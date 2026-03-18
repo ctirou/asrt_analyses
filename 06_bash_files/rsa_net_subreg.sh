@@ -7,7 +7,7 @@
 
 #SBATCH --partition=htc
 #SBATCH --cpus-per-task=20              # Run a single task (by default tasks == CPU)
-#SBATCH --mem=30G                       # Memory in MB by default
+#SBATCH --mem=32G                       # Memory in MB by default
 #SBATCH --time=0-01:00:00                # 7 days by default on htc partition
 #SBATCH --array=0-14                    # number of subjects (last num included)
 
@@ -15,4 +15,5 @@
 
 module load conda
 conda activate mne
-python -m 04_source.rsa.rsa_net_subreg.py
+# python -m 04_source.rsa.rsa_net_subreg.py
+python -m 04_source.rsa.rsa_net_subreg_merged.py

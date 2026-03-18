@@ -82,7 +82,7 @@ norm = colors.Normalize(vmin=0.18, vmax=0.32)
 images = []
 
 # plot original and reordered patterns
-for ax, data, title in zip(axs.flat[:2], [data_orig.mean(0), data_reord.mean(0)], ["Original", "Re-ordered"]):
+for ax, data, title in zip(axs.flat[:2], [data_orig.mean(0), data_reord.mean(0)], ["Pattern trials (Fig. 2 in main text)", "Re-ordered random trials"]):
     images.append(ax.imshow(data,
                     norm=norm,
                     interpolation="lanczos",
@@ -96,7 +96,7 @@ for ax, data, title in zip(axs.flat[:2], [data_orig.mean(0), data_reord.mean(0)]
     ax.axvline(0, color="k")
     ax.axhline(0, color="k")
     xx, yy = np.meshgrid(times, times, copy=False, indexing='xy')
-    pval_fname = "data_orig-pval.npy" if "Original" in title else "data_reord-pval.npy"
+    pval_fname = "data_orig-pval.npy" if "Pattern" in title else "data_reord-pval.npy"
     pval = np.load(res_path / pval_fname)
     sig = pval < threshold
     ax.contour(xx, yy, sig, colors=contour_color, levels=[0],
@@ -115,7 +115,7 @@ im = axs[-1].imshow(contrast.mean(0),
 axs[-1].set_ylabel("Training time (s)", fontsize=13)
 axs[-1].set_xticks(np.arange(times[0] + 0.5, times[-1], 0.5))
 axs[-1].set_yticks(np.arange(times[0] + 0.5, times[-1], 0.5))
-axs[-1].set_title("Contrast (original - re-ordered)", fontsize=16)
+axs[-1].set_title("Contrast (pattern - re-ordered random)", fontsize=16)
 axs[-1].axvline(0, color="k")
 axs[-1].axhline(0, color="k")
 axs[-1].set_xlabel("Testing time (s)", fontsize=13)
