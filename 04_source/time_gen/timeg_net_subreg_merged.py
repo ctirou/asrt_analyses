@@ -17,7 +17,6 @@ from config import *
 from joblib import Parallel, delayed
 import gc
 
-
 def get_base_name(label_name):
     """Strip hemisphere prefix (LH_/RH_) and suffix (-lh/-rh) to get bilateral base name.
     e.g. '7Networks_LH_SomMot_1-lh' -> '7Networks_SomMot_1'
@@ -26,7 +25,25 @@ def get_base_name(label_name):
     return name.replace('-lh', '').replace('-rh', '')
 
 data_path = DATA_DIR / 'for_timeg'
-subjects = SUBJS15
+# subjects = SUBJS15
+subjects = [
+    # 'sub01',
+    # 'sub02',
+    'sub03',
+    # 'sub04',
+    'sub05',
+    'sub06',
+    # 'sub07',
+    'sub08',
+    'sub09',
+    'sub10',
+    'sub11',
+    # 'sub12',
+    'sub13',
+    # 'sub14',
+    'sub15'
+    ]
+
 lock = 'stim'
 solver = 'lbfgs'
 scoring = "accuracy"
@@ -189,8 +206,6 @@ if is_cluster:
         print("Error: SLURM_ARRAY_TASK_ID is not set correctly or is out of bounds.")
         sys.exit(1)
 else:
-    # jobs = 1
-    # Parallel(-1)(delayed(process_subject)(subject, jobs) for subject in subjects)
     jobs = -1
     for subject in subjects:
         process_subject(subject, jobs)

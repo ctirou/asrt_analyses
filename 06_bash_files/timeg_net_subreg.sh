@@ -8,8 +8,8 @@
 #SBATCH --partition=htc
 #SBATCH --cpus-per-task=20              # Run a single task (by default tasks == CPU)
 #SBATCH --mem=64G                    # Memory in MB by default
-#SBATCH --time=0-08:00:00                    # 7 days by default on htc partition
-#SBATCH --array=0-14                    # number of subjects (last num included)
+#SBATCH --time=0-04:00:00                    # 7 days by default on htc partition
+#SBATCH --array=0-8                    # number of subjects (last num included)
 
 # Commands to be submitted:
 

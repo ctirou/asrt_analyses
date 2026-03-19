@@ -2,26 +2,20 @@
 # License: BSD (3-clause)
 
 import os
-import os.path as op
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from scipy.ndimage import uniform_filter1d
 from config import *
 from tqdm.auto import tqdm
-from base import get_sequence
 
+subjects = SUBJS15
 path_data = HOME / 'raw_behavs'
 figures_dir = FIGURES_DIR
-
-subjects = [sub for sub in SUBJS15 if sub != 'sub05']
+saving = True
 
 sessions = ['0', '1', '2', '3', '4']
 blocks = np.arange(1, 24)
 n = len(subjects)
-
-# online_dict = {}
-# offline_dict = {}
 
 online_pattern, online_random = [], []
 offline_pattern, offline_random = [], []
@@ -37,11 +31,7 @@ for subject in tqdm(subjects):
     behav_files = sorted([f for f in behav_files_filter if '_eASRT_Practice' in f or '_eASRT_Epoch' in f])
     behav_sessions = [behav_files[-1]] + behav_files[:-1]
     
-    # online_dict[subject] = {}
-    # offline_dict[subject] = {}
-
     behav_df = []            
-
     for i, behav_session in enumerate(behav_sessions):
         behav_fname = path_data / subject / behav_session
         behav = pd.read_csv(behav_fname, sep='\t')
@@ -50,12 +40,10 @@ for subject in tqdm(subjects):
             behav.columns = [col for col in behav.columns if col not in ['isi_if_correct', 'isi_if_incorrect']] + ['isi_if_correct', 'isi_if_incorrect']
         behav['session'] = i
         behav_df.append(behav)
-
     behav_df = pd.concat(behav_df, ignore_index=True)
+    
     behav_df.loc[behav_df.session != 0, 'block'] += 3
-    
     behav_df = behav_df[behav_df.talalat == 1].reset_index(drop=True)
-    
     blocks = behav_df.block.unique()
     
     pat, rand = [], []
@@ -84,24 +72,6 @@ for subject in tqdm(subjects):
     online_random.append(online_rand)
     offline_pattern.append(offline_pat)
     offline_random.append(offline_rand)
-
-    # fig, ax = plt.subplots(1, 2, figsize=(10, 5))
-    # ax[0].plot(blocks, online_pat, label='Online Pattern', color='blue')
-    # ax[0].plot(blocks, online_rand, label='Online Random', color='orange')
-    # ax[0].set_title(f'{subject} - Online Learning')
-    # ax[0].set_xlabel('Block')
-    # ax[0].set_ylabel('RT Difference (Tail - Head)')
-    # ax[0].legend()
-    # ax[0].grid()
-    
-    # ax[1].plot(blocks[1:], offline_pat, label='Offline Pattern', color='blue')
-    # ax[1].plot(blocks[1:], offline_rand, label='Offline Random', color='orange')
-    # ax[1].set_title(f'{subject} - Offline Learning')
-    # ax[1].set_xlabel('Block')
-    # ax[1].set_ylabel('RT Difference (Next Head - Previous Tail)')
-    # ax[1].legend()
-    # ax[1].grid()
-    # plt.tight_layout()
     
 online_pattern = np.array(online_pattern) # shape (n_subjects, n_blocks)
 online_random = np.array(online_random)
@@ -112,43 +82,112 @@ plt.rcParams.update({'font.family': 'serif', 'font.serif': 'Arial'})
 color1 = "#FFD966"
 color2 = "#FF718A"
 
-fig, ax = plt.subplots(1, 2, figsize=(7, 4), sharey=True, layout='tight')
-
+fig, ax = plt.subplots(1, 2, figsize=(7, 3), sharey=True, layout='tight')
 for axx in ax.flatten():
     axx.spines['top'].set_visible(False)
     axx.spines['right'].set_visible(False)
 
 # online
-sem_pat = np.nanstd(online_pattern, axis=0) / np.sqrt(n)
 sem_rand = np.nanstd(online_random, axis=0) / np.sqrt(n)
+ax[0].plot(blocks, np.nanmean(online_random, axis=0), color=color2, label='Random', zorder=9, alpha=1)
+ax[0].fill_between(blocks, np.nanmean(online_random, axis=0) - sem_rand, np.nanmean(online_random, axis=0) + sem_rand, color=color2, alpha=0.1)
 
-ax[0].plot(blocks, np.nanmean(online_random, axis=0), color=color2, label='Random')
-ax[0].fill_between(blocks, np.nanmean(online_random, axis=0) - sem_rand, np.nanmean(online_random, axis=0) + sem_rand, color=color2, alpha=0.3)
+sem_pat = np.nanstd(online_pattern, axis=0) / np.sqrt(n)
+ax[0].plot(blocks, np.nanmean(online_pattern, axis=0), color=color1, label='Pattern', zorder=10, alpha=1)
+ax[0].fill_between(blocks, np.nanmean(online_pattern, axis=0) - sem_pat, np.nanmean(online_pattern, axis=0) + sem_pat, color=color1, alpha=0.2)
 
-ax[0].plot(blocks, np.nanmean(online_pattern, axis=0), color=color1, label='Pattern')
-ax[0].fill_between(blocks, np.nanmean(online_pattern, axis=0) - sem_pat, np.nanmean(online_pattern, axis=0) + sem_pat, color=color1, alpha=0.3)
-
-ax[0].set_title('Online Learning\nTail - Head')
+ax[0].set_title('Online', fontstyle='italic')
 ax[0].set_xticks(blocks[::2])
 ax[0].set_xlabel('Block')
-ax[0].set_ylabel('RT Difference (a.u.)')
-ax[0].grid(alpha=0.3)
-
-# ax[0].legend()
+ax[0].set_ylabel(f'RT Difference (a.u.) - {n_bin} bins')
+ax[0].grid(alpha=0.2, linestyle='--', color='gray', linewidth=0.5)
 
 # offline
-sem_pat = np.nanstd(offline_pattern, axis=0) / np.sqrt(n)
 sem_rand = np.nanstd(offline_random, axis=0) / np.sqrt(n)
+ax[1].plot(blocks[1:], np.nanmean(offline_random, axis=0), color=color2, zorder=10, alpha=1)
+ax[1].fill_between(blocks[1:], np.nanmean(offline_random, axis=0) - sem_rand, np.nanmean(offline_random, axis=0) + sem_rand, color=color2, alpha=0.1)
 
-ax[1].plot(blocks[1:], np.nanmean(offline_random, axis=0), color=color2)
-ax[1].fill_between(blocks[1:], np.nanmean(offline_random, axis=0) - sem_rand, np.nanmean(offline_random, axis=0) + sem_rand, color=color2, alpha=0.3)
-
-ax[1].plot(blocks[1:], np.nanmean(offline_pattern, axis=0), color=color1)
-ax[1].fill_between(blocks[1:], np.nanmean(offline_pattern, axis=0) - sem_pat, np.nanmean(offline_pattern, axis=0) + sem_pat, color=color1, alpha=0.3)
-
-ax[1].set_title('Offline Learning\nNext Head - Previous Tail')
+sem_pat = np.nanstd(offline_pattern, axis=0) / np.sqrt(n)
+ax[1].plot(blocks[1:], np.nanmean(offline_pattern, axis=0), color=color1, zorder=9, alpha=1)
+ax[1].fill_between(blocks[1:], np.nanmean(offline_pattern, axis=0) - sem_pat, np.nanmean(offline_pattern, axis=0) + sem_pat, color=color1, alpha=0.2)
+ax[1].set_title('Offline', fontstyle='italic')
 ax[1].set_xticks(blocks[1::2])
 ax[1].set_xlabel('Block')
 ax[1].grid(alpha=0.2, linestyle='--', color='gray', linewidth=0.5)
-# ax[1].set_ylabel('RT Difference (a.u.)')
-plt.show()
+if saving: 
+    fig.savefig(figures_dir / 'online_offline_learning.png', dpi=300)
+    plt.close()
+    
+fig, ax = plt.subplots(4, 2, figsize=(7, 10), sharey=True, sharex=False, layout='tight')
+for axx in ax.flatten():
+    axx.grid(alpha=0.2, linestyle='--', color='gray', linewidth=0.5)
+    axx.grid(True, which='minor', alpha=0.1, linestyle=':', color='gray', linewidth=0.3)
+    axx.spines['top'].set_visible(False)
+    axx.spines['right'].set_visible(False)
+    axx.set_xticks(blocks[::2])
+    axx.axvspan(1, 3, color='gray', alpha=0.1)
+    
+# Online pattern
+ax[0, 0].set_title('Online', fontstyle='italic')
+sem_pat = np.nanstd(online_pattern, axis=0) / np.sqrt(n)
+ax[0, 0].plot(blocks, np.nanmean(online_pattern, axis=0), color=color1, label='Pattern', zorder=10, alpha=1)
+ax[0, 0].fill_between(blocks, np.nanmean(online_pattern, axis=0) - sem_pat, np.nanmean(online_pattern, axis=0) + sem_pat, color=color1, alpha=0.2)
+ax[0, 0].set_ylabel('Pattern')
+# Offline pattern
+ax[0, 1].set_title('Offline', fontstyle='italic')
+sem_pat = np.nanstd(offline_pattern, axis=0) / np.sqrt(n)
+ax[0, 1].plot(blocks[1:], np.nanmean(offline_pattern, axis=0), color=color1, zorder=9, alpha=1)
+ax[0, 1].fill_between(blocks[1:], np.nanmean(offline_pattern, axis=0) - sem_pat, np.nanmean(offline_pattern, axis=0) + sem_pat, color=color1, alpha=0.2)
+
+# Online random
+sem_rand = np.nanstd(online_random, axis=0) / np.sqrt(n)
+ax[1, 0].plot(blocks, np.nanmean(online_random, axis=0), color=color2, label='Random', zorder=9, alpha=1)
+ax[1, 0].fill_between(blocks, np.nanmean(online_random, axis=0) - sem_rand, np.nanmean(online_random, axis=0) + sem_rand, color=color2, alpha=0.1)
+ax[1, 0].set_ylabel('Random')
+# Offline random
+sem_rand = np.nanstd(offline_random, axis=0) / np.sqrt(n)
+ax[1, 1].plot(blocks[1:], np.nanmean(offline_random, axis=0), color=color2, zorder=10, alpha=1)
+ax[1, 1].fill_between(blocks[1:], np.nanmean(offline_random, axis=0) - sem_rand, np.nanmean(offline_random, axis=0) + sem_rand, color=color2, alpha=0.1)
+
+# Combined pattern and random
+# online
+sem_rand = np.nanstd(online_random, axis=0) / np.sqrt(n)
+ax[2, 0].plot(blocks, np.nanmean(online_random, axis=0), color=color2, label='Random', zorder=9, alpha=1)
+ax[2, 0].fill_between(blocks, np.nanmean(online_random, axis=0) - sem_rand, np.nanmean(online_random, axis=0) + sem_rand, color=color2, alpha=0.1)
+sem_pat = np.nanstd(online_pattern, axis=0) / np.sqrt(n)
+ax[2, 0].plot(blocks, np.nanmean(online_pattern, axis=0), color=color1, label='Pattern', zorder=10, alpha=1)
+ax[2, 0].fill_between(blocks, np.nanmean(online_pattern, axis=0) - sem_pat, np.nanmean(online_pattern, axis=0) + sem_pat, color=color1, alpha=0.2)
+ax[2, 0].set_ylabel('Combined')
+# offline
+sem_rand = np.nanstd(offline_random, axis=0) / np.sqrt(n)
+ax[2, 1].plot(blocks[1:], np.nanmean(offline_random, axis=0), color=color2, zorder=10, alpha=1)
+ax[2, 1].fill_between(blocks[1:], np.nanmean(offline_random, axis=0) - sem_rand, np.nanmean(offline_random, axis=0) + sem_rand, color=color2, alpha=0.1)
+sem_pat = np.nanstd(offline_pattern, axis=0) / np.sqrt(n)
+ax[2, 1].plot(blocks[1:], np.nanmean(offline_pattern, axis=0), color=color1, zorder=9, alpha=1)
+ax[2, 1].fill_between(blocks[1:], np.nanmean(offline_pattern, axis=0) - sem_pat, np.nanmean(offline_pattern, axis=0) + sem_pat, color=color1, alpha=0.2)
+
+# Within trials
+# pattern
+sem_pat = np.nanstd(online_pattern, axis=0) / np.sqrt(n)
+ax[3, 0].set_title('Pattern', fontstyle='italic')
+ax[3, 0].plot(blocks, np.nanmean(online_pattern, axis=0), color='green', zorder=10, alpha=1, label='Online')
+ax[3, 0].fill_between(blocks, np.nanmean(online_pattern, axis=0) - sem_pat, np.nanmean(online_pattern, axis=0) + sem_pat, color='green', alpha=0.2)
+sem_pat = np.nanstd(offline_pattern, axis=0) / np.sqrt(n)
+ax[3, 0].plot(blocks[1:], np.nanmean(offline_pattern, axis=0), color='blue', zorder=9, alpha=1, label='Offline')
+ax[3, 0].fill_between(blocks[1:], np.nanmean(offline_pattern, axis=0) - sem_pat, np.nanmean(offline_pattern, axis=0) + sem_pat, color='blue', alpha=0.2)
+ax[3, 0].set_ylabel('Within Trials')
+ax[3, 0].legend(frameon=False, fontsize=8)
+ax[3, 0].set_xlabel('Block')
+# random
+sem_rand = np.nanstd(online_random, axis=0) / np.sqrt(n)
+ax[3, 1].set_title('Random', fontstyle='italic')
+ax[3, 1].plot(blocks, np.nanmean(online_random, axis=0), color='green', zorder=10, alpha=1, label='Online')
+ax[3, 1].fill_between(blocks, np.nanmean(online_random, axis=0) - sem_rand, np.nanmean(online_random, axis=0) + sem_rand, color='green', alpha=0.2)
+sem_rand = np.nanstd(offline_random, axis=0) / np.sqrt(n)
+ax[3, 1].plot(blocks[1:], np.nanmean(offline_random, axis=0), color='blue', zorder=9, alpha=1, label='Offline')
+ax[3, 1].fill_between(blocks[1:], np.nanmean(offline_random, axis=0) - sem_rand, np.nanmean(offline_random, axis=0) + sem_rand, color='blue', alpha=0.2)
+ax[3, 1].set_xlabel('Block')
+
+if saving:
+    fig.savefig(figures_dir / 'online_offline_learning_detailed.png', dpi=300)
+    plt.close()
