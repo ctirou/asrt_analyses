@@ -296,3 +296,68 @@ for i, (label, name, j) in enumerate(zip(networks, network_names, ['C', 'F', 'I'
 fname = 'rsa_figure.pdf'
 fig.savefig(figures_dir / fname, transparent=True)
 plt.close()
+
+
+# save table correlations no practice
+rows = list()
+for i, network in enumerate(networks):
+    # get table
+    for j, subject in enumerate(subjects):
+        for t, time in enumerate(times):
+            rows.append({
+                "network": network_names[i],
+                "subject": subject,
+                "time": t,
+                "value": corr_rp_no_prac[network][j, t]
+            })
+df = pd.DataFrame(rows)
+fname = 'rsa_source_tr_all_corr_no_corr.csv' if data_type.endswith("new") else 'rsa_source_tr_corr.csv'
+df.to_csv(FIGURES_DIR / "TM" / "data" / fname, index=False, sep=",")
+
+seg_df = pd.read_csv("/Users/coum/MEGAsync/figures/TM/em_segments_rs_tr_source_no_prac.csv")
+seg_df = seg_df[seg_df['metric'] == 'RS CORR']
+# dictionary of boolean arrays
+sig_dict = {}
+for _, row in seg_df.iterrows():
+    arr = sig_dict.get(row["network"], np.zeros(82, dtype=bool))
+    arr[row["start"]:row["end"] + 1] = True
+    sig_dict[row["network"]] = arr
+sig_df = pd.read_csv(FIGURES_DIR / "TM" / "smooth_rs_tr_source_no_prac.csv")
+sig_df = sig_df[sig_df['metric'] == 'RS CORR']
+for i, net in enumerate(sig_df['network'].unique()):
+    if net in sig_dict:
+        if sig_df[sig_df['network'] == net]['signif_holm'][i+10] == 'ns':
+            del sig_dict[net]
+
+# plot it
+times = np.linspace(-0.2, 0.6, 82)
+cmap = ['#0173B2','#DE8F05','#029E73','#D55E00','#CC78BC','#CA9161','#FBAFE4','#ECE133','#56B4E9', "#76B041"]
+fig, axes = plt.subplots(5, 2, figsize=(7, 9), sharey=True, sharex=True, layout="tight")
+for i, ax in enumerate(axes.flatten()):
+    ax.axvspan(0, 0.2, facecolor='grey', edgecolor=None, alpha=.1)
+    all_rhos = corr_rp[networks[i]]
+    sem = np.std(all_rhos, axis=0) / np.sqrt(all_rhos.shape[0])
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.axhline(0, color='black', alpha=1)
+    network = networks[i]
+    # Main plot
+    ax.plot(times, all_rhos.mean(0), alpha=1, zorder=10, color='C7')
+        # Plot significant regions separately
+    sig = sig_dict[network_names[i]] if network_names[i] in sig_dict else np.zeros(all_rhos.shape[1], dtype=bool)
+    for start, end in contiguous_regions(sig):
+        ax.plot(times[start:end], all_rhos.mean(0)[start:end], alpha=1, zorder=10, color=cmap[i])
+    ax.fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, alpha=0.2, zorder=5, facecolor='C7')
+    # Highlight significant regions
+    ax.fill_between(times, all_rhos.mean(0) - sem, all_rhos.mean(0) + sem, where=sig, alpha=0.5, zorder=5, color=cmap[i])
+    ax.set_title(network_names[i], fontsize=13, fontstyle='italic')
+    
+    if ax in axes[:, 0]:
+        ax.set_ylabel("Spearman's rho", fontsize=11)
+    
+    # Only set xlabel for axes in the bottom row
+    if i >= (axes.shape[0] - 1) * axes.shape[1]:
+        ax.set_xlabel("Time (s)", fontsize=11)
+    
+plt.savefig("/Users/coum/MEGAsync/figures/RSA/source/rsa_source_no_prac_corr.pdf", transparent=True)
+plt.close(fig)

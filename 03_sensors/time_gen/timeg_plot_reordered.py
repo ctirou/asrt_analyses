@@ -144,3 +144,14 @@ cbar2.set_label("Difference in\naccuracy", rotation=270, fontsize=13)
 
 fig.savefig(figure_dir / "orig_and_reord.pdf", transparent=True)
 plt.close()
+
+# diag = np.diag(contrast.mean(0))
+# pval_diag = np.diag(pval)
+# times[pval_diag < threshold]
+
+# plt.plot(times, diag, color='blue')
+# sig = pval_diag < threshold
+# for t in [-3, -1.5, 0, 1.5, 3]:
+#     plt.axvspan(t, t+0.2, color="grey", alpha=0.1)
+# plt.axhline(0, color="k")
+# plt.fill_between(times, diag, where=sig, color="blue", alpha=0.2)

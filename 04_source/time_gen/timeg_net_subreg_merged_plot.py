@@ -18,6 +18,7 @@ networks = ['SomMot', 'DorsAttn']
 parc = "Schaefer2018_200Parcels_7Networks"
 hemi = 'both'
 use_decode = False
+saving = True
 
 def natural_sort_key(name):
     return [int(n) for n in re.findall(r'\d+', name)]
@@ -100,7 +101,7 @@ for network in networks:
     n_rows = len(label_names)
     n_cols = 1
 
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(4.5, n_rows * 1.75),
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(4.5, n_rows * 2.25),
                              sharey=True, sharex=True, layout="tight")
     axes = np.array(axes).reshape(n_rows, n_cols)
 
@@ -114,9 +115,13 @@ for network in networks:
         if not use_decode:
             sig = sig_dict[lname] if lname in sig_dict else np.zeros(len(times), dtype=bool)
             sig_level_rows = sig_df[sig_df['label'] == lname]['signif_holm']
-            if len(sig_level_rows) > 0 and sig_level_rows.values[0] != 'ns':
-                ax.text(0.4, 0.1, sig_level_rows.values[0], fontsize=20,
-                        ha='center', va='bottom', color=color, weight='bold')
+            if len(times[sig]) > 0 and sig_level_rows.values[0] != 'ns':
+                if network == 'SomMot':
+                    ax.text(-0.25, 1, sig_level_rows.values[0], fontsize=20,
+                            ha='center', va='bottom', color=color, weight='bold')
+                else:
+                    ax.text(-0.25, 1.5, sig_level_rows.values[0], fontsize=20,
+                            ha='center', va='bottom', color=color, weight='bold')
         else:
             pval = decod_stats(data, -1)
             sig = pval < 0.05
@@ -129,7 +134,6 @@ for network in networks:
         ax.plot(times, mean, alpha=1, zorder=10, color='C7')
         for start, end in contiguous_regions(sig):
             ax.plot(times[start:end], mean[start:end], alpha=1, zorder=10, color=color)
-
 
         ax.fill_between(times, mean - sem, mean + sem, alpha=0.2, zorder=5, facecolor='C7')
         ax.fill_between(times, mean - sem, mean + sem, where=sig, alpha=0.5, zorder=5, color=color)
@@ -148,8 +152,9 @@ for network in networks:
 
     fig.suptitle(net_labels_map[network], fontsize=13, color=color)
     
-    fig.savefig(figures_dir / f"timeg-net-subreg-merged-{network}.pdf")
-    plt.close()
+    if saving:
+        fig.savefig(figures_dir / f"timeg-net-subreg-merged-{network}.pdf")
+        plt.close()
 
     # Save table per network with label column
     rows = []
@@ -164,4 +169,5 @@ for network in networks:
                     "value": data[j, t]
                 })
     df = pd.DataFrame(rows)
-    df.to_csv(FIGURES_DIR / "TM" / "data" / f'{network}_subreg_merged_pa_tr.csv', index=False, sep=",")
+    if saving:
+        df.to_csv(FIGURES_DIR / "TM" / "data" / f'{network}_subreg_merged_pa_tr.csv', index=False, sep=",")

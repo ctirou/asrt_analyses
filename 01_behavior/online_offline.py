@@ -238,6 +238,7 @@ idx = np.arange(int(start), int(end)+1)
 diff_rp_blocks = np.nanmean(diff_rp[:, :, idx], axis=(-1)) # shape (n_subjects, n_blocks)
 
 offline_rsa = np.diff(diff_rp_blocks, axis=1) # shape (n_subjects, n_blocks - 1)
+online_rsa = diff_rp_blocks.copy() # shape (n_subjects, n_blocks)
 
 # PA offline
 # --- Temporal generalization sensors --- blocks ---
@@ -277,6 +278,7 @@ for sub in range(len(subjects)):
 box_blocks = np.array(box_blocks)
 
 offline_pa = np.diff(box_blocks, axis=1)
+online_pa = box_blocks.copy()
 
 # plot all offlines
 
@@ -300,9 +302,9 @@ ax[0].plot(blocks[1:], mean_pa, color='blue', zorder=9, alpha=0.3)
 ax[0].plot(blocks[1:], gaussian_filter1d(mean_pa, sigma=2), color='blue', zorder=10, alpha=1)
 ax[0].fill_between(blocks[1:], mean_pa - sem, mean_pa + sem, color='blue', alpha=0.1)
 # Behavioral
-contrast_offline = offline_pattern - offline_random
-mean_beh = np.nanmean(contrast_offline, axis=0)
-sem = np.nanstd(contrast_offline, axis=0) / np.sqrt(n)
+offline_behav = offline_pattern - offline_random
+mean_beh = np.nanmean(offline_behav, axis=0)
+sem = np.nanstd(offline_behav, axis=0) / np.sqrt(n)
 ax[1].set_title('Behavior', fontstyle='italic')
 ax[1].plot(blocks[1:], mean_beh, color='purple', zorder=11, alpha=0.3)
 ax[1].plot(blocks[1:], gaussian_filter1d(mean_beh, sigma=2), color='purple', zorder=12, alpha=1)
@@ -317,40 +319,220 @@ ax[2].fill_between(blocks[1:], mean_rsa - sem, mean_rsa + sem, color='green', al
 ax[2].set_xlabel('Block')
 
 # compute correlation between PA and behavior
-from scipy.stats import spearmanr as spear
+from scipy.stats import ttest_1samp, spearmanr as spear
+online_behav = online_pattern - online_random
 
-all_rhos_pa = np.array([[spear(contrast_offline[sub], offline_pa[sub])[0]] for sub in range(len(subjects))])
-all_rhos_pa, _, _ = fisher_z_and_ttest(all_rhos_pa)
+offline_behav = offline_behav - np.nanmean(offline_behav, axis=0)
+online_behav = online_behav - np.nanmean(online_behav, axis=0)
+offline_pa = offline_pa - np.nanmean(offline_pa, axis=0)
+online_pa = online_pa - np.nanmean(online_pa, axis=0)
+offline_rsa = offline_rsa - np.nanmean(offline_rsa, axis=0)
+online_rsa = online_rsa - np.nanmean(online_rsa, axis=0)
 
-correlations_pa = []
-for block in range(22):
-    r, p = spearmanr(offline_pa[:, block], contrast_offline[:, block])
-    correlations_pa.append((r, p))
-correlations_pa = np.array(correlations_pa)
+offline_pattern = offline_pattern - np.nanmean(offline_pattern, axis=0)
+online_pattern = online_pattern - np.nanmean(online_pattern, axis=0)
 
-# compute correlation between RSA and behavior
-correlations_rsa = []
-for block in range(22):
-    r, p = spearmanr(offline_rsa[:, block], contrast_offline[:, block])
-    correlations_rsa.append((r, p))
-correlations_rsa = np.array(correlations_rsa)
+cmap = plt.cm.get_cmap('tab20', len(subjects))
 
-fig, ax = plt.subplots(1, 2, figsize=(10, 5), sharey=True, layout='tight')
+print("\n---\n")
+
+rhos_pa_off = np.array([[spear(offline_behav[sub], offline_pa[sub])[0]] for sub in range(len(subjects))])
+rhos_pa_off, _, _ = fisher_z_and_ttest(rhos_pa_off)
+pval_unc = ttest_1samp(rhos_pa_off, 0)[1]
+sig_unc = pval_unc < 0.05
+print(f"Offline - PA vs Behavior: r = {rhos_pa_off.mean():.3f}, p_unc = {pval_unc[0]:.3f}, sig_unc = {sig_unc[0]}")
+
+rhos_rsa_off = np.array([[spear(offline_behav[sub], offline_rsa[sub])[0]] for sub in range(len(subjects))])
+rhos_rsa_off, _, _ = fisher_z_and_ttest(rhos_rsa_off)
+pval_unc = ttest_1samp(rhos_rsa_off, 0)[1]
+sig_unc = pval_unc < 0.05
+print(f"Offline - RSA vs Behavior: r = {rhos_rsa_off.mean():.3f}, p_unc = {pval_unc[0]:.3f}, sig_unc = {sig_unc[0]}")
+
+rhos_pa_on = np.array([[spear(online_behav[sub, 1:], offline_pa[sub])[0]] for sub in range(len(subjects))])
+rhos_pa_on, _, _ = fisher_z_and_ttest(rhos_pa_on)
+pval_unc = ttest_1samp(rhos_pa_on, 0)[1]
+sig_unc = pval_unc < 0.05
+print(f"Online - PA vs Behavior: r = {rhos_pa_on.mean():.3f}, p_unc = {pval_unc[0]:.3f}, sig_unc = {sig_unc[0]}")
+
+rhos_rsa_on = np.array([[spear(online_behav[sub, 1:], offline_rsa[sub])[0]] for sub in range(len(subjects))])
+rhos_rsa_on, _, _ = fisher_z_and_ttest(rhos_rsa_on)
+pval_unc = ttest_1samp(rhos_rsa_on, 0)[1]
+sig_unc = pval_unc < 0.05
+print(f"Online - RSA vs Behavior: r = {rhos_rsa_on.mean():.3f}, p_unc = {pval_unc[0]:.3f}, sig_unc = {sig_unc[0]}")
+
+
+
+rhos_pa_pat = np.array([[spear(offline_pa[sub], offline_pattern[sub])[0]] for sub in range(len(subjects))])
+rhos_pa_pat, _, _ = fisher_z_and_ttest(rhos_pa_pat)
+pval_unc = ttest_1samp(rhos_pa_pat, 0)[1]
+sig_unc = pval_unc < 0.05
+print(f"Offline - PA vs Pattern: r = {rhos_pa_pat.mean():.3f}, p_unc = {pval_unc[0]:.3f}, sig_unc = {sig_unc[0]}")
+
+rhos_rsa_pat = np.array([[spear(offline_rsa[sub], offline_pattern[sub])[0]] for sub in range(len(subjects))])
+rhos_rsa_pat, _, _ = fisher_z_and_ttest(rhos_rsa_pat)
+pval_unc = ttest_1samp(rhos_rsa_pat, 0)[1]
+sig_unc = pval_unc < 0.05
+print(f"Offline - RSA vs Pattern: r = {rhos_rsa_pat.mean():.3f}, p_unc = {pval_unc[0]:.3f}, sig_unc = {sig_unc[0]}")
+
+# Mecha vs pattern
+fig, ax = plt.subplots(2, 1, figsize=(10, 6), sharey=True, layout='tight')
 for axx in ax.flatten():
     axx.spines['top'].set_visible(False)
     axx.spines['right'].set_visible(False)
-    axx.grid(alpha=0.2, linestyle='--', color='gray', linewidth=0.5)
-    axx.grid(True, which='minor', alpha=0.1, linestyle=':', color='gray', linewidth=0.3)
-    axx.set_xticks(blocks[1::2])
+# PA vs pattern offline
+slopes, intercepts = [], []
+for sub in range(len(subjects)):
+    x = offline_pa[sub]
+    y = offline_pattern[sub]
+    slope, intercept = np.polyfit(x, y, 1)
+    ax[0].scatter(x, y, alpha=0.3)
+    ax[0].plot(x, slope * x + intercept, alpha=0.6)
+    slopes.append(slope)
+    intercepts.append(intercept)
+rangee = np.linspace(offline_pa.min(), offline_pa.max(), 100)
+mean_slope = np.mean(slopes)
+mean_intercept = np.mean(intercepts)
+ax[0].plot(rangee, mean_slope * rangee + mean_intercept, color='blue', lw=4, label='Mean fit')
+ax[0].set_title('Offline - PA vs Pattern', fontstyle='italic')
+ax[0].set_xlabel('PA')
+ax[0].set_ylabel('Pattern')
+# RSA vs pattern offline
+slopes, intercepts = [], []
+for sub in range(len(subjects)):
+    x = offline_rsa[sub]
+    y = offline_pattern[sub]
+    slope, intercept = np.polyfit(x, y, 1)
+    ax[1].scatter(x, y, alpha=0.3)
+    ax[1].plot(x, slope * x + intercept, alpha=0.6)
+    slopes.append(slope)
+    intercepts.append(intercept)
+rangee = np.linspace(offline_rsa.min(), offline_rsa.max(), 100)
+mean_slope = np.mean(slopes)
+mean_intercept = np.mean(intercepts)
+ax[1].plot(rangee, mean_slope * rangee + mean_intercept, color='blue', lw=4, label='Mean fit')
+ax[1].set_title('Offline - RSA vs Pattern', fontstyle='italic')
+ax[1].set_xlabel('RSA')
+ax[1].set_ylabel('Pattern') 
 
-# PA vs behavior
-ax[0].set_title('PA vs Behavior', fontstyle='italic')
-ax[0].plot(blocks[1:], correlations_pa[:, 0], color='blue', zorder=10, alpha=1)
-ax[0].fill_between(blocks[1:], correlations_pa[:, 0] - correlations_pa[:, 1], correlations_pa[:, 0] + correlations_pa[:, 1], color='blue', alpha=0.1)
 
-# RSA vs behavior
-ax[1].set_title('RSA vs Behavior', fontstyle='italic')
-ax[1].plot(blocks[1:], correlations_rsa[:, 0], color='green', zorder=10, alpha=1)
-ax[1].fill_between(blocks[1:], correlations_rsa[:, 0] - correlations_rsa[:, 1], correlations_rsa[:, 0] + correlations_rsa[:, 1], color='green', alpha=0.1)
+# Mecha vs behavior
+fig, ax = plt.subplots(2, 2, figsize=(10, 6), sharey=True, layout='tight')
+for axx in ax.flatten():
+    axx.spines['top'].set_visible(False)
+    axx.spines['right'].set_visible(False)
 
-ax[1].set_xlabel('Block')
+# PA vs behavior offline
+slopes, intercepts = [], []
+for sub in range(len(subjects)):
+    x = offline_pa[sub]
+    y = offline_behav[sub]
+    slope, intercept = np.polyfit(x, y, 1)
+    ax[0, 0].scatter(x, y, alpha=0.3)
+    ax[0, 0].plot(x, slope * x + intercept, alpha=0.6)
+    slopes.append(slope)
+    intercepts.append(intercept)
+rangee = np.linspace(offline_pa.min(), offline_pa.max(), 100)
+mean_slope = np.mean(slopes)
+mean_intercept = np.mean(intercepts)
+ax[0, 0].plot(rangee, mean_slope * rangee + mean_intercept, color='blue', lw=4, label='Mean fit')
+ax[0, 0].set_title('Offline - PA vs Behavior', fontstyle='italic')
+ax[0, 0].set_xlabel('PA')
+ax[0, 0].set_ylabel('Behavior')
+
+# RSA vs behavior offline
+slopes, intercepts = [], []
+for sub in range(len(subjects)):
+    x = offline_rsa[sub]
+    y = offline_behav[sub]
+    slope, intercept = np.polyfit(x, y, 1)
+    ax[0, 1].scatter(x, y, alpha=0.3)
+    ax[0, 1].plot(x, slope * x + intercept, alpha=0.6)
+    slopes.append(slope)
+    intercepts.append(intercept)
+rangee = np.linspace(offline_rsa.min(), offline_rsa.max(), 100)
+mean_slope = np.mean(slopes)
+mean_intercept = np.mean(intercepts)
+ax[0, 1].plot(rangee, mean_slope * rangee + mean_intercept, color='blue', lw=4, label='Mean fit')
+ax[0, 1].set_title('Offline - RSA vs Behavior', fontstyle='italic')
+ax[0, 1].set_xlabel('RSA')
+ax[0, 1].set_ylabel('Behavior')
+
+# PA vs behavior online
+slopes, intercepts = [], []
+for sub in range(len(subjects)):
+    x = offline_pa[sub]
+    y = online_behav[sub, 1:]
+    slope, intercept = np.polyfit(x, y, 1)
+    ax[1, 0].scatter(x, y, alpha=0.3)
+    ax[1, 0].plot(x, slope * x + intercept, alpha=0.6)
+    slopes.append(slope)
+    intercepts.append(intercept)
+rangee = np.linspace(offline_pa.min(), offline_pa.max(), 100)
+mean_slope = np.mean(slopes)
+mean_intercept = np.mean(intercepts)
+ax[1, 0].plot(rangee, mean_slope * rangee + mean_intercept, color='green', lw=4, label='Mean fit')
+ax[1, 0].set_title('Online - PA vs Behavior', fontstyle='italic')
+ax[1, 0].set_xlabel('PA')
+ax[1, 0].set_ylabel('Behavior')
+
+# RSA vs behavior online
+slopes, intercepts = [], []
+for sub in range(len(subjects)):
+    x = offline_rsa[sub]
+    y = online_behav[sub, 1:]
+    slope, intercept = np.polyfit(x, y, 1)
+    ax[1, 1].scatter(x, y, alpha=0.3)
+    ax[1, 1].plot(x, slope * x + intercept, alpha=0.6)
+    slopes.append(slope)
+    intercepts.append(intercept)
+rangee = np.linspace(offline_rsa.min(), offline_rsa.max(), 100)
+mean_slope = np.mean(slopes)
+mean_intercept = np.mean(intercepts)
+ax[1, 1].plot(rangee, mean_slope * rangee + mean_intercept, color='green', lw=4, label='Mean fit')
+ax[1, 1].set_title('Online - RSA vs Behavior', fontstyle='italic')
+ax[1, 1].set_xlabel('RSA')
+ax[1, 1].set_ylabel('Behavior')
+
+if saving:
+    fig.savefig(figures_dir / 'online_offline_scatter.png', dpi=300)
+    plt.close()
+
+# Correlate online measures and offline behavior within subjects
+rhos_pa_on_beh = np.array([[spear(offline_behav[sub], online_pa[sub, 1:])[0]] for sub in range(len(subjects))])
+rhos_rsa_on_beh = np.array([[spear(offline_behav[sub], online_rsa[sub, 1:])[0]] for sub in range(len(subjects))])
+rhos_pa_on_beh, _, _ = fisher_z_and_ttest(rhos_pa_on_beh)
+rhos_rsa_on_beh, _, _ = fisher_z_and_ttest(rhos_rsa_on_beh)
+pval_pa = ttest_1samp(rhos_pa_on_beh, 0)[1]
+pval_rsa = ttest_1samp(rhos_rsa_on_beh, 0)[1]
+sig_pa = pval_pa < 0.05
+sig_rsa = pval_rsa < 0.05
+print("\n---\n")
+print(f"Online PA vs Offline Behavior: r = {rhos_pa_on_beh.mean():.3f}, p = {pval_pa[0]:.3f}, sig = {sig_pa[0]}")
+print(f"Online RSA vs Offline Behavior: r = {rhos_rsa_on_beh.mean():.3f}, p = {pval_rsa[0]:.3f}, sig = {sig_rsa[0]}")
+
+
+# Flatten all data for correlation
+offline_pa_flat = offline_pa.flatten()
+offline_rsa_flat = offline_rsa.flatten()
+offline_behav_flat = offline_behav.flatten()
+
+online_pa_flat = online_pa.flatten()
+online_rsa_flat = online_rsa.flatten()
+online_behav_flat = online_behav[:, 1:].flatten()
+
+print("\n---\n")
+flat_rhos_pa_off, pval = spear(offline_behav_flat, offline_pa_flat)[0], spear(offline_behav_flat, offline_pa_flat)[1]
+print(f"Offline - PA vs Behavior (flat): r = {flat_rhos_pa_off:.3f}, p = {pval:.3f}")
+flat_rhos_rsa_off, pval = spear(offline_behav_flat, offline_rsa_flat)[0], spear(offline_behav_flat, offline_rsa_flat)[1]
+print(f"Offline - RSA vs Behavior (flat): r = {flat_rhos_rsa_off:.3f}, p = {pval:.3f}")
+
+flat_rhos_pa_on, pval = spear(online_behav_flat, offline_pa_flat)[0], spear(online_behav_flat, offline_pa_flat)[1]
+print(f"Online - PA vs Behavior (flat): r = {flat_rhos_pa_on:.3f}, p = {pval:.3f}")
+flat_rhos_rsa_on, pval = spear(online_behav_flat, offline_rsa_flat)[0], spear(online_behav_flat, offline_rsa_flat)[1]
+print(f"Online - RSA vs Behavior (flat): r = {flat_rhos_rsa_on:.3f}, p = {pval:.3f}")
+
+flat_rhos_pa_pat_off, pval = spear(offline_pattern.flatten(), offline_pa_flat)[0], spear(offline_pattern.flatten(), offline_pa_flat)[1]
+print(f"Offline - Pattern vs PA (flat): r = {flat_rhos_pa_pat_off:.3f}, p = {pval:.3f}")
+
+flat_rhos_rsa_pat_off, pval = spear(offline_pattern.flatten(), offline_rsa_flat)[0], spear(offline_pattern.flatten(), offline_rsa_flat)[1]
+print(f"Offline - Pattern vs RSA (flat): r = {flat_rhos_rsa_pat_off:.3f}, p = {pval:.3f}")
