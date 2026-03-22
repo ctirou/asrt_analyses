@@ -125,3 +125,19 @@ ax2.set_title("Block level effects")
 
 plt.savefig(figure_dir / "timeg_opt_block_supp.pdf", dpi=300, transparent=True)
 plt.close()
+
+# export table of block-level effects
+for effect, data, fname in [
+    ("sharpening", sharp, "timeg_sensors_sharp_br.csv"),
+    ("dampening", damp, "timeg_sensors_damp_br.csv"),
+]:
+    rows = list()
+    for i, subject in enumerate(subjects):
+        for block in range(data.shape[1]):
+            rows.append({
+                "subject": subject,
+                "block": block + 1,
+                "value": data[i, block]
+            })
+    df = pd.DataFrame(rows)
+    df.to_csv(FIGURES_DIR / "TM" / "data" / fname, index=False, sep=",")
