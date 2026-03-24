@@ -113,7 +113,8 @@ for subject in tqdm(subjects):
         nblocks = np.unique(behav_df.block)
         for block in nblocks:
             
-            idx = "0" + str(block) if i == 0 else str(block)
+            # idx = "0" + str(block) if i == 0 else str(block)
+            idx = str(block+3) if i != 0 else str(block)
 
             learn_index_blocks_d[subject][idx] = 0
             pattern_blocks[subject][idx] = 0
@@ -130,17 +131,17 @@ for subject in tqdm(subjects):
                     elif behav_df.triplet[j] == 32:
                         rand.append(behav_df.RT[j])
                     if i == 0:
-                        if behav_df.trialtype[j] == 1:
-                            one.append(behav_df.RT[j])
-                        elif behav_df.trialtype[j] == 2:
+                        if behav_df.trialtype[j] == 1: # pattern
+                             one.append(behav_df.RT[j])
+                        elif behav_df.trialtype[j] == 2: # random
                             two.append(behav_df.RT[j])
             
             index = np.mean(rand) - np.mean(pat)
             prac_index = np.mean(two) - np.mean(one) if i == 0 else 0
-            learn_index_blocks_d[subject][idx] = index if idx not in ['01', '02', '03'] else prac_index
+            learn_index_blocks_d[subject][idx] = index if idx not in ['1', '2', '3'] else prac_index
             
-            pattern_blocks[subject][idx] = np.mean(pat) if idx not in ['01', '02', '03'] else np.mean(one)
-            random_high_blocks[subject][idx] = np.mean(rand) if idx not in ['01', '02', '03'] else np.mean(two)
+            pattern_blocks[subject][idx] = np.mean(pat) if idx not in ['1', '2', '3'] else np.mean(one)
+            random_high_blocks[subject][idx] = np.mean(rand) if idx not in ['1', '2', '3'] else np.mean(two)
             all_blocks[subject][idx] = np.mean(all_of_them)
 
 color1 = "#FFD966"
@@ -166,7 +167,8 @@ if not op.exists(figures_dir / 'behav' / 'all_blocks.csv'):
 plt.rcParams.update({'font.family': 'serif', 'font.serif': 'Arial'})
 fig, ax = plt.subplots(1, 1, figsize=(6, 6), layout="tight")
 ax.autoscale()
-blocks = ['01', '02', '03'] + [str(i) for i in range(1, 21)]
+# blocks = ['01', '02', '03'] + [str(i) for i in range(1, 21)]
+blocks = [str(i) for i in range(1, 24)]
 x = np.arange(len(blocks))  
 width = 0.3
 # Reaction times
@@ -176,7 +178,7 @@ for subject in subjects:
         # All (center, no dodge)
         ax.scatter(xpos, all_blocks_df.loc[subject][i],
                    color='grey', marker=".", alpha=0.2)
-        if i not in ['01', '02', '03']:
+        if i not in ['1', '2', '3']:
             # Pattern (dodged left)
             ax.scatter(xpos - width, pattern_blocks_df.loc[subject][i],
                        color=color1, marker=".", alpha=0.3)
@@ -189,7 +191,7 @@ ax.plot(x[3:] - width, pattern_blocks_df.mean(axis=0)[3:], '-o',
         color=color1, label="Pattern", markersize=7, alpha=1)
 ax.plot(x[3:] + width, random_high_blocks_df.mean(axis=0)[3:], '-o',
         color=color2, label="Random", markersize=7, alpha=1)
-ax.legend(loc='lower left', frameon=False, title=f"n = {n}")
+ax.legend(loc='lower left', frameon=False, title=f"N = {n}")
 ax.set_ylabel("Reaction time (ms)", fontsize=12)
 ax.spines['top'].set_visible(False)
 ax.spines['right'].set_visible(False)
@@ -211,51 +213,51 @@ axlow.set_xlabel("Block", fontsize=12)
 fig.savefig(figures_dir / 'behav' / 'combined_blocks.pdf', transparent=True)
 plt.close()
 
-# ----------------------------------- USING RUNS -----------------------------------
-# Save session learning indices to CSV
-learn_index_df = pd.DataFrame.from_dict(learn_index_dict, orient='index')
-if not op.exists(figures_dir / 'behav' / 'learning_indices_runs.csv'):
-    learn_index_df.to_csv(figures_dir / 'behav' / 'learning_indices_runs.csv', sep='\t')
+# # ----------------------------------- USING RUNS -----------------------------------
+# # Save session learning indices to CSV
+# learn_index_df = pd.DataFrame.from_dict(learn_index_dict, orient='index')
+# if not op.exists(figures_dir / 'behav' / 'learning_indices_runs.csv'):
+#     learn_index_df.to_csv(figures_dir / 'behav' / 'learning_indices_runs.csv', sep='\t')
 
-# Calculate means and standard errors
-mean_all = [np.mean(all_RT[f'Epoch_{i}']) for i in range(5)]
-stderr_all = [np.std(all_RT[f'Epoch_{i}']) / np.sqrt(n) for i in range(5)]
-mean_pattern = [np.mean(pattern_RT[f'Epoch_{i}']) for i in range(1, 5)]
-stderr_pattern = [np.std(pattern_RT[f'Epoch_{i}']) / np.sqrt(n) for i in range(1, 5)]
-mean_random_high = [np.mean(random_high_RT[f'Epoch_{i}']) for i in range(1, 5)]
-stderr_random_high = [np.std(random_high_RT[f'Epoch_{i}']) / np.sqrt(n) for i in range(1, 5)]
-mean_random_low = [np.mean(random_low_RT[f'Epoch_{i}']) for i in range(5)]
-stderr_random_low = [np.std(random_low_RT[f'Epoch_{i}']) / np.sqrt(n) for i in range(5)]
+# # Calculate means and standard errors
+# mean_all = [np.mean(all_RT[f'Epoch_{i}']) for i in range(5)]
+# stderr_all = [np.std(all_RT[f'Epoch_{i}']) / np.sqrt(n) for i in range(5)]
+# mean_pattern = [np.mean(pattern_RT[f'Epoch_{i}']) for i in range(1, 5)]
+# stderr_pattern = [np.std(pattern_RT[f'Epoch_{i}']) / np.sqrt(n) for i in range(1, 5)]
+# mean_random_high = [np.mean(random_high_RT[f'Epoch_{i}']) for i in range(1, 5)]
+# stderr_random_high = [np.std(random_high_RT[f'Epoch_{i}']) / np.sqrt(n) for i in range(1, 5)]
+# mean_random_low = [np.mean(random_low_RT[f'Epoch_{i}']) for i in range(5)]
+# stderr_random_low = [np.std(random_low_RT[f'Epoch_{i}']) / np.sqrt(n) for i in range(5)]
 
-# Combined RT and learning index
-fig, ax = plt.subplots(1, 1, figsize=(6, 6), layout="tight")
-plt.rcParams.update({'font.family': 'serif', 'font.serif': 'Arial'})
-ax.autoscale()
-for subject in subjects:
-    for i in range(5):
-        ax.scatter(str(i), subdict[subject][i]["all"], color=color3, marker=".", alpha=0.3)
-        if i > 0:
-            ax.scatter(str(i), subdict[subject][i]["pattern"], color=color1, marker=".", alpha=0.4)
-            ax.scatter(str(i), subdict[subject][i]["random_high"], color=color2, marker=".", alpha=0.4)
-ax.plot(sessions, mean_all, '-o', color=color3, label="All", markersize=7, alpha=.7)
-ax.plot(sessions[1:], mean_pattern, '-o', color=color1, label="Pattern", markersize=7, alpha=1)
-ax.plot(sessions[1:], mean_random_high, '-o', color=color2, label="Random", markersize=7, alpha=1)
-ax.legend(loc='lower left', frameon=False, title=f"n = {n}")
-ax.set_ylabel("Reaction time (ms)", fontsize=12)
-ax.spines['top'].set_visible(False)
-ax.spines['right'].set_visible(False)
-ax.xaxis.set_tick_params(labelbottom=False)
-divider = make_axes_locatable(ax)
-axlow = divider.append_axes("bottom", 1.2, pad=0.4, sharex=ax)
-axlow.autoscale()
-learning_indices_mean = learn_index_df.mean(axis=0)
-learning_indices_stderr = learn_index_df.sem(axis=0)
-bar_width = 0.5
-axlow.bar(sessions, learning_indices_mean, yerr=learning_indices_stderr, alpha=0.7, capsize=5, color="#029E73", width=bar_width)
-axlow.set_ylabel("Learning index (ms)", fontsize=12)
-axlow.spines['top'].set_visible(False)
-axlow.spines['right'].set_visible(False)
-axlow.set_xticklabels(['Practice', '1', '2', '3', '4'])
-axlow.set_xlabel("Run", fontsize=12)
-fig.savefig(figures_dir / 'behav' / 'combined_runs.pdf', transparent=True)
-plt.close()
+# # Combined RT and learning index
+# fig, ax = plt.subplots(1, 1, figsize=(6, 6), layout="tight")
+# plt.rcParams.update({'font.family': 'serif', 'font.serif': 'Arial'})
+# ax.autoscale()
+# for subject in subjects:
+#     for i in range(5):
+#         ax.scatter(str(i), subdict[subject][i]["all"], color=color3, marker=".", alpha=0.3)
+#         if i > 0:
+#             ax.scatter(str(i), subdict[subject][i]["pattern"], color=color1, marker=".", alpha=0.4)
+#             ax.scatter(str(i), subdict[subject][i]["random_high"], color=color2, marker=".", alpha=0.4)
+# ax.plot(sessions, mean_all, '-o', color=color3, label="All", markersize=7, alpha=.7)
+# ax.plot(sessions[1:], mean_pattern, '-o', color=color1, label="Pattern", markersize=7, alpha=1)
+# ax.plot(sessions[1:], mean_random_high, '-o', color=color2, label="Random", markersize=7, alpha=1)
+# ax.legend(loc='lower left', frameon=False, title=f"n = {n}")
+# ax.set_ylabel("Reaction time (ms)", fontsize=12)
+# ax.spines['top'].set_visible(False)
+# ax.spines['right'].set_visible(False)
+# ax.xaxis.set_tick_params(labelbottom=False)
+# divider = make_axes_locatable(ax)
+# axlow = divider.append_axes("bottom", 1.2, pad=0.4, sharex=ax)
+# axlow.autoscale()
+# learning_indices_mean = learn_index_df.mean(axis=0)
+# learning_indices_stderr = learn_index_df.sem(axis=0)
+# bar_width = 0.5
+# axlow.bar(sessions, learning_indices_mean, yerr=learning_indices_stderr, alpha=0.7, capsize=5, color="#029E73", width=bar_width)
+# axlow.set_ylabel("Learning index (ms)", fontsize=12)
+# axlow.spines['top'].set_visible(False)
+# axlow.spines['right'].set_visible(False)
+# axlow.set_xticklabels(['Practice', '1', '2', '3', '4'])
+# axlow.set_xlabel("Run", fontsize=12)
+# fig.savefig(figures_dir / 'behav' / 'combined_runs.pdf', transparent=True)
+# plt.close()
