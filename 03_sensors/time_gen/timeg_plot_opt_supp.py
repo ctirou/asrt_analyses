@@ -92,19 +92,21 @@ hw = 3  # half-window size for min2
 idx_02 = np.sum(times[win] <= 0.2) - 1 # last index at 0.2s
 ax1b.axvspan(0, 0.2, color="lightgray", alpha=0.2)
 ax1b.axhline(0, color="grey", linestyle="-", alpha=0.5)
+idxx = np.where((times[win] >= 0.16) & (times[win] <= 0.26))[0]
+ax1b.axvspan(times[win][idxx[0]], times[win][idxx[-1]], facecolor="b", alpha=0.2, label='p < 0.0001')
+ax1b.axvspan(times[win][max(0, min2 + np.sum(times[win] <= 0.2) - hw)],
+             times[win][min2 + np.sum(times[win] <= 0.2) + hw], facecolor="r", alpha=0.2, label='ns')
 ax1b.plot(times[win], contrast_mean.mean(0), color="g")
 ax1b.fill_between(times[win], contrast_mean.mean(0) - contrast_mean.std(0) / np.sqrt(n),
                   contrast_mean.mean(0) + contrast_mean.std(0) / np.sqrt(n), alpha=0.2, color="g")
-ax1b.axvspan(times[win][max1], times[win][idx_02], facecolor="b", alpha=0.2)
-ax1b.axvspan(times[win][max(0, min2 + np.sum(times[win] <= 0.2) - hw)],
-             times[win][min2 + np.sum(times[win] <= 0.2) + hw], facecolor="r", alpha=0.2)
 ax1b.set_xlabel("Time (s)")
 ax1b.set_ylabel("Diff. in accuracy (%)")
+ax1b.legend(fontsize=9, frameon=False)
 
 # right: block level
 max1_idx = max1
 min2_idx = min2 + np.sum(times[win] <= 0.2)
-sharp = contrast[..., max1_idx:idx_02 + 1].mean(-1)
+sharp = contrast[..., idxx[0]:idxx[-1]].mean(-1)
 damp = contrast[..., max(0, min2_idx - hw):min2_idx + hw + 1].mean(-1) * (-1)
 blocks = np.arange(1, 24)
 sigma = 1.5  # smoothing kernel width (in blocks)
